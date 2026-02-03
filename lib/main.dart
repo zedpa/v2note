@@ -1,4 +1,5 @@
 ﻿import 'package:flutter/material.dart';
+import 'package:v2note/ui/timeline_item.dart';
 
 void main() {
   runApp(const V2NoteApp());
@@ -21,9 +22,19 @@ class TimelineScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final items = const [
+      TimelineItem(summary: 'First note', tags: ['work', 'idea']),
+      TimelineItem(summary: 'Second note', tags: ['todo']),
+    ];
+
     return Scaffold(
       appBar: AppBar(title: const Text('Timeline')),
-      body: const Center(child: Text('Timeline Feed')),
+      body: ListView.separated(
+        padding: const EdgeInsets.all(12),
+        itemBuilder: (context, index) => items[index],
+        separatorBuilder: (context, index) => const SizedBox(height: 8),
+        itemCount: items.length,
+      ),
     );
   }
 }
