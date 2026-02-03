@@ -1,5 +1,6 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:v2note/ui/timeline_item.dart';
+import 'package:v2note/ui/weekly_review_card.dart';
 
 void main() {
   runApp(const V2NoteApp());
@@ -23,6 +24,7 @@ class TimelineScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final items = const [
+      WeeklyReviewCard(title: 'Weekly Review', summary: 'Great progress this week'),
       TimelineItem(summary: 'First note', tags: ['work', 'idea']),
       TimelineItem(summary: 'Second note', tags: ['todo']),
     ];
