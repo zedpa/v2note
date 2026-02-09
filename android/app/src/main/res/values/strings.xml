@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">VoiceNote</string>
+    <string name="title_activity_main">VoiceNote</string>
+    <string name="package_name">com.v2note.app</string>
+    <string name="custom_url_scheme">com.v2note.app</string>
+</resources>
