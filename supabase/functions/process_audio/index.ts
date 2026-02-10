@@ -1,5 +1,11 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
+};
+
 export type ProcessAudioPayload = {
   audio_url: string;
   record_id: string;
@@ -64,6 +70,7 @@ const submitAsrTask = async (audioUrl: string, language: string | undefined, dep
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${deps.env.ASR_API_KEY}`,
+      "X-DashScope-Async": "enable",
     },
     body: JSON.stringify(body),
   });
@@ -105,15 +112,36 @@ const pollAsrResult = async (taskId: string, deps: Deps): Promise<string> => {
     const status = json.output?.task_status;
 
     if (status === "SUCCEEDED") {
-      // Extract transcript from results
+      // DashScope file transcription returns a transcription_url to download
       const results = json.output?.results;
       if (Array.isArray(results) && results.length > 0) {
-        const transcripts = results[0]?.transcription_result?.sentences;
-        if (Array.isArray(transcripts)) {
-          return transcripts.map((s: { text: string }) => s.text).join("");
+        const transcriptionUrl = results[0]?.transcription_url;
+        if (transcriptionUrl) {
+          // Download the transcription result JSON
+          const trRes = await deps.fetch(transcriptionUrl);
+          if (!trRes.ok) {
+            throw new Error(`Failed to download transcription result (${trRes.status})`);
+          }
+          const trJson = await trRes.json();
+          // Parse transcripts array
+          const transcripts = trJson.transcripts;
+          if (Array.isArray(transcripts) && transcripts.length > 0) {
+            // Try full text first, then join sentences
+            if (transcripts[0]?.text) {
+              return transcripts[0].text;
+            }
+            const sentences = transcripts[0]?.sentences;
+            if (Array.isArray(sentences)) {
+              return sentences.map((s: { text: string }) => s.text).join("");
+            }
+          }
         }
-        // Fallback: try text field directly
-        return results[0]?.transcription_result?.text ?? "";
+        // Fallback: try inline result (older API format)
+        const inlineResult = results[0]?.transcription_result;
+        if (inlineResult?.text) return inlineResult.text;
+        if (Array.isArray(inlineResult?.sentences)) {
+          return inlineResult.sentences.map((s: { text: string }) => s.text).join("");
+        }
       }
       return "";
     }
@@ -134,7 +162,52 @@ const callAsr = async (audioUrl: string, language: string | undefined, deps: Dep
   return await pollAsrResult(taskId, deps);
 };
 
-const callOpenAi = async (transcript: string, deps: Deps): Promise<Omit<ProcessAudioResult, "transcript">> => {
+// Fetch existing tags for the device that owns this record
+const fetchDeviceTags = async (recordId: string, deps: Deps): Promise<string[]> => {
+  const baseUrl = deps.env.SUPABASE_URL;
+  const headers = {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${deps.env.SUPABASE_SERVICE_ROLE_KEY}`,
+    apikey: deps.env.SUPABASE_SERVICE_ROLE_KEY,
+  };
+
+  // Get device_id from record
+  const recRes = await deps.fetch(
+    `${baseUrl}/rest/v1/record?id=eq.${recordId}&select=device_id`,
+    { headers },
+  );
+  const recData = await recRes.json();
+  const deviceId = Array.isArray(recData) ? recData[0]?.device_id : null;
+  if (!deviceId) return [];
+
+  // Get all record IDs for this device
+  const recsRes = await deps.fetch(
+    `${baseUrl}/rest/v1/record?device_id=eq.${deviceId}&select=id`,
+    { headers },
+  );
+  const recsData = await recsRes.json();
+  const recordIds: string[] = (Array.isArray(recsData) ? recsData : []).map((r: any) => r.id);
+  if (recordIds.length === 0) return [];
+
+  // Get unique tag names via record_tag + tag join
+  const rtRes = await deps.fetch(
+    `${baseUrl}/rest/v1/record_tag?record_id=in.(${recordIds.join(",")})&select=tag:tag_id(name)`,
+    { headers },
+  );
+  const rtData = await rtRes.json();
+  const tagNames = new Set<string>();
+  for (const rt of (Array.isArray(rtData) ? rtData : [])) {
+    const name = rt.tag?.name;
+    if (name) tagNames.add(name);
+  }
+  return Array.from(tagNames);
+};
+
+const callOpenAi = async (transcript: string, existingTags: string[], deps: Deps): Promise<Omit<ProcessAudioResult, "transcript">> => {
+  const tagsHint = existingTags.length > 0
+    ? `\n- 优先从用户已有标签中选择：[${existingTags.join("、")}]`
+    : "";
+
   const systemPrompt = `你是一个语音笔记助手。分析用户的语音转录文本，提取结构化信息。
 请返回 JSON 格式（不要包含 markdown 代码块标记）：
 {
@@ -148,9 +221,13 @@ const callOpenAi = async (transcript: string, deps: Deps): Promise<Omit<ProcessA
 规则：
 - title: 概括核心内容的简短标题
 - summary: 简洁概括语音内容
-- tags: 1-5个相关标签，使用中文
+- tags: 1-3个概括性分类标签，使用中文
+- 标签应为宏观分类（如"工作"、"学习"、"生活"、"健康"、"理财"），而非具体事件描述${tagsHint}
+- 仅当内容明确不属于任何已有标签时，才创建新标签
 - todos: 提取文本中提到的任何待办/行动事项，没有则为空数组
-- ideas: 提取有价值的想法或灵感，没有则为空数组`;
+- ideas: 仅提取真正有创意、有启发性的想法或灵感
+- 日常事务记录（如买菜、开会、通勤等流水账）不需要生成灵感，返回空数组
+- 只有当内容包含独特见解、创新思路、值得深入思考的观点时，才提取为灵感`;
 
   const res = await deps.fetch(`${deps.env.OPENAI_URL}/chat/completions`, {
     method: "POST",
@@ -312,7 +389,18 @@ export const processAudio = async (
   }
 
   const transcript = await callAsr(payload.audio_url, payload.language, deps);
-  const analysis = await callOpenAi(transcript, deps);
+
+  // Fetch existing tags for this device to encourage reuse
+  let existingTags: string[] = [];
+  if (deps.env.SUPABASE_URL && deps.env.SUPABASE_SERVICE_ROLE_KEY) {
+    try {
+      existingTags = await fetchDeviceTags(payload.record_id, deps);
+    } catch {
+      // Non-critical: proceed without existing tags
+    }
+  }
+
+  const analysis = await callOpenAi(transcript, existingTags, deps);
 
   const result: ProcessAudioResult = {
     transcript,
@@ -328,11 +416,16 @@ export const processAudio = async (
 };
 
 export const handler = async (req: Request, deps: Deps) => {
+  // Handle CORS preflight
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
+  }
+
   try {
     const body = (await req.json()) as ProcessAudioPayload;
     const result = await processAudio(body, deps);
     return new Response(JSON.stringify(result), {
-      headers: { "Content-Type": "application/json" },
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
@@ -361,7 +454,7 @@ export const handler = async (req: Request, deps: Deps) => {
 
     return new Response(JSON.stringify({ error: message }), {
       status,
-      headers: { "Content-Type": "application/json" },
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 };

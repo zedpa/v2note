@@ -1,5 +1,11 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
+};
+
 interface WeeklyReviewPayload {
   device_id: string;
   week_start?: string; // ISO date, defaults to last Monday
@@ -7,13 +13,17 @@ interface WeeklyReviewPayload {
 }
 
 serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
+  }
+
   try {
     const body = (await req.json().catch(() => ({}))) as WeeklyReviewPayload;
 
     if (!body.device_id) {
       return new Response(JSON.stringify({ error: "device_id is required" }), {
         status: 400,
-        headers: { "Content-Type": "application/json" },
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
@@ -155,13 +165,13 @@ ${ideaTexts.join("\n") || "无"}
     const result = await upsertRes.json();
 
     return new Response(JSON.stringify({ ok: true, review: result }), {
-      headers: { "Content-Type": "application/json" },
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
     return new Response(JSON.stringify({ error: message }), {
       status: 500,
-      headers: { "Content-Type": "application/json" },
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 });

@@ -3,6 +3,7 @@
 import { X, Clock, MapPin, Tag, CheckSquare, Lightbulb, FileText } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useNoteDetail } from "@/hooks/use-note-detail";
+import { SwipeBack } from "./swipe-back";
 
 interface NoteDetailProps {
   recordId: string;
@@ -14,7 +15,7 @@ export function NoteDetail({ recordId, onClose }: NoteDetailProps) {
 
   if (loading) {
     return (
-      <div className="fixed inset-0 z-50 bg-background">
+      <SwipeBack onClose={onClose}>
         <div className="flex items-center justify-between p-4">
           <button type="button" onClick={onClose} className="p-2 rounded-xl bg-secondary">
             <X className="w-5 h-5" />
@@ -25,7 +26,7 @@ export function NoteDetail({ recordId, onClose }: NoteDetailProps) {
           <div className="h-4 bg-secondary rounded w-1/2" />
           <div className="h-20 bg-secondary rounded" />
         </div>
-      </div>
+      </SwipeBack>
     );
   }
 
@@ -37,7 +38,7 @@ export function NoteDetail({ recordId, onClose }: NoteDetailProps) {
   const timeStr = `${dt.getHours().toString().padStart(2, "0")}:${dt.getMinutes().toString().padStart(2, "0")}`;
 
   return (
-    <div className="fixed inset-0 z-50 bg-background overflow-y-auto">
+    <SwipeBack onClose={onClose}>
       {/* Header */}
       <div className="sticky top-0 bg-background/80 backdrop-blur-xl z-10 flex items-center justify-between p-4 border-b border-border/50">
         <button type="button" onClick={onClose} className="p-2 rounded-xl bg-secondary hover:bg-secondary/70 transition-colors">
@@ -173,6 +174,6 @@ export function NoteDetail({ recordId, onClose }: NoteDetailProps) {
           </div>
         )}
       </div>
-    </div>
+    </SwipeBack>
   );
 }

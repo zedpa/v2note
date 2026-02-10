@@ -73,14 +73,18 @@ export async function uploadAudio(
     .update({ status: "uploaded" })
     .eq("id", record.id);
 
-  // 4. Get public URL
-  const { data: urlData } = supabase.storage
+  // 4. Get signed URL (private bucket, valid for 1 hour)
+  const { data: urlData, error: urlError } = await supabase.storage
     .from("audio-recordings")
-    .getPublicUrl(fileName);
+    .createSignedUrl(fileName, 3600);
+
+  if (urlError || !urlData?.signedUrl) {
+    throw new Error(`Failed to create signed URL: ${urlError?.message}`);
+  }
 
   return {
     recordId: record.id,
     audioPath: fileName,
-    audioUrl: urlData.publicUrl,
+    audioUrl: urlData.signedUrl,
   };
 }

@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { useAudioRecorder } from "@/hooks/use-audio-recorder";
 import { uploadAudio } from "@/lib/upload";
 import { processRecording } from "@/lib/process";
+import { emit } from "@/lib/events";
 import { toast } from "sonner";
 
 export function RecordButton() {
@@ -67,12 +68,15 @@ export function RecordButton() {
       );
 
       toast("录音上传成功，AI 正在处理...");
+      emit("recording:uploaded");
 
       // Process in background — don't await
       processRecording(uploaded.recordId, uploaded.audioUrl).then(() => {
         toast("AI 处理完成！");
+        emit("recording:processed");
       }).catch((err) => {
         toast.error(`处理失败: ${err.message}`);
+        emit("recording:processed");
       });
     } catch (err: any) {
       toast.error(`录音保存失败: ${err.message}`);

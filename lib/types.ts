@@ -12,6 +12,7 @@ export interface Record {
   audio_path: string | null
   duration_seconds: number | null
   location_text: string | null
+  archived: boolean
   created_at: string
   updated_at: string
 }
@@ -101,6 +102,14 @@ export interface TodoItem {
   id: string
   text: string
   done: boolean
+  source: string | null
+  record_id: string
+  created_at: string
+}
+
+export interface IdeaItem {
+  id: string
+  text: string
   source: string | null
   record_id: string
   created_at: string

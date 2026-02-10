@@ -1,5 +1,11 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
+};
+
 interface GenerateSummaryPayload {
   device_id: string;
   period: "daily" | "weekly" | "monthly";
@@ -7,13 +13,17 @@ interface GenerateSummaryPayload {
 }
 
 serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
+  }
+
   try {
     const body = (await req.json().catch(() => ({}))) as GenerateSummaryPayload;
 
     if (!body.device_id || !body.period) {
       return new Response(
         JSON.stringify({ error: "device_id and period are required" }),
-        { status: 400, headers: { "Content-Type": "application/json" } },
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
@@ -76,7 +86,7 @@ serve(async (req) => {
     if (summaries.length === 0) {
       return new Response(
         JSON.stringify({ summary: null, message: "No records for this period" }),
-        { headers: { "Content-Type": "application/json" } },
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
@@ -120,13 +130,13 @@ ${summaries.join("\n")}
         record_count: summaries.length,
         summary: generatedSummary,
       }),
-      { headers: { "Content-Type": "application/json" } },
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
     return new Response(JSON.stringify({ error: message }), {
       status: 500,
-      headers: { "Content-Type": "application/json" },
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 });

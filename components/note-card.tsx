@@ -1,6 +1,7 @@
 "use client";
 
-import { MapPin, Clock, Sparkles } from "lucide-react";
+import { useRef, useCallback } from "react";
+import { MapPin, Clock, Sparkles, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export interface Note {
@@ -12,6 +13,7 @@ export interface Note {
   time: string;
   location?: string;
   type?: "diary" | "daily" | "weekly" | "monthly";
+  status?: string;
 }
 
 const TAG_STYLES: Record<string, string> = {
@@ -29,8 +31,83 @@ function getTagStyle(tag: string) {
   return TAG_STYLES[tag.toLowerCase()] || "bg-secondary text-secondary-foreground";
 }
 
-export function NoteCard({ note, isLast, onClick }: { note: Note; isLast: boolean; onClick?: () => void }) {
+const LONG_PRESS_MS = 500;
+
+interface NoteCardProps {
+  note: Note;
+  isLast: boolean;
+  onClick?: () => void;
+  selected?: boolean;
+  selectionMode?: boolean;
+  onLongPress?: () => void;
+  onToggleSelect?: () => void;
+}
+
+export function NoteCard({
+  note,
+  isLast,
+  onClick,
+  selected,
+  selectionMode,
+  onLongPress,
+  onToggleSelect,
+}: NoteCardProps) {
+  const longPressTimer = useRef<NodeJS.Timeout | null>(null);
+  const didLongPress = useRef(false);
+
+  const isProcessing = note.status && note.status !== "completed";
   const isSummary = note.type === "daily" || note.type === "weekly" || note.type === "monthly";
+
+  // Processing placeholder card
+  if (isProcessing) {
+    return (
+      <div className="flex gap-3 relative">
+        <div className="flex flex-col items-center pt-1.5 shrink-0 w-5">
+          <div className="w-2.5 h-2.5 rounded-full shrink-0 ring-2 ring-background bg-muted-foreground/40 animate-pulse" />
+          {!isLast && <div className="w-px flex-1 bg-border mt-1.5" />}
+        </div>
+        <div className="flex-1 rounded-2xl p-4 mb-3 border border-border/60 bg-card/60">
+          <div className="flex items-center gap-2 mb-3">
+            <div className="w-4 h-4 rounded-full border-2 border-primary/30 border-t-primary animate-spin" />
+            <span className="text-sm font-semibold text-foreground/70">AI 处理中...</span>
+          </div>
+          <div className="space-y-2 animate-pulse">
+            <div className="h-3 bg-secondary rounded w-2/3" />
+            <div className="h-3 bg-secondary rounded w-full" />
+            <div className="h-3 bg-secondary rounded w-4/5" />
+          </div>
+          <div className="flex items-center gap-1 mt-3 text-muted-foreground">
+            <Clock className="w-3 h-3" />
+            <span className="text-[11px]">{note.time}</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const handlePointerDown = useCallback(() => {
+    didLongPress.current = false;
+    longPressTimer.current = setTimeout(() => {
+      didLongPress.current = true;
+      onLongPress?.();
+    }, LONG_PRESS_MS);
+  }, [onLongPress]);
+
+  const handlePointerUp = useCallback(() => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+  }, []);
+
+  const handleClick = useCallback(() => {
+    if (didLongPress.current) return;
+    if (selectionMode) {
+      onToggleSelect?.();
+    } else {
+      onClick?.();
+    }
+  }, [selectionMode, onToggleSelect, onClick]);
 
   return (
     <div className="flex gap-3 relative">
@@ -50,14 +127,34 @@ export function NoteCard({ note, isLast, onClick }: { note: Note; isLast: boolea
       {/* Card content */}
       <button
         type="button"
-        onClick={onClick}
+        onPointerDown={handlePointerDown}
+        onPointerUp={handlePointerUp}
+        onPointerLeave={handlePointerUp}
+        onClick={handleClick}
         className={cn(
           "flex-1 rounded-2xl p-4 mb-3 text-left transition-all duration-200",
           "hover:shadow-md active:scale-[0.98]",
           "border border-border/60",
           isSummary ? "bg-accent/5" : "bg-card",
+          selectionMode && selected && "ring-2 ring-primary border-primary/40",
         )}
       >
+        {/* Selection checkbox */}
+        {selectionMode && (
+          <div className="flex items-center gap-2 mb-2">
+            <div
+              className={cn(
+                "w-5 h-5 rounded-md border-2 flex items-center justify-center transition-colors",
+                selected
+                  ? "bg-primary border-primary"
+                  : "border-muted-foreground/30",
+              )}
+            >
+              {selected && <Check className="w-3 h-3 text-primary-foreground" />}
+            </div>
+          </div>
+        )}
+
         {/* AI summary badge */}
         {isSummary && (
           <div className="flex items-center gap-1 mb-2">

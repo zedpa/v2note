@@ -5,6 +5,7 @@ import { ArrowLeft, Search, X } from "lucide-react";
 import { useSearch } from "@/hooks/use-search";
 import { NoteCard } from "./note-card";
 import type { Note } from "./note-card";
+import { SwipeBack } from "./swipe-back";
 
 interface SearchViewProps {
   onClose: () => void;
@@ -39,7 +40,7 @@ export function SearchView({ onClose, onNoteClick }: SearchViewProps) {
   }));
 
   return (
-    <div className="fixed inset-0 z-50 bg-background overflow-y-auto">
+    <SwipeBack onClose={onClose}>
       {/* Search bar */}
       <div className="sticky top-0 bg-background/80 backdrop-blur-xl z-10 p-4 border-b border-border/50">
         <div className="flex items-center gap-3">
@@ -105,6 +106,6 @@ export function SearchView({ onClose, onNoteClick }: SearchViewProps) {
           </div>
         )}
       </div>
-    </div>
+    </SwipeBack>
   );
 }

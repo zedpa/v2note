@@ -1,56 +1,51 @@
 "use client";
 
 import { useState } from "react";
-import { AppHeader } from "@/components/app-header";
+import { NewHeader } from "@/components/new-header";
 import { NotesGrid } from "@/components/notes-grid";
 import { TodoView } from "@/components/todo-view";
-import { ProfileView } from "@/components/profile-view";
-import { BottomNav, type TabKey } from "@/components/bottom-nav";
+import { IdeaView } from "@/components/idea-view";
+import { FloatingRecordButton } from "@/components/floating-record-button";
+import { ProfileOverlay } from "@/components/profile-overlay";
 import { NoteDetail } from "@/components/note-detail";
 import { SearchView } from "@/components/search-view";
 import { OfflineBanner } from "@/components/offline-banner";
-import { useNotes } from "@/hooks/use-notes";
-import { useTodos } from "@/hooks/use-todos";
+import { useTags } from "@/hooks/use-tags";
 
 export default function Page() {
-  const [activeTab, setActiveTab] = useState<TabKey>("notes");
   const [activeFilter, setActiveFilter] = useState("全部");
   const [detailId, setDetailId] = useState<string | null>(null);
   const [showSearch, setShowSearch] = useState(false);
+  const [showProfile, setShowProfile] = useState(false);
 
-  const { notes } = useNotes();
-  const { todos } = useTodos();
-
-  const completedNotes = notes.filter((n) => n.status === "completed");
-  const profileStats = [
-    { label: "笔记", value: String(completedNotes.length) },
-    { label: "录音", value: String(notes.length) },
-    { label: "待办", value: String(todos.filter((t) => !t.done).length) },
-  ];
+  const { tags } = useTags();
 
   return (
     <div className="min-h-dvh bg-background max-w-lg mx-auto relative">
       <OfflineBanner />
 
-      <AppHeader
-        activeTab={activeTab}
+      <NewHeader
         activeFilter={activeFilter}
         onFilterChange={setActiveFilter}
         onSearchClick={() => setShowSearch(true)}
+        onAvatarClick={() => setShowProfile(true)}
+        tags={tags}
       />
 
-      <main className="pb-44">
-        {activeTab === "notes" && (
+      <main className="pb-32">
+        {activeFilter === "待办" ? (
+          <TodoView />
+        ) : activeFilter === "灵感" ? (
+          <IdeaView onNoteClick={(id) => setDetailId(id)} />
+        ) : (
           <NotesGrid
             activeFilter={activeFilter}
             onNoteClick={(id) => setDetailId(id)}
           />
         )}
-        {activeTab === "todos" && <TodoView />}
-        {activeTab === "profile" && <ProfileView stats={profileStats} />}
       </main>
 
-      <BottomNav activeTab={activeTab} onTabChange={setActiveTab} />
+      <FloatingRecordButton />
 
       {/* Overlays */}
       {detailId && (
@@ -64,6 +59,9 @@ export default function Page() {
             setDetailId(id);
           }}
         />
+      )}
+      {showProfile && (
+        <ProfileOverlay onClose={() => setShowProfile(false)} />
       )}
     </div>
   );

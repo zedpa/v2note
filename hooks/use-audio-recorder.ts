@@ -27,6 +27,15 @@ export function useAudioRecorder() {
 
   const startRecording = useCallback(async () => {
     await ensurePermission();
+    // Clean up any stale recording state from the plugin
+    try {
+      const status = await VoiceRecorder.getCurrentStatus();
+      if (status.status === "RECORDING") {
+        await VoiceRecorder.stopRecording();
+      }
+    } catch {
+      // ignore cleanup errors
+    }
     await VoiceRecorder.startRecording();
     setIsRecording(true);
     setDuration(0);
