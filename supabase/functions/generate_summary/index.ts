@@ -8,8 +8,8 @@ const corsHeaders = {
 
 interface GenerateSummaryPayload {
   device_id: string;
-  period: "daily" | "weekly" | "monthly";
-  date?: string; // ISO date string, defaults to today/this week/this month
+  period: "daily" | "weekly" | "monthly" | "yearly";
+  date?: string; // ISO date string, defaults to today/this week/this month/this year
 }
 
 serve(async (req) => {
@@ -59,12 +59,17 @@ serve(async (req) => {
       rangeStart = `${monday.toISOString().split("T")[0]}T00:00:00Z`;
       rangeEnd = `${sunday.toISOString().split("T")[0]}T23:59:59Z`;
       periodLabel = `${monday.getMonth() + 1}.${monday.getDate()} - ${sunday.getMonth() + 1}.${sunday.getDate()} 周报`;
-    } else {
+    } else if (body.period === "monthly") {
       const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
       const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
       rangeStart = `${firstDay.toISOString().split("T")[0]}T00:00:00Z`;
       rangeEnd = `${lastDay.toISOString().split("T")[0]}T23:59:59Z`;
       periodLabel = `${now.getFullYear()}年${now.getMonth() + 1}月月报`;
+    } else {
+      // yearly
+      rangeStart = `${now.getFullYear()}-01-01T00:00:00Z`;
+      rangeEnd = `${now.getFullYear()}-12-31T23:59:59Z`;
+      periodLabel = `${now.getFullYear()}年年报`;
     }
 
     // Fetch records
@@ -91,7 +96,7 @@ serve(async (req) => {
     }
 
     // Generate AI summary
-    const periodMap = { daily: "日报", weekly: "周报", monthly: "月报" };
+    const periodMap: Record<string, string> = { daily: "日报", weekly: "周报", monthly: "月报", yearly: "年报" };
     const prompt = `请根据以下记录生成一份${periodMap[body.period]}总结（100-200字）。
 
 记录：

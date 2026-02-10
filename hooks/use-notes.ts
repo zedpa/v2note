@@ -6,6 +6,7 @@ import { getDeviceId } from "@/lib/device";
 import { on } from "@/lib/events";
 import { toast } from "sonner";
 import type { NoteItem } from "@/lib/types";
+import { getCachedNotes, setCachedNotes } from "@/lib/local-cache";
 
 interface DateGroup {
   date: string;
@@ -20,6 +21,19 @@ export function useNotes() {
   const [error, setError] = useState<string | null>(null);
   const pollRef = useRef<NodeJS.Timeout | null>(null);
   const initialLoadDone = useRef(false);
+
+  // Load from cache on first render
+  const cacheLoadedRef = useRef(false);
+  useEffect(() => {
+    if (cacheLoadedRef.current) return;
+    cacheLoadedRef.current = true;
+    getCachedNotes().then((cached) => {
+      if (cached && cached.length > 0 && notes.length === 0) {
+        setNotes(cached);
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const fetchNotes = useCallback(async (silent = false) => {
     try {
@@ -71,6 +85,9 @@ export function useNotes() {
       setNotes(items);
       setError(null);
       initialLoadDone.current = true;
+
+      // Update local cache
+      setCachedNotes(items);
     } catch (e: any) {
       setError(e.message ?? "Failed to load notes");
     } finally {

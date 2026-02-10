@@ -4,8 +4,10 @@ import { useState, useCallback } from "react";
 import { NoteCard } from "./note-card";
 import type { Note } from "./note-card";
 import { SelectionToolbar } from "./selection-toolbar";
+import { ReportGenerator } from "./report-generator";
 import { useNotes } from "@/hooks/use-notes";
 import { cn } from "@/lib/utils";
+import type { ReportPeriod } from "@/hooks/use-report";
 
 type ViewMode = "day" | "week" | "month" | "year";
 
@@ -23,6 +25,7 @@ interface NotesGridProps {
 
 export function NotesGrid({ activeFilter, onNoteClick }: NotesGridProps) {
   const [view, setView] = useState<ViewMode>("day");
+  const [showReport, setShowReport] = useState(false);
   const { notes, loading, deleteNotes, archiveNotes } = useNotes();
 
   // Selection state
@@ -159,15 +162,26 @@ export function NotesGrid({ activeFilter, onNoteClick }: NotesGridProps) {
           ))}
         </div>
 
-        {/* View subtitle */}
-        <p className="text-[11px] text-muted-foreground mb-4 px-1">
-          {getViewSubtitle(view)}
-          <span className="ml-2 text-foreground/40">
-            {"共 "}
-            {displayNotes.length}
-            {" 条"}
-          </span>
-        </p>
+        {/* View subtitle + report button */}
+        <div className="flex items-center justify-between mb-4 px-1">
+          <p className="text-[11px] text-muted-foreground">
+            {getViewSubtitle(view)}
+            <span className="ml-2 text-foreground/40">
+              {"共 "}
+              {displayNotes.length}
+              {" 条"}
+            </span>
+          </p>
+          {view !== "day" && (
+            <button
+              type="button"
+              onClick={() => setShowReport(true)}
+              className="text-[11px] font-medium text-primary hover:text-primary/80 transition-colors"
+            >
+              生成{view === "week" ? "周" : view === "month" ? "月" : "年"}报
+            </button>
+          )}
+        </div>
 
         {/* Loading skeleton */}
         {loading && (
@@ -232,6 +246,16 @@ export function NotesGrid({ activeFilter, onNoteClick }: NotesGridProps) {
           </div>
         )}
       </div>
+
+      {/* Report generator overlay */}
+      {showReport && (
+        <ReportGenerator
+          defaultPeriod={
+            view === "week" ? "weekly" : view === "month" ? "monthly" : view === "year" ? "yearly" : "daily"
+          }
+          onClose={() => setShowReport(false)}
+        />
+      )}
     </div>
   );
 }

@@ -7,9 +7,10 @@ const corsHeaders = {
 };
 
 export type ProcessAudioPayload = {
-  audio_url: string;
+  audio_url?: string;
   record_id: string;
   language?: string;
+  text?: string; // If provided, skip ASR and use this text directly
 };
 
 export type ProcessAudioResult = {
@@ -364,8 +365,8 @@ export const processAudio = async (
   payload: ProcessAudioPayload,
   deps: Deps,
 ): Promise<ProcessAudioResult> => {
-  if (!payload.audio_url) {
-    throw new Error("audio_url is required");
+  if (!payload.audio_url && !payload.text) {
+    throw new Error("audio_url or text is required");
   }
   if (!payload.record_id) {
     throw new Error("record_id is required");
@@ -388,7 +389,10 @@ export const processAudio = async (
     );
   }
 
-  const transcript = await callAsr(payload.audio_url, payload.language, deps);
+  // Use provided text or run ASR
+  const transcript = payload.text
+    ? payload.text
+    : await callAsr(payload.audio_url!, payload.language, deps);
 
   // Fetch existing tags for this device to encourage reuse
   let existingTags: string[] = [];

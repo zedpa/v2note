@@ -9,6 +9,7 @@ import { FloatingRecordButton } from "@/components/floating-record-button";
 import { ProfileOverlay } from "@/components/profile-overlay";
 import { NoteDetail } from "@/components/note-detail";
 import { SearchView } from "@/components/search-view";
+import { TextEditor } from "@/components/text-editor";
 import { OfflineBanner } from "@/components/offline-banner";
 import { useTags } from "@/hooks/use-tags";
 
@@ -17,6 +18,7 @@ export default function Page() {
   const [detailId, setDetailId] = useState<string | null>(null);
   const [showSearch, setShowSearch] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
+  const [showTextEditor, setShowTextEditor] = useState(false);
 
   const { tags } = useTags();
 
@@ -45,7 +47,7 @@ export default function Page() {
         )}
       </main>
 
-      <FloatingRecordButton />
+      <FloatingRecordButton onOpenTextEditor={() => setShowTextEditor(true)} />
 
       {/* Overlays */}
       {detailId && (
@@ -62,6 +64,9 @@ export default function Page() {
       )}
       {showProfile && (
         <ProfileOverlay onClose={() => setShowProfile(false)} />
+      )}
+      {showTextEditor && (
+        <TextEditor onClose={() => setShowTextEditor(false)} />
       )}
     </div>
   );

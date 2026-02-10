@@ -11,7 +11,11 @@ import { processRecording } from "@/lib/process";
 import { emit } from "@/lib/events";
 import { toast } from "sonner";
 
-export function RecordButton() {
+interface RecordButtonProps {
+  onOpenTextEditor?: () => void;
+}
+
+export function RecordButton({ onOpenTextEditor }: RecordButtonProps) {
   const [phase, setPhase] = useState<
     "idle" | "pressing" | "recording" | "locked"
   >("idle");
@@ -19,6 +23,7 @@ export function RecordButton() {
   const [slideOffset, setSlideOffset] = useState(0);
   const [waveHeights, setWaveHeights] = useState<number[]>(Array(16).fill(12));
   const [uploading, setUploading] = useState(false);
+  const lastTapRef = useRef(0);
 
   const recorder = useAudioRecorder();
   const timerRef = useRef<NodeJS.Timeout | null>(null);
@@ -107,6 +112,16 @@ export function RecordButton() {
   const handlePointerDown = useCallback(
     (e: React.PointerEvent) => {
       if (phase === "locked" || uploading) return;
+
+      // Double-tap detection: open text editor
+      const now = Date.now();
+      if (now - lastTapRef.current < 350 && phase === "idle") {
+        lastTapRef.current = 0;
+        onOpenTextEditor?.();
+        return;
+      }
+      lastTapRef.current = now;
+
       isPressingRef.current = true;
       startYRef.current = e.clientY;
       setSlideOffset(0);
@@ -126,7 +141,7 @@ export function RecordButton() {
         }
       }, 300);
     },
-    [phase, uploading, startTimers, recorder],
+    [phase, uploading, startTimers, recorder, onOpenTextEditor],
   );
 
   // Handle move for slide detection
@@ -369,7 +384,7 @@ export function RecordButton() {
       {/* Label */}
       {!isActive && (
         <span className="text-[10px] font-medium mt-1 text-muted-foreground">
-          {uploading ? "上传中..." : "长按录音"}
+          {uploading ? "上传中..." : "长按录音 · 双击写字"}
         </span>
       )}
     </div>
