@@ -1,4 +1,4 @@
-import { Preferences } from "@capacitor/preferences";
+import { getItem, setItem, removeItem } from "./storage";
 import type { NoteItem } from "./types";
 
 const CACHE_KEY = "cache:notes";
@@ -11,7 +11,7 @@ interface CachedNotes {
 
 export async function getCachedNotes(): Promise<NoteItem[] | null> {
   try {
-    const { value } = await Preferences.get({ key: CACHE_KEY });
+    const value = await getItem(CACHE_KEY);
     if (!value) return null;
 
     const cached: CachedNotes = JSON.parse(value);
@@ -27,12 +27,12 @@ export async function getCachedNotes(): Promise<NoteItem[] | null> {
 export async function setCachedNotes(notes: NoteItem[]): Promise<void> {
   try {
     const data: CachedNotes = { notes, timestamp: Date.now() };
-    await Preferences.set({ key: CACHE_KEY, value: JSON.stringify(data) });
+    await setItem(CACHE_KEY, JSON.stringify(data));
   } catch {
     // Silently fail — cache is non-critical
   }
 }
 
 export async function clearNotesCache(): Promise<void> {
-  await Preferences.remove({ key: CACHE_KEY });
+  await removeItem(CACHE_KEY);
 }

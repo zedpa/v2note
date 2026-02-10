@@ -1,4 +1,4 @@
-import { Preferences } from "@capacitor/preferences";
+import { getItem, setItem, removeItem } from "./storage";
 import { uploadAudio } from "./upload";
 import { processRecording } from "./process";
 import { emit } from "./events";
@@ -16,7 +16,7 @@ export interface QueuedUpload {
 }
 
 async function readQueue(): Promise<QueuedUpload[]> {
-  const { value } = await Preferences.get({ key: QUEUE_KEY });
+  const value = await getItem(QUEUE_KEY);
   if (!value) return [];
   try {
     return JSON.parse(value);
@@ -26,7 +26,7 @@ async function readQueue(): Promise<QueuedUpload[]> {
 }
 
 async function writeQueue(queue: QueuedUpload[]): Promise<void> {
-  await Preferences.set({ key: QUEUE_KEY, value: JSON.stringify(queue) });
+  await setItem(QUEUE_KEY, JSON.stringify(queue));
 }
 
 export async function enqueueFailedUpload(
@@ -103,5 +103,5 @@ export async function removeFromQueue(id: string): Promise<void> {
 }
 
 export async function clearQueue(): Promise<void> {
-  await Preferences.remove({ key: QUEUE_KEY });
+  await removeItem(QUEUE_KEY);
 }

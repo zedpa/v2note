@@ -1,13 +1,34 @@
-import { Device as CapDevice } from '@capacitor/device'
 import { supabase } from './supabase'
 
 let cachedDeviceId: string | null = null
 
+async function getDeviceIdentifier(): Promise<{ identifier: string; platform: string }> {
+  try {
+    const { Capacitor } = await import('@capacitor/core')
+    if (Capacitor.isNativePlatform()) {
+      const { Device } = await import('@capacitor/device')
+      const idResult = await Device.getId()
+      const info = await Device.getInfo()
+      return { identifier: idResult.identifier, platform: info.platform }
+    }
+  } catch {
+    // Capacitor not available
+  }
+
+  // Web fallback: generate and persist a random device ID
+  const STORAGE_KEY = 'voicenote:deviceIdentifier'
+  let identifier = localStorage.getItem(STORAGE_KEY)
+  if (!identifier) {
+    identifier = `web-${crypto.randomUUID()}`
+    localStorage.setItem(STORAGE_KEY, identifier)
+  }
+  return { identifier, platform: 'web' }
+}
+
 export async function getDeviceId(): Promise<string> {
   if (cachedDeviceId) return cachedDeviceId
 
-  const info = await CapDevice.getId()
-  const identifier = info.identifier
+  const { identifier, platform } = await getDeviceIdentifier()
 
   // Try to find existing device
   const { data: existing } = await supabase
@@ -22,12 +43,11 @@ export async function getDeviceId(): Promise<string> {
   }
 
   // Register new device
-  const deviceInfo = await CapDevice.getInfo()
   const { data: created, error } = await supabase
     .from('device')
     .insert({
       device_identifier: identifier,
-      platform: deviceInfo.platform,
+      platform,
     })
     .select('id')
     .single()
