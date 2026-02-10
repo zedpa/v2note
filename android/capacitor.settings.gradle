@@ -11,5 +11,8 @@ project(':capacitor-filesystem').projectDir = new File('../node_modules/.pnpm/@c
 include ':capacitor-preferences'
 project(':capacitor-preferences').projectDir = new File('../node_modules/.pnpm/@capacitor+preferences@8.0.0_@capacitor+core@8.0.2/node_modules/@capacitor/preferences/android')
 
+include ':capacitor-status-bar'
+project(':capacitor-status-bar').projectDir = new File('../node_modules/.pnpm/@capacitor+status-bar@8.0.0_@capacitor+core@8.0.2/node_modules/@capacitor/status-bar/android')
+
 include ':capacitor-voice-recorder'
 project(':capacitor-voice-recorder').projectDir = new File('../node_modules/.pnpm/capacitor-voice-recorder@7._afce050cfe015c01cb95da0607e6650f/node_modules/capacitor-voice-recorder/android')
