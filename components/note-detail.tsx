@@ -50,11 +50,13 @@ export function NoteDetail({ recordId, onClose }: NoteDetailProps) {
   return (
     <SwipeBack onClose={onClose}>
       {/* Header */}
-      <div className="sticky top-0 bg-background/80 backdrop-blur-xl z-10 flex items-center justify-between p-4 border-b border-border/50">
-        <button type="button" onClick={onClose} className="p-2 rounded-xl bg-secondary hover:bg-secondary/70 transition-colors">
-          <X className="w-5 h-5 text-muted-foreground" />
-        </button>
-        <span className="text-xs text-muted-foreground">{dateStr}</span>
+      <div className="sticky top-0 bg-background/80 backdrop-blur-xl z-10 pt-safe border-b border-border/50">
+        <div className="flex items-center justify-between p-4">
+          <button type="button" onClick={onClose} className="p-2 rounded-xl bg-secondary hover:bg-secondary/70 transition-colors">
+            <X className="w-5 h-5 text-muted-foreground" />
+          </button>
+          <span className="text-xs text-muted-foreground">{dateStr}</span>
+        </div>
       </div>
 
       <div className="px-4 py-6 space-y-6 pb-20">

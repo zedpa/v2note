@@ -1,13 +1,17 @@
 import { supabase } from "./supabase";
+import { getUserType } from "./settings";
 
 export async function processRecording(
   recordId: string,
   audioUrl: string,
 ): Promise<void> {
+  const userType = await getUserType();
+
   const { data, error } = await supabase.functions.invoke("process_audio", {
     body: {
       record_id: recordId,
       audio_url: audioUrl,
+      user_type: userType,
     },
   });
 

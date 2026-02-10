@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   X,
   Moon,
@@ -11,6 +11,8 @@ import {
   Star,
   ChevronRight,
   CheckSquare,
+  Briefcase,
+  Palette,
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import { cn } from "@/lib/utils";
@@ -19,6 +21,8 @@ import { TodoView } from "./todo-view";
 import { SwipeBack } from "./swipe-back";
 import { useNotes } from "@/hooks/use-notes";
 import { useTodos } from "@/hooks/use-todos";
+import { getUserType, setUserType } from "@/lib/settings";
+import type { UserType } from "@/lib/types";
 
 interface ProfileOverlayProps {
   onClose: () => void;
@@ -29,6 +33,17 @@ export function ProfileOverlay({ onClose }: ProfileOverlayProps) {
   const isDark = theme === "dark";
   const [showExport, setShowExport] = useState(false);
   const [showTodos, setShowTodos] = useState(false);
+  const [userType, setUserTypeState] = useState<UserType>(null);
+
+  useEffect(() => {
+    getUserType().then(setUserTypeState);
+  }, []);
+
+  const handleUserType = async (type: UserType) => {
+    const newType = userType === type ? null : type;
+    setUserTypeState(newType);
+    await setUserType(newType);
+  };
 
   const { notes } = useNotes();
   const { todos } = useTodos();
@@ -49,16 +64,18 @@ export function ProfileOverlay({ onClose }: ProfileOverlayProps) {
     return (
       <SwipeBack onClose={() => setShowTodos(false)}>
         <div className="max-w-lg mx-auto">
-          <div className="flex items-center justify-between px-4 pt-4 pb-3 sticky top-0 bg-background/80 backdrop-blur-xl z-10">
-            <h1 className="text-lg font-bold text-foreground">待办事项</h1>
-            <button
-              type="button"
-              onClick={() => setShowTodos(false)}
-              className="p-2 rounded-xl bg-secondary hover:bg-secondary/70 transition-colors"
-              aria-label="返回"
-            >
-              <X className="w-5 h-5 text-muted-foreground" />
-            </button>
+          <div className="sticky top-0 bg-background/80 backdrop-blur-xl z-10 pt-safe">
+            <div className="flex items-center justify-between px-4 pt-4 pb-3">
+              <h1 className="text-lg font-bold text-foreground">待办事项</h1>
+              <button
+                type="button"
+                onClick={() => setShowTodos(false)}
+                className="p-2 rounded-xl bg-secondary hover:bg-secondary/70 transition-colors"
+                aria-label="返回"
+              >
+                <X className="w-5 h-5 text-muted-foreground" />
+              </button>
+            </div>
           </div>
           <TodoView />
         </div>
@@ -70,16 +87,18 @@ export function ProfileOverlay({ onClose }: ProfileOverlayProps) {
     <SwipeBack onClose={onClose}>
       <div className="max-w-lg mx-auto">
         {/* Header */}
-        <div className="flex items-center justify-between px-4 pt-4 pb-3 sticky top-0 bg-background/80 backdrop-blur-xl z-10">
-          <h1 className="text-lg font-bold text-foreground">我的</h1>
-          <button
-            type="button"
-            onClick={onClose}
-            className="p-2 rounded-xl bg-secondary hover:bg-secondary/70 transition-colors"
-            aria-label="关闭"
-          >
-            <X className="w-5 h-5 text-muted-foreground" />
-          </button>
+        <div className="sticky top-0 bg-background/80 backdrop-blur-xl z-10 pt-safe">
+          <div className="flex items-center justify-between px-4 pt-4 pb-3">
+            <h1 className="text-lg font-bold text-foreground">我的</h1>
+            <button
+              type="button"
+              onClick={onClose}
+              className="p-2 rounded-xl bg-secondary hover:bg-secondary/70 transition-colors"
+              aria-label="关闭"
+            >
+              <X className="w-5 h-5 text-muted-foreground" />
+            </button>
+          </div>
         </div>
 
         <div className="px-4 pb-8">
@@ -126,6 +145,53 @@ export function ProfileOverlay({ onClose }: ProfileOverlayProps) {
                 className="h-full bg-primary rounded-full transition-all"
                 style={{ width: "0%" }}
               />
+            </div>
+          </div>
+
+          {/* User type selector */}
+          <div className="p-4 rounded-2xl bg-card border border-border/50 mb-6">
+            <p className="text-xs font-medium text-foreground mb-3">我的角色</p>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => handleUserType("manager")}
+                className={cn(
+                  "flex flex-col items-center gap-2 p-3 rounded-xl border transition-all",
+                  userType === "manager"
+                    ? "border-primary bg-primary/10"
+                    : "border-border/50 hover:bg-secondary/50",
+                )}
+              >
+                <Briefcase className={cn(
+                  "w-5 h-5",
+                  userType === "manager" ? "text-primary" : "text-muted-foreground",
+                )} />
+                <span className={cn(
+                  "text-xs font-medium",
+                  userType === "manager" ? "text-primary" : "text-foreground",
+                )}>管理者</span>
+                <span className="text-[10px] text-muted-foreground">销售/区域经理</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleUserType("creator")}
+                className={cn(
+                  "flex flex-col items-center gap-2 p-3 rounded-xl border transition-all",
+                  userType === "creator"
+                    ? "border-primary bg-primary/10"
+                    : "border-border/50 hover:bg-secondary/50",
+                )}
+              >
+                <Palette className={cn(
+                  "w-5 h-5",
+                  userType === "creator" ? "text-primary" : "text-muted-foreground",
+                )} />
+                <span className={cn(
+                  "text-xs font-medium",
+                  userType === "creator" ? "text-primary" : "text-foreground",
+                )}>创作者</span>
+                <span className="text-[10px] text-muted-foreground">写作/设计/音乐</span>
+              </button>
             </div>
           </div>
 

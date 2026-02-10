@@ -1,6 +1,7 @@
 import { supabase } from "./supabase";
 import { getDeviceId } from "./device";
 import { emit } from "./events";
+import { getUserType } from "./settings";
 
 export interface ManualNoteInput {
   title: string;
@@ -41,10 +42,12 @@ export async function createManualNote(input: ManualNoteInput): Promise<string> 
     // Invoke AI processing with text (skip ASR)
     emit("recording:uploaded");
     try {
+      const userType = await getUserType();
       const { error } = await supabase.functions.invoke("process_audio", {
         body: {
           record_id: record.id,
           text: input.content,
+          user_type: userType,
         },
       });
       if (error) throw error;

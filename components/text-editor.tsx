@@ -56,16 +56,18 @@ export function TextEditor({ onClose }: TextEditorProps) {
     <div className="fixed inset-0 z-50 bg-background overflow-y-auto">
       <div className="max-w-lg mx-auto">
         {/* Header */}
-        <div className="flex items-center justify-between px-4 pt-4 pb-3 sticky top-0 bg-background/80 backdrop-blur-xl z-10 border-b border-border/50">
-          <h1 className="text-lg font-bold text-foreground">新建笔记</h1>
-          <button
-            type="button"
-            onClick={onClose}
-            className="p-2 rounded-xl bg-secondary hover:bg-secondary/70 transition-colors"
-            aria-label="关闭"
-          >
-            <X className="w-5 h-5 text-muted-foreground" />
-          </button>
+        <div className="sticky top-0 bg-background/80 backdrop-blur-xl z-10 pt-safe border-b border-border/50">
+          <div className="flex items-center justify-between px-4 pt-4 pb-3">
+            <h1 className="text-lg font-bold text-foreground">新建笔记</h1>
+            <button
+              type="button"
+              onClick={onClose}
+              className="p-2 rounded-xl bg-secondary hover:bg-secondary/70 transition-colors"
+              aria-label="关闭"
+            >
+              <X className="w-5 h-5 text-muted-foreground" />
+            </button>
+          </div>
         </div>
 
         <div className="px-4 py-4 space-y-4">

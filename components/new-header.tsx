@@ -19,12 +19,12 @@ export function NewHeader({
   tags,
 }: NewHeaderProps) {
   // Fixed pills: 全部, 待办, 灵感 + dynamic tags (deduplicated)
-  const fixedFilters = ["全部", "待办", "灵感"];
+  const fixedFilters = ["全部", "待办", "灵感", "周盘"];
   const dynamicTags = tags.filter((t) => !fixedFilters.includes(t));
   const filters = [...fixedFilters, ...dynamicTags];
 
   return (
-    <header className="sticky top-0 z-30 bg-background/80 backdrop-blur-xl">
+    <header className="sticky top-0 z-30 bg-background/80 backdrop-blur-xl pt-safe">
       <div className="flex items-center gap-3 px-4 pt-4 pb-3">
         {/* Search bar */}
         <button
