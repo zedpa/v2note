@@ -2,12 +2,18 @@ import { supabase } from "./supabase";
 import { getDeviceId } from "./device";
 import { emit } from "./events";
 import { getUserType } from "./settings";
+import { getCustomTags, getAvailableTags } from "./tag-manager";
 
 export interface ManualNoteInput {
-  title: string;
   content: string;
   tags?: string[];
   useAi?: boolean;
+}
+
+function extractTitle(text: string): string {
+  const match = text.match(/^[^。！？!?.]+/);
+  const firstSentence = match ? match[0].trim() : text.trim();
+  return firstSentence.slice(0, 8);
 }
 
 /**
@@ -38,16 +44,22 @@ export async function createManualNote(input: ManualNoteInput): Promise<string> 
     text: input.content,
   });
 
+  const title = extractTitle(input.content);
+
   if (input.useAi) {
     // Invoke AI processing with text (skip ASR)
     emit("recording:uploaded");
     try {
       const userType = await getUserType();
+      const customTags = await getCustomTags();
+      const availableTags = getAvailableTags(customTags);
+
       const { error } = await supabase.functions.invoke("process_audio", {
         body: {
           record_id: record.id,
           text: input.content,
           user_type: userType,
+          available_tags: availableTags,
         },
       });
       if (error) throw error;
@@ -56,12 +68,12 @@ export async function createManualNote(input: ManualNoteInput): Promise<string> 
       emit("recording:processed");
     }
   } else {
-    // Manual summary without AI
+    // Manual save without AI
     await supabase.from("summary").insert({
       record_id: record.id,
-      title: input.title || input.content.slice(0, 20),
-      short_summary: input.content.slice(0, 200),
-      long_summary: input.content,
+      title,
+      short_summary: "",
+      long_summary: "",
     });
 
     // Insert tags if provided

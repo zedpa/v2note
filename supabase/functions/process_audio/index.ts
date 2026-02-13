@@ -12,12 +12,13 @@ export type ProcessAudioPayload = {
   language?: string;
   text?: string; // If provided, skip ASR and use this text directly
   user_type?: 'manager' | 'creator' | null;
+  available_tags?: string[]; // Tags AI can choose from
 };
 
 export type ProcessAudioResult = {
   transcript: string;
   title: string;
-  summary: string;
+  short_summary: string;
   tags: string[];
   todos: string[];
   ideas: string[];
@@ -164,6 +165,13 @@ const callAsr = async (audioUrl: string, language: string | undefined, deps: Dep
   return await pollAsrResult(taskId, deps);
 };
 
+// Extract title from first sentence, max 8 chars
+const extractTitle = (text: string): string => {
+  const match = text.match(/^[^。！？!?.]+/);
+  const firstSentence = match ? match[0].trim() : text.trim();
+  return firstSentence.slice(0, 8);
+};
+
 // Fetch existing tags for the device that owns this record
 const fetchDeviceTags = async (recordId: string, deps: Deps): Promise<string[]> => {
   const baseUrl = deps.env.SUPABASE_URL;
@@ -231,66 +239,54 @@ const fetchUserType = async (recordId: string, deps: Deps): Promise<string | nul
   return Array.isArray(devData) ? devData[0]?.user_type ?? null : null;
 };
 
-const buildSystemPrompt = (userType: string | null, tagsHint: string): string => {
+const buildSystemPrompt = (userType: string | null, availableTags: string[]): string => {
+  const tagsListStr = availableTags.length > 0
+    ? `可用标签：[${availableTags.join("、")}]`
+    : "无可用标签";
+
   const jsonFormat = `请返回 JSON 格式（不要包含 markdown 代码块标记）：
 {
-  "title": "简短标题（10字以内）",
-  "summary": "内容摘要（50-100字）",
-  "tags": ["标签1", "标签2"],
-  "todos": ["待办事项1", "待办事项2"],
-  "ideas": ["想法或灵感1"]
+  "short_summary": "一句话概括内容（15-30字）",
+  "tags": ["从可用标签中选择"],
+  "todos": ["待办事项"],
+  "ideas": ["想法灵感"]
 }`;
 
   if (userType === "manager") {
-    return `你是一个专为管理者（销售经理、区域经理）设计的语音笔记助手。分析用户的语音转录文本，提取结构化信息。
+    return `你是一个专为管理者（销售经理、区域经理）设计的语音笔记助手。分析用户的语音转录文本，提取待办和想法。
 ${jsonFormat}
 
 规则：
-- title: 概括核心内容的简短标题
-- summary: 简洁概括语音内容，关注业务要点
-- tags: 1-3个分类标签，优先使用管理相关标签（如"客户管理"、"团队管理"、"业绩跟踪"、"项目推进"、"汇报总结"、"市场动态"）${tagsHint}
-- 仅当内容明确不属于任何已有标签时，才创建新标签
+- tags: 只能从以下可用标签中选择（不能创建新标签）。${tagsListStr}
 - todos: 积极提取行动事项 — 包括需要打的电话、要跟进的客户、需要准备的材料、要安排的会议等，即使表述较隐含也应提取
 - ideas: 提取管理洞察 — 团队问题模式、客户风险信号、市场机会、流程改进建议
 - 日常寒暄、重复性事务不提取为 ideas`;
   }
 
   if (userType === "creator") {
-    return `你是一个专为创作者（写作、设计、音乐、艺术）设计的语音笔记助手。分析用户的语音转录文本，提取结构化信息。
+    return `你是一个专为创作者（写作、设计、音乐、艺术）设计的语音笔记助手。分析用户的语音转录文本，提取待办和想法。
 ${jsonFormat}
 
 规则：
-- title: 概括核心内容的简短标题
-- summary: 简洁概括语音内容，保留创意细节
-- tags: 1-3个分类标签，优先使用创作相关标签（如"灵感"、"创意"、"素材"、"写作"、"设计"、"音乐"、"观察"）${tagsHint}
-- 仅当内容明确不属于任何已有标签时，才创建新标签
+- tags: 只能从以下可用标签中选择（不能创建新标签）。${tagsListStr}
 - todos: 保守提取 — 仅提取用户明确说出"我需要做…"、"记得要…"等明确待办
 - ideas: 积极提取所有创意种子 — 包括灵感片段、概念联想、观察发现、比喻意象、情绪感受、素材线索
 - 创作者的随想和联想都有价值，即使不完整也应作为灵感保留`;
   }
 
   // Default prompt (user_type is null)
-  return `你是一个语音笔记助手。分析用户的语音转录文本，提取结构化信息。
+  return `你是一个语音笔记助手。分析用户的语音转录文本，提取待办和想法。
 ${jsonFormat}
 
 规则：
-- title: 概括核心内容的简短标题
-- summary: 简洁概括语音内容
-- tags: 1-3个概括性分类标签，使用中文
-- 标签应为宏观分类（如"工作"、"学习"、"生活"、"健康"、"理财"），而非具体事件描述${tagsHint}
-- 仅当内容明确不属于任何已有标签时，才创建新标签
+- tags: 只能从以下可用标签中选择（不能创建新标签）。${tagsListStr}
 - todos: 提取文本中提到的任何待办/行动事项，没有则为空数组
 - ideas: 仅提取真正有创意、有启发性的想法或灵感
-- 日常事务记录（如买菜、开会、通勤等流水账）不需要生成灵感，返回空数组
-- 只有当内容包含独特见解、创新思路、值得深入思考的观点时，才提取为灵感`;
+- 日常事务记录不需要生成灵感，返回空数组`;
 };
 
-const callOpenAi = async (transcript: string, existingTags: string[], userType: string | null, deps: Deps): Promise<Omit<ProcessAudioResult, "transcript">> => {
-  const tagsHint = existingTags.length > 0
-    ? `\n- 优先从用户已有标签中选择：[${existingTags.join("、")}]`
-    : "";
-
-  const systemPrompt = buildSystemPrompt(userType, tagsHint);
+const callOpenAi = async (transcript: string, availableTags: string[], userType: string | null, deps: Deps): Promise<Omit<ProcessAudioResult, "transcript" | "title">> => {
+  const systemPrompt = buildSystemPrompt(userType, availableTags);
 
   const res = await deps.fetch(`${deps.env.OPENAI_URL}/chat/completions`, {
     method: "POST",
@@ -323,10 +319,19 @@ const callOpenAi = async (transcript: string, existingTags: string[], userType: 
     throw new Error(`Failed to parse OpenAI response as JSON: ${content}`);
   }
 
+  // Filter tags to only those in the available list
+  const rawTags = Array.isArray(parsed.tags) ? parsed.tags.map(String) : [];
+  const filteredTags = availableTags.length > 0
+    ? rawTags.filter((t) => availableTags.includes(t))
+    : rawTags;
+
+  const shortSummary = typeof parsed.short_summary === "string"
+    ? parsed.short_summary
+    : "";
+
   return {
-    title: String(parsed.title ?? ""),
-    summary: String(parsed.summary ?? ""),
-    tags: Array.isArray(parsed.tags) ? parsed.tags.map(String) : [],
+    short_summary: shortSummary,
+    tags: filteredTags,
     todos: Array.isArray(parsed.todos) ? parsed.todos.map(String) : [],
     ideas: Array.isArray(parsed.ideas) ? parsed.ideas.map(String) : [],
   };
@@ -363,8 +368,8 @@ const writeToDatabase = async (
     body: JSON.stringify({
       record_id: recordId,
       title: result.title,
-      short_summary: result.summary,
-      long_summary: result.summary,
+      short_summary: result.short_summary,
+      long_summary: "",
     }),
   });
 
@@ -456,13 +461,13 @@ export const processAudio = async (
     ? payload.text
     : await callAsr(payload.audio_url!, payload.language, deps);
 
-  // Fetch existing tags for this device to encourage reuse
-  let existingTags: string[] = [];
-  if (deps.env.SUPABASE_URL && deps.env.SUPABASE_SERVICE_ROLE_KEY) {
+  // Use available_tags from payload, fallback to fetching from DB
+  let availableTags = payload.available_tags ?? [];
+  if (availableTags.length === 0 && deps.env.SUPABASE_URL && deps.env.SUPABASE_SERVICE_ROLE_KEY) {
     try {
-      existingTags = await fetchDeviceTags(payload.record_id, deps);
+      availableTags = await fetchDeviceTags(payload.record_id, deps);
     } catch {
-      // Non-critical: proceed without existing tags
+      // Non-critical: proceed without tags
     }
   }
 
@@ -476,10 +481,14 @@ export const processAudio = async (
     }
   }
 
-  const analysis = await callOpenAi(transcript, existingTags, userType, deps);
+  const analysis = await callOpenAi(transcript, availableTags, userType, deps);
+
+  // Generate title from transcript (first sentence, max 8 chars)
+  const title = extractTitle(transcript);
 
   const result: ProcessAudioResult = {
     transcript,
+    title,
     ...analysis,
   };
 

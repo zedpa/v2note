@@ -119,11 +119,12 @@ export type WeeklyReviewStructuredData =
   | ManagerWeeklyReviewDataB
   | CreatorWeeklyReviewData
 
-export interface WeeklyReview {
+export interface Review {
   id: string
   device_id: string
-  week_start: string
-  week_end: string
+  period: 'daily' | 'weekly' | 'monthly' | 'yearly'
+  period_start: string
+  period_end: string
   summary: string
   stats: {
     total_records?: number
@@ -134,6 +135,9 @@ export interface WeeklyReview {
   structured_data: WeeklyReviewStructuredData | null
   created_at: string
 }
+
+/** @deprecated Use Review instead */
+export type WeeklyReview = Review
 
 // Composite type for note display (record + summary + tags)
 export interface NoteItem {

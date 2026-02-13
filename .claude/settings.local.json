@@ -27,7 +27,16 @@
       "Bash(curl:*)",
       "Bash(npx next dev:*)",
       "Bash(git commit:*)",
-      "Bash(cd:*)"
+      "Bash(cd:*)",
+      "Bash(del \"G:\\\\AI\\\\abc\\\\v2note\\\\components\\\\report-generator.tsx\")",
+      "Bash(del \"G:\\\\AI\\\\abc\\\\v2note\\\\hooks\\\\use-weekly-review.ts\")",
+      "Bash(del \"G:\\\\AI\\\\abc\\\\v2note\\\\hooks\\\\use-summaries.ts\")",
+      "Bash(del \"G:\\\\AI\\\\abc\\\\v2note\\\\components\\\\weekly-review-view.tsx\")",
+      "Bash(del \"G:\\\\AI\\\\abc\\\\v2note\\\\components\\\\weekly-review-card.tsx\")",
+      "Bash(del \"G:\\\\AI\\\\abc\\\\v2note\\\\components\\\\notes-grid.tsx\")",
+      "Bash(node test-edge-function.mjs:*)",
+      "Bash(npx supabase projects api-keys:*)",
+      "Bash(npx supabase:*)"
     ]
   }
 }

@@ -3,10 +3,9 @@
 import { useState, useEffect } from "react";
 import { initStatusBar } from "@/lib/status-bar";
 import { NewHeader } from "@/components/new-header";
-import { NotesGrid } from "@/components/notes-grid";
+import { NotesTree } from "@/components/notes-tree";
 import { TodoView } from "@/components/todo-view";
 import { IdeaView } from "@/components/idea-view";
-import { WeeklyReviewView } from "@/components/weekly-review-view";
 import { FloatingRecordButton } from "@/components/floating-record-button";
 import { ProfileOverlay } from "@/components/profile-overlay";
 import { NoteDetail } from "@/components/note-detail";
@@ -16,13 +15,13 @@ import { OfflineBanner } from "@/components/offline-banner";
 import { useTags } from "@/hooks/use-tags";
 
 export default function Page() {
-  const [activeFilter, setActiveFilter] = useState("全部");
+  const [activeFilter, setActiveFilter] = useState("");
   const [detailId, setDetailId] = useState<string | null>(null);
   const [showSearch, setShowSearch] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
   const [showTextEditor, setShowTextEditor] = useState(false);
 
-  const { tags } = useTags();
+  const { tags, addTag, removeTag, isSystemTag } = useTags();
 
   useEffect(() => {
     initStatusBar();
@@ -38,6 +37,9 @@ export default function Page() {
         onSearchClick={() => setShowSearch(true)}
         onAvatarClick={() => setShowProfile(true)}
         tags={tags}
+        onAddTag={addTag}
+        onRemoveTag={removeTag}
+        isSystemTag={isSystemTag}
       />
 
       <main className="pb-32">
@@ -45,11 +47,9 @@ export default function Page() {
           <TodoView />
         ) : activeFilter === "灵感" ? (
           <IdeaView onNoteClick={(id) => setDetailId(id)} />
-        ) : activeFilter === "周盘" ? (
-          <WeeklyReviewView />
         ) : (
-          <NotesGrid
-            activeFilter={activeFilter}
+          <NotesTree
+            activeFilter={activeFilter || undefined}
             onNoteClick={(id) => setDetailId(id)}
           />
         )}
