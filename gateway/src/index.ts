@@ -230,9 +230,10 @@ wss.on("connection", (ws) => {
 
 // ── Start ──
 
-server.listen(PORT, () => {
+server.listen(PORT, "0.0.0.0", () => {
   console.log(`[gateway] v2note Dialog Gateway running on port ${PORT}`);
-  console.log(`[gateway] WebSocket: ws://localhost:${PORT}`);
-  console.log(`[gateway] REST API: http://localhost:${PORT}/api/v1/`);
-  console.log(`[gateway] Health: http://localhost:${PORT}/health`);
+  console.log(`[gateway] WebSocket: ws://0.0.0.0:${PORT}`);
+  console.log(`[gateway] REST API: http://0.0.0.0:${PORT}/api/v1/`);
+  console.log(`[gateway] Health: http://0.0.0.0:${PORT}/health`);
+  console.log(`[gateway] LAN: http://172.28.251.48:${PORT}`);
 });

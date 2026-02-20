@@ -56,7 +56,16 @@
       "Bash(netstat:*)",
       "Bash(taskkill:*)",
       "Bash(ipconfig:*)",
-      "Bash(npx:*)"
+      "Bash(npx:*)",
+      "Bash(npm install:*)",
+      "Bash(pkill:*)",
+      "Bash(pnpm gateway:*)",
+      "Bash(lsof:*)",
+      "Bash(ss:*)",
+      "Bash(kill:*)",
+      "Bash(ufw allow:*)",
+      "Bash(PORT=3000 pnpm dev)",
+      "Bash(ufw status:*)"
     ]
   }
 }
