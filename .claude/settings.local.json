@@ -36,7 +36,27 @@
       "Bash(del \"G:\\\\AI\\\\abc\\\\v2note\\\\components\\\\notes-grid.tsx\")",
       "Bash(node test-edge-function.mjs:*)",
       "Bash(npx supabase projects api-keys:*)",
-      "Bash(npx supabase:*)"
+      "Bash(npx supabase:*)",
+      "Bash(dir:*)",
+      "Bash(git ls-tree:*)",
+      "Bash(git mv:*)",
+      "Bash(pnpm install:*)",
+      "Bash(npx tsc:*)",
+      "Bash(find:*)",
+      "Bash(pnpm remove:*)",
+      "Bash(python -c:*)",
+      "Bash(python3:*)",
+      "Bash(where:*)",
+      "Bash(D:\\\\Python\\\\Python311\\\\python.exe -c:*)",
+      "Bash(/c/Users/zedpa/AppData/Local/Microsoft/WindowsApps/python.exe:*)",
+      "Bash(git check-ignore:*)",
+      "Bash(npx tsx:*)",
+      "Bash(nslookup:*)",
+      "Bash(NODE_OPTIONS=\"--dns-result-order=ipv4first\" npx tsx:*)",
+      "Bash(netstat:*)",
+      "Bash(taskkill:*)",
+      "Bash(ipconfig:*)",
+      "Bash(npx:*)"
     ]
   }
 }

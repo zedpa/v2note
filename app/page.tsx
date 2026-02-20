@@ -1,25 +1,35 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { initStatusBar } from "@/lib/status-bar";
-import { NewHeader } from "@/components/new-header";
-import { NotesTree } from "@/components/notes-tree";
-import { TodoView } from "@/components/todo-view";
-import { IdeaView } from "@/components/idea-view";
-import { FloatingRecordButton } from "@/components/floating-record-button";
-import { ProfileOverlay } from "@/components/profile-overlay";
-import { NoteDetail } from "@/components/note-detail";
-import { SearchView } from "@/components/search-view";
-import { TextEditor } from "@/components/text-editor";
-import { OfflineBanner } from "@/components/offline-banner";
-import { useTags } from "@/hooks/use-tags";
+import { initStatusBar } from "@/shared/lib/status-bar";
+import { NewHeader } from "@/shared/components/new-header";
+import { NotesTimeline } from "@/features/notes/components/notes-timeline";
+import { TodoView } from "@/features/todos/components/todo-view";
+import { IdeaView } from "@/features/ideas/components/idea-view";
+import { FAB } from "@/features/recording/components/fab";
+import { SidebarDrawer } from "@/features/sidebar/components/sidebar-drawer";
+import { NoteDetail } from "@/features/notes/components/note-detail";
+import { SearchView } from "@/features/search/components/search-view";
+import { ChatView } from "@/features/chat/components/chat-view";
+import { OfflineBanner } from "@/shared/components/offline-banner";
+import { StatsDashboard } from "@/features/sidebar/components/stats-dashboard";
+import { MemorySoulOverlay } from "@/features/memory/components/memory-soul-overlay";
+import { ReviewOverlay } from "@/features/reviews/components/review-overlay";
+import { useTags } from "@/features/tags/hooks/use-tags";
 
 export default function Page() {
+  const [showSidebar, setShowSidebar] = useState(false);
   const [activeFilter, setActiveFilter] = useState("");
   const [detailId, setDetailId] = useState<string | null>(null);
   const [showSearch, setShowSearch] = useState(false);
-  const [showProfile, setShowProfile] = useState(false);
-  const [showTextEditor, setShowTextEditor] = useState(false);
+  const [showChat, setShowChat] = useState(false);
+  const [showStats, setShowStats] = useState(false);
+  const [showMemory, setShowMemory] = useState(false);
+  const [showReview, setShowReview] = useState(false);
+  const [chatDateRange, setChatDateRange] = useState<{
+    start: string;
+    end: string;
+  } | null>(null);
 
   const { tags, addTag, removeTag, isSystemTag } = useTags();
 
@@ -29,33 +39,45 @@ export default function Page() {
 
   return (
     <div className="min-h-dvh bg-background max-w-lg mx-auto relative">
+      <SidebarDrawer
+        open={showSidebar}
+        onClose={() => setShowSidebar(false)}
+        onViewStats={() => setShowStats(true)}
+        onViewMemory={() => setShowMemory(true)}
+        onViewReview={() => setShowReview(true)}
+      />
       <OfflineBanner />
 
       <NewHeader
         activeFilter={activeFilter}
         onFilterChange={setActiveFilter}
         onSearchClick={() => setShowSearch(true)}
-        onAvatarClick={() => setShowProfile(true)}
+        onAvatarClick={() => setShowSidebar(true)}
         tags={tags}
         onAddTag={addTag}
         onRemoveTag={removeTag}
         isSystemTag={isSystemTag}
       />
 
-      <main className="pb-32">
+      <main className="pb-6">
         {activeFilter === "待办" ? (
           <TodoView />
         ) : activeFilter === "灵感" ? (
           <IdeaView onNoteClick={(id) => setDetailId(id)} />
         ) : (
-          <NotesTree
-            activeFilter={activeFilter || undefined}
+          <NotesTimeline
+            filter={activeFilter || undefined}
             onNoteClick={(id) => setDetailId(id)}
           />
         )}
       </main>
 
-      <FloatingRecordButton onOpenTextEditor={() => setShowTextEditor(true)} />
+      <FAB
+        onStartReview={(range) => {
+          setChatDateRange(range);
+          setShowChat(true);
+        }}
+      />
 
       {/* Overlays */}
       {detailId && (
@@ -70,11 +92,20 @@ export default function Page() {
           }}
         />
       )}
-      {showProfile && (
-        <ProfileOverlay onClose={() => setShowProfile(false)} />
+      {showChat && chatDateRange && (
+        <ChatView
+          dateRange={chatDateRange}
+          onClose={() => setShowChat(false)}
+        />
       )}
-      {showTextEditor && (
-        <TextEditor onClose={() => setShowTextEditor(false)} />
+      {showStats && (
+        <StatsDashboard onClose={() => setShowStats(false)} />
+      )}
+      {showMemory && (
+        <MemorySoulOverlay onClose={() => setShowMemory(false)} />
+      )}
+      {showReview && (
+        <ReviewOverlay onClose={() => setShowReview(false)} />
       )}
     </div>
   );

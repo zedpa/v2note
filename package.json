@@ -10,7 +10,7 @@
     "cap:sync": "next build && cap sync",
     "cap:android": "cap open android",
     "cap:ios": "cap open ios",
-    "supabase": "./bin/supabase.exe"
+    "gateway": "cd gateway && pnpm dev"
   },
   "dependencies": {
     "@capacitor/android": "^8.0.2",
@@ -48,7 +48,6 @@
     "@radix-ui/react-toggle": "1.1.1",
     "@radix-ui/react-toggle-group": "1.1.1",
     "@radix-ui/react-tooltip": "1.1.6",
-    "@supabase/supabase-js": "^2.95.3",
     "autoprefixer": "^10.4.20",
     "capacitor-voice-recorder": "^7.0.6",
     "class-variance-authority": "^0.7.1",
@@ -79,7 +78,6 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "postcss": "^8.5",
-    "supabase": "^2.76.6",
     "tailwindcss": "^3.4.17",
     "typescript": "5.7.3"
   }
