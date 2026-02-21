@@ -69,7 +69,7 @@ export function NewHeader({
 
   return (
     <header className="sticky top-0 z-30 bg-background/80 backdrop-blur-xl pt-safe">
-      <div className="flex items-center gap-3 px-4 pt-4 pb-3">
+      <div className="flex items-center gap-3 px-4 pt-1 pb-3">
         {/* Search bar */}
         <button
           type="button"

@@ -34,7 +34,7 @@ export function SidebarDrawer({
       <div
         className={cn(
           "fixed top-0 left-0 bottom-0 z-50 w-72 bg-background border-r border-border",
-          "flex flex-col",
+          "flex flex-col pt-safe",
           "animate-in slide-in-from-left duration-300",
         )}
       >

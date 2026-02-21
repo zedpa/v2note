@@ -175,11 +175,12 @@
   animation: mood-shift 0.6s ease-out both;
 }
 
-/* Safe area for mobile */
+/* Safe area for mobile — with Android fallback (env returns 0 on Android) */
 .pb-safe {
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 .pt-safe {
-  padding-top: env(safe-area-inset-top, 0px);
+  padding-top: 24px;
+  padding-top: max(env(safe-area-inset-top, 0px), 24px);
 }

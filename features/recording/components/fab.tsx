@@ -115,7 +115,12 @@ export function FAB({ onStartReview, commandContext }: FABProps) {
       setPartialText("");
       startTimers();
     } catch (err: any) {
-      toast.error(`无法开始录音: ${err.message}`);
+      const msg = err.message ?? "";
+      if (msg.includes("fetch") || msg.includes("network")) {
+        toast.error("无法连接服务器，请检查网络");
+      } else {
+        toast.error(`无法开始录音: ${msg}`);
+      }
       stopTimers();
       resetRef.current();
     }

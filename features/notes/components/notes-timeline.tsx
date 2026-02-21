@@ -138,7 +138,9 @@ function TimelineCard({
   index: number;
   onClick?: () => void;
 }) {
-  const isProcessing = note.status !== "completed";
+  // Only show skeleton if still processing AND no content available yet
+  const hasContent = !!(note.short_summary || note.title !== "处理中...");
+  const isProcessing = note.status !== "completed" && !hasContent;
 
   if (isProcessing) {
     return (
