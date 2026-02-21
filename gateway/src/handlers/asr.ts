@@ -91,25 +91,35 @@ export async function startASR(
         if (!output?.sentence) return;
 
         const sentence = output.sentence;
+        const sid = sentence.sentence_id ?? 0;
 
         if (sentence.end_time !== undefined && sentence.begin_time !== undefined) {
-          // Final sentence
-          session.sentences.push({
-            text: sentence.text,
-            sentenceId: sentence.sentence_id ?? session.sentences.length,
-            begin_time: sentence.begin_time,
-            end_time: sentence.end_time,
-          });
-
-          sendToClient(clientWs, {
-            type: "asr.sentence",
-            payload: {
+          // Confirmed sentence — deduplicate by sentence_id
+          const existing = session.sentences.find((s) => s.sentenceId === sid);
+          if (existing) {
+            // Update existing sentence (DashScope refines same sentence_id)
+            existing.text = sentence.text;
+            existing.begin_time = sentence.begin_time;
+            existing.end_time = sentence.end_time;
+          } else {
+            // New sentence
+            session.sentences.push({
               text: sentence.text,
-              sentenceId: sentence.sentence_id ?? session.sentences.length - 1,
+              sentenceId: sid,
               begin_time: sentence.begin_time,
               end_time: sentence.end_time,
-            },
-          });
+            });
+
+            sendToClient(clientWs, {
+              type: "asr.sentence",
+              payload: {
+                text: sentence.text,
+                sentenceId: sid,
+                begin_time: sentence.begin_time,
+                end_time: sentence.end_time,
+              },
+            });
+          }
         } else {
           // Partial result
           session.partialText = sentence.text ?? "";
@@ -117,7 +127,7 @@ export async function startASR(
             type: "asr.partial",
             payload: {
               text: sentence.text ?? "",
-              sentenceId: sentence.sentence_id ?? 0,
+              sentenceId: sid,
             },
           });
         }

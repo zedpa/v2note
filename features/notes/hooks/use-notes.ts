@@ -44,23 +44,31 @@ export function useNotes() {
 
       const items: NoteItem[] = records.map((r: any) => {
         const summary = r.summary;
+        const transcript = r.transcript?.text ?? "";
         const tags = (r.tags ?? []).map((t: any) => t.name).filter(Boolean);
 
         const dt = new Date(r.created_at);
         const date = `${dt.getMonth() + 1}月${dt.getDate()}日`;
         const time = `${dt.getHours().toString().padStart(2, "0")}:${dt.getMinutes().toString().padStart(2, "0")}`;
 
+        // Fallback: use transcript when summary is not available yet
+        const title = summary?.title || transcript.slice(0, 50) || "处理中...";
+        const short_summary = summary?.short_summary || transcript.slice(0, 200) || "";
+
+        // Only show audio_path when it's a valid URL
+        const audioPath = r.audio_path && r.audio_path.startsWith("http") ? r.audio_path : null;
+
         return {
           id: r.id,
-          title: summary?.title ?? "处理中...",
-          short_summary: summary?.short_summary ?? "",
+          title,
+          short_summary,
           tags,
           date,
           time,
           location: r.location_text,
           status: r.status,
           duration_seconds: r.duration_seconds,
-          audio_path: r.audio_path ?? null,
+          audio_path: audioPath,
           created_at: r.created_at,
         };
       });

@@ -42,7 +42,7 @@ export function ChatView({ dateRange, onClose }: ChatViewProps) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-background flex flex-col">
+    <div className="fixed inset-0 z-50 bg-background flex flex-col pt-safe">
       {/* Header */}
       <div className="flex items-center gap-3 px-4 py-3 border-b border-border/60 shrink-0">
         <button

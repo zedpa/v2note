@@ -18,8 +18,10 @@ export function usePCMRecorder() {
   const startTimeRef = useRef(0);
 
   const startRecording = useCallback(async (callbacks: PCMRecorderCallbacks) => {
+    let step = "init";
     try {
-      // Request microphone with target sample rate
+      // Step 1: Request microphone
+      step = "getUserMedia";
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           channelCount: 1,
@@ -30,24 +32,27 @@ export function usePCMRecorder() {
       });
       streamRef.current = stream;
 
-      // Create AudioContext at 16kHz
+      // Step 2: Create AudioContext
+      step = "AudioContext";
       const ctx = new AudioContext({ sampleRate: 16000 });
       contextRef.current = ctx;
 
-      // Load worklet
+      // Step 3: Load worklet
+      step = "addModule";
       await ctx.audioWorklet.addModule("/worklets/pcm-processor.js");
 
+      // Step 4: Connect nodes
+      step = "connect";
       const source = ctx.createMediaStreamSource(stream);
       const worklet = new AudioWorkletNode(ctx, "pcm-processor");
       workletRef.current = worklet;
 
-      // Receive PCM chunks from worklet
       worklet.port.onmessage = (event) => {
         callbacks.onPCMData(event.data);
       };
 
       source.connect(worklet);
-      worklet.connect(ctx.destination); // needed for worklet to process
+      worklet.connect(ctx.destination);
 
       setIsRecording(true);
       setDuration(0);
@@ -56,7 +61,7 @@ export function usePCMRecorder() {
         setDuration(Math.floor((Date.now() - startTimeRef.current) / 1000));
       }, 1000);
     } catch (err: any) {
-      callbacks.onError(new Error(err.message ?? "Failed to start recording"));
+      callbacks.onError(new Error(`[${step}] ${err.message ?? "unknown"}`));
     }
   }, []);
 
