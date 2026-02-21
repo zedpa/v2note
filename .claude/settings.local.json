@@ -65,7 +65,8 @@
       "Bash(kill:*)",
       "Bash(ufw allow:*)",
       "Bash(PORT=3000 pnpm dev)",
-      "Bash(ufw status:*)"
+      "Bash(ufw status:*)",
+      "Bash(git merge:*)"
     ]
   }
 }
