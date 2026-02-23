@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useTheme } from "next-themes";
 import { initStatusBar } from "@/shared/lib/status-bar";
 import { NewHeader } from "@/shared/components/new-header";
@@ -23,6 +23,8 @@ import { SettingsEditor } from "@/features/settings/components/settings-editor";
 import { toast } from "sonner";
 import { getCommandDefs } from "@/features/commands/lib/registry";
 import { NudgeToastListener } from "@/features/proactive/components/nudge-toast";
+import { SwipeBack } from "@/shared/components/swipe-back";
+import { useBackHandler } from "@/shared/hooks/use-back-handler";
 
 type OverlayName =
   | "search"
@@ -51,6 +53,14 @@ export default function Page() {
   useEffect(() => {
     initStatusBar();
   }, []);
+
+  const backHandler = useMemo(() => {
+    if (detailId) return () => setDetailId(null);
+    if (activeOverlay) return () => setActiveOverlay(null);
+    return null;
+  }, [detailId, activeOverlay]);
+
+  useBackHandler(backHandler);
 
   const openOverlay = useCallback((name: string, _args?: string[]) => {
     setActiveOverlay(name as OverlayName);
@@ -163,24 +173,26 @@ export default function Page() {
         <TodayGantt onClose={closeOverlay} />
       )}
       {activeOverlay === "ideas" && (
-        <div className="fixed inset-0 z-50 bg-background pt-safe">
-          <div className="flex items-center justify-between px-4 py-3 border-b border-border/60">
-            <h1 className="text-lg font-bold text-foreground">灵感</h1>
-            <button
-              type="button"
-              onClick={closeOverlay}
-              className="p-2 rounded-full hover:bg-secondary/60 transition-colors"
-            >
-              <span className="text-muted-foreground text-lg">&times;</span>
-            </button>
+        <SwipeBack onClose={closeOverlay}>
+          <div className="flex flex-col min-h-dvh pt-safe">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-border/60">
+              <h1 className="text-lg font-bold text-foreground">灵感</h1>
+              <button
+                type="button"
+                onClick={closeOverlay}
+                className="p-2 rounded-full hover:bg-secondary/60 transition-colors"
+              >
+                <span className="text-muted-foreground text-lg">&times;</span>
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto">
+              <IdeaView onNoteClick={(id) => {
+                closeOverlay();
+                setDetailId(id);
+              }} />
+            </div>
           </div>
-          <div className="overflow-y-auto h-[calc(100vh-60px)]">
-            <IdeaView onNoteClick={(id) => {
-              closeOverlay();
-              setDetailId(id);
-            }} />
-          </div>
-        </div>
+        </SwipeBack>
       )}
       {activeOverlay === "skills" && (
         <SkillsPage onClose={closeOverlay} />

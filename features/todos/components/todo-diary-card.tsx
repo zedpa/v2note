@@ -3,6 +3,7 @@
 import { X, Check, Circle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTodos } from "@/features/todos/hooks/use-todos";
+import { SwipeBack } from "@/shared/components/swipe-back";
 
 interface TodoDiaryCardProps {
   onClose: () => void;
@@ -20,26 +21,27 @@ export function TodoDiaryCard({ onClose, onNoteClick }: TodoDiaryCardProps) {
   const today = new Date().toISOString().split("T")[0];
 
   return (
-    <div className="fixed inset-0 z-50 bg-background flex flex-col pt-safe">
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-border/60">
-        <div>
-          <h1 className="text-lg font-bold text-foreground">待办事项</h1>
-          <p className="text-xs text-muted-foreground">
-            {pending.length} 项待办 / {done.length} 项已完成
-          </p>
+    <SwipeBack onClose={onClose}>
+      <div className="flex flex-col min-h-dvh pt-safe">
+        {/* Header */}
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border/60">
+          <div>
+            <h1 className="text-lg font-bold text-foreground">待办事项</h1>
+            <p className="text-xs text-muted-foreground">
+              {pending.length} 项待办 / {done.length} 项已完成
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-2 rounded-full hover:bg-secondary/60 transition-colors"
+          >
+            <X className="w-5 h-5 text-muted-foreground" />
+          </button>
         </div>
-        <button
-          type="button"
-          onClick={onClose}
-          className="p-2 rounded-full hover:bg-secondary/60 transition-colors"
-        >
-          <X className="w-5 h-5 text-muted-foreground" />
-        </button>
-      </div>
 
-      {/* Content */}
-      <div className="flex-1 overflow-y-auto px-4 py-4">
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto px-4 py-4">
         {loading && (
           <div className="space-y-2">
             {[1, 2, 3].map((i) => (
@@ -141,7 +143,8 @@ export function TodoDiaryCard({ onClose, onNoteClick }: TodoDiaryCardProps) {
           </div>
         )}
       </div>
-    </div>
+      </div>
+    </SwipeBack>
   );
 }
 

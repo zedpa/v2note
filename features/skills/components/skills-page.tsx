@@ -19,6 +19,7 @@ import {
 } from "@/shared/lib/local-config";
 import { listSkills, getSkillDetail } from "@/shared/lib/api/skills";
 import { getDeviceId } from "@/shared/lib/device";
+import { SwipeBack } from "@/shared/components/swipe-back";
 
 interface SkillDisplay {
   name: string;
@@ -135,21 +136,22 @@ export function SkillsPage({ onClose }: SkillsPageProps) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-background flex flex-col pt-safe">
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-border/60">
-        <h1 className="text-lg font-bold text-foreground">技能管理</h1>
-        <button
-          type="button"
-          onClick={onClose}
-          className="p-2 rounded-full hover:bg-secondary/60 transition-colors"
-        >
-          <X className="w-5 h-5 text-muted-foreground" />
-        </button>
-      </div>
+    <SwipeBack onClose={onClose}>
+      <div className="flex flex-col min-h-dvh pt-safe">
+        {/* Header */}
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border/60">
+          <h1 className="text-lg font-bold text-foreground">技能管理</h1>
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-2 rounded-full hover:bg-secondary/60 transition-colors"
+          >
+            <X className="w-5 h-5 text-muted-foreground" />
+          </button>
+        </div>
 
-      {/* Content */}
-      <div className="flex-1 overflow-y-auto px-4 py-4">
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto px-4 py-4">
         <p className="text-xs text-muted-foreground mb-4">
           开启或关闭 AI 技能。录音处理时仅使用已启用的技能进行分析和提取。
         </p>
@@ -213,6 +215,7 @@ export function SkillsPage({ onClose }: SkillsPageProps) {
           ))}
         </div>
       </div>
-    </div>
+      </div>
+    </SwipeBack>
   );
 }

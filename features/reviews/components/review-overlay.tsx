@@ -7,6 +7,7 @@ import { DateSelector } from "./date-selector";
 import { ReviewResult } from "./review-result";
 import { ReviewList } from "./review-list";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { SwipeBack } from "@/shared/components/swipe-back";
 import type { Review } from "@/shared/lib/types";
 
 interface ReviewOverlayProps {
@@ -77,54 +78,56 @@ export function ReviewOverlay({ onClose }: ReviewOverlayProps) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-background flex flex-col pt-safe">
-      {/* Header */}
-      <div className="flex items-center gap-3 px-4 py-3 border-b border-border/60">
-        <button
-          type="button"
-          onClick={handleBack}
-          className="p-1.5 rounded-full hover:bg-secondary/60 transition-colors"
-        >
-          <ArrowLeft className="w-5 h-5" />
-        </button>
-        <h1 className="text-lg font-semibold">
-          {stage === "viewing" ? "复盘结果" : "复盘记录"}
-        </h1>
-      </div>
+    <SwipeBack onClose={onClose}>
+      <div className="flex flex-col min-h-dvh pt-safe">
+        {/* Header */}
+        <div className="flex items-center gap-3 px-4 py-3 border-b border-border/60">
+          <button
+            type="button"
+            onClick={handleBack}
+            className="p-1.5 rounded-full hover:bg-secondary/60 transition-colors"
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </button>
+          <h1 className="text-lg font-semibold">
+            {stage === "viewing" ? "复盘结果" : "复盘记录"}
+          </h1>
+        </div>
 
-      <ScrollArea className="flex-1">
-        <div className="max-w-lg mx-auto p-4">
-          {stage === "selecting" && (
-            <div className="space-y-6">
-              <DateSelector
-                onGenerate={handleGenerate}
+        <ScrollArea className="flex-1">
+          <div className="max-w-lg mx-auto p-4">
+            {stage === "selecting" && (
+              <div className="space-y-6">
+                <DateSelector
+                  onGenerate={handleGenerate}
+                  generating={generating}
+                />
+                {!loading && (
+                  <ReviewList
+                    reviews={reviews}
+                    onSelect={handleSelectHistory}
+                  />
+                )}
+              </div>
+            )}
+
+            {stage === "generating" && (
+              <div className="flex flex-col items-center justify-center py-20 gap-4">
+                <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                <p className="text-sm text-muted-foreground">AI 正在生成复盘...</p>
+              </div>
+            )}
+
+            {stage === "viewing" && currentReview && (
+              <ReviewResult
+                review={currentReview}
+                onRegenerate={handleRegenerate}
                 generating={generating}
               />
-              {!loading && (
-                <ReviewList
-                  reviews={reviews}
-                  onSelect={handleSelectHistory}
-                />
-              )}
-            </div>
-          )}
-
-          {stage === "generating" && (
-            <div className="flex flex-col items-center justify-center py-20 gap-4">
-              <Loader2 className="w-8 h-8 animate-spin text-primary" />
-              <p className="text-sm text-muted-foreground">AI 正在生成复盘...</p>
-            </div>
-          )}
-
-          {stage === "viewing" && currentReview && (
-            <ReviewResult
-              review={currentReview}
-              onRegenerate={handleRegenerate}
-              generating={generating}
-            />
-          )}
-        </div>
-      </ScrollArea>
-    </div>
+            )}
+          </div>
+        </ScrollArea>
+      </div>
+    </SwipeBack>
   );
 }

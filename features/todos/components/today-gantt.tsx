@@ -3,6 +3,7 @@
 import { X, Circle, Check, Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTodayTodos, type TodayTodo } from "@/features/todos/hooks/use-today-todos";
+import { SwipeBack } from "@/shared/components/swipe-back";
 
 interface TodayGanttProps {
   onClose: () => void;
@@ -22,26 +23,27 @@ export function TodayGantt({ onClose }: TodayGanttProps) {
   const nowOffset = ((currentHour - 6) * 60 + currentMinutes) / (18 * 60);
 
   return (
-    <div className="fixed inset-0 z-50 bg-background flex flex-col pt-safe">
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-border/60">
-        <div>
-          <h1 className="text-lg font-bold text-foreground">今日任务</h1>
-          <p className="text-xs text-muted-foreground">
-            {now.toLocaleDateString("zh-CN", { month: "long", day: "numeric", weekday: "long" })}
-          </p>
+    <SwipeBack onClose={onClose}>
+      <div className="flex flex-col min-h-dvh pt-safe">
+        {/* Header */}
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border/60">
+          <div>
+            <h1 className="text-lg font-bold text-foreground">今日任务</h1>
+            <p className="text-xs text-muted-foreground">
+              {now.toLocaleDateString("zh-CN", { month: "long", day: "numeric", weekday: "long" })}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-2 rounded-full hover:bg-secondary/60 transition-colors"
+          >
+            <X className="w-5 h-5 text-muted-foreground" />
+          </button>
         </div>
-        <button
-          type="button"
-          onClick={onClose}
-          className="p-2 rounded-full hover:bg-secondary/60 transition-colors"
-        >
-          <X className="w-5 h-5 text-muted-foreground" />
-        </button>
-      </div>
 
-      {/* Content */}
-      <div className="flex-1 overflow-y-auto">
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto">
         {loading && (
           <div className="flex items-center justify-center py-16">
             <span className="text-sm text-muted-foreground">加载中...</span>
@@ -124,7 +126,8 @@ export function TodayGantt({ onClose }: TodayGanttProps) {
           </div>
         )}
       </div>
-    </div>
+      </div>
+    </SwipeBack>
   );
 }
 
