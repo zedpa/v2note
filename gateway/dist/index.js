@@ -21,6 +21,7 @@ import { registerExportRoutes } from "./routes/export.js";
 import { registerSyncRoutes } from "./routes/sync.js";
 import { registerMemoryRoutes } from "./routes/memory.js";
 import { registerSoulRoutes } from "./routes/soul.js";
+import { getProactiveEngine } from "./proactive/engine.js";
 // Load environment
 config({ path: "../.env.local" });
 config({ path: ".env" });
@@ -80,6 +81,8 @@ function send(ws, msg) {
         ws.send(JSON.stringify(msg));
     }
 }
+const proactiveEngine = getProactiveEngine();
+proactiveEngine.start();
 wss.on("connection", (ws) => {
     console.log("[gateway] Client connected");
     ws.on("message", async (raw, isBinary) => {
@@ -144,6 +147,7 @@ wss.on("connection", (ws) => {
                 }
                 case "asr.start": {
                     connectionDeviceMap.set(ws, msg.payload.deviceId);
+                    proactiveEngine.registerDevice(msg.payload.deviceId, ws);
                     await startASR(ws, msg.payload.deviceId, msg.payload.locationText);
                     break;
                 }
@@ -175,14 +179,16 @@ wss.on("connection", (ws) => {
             cancelASR(deviceId);
             connectionDeviceMap.delete(ws);
         }
+        proactiveEngine.unregisterByWs(ws);
         console.log("[gateway] Client disconnected");
     });
 });
 // ── Start ──
-server.listen(PORT, () => {
+server.listen(PORT, "0.0.0.0", () => {
     console.log(`[gateway] v2note Dialog Gateway running on port ${PORT}`);
-    console.log(`[gateway] WebSocket: ws://localhost:${PORT}`);
-    console.log(`[gateway] REST API: http://localhost:${PORT}/api/v1/`);
-    console.log(`[gateway] Health: http://localhost:${PORT}/health`);
+    console.log(`[gateway] WebSocket: ws://0.0.0.0:${PORT}`);
+    console.log(`[gateway] REST API: http://0.0.0.0:${PORT}/api/v1/`);
+    console.log(`[gateway] Health: http://0.0.0.0:${PORT}/health`);
+    console.log(`[gateway] LAN: http://172.28.251.48:${PORT}`);
 });
 //# sourceMappingURL=index.js.map

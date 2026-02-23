@@ -36,6 +36,22 @@ export async function update(id, fields) {
         sets.push(`done = $${i++}`);
         params.push(fields.done);
     }
+    if (fields.estimated_minutes !== undefined) {
+        sets.push(`estimated_minutes = $${i++}`);
+        params.push(fields.estimated_minutes);
+    }
+    if (fields.scheduled_start !== undefined) {
+        sets.push(`scheduled_start = $${i++}`);
+        params.push(fields.scheduled_start);
+    }
+    if (fields.scheduled_end !== undefined) {
+        sets.push(`scheduled_end = $${i++}`);
+        params.push(fields.scheduled_end);
+    }
+    if (fields.priority !== undefined) {
+        sets.push(`priority = $${i++}`);
+        params.push(fields.priority);
+    }
     if (sets.length === 0)
         return;
     params.push(id);

@@ -18,8 +18,10 @@ const SKILLS_DIR = join(__dirname, "../../skills");
 export async function startChat(payload) {
     const session = getSession(payload.deviceId);
     session.mode = "chat";
-    // Load context
-    const soul = await loadSoul(payload.deviceId);
+    // Load context: prefer localConfig soul, fall back to server DB
+    const soul = payload.localConfig?.soul
+        ? { content: payload.localConfig.soul.content }
+        : await loadSoul(payload.deviceId);
     const memoryManager = new MemoryManager();
     const memories = await memoryManager.loadContext(payload.deviceId, payload.dateRange);
     // Load records from the date range for context

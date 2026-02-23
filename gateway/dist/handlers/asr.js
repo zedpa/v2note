@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { recordRepo } from "../db/repositories/index.js";
 import { transcriptRepo } from "../db/repositories/index.js";
 import { processEntry } from "./process.js";
+import { matchVoiceCommand } from "./voice-commands.js";
 const sessions = new Map();
 const DASHSCOPE_WS_URL = "wss://dashscope.aliyuncs.com/api-ws/v1/inference/";
 /**
@@ -67,23 +68,34 @@ export async function startASR(clientWs, deviceId, locationText) {
                 if (!output?.sentence)
                     return;
                 const sentence = output.sentence;
+                const sid = sentence.sentence_id ?? 0;
                 if (sentence.end_time !== undefined && sentence.begin_time !== undefined) {
-                    // Final sentence
-                    session.sentences.push({
-                        text: sentence.text,
-                        sentenceId: sentence.sentence_id ?? session.sentences.length,
-                        begin_time: sentence.begin_time,
-                        end_time: sentence.end_time,
-                    });
-                    sendToClient(clientWs, {
-                        type: "asr.sentence",
-                        payload: {
+                    // Confirmed sentence — deduplicate by sentence_id
+                    const existing = session.sentences.find((s) => s.sentenceId === sid);
+                    if (existing) {
+                        // Update existing sentence (DashScope refines same sentence_id)
+                        existing.text = sentence.text;
+                        existing.begin_time = sentence.begin_time;
+                        existing.end_time = sentence.end_time;
+                    }
+                    else {
+                        // New sentence
+                        session.sentences.push({
                             text: sentence.text,
-                            sentenceId: sentence.sentence_id ?? session.sentences.length - 1,
+                            sentenceId: sid,
                             begin_time: sentence.begin_time,
                             end_time: sentence.end_time,
-                        },
-                    });
+                        });
+                        sendToClient(clientWs, {
+                            type: "asr.sentence",
+                            payload: {
+                                text: sentence.text,
+                                sentenceId: sid,
+                                begin_time: sentence.begin_time,
+                                end_time: sentence.end_time,
+                            },
+                        });
+                    }
                 }
                 else {
                     // Partial result
@@ -92,7 +104,7 @@ export async function startASR(clientWs, deviceId, locationText) {
                         type: "asr.partial",
                         payload: {
                             text: sentence.text ?? "",
-                            sentenceId: sentence.sentence_id ?? 0,
+                            sentenceId: sid,
                         },
                     });
                 }
@@ -189,6 +201,20 @@ async function finishASR(clientWs, deviceId) {
         sessions.delete(deviceId);
         return;
     }
+    // Check if the transcript matches a voice command
+    const voiceCmd = matchVoiceCommand(transcript);
+    if (voiceCmd) {
+        console.log(`[asr] Voice command detected: /${voiceCmd.command}`);
+        sendToClient(clientWs, {
+            type: "command.detected",
+            payload: { command: voiceCmd.command, args: voiceCmd.args },
+        });
+        // Cleanup and return — don't create a record for voice commands
+        if (session.dashscopeWs)
+            session.dashscopeWs.close();
+        sessions.delete(deviceId);
+        return;
+    }
     // Calculate duration from last sentence end_time
     const lastSentence = session.sentences[session.sentences.length - 1];
     const durationMs = lastSentence?.end_time ?? 0;
@@ -238,6 +264,10 @@ async function finishASR(clientWs, deviceId) {
     })
         .catch((err) => {
         console.error("[asr] Process error:", err);
+        sendToClient(clientWs, {
+            type: "error",
+            payload: { message: `AI processing failed: ${err.message}` },
+        });
     });
     // Cleanup
     if (session.dashscopeWs) {

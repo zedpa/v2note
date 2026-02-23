@@ -5,6 +5,10 @@ export async function upsert(name) {
      RETURNING *`, [name]);
     return row;
 }
+export async function findByName(name) {
+    const row = await queryOne(`SELECT * FROM tag WHERE name = $1`, [name]);
+    return row ?? null;
+}
 export async function findAll() {
     return query(`SELECT * FROM tag ORDER BY name`);
 }

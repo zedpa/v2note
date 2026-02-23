@@ -15,6 +15,7 @@
     "ws": "^8.18.0"
   },
   "devDependencies": {
+    "@types/ali-oss": "^6.23.3",
     "@types/node": "^22",
     "@types/pg": "^8.16.0",
     "@types/ws": "^8.5.13",

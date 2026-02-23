@@ -243,7 +243,7 @@ export class MCPClient extends EventEmitter {
       throw new Error(`HTTP ${res.status}: ${await res.text()}`);
     }
 
-    const response: JsonRpcResponse = await res.json();
+    const response = await res.json() as JsonRpcResponse;
     if (response.error) {
       throw new Error(`MCP error: ${response.error.message}`);
     }

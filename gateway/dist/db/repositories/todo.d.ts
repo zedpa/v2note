@@ -3,6 +3,11 @@ export interface Todo {
     record_id: string;
     text: string;
     done: boolean;
+    estimated_minutes: number | null;
+    scheduled_start: string | null;
+    scheduled_end: string | null;
+    priority: number;
+    completed_at: string | null;
     created_at: string;
 }
 export declare function findByDevice(deviceId: string): Promise<Todo[]>;
@@ -20,6 +25,10 @@ export declare function createMany(items: Array<{
 export declare function update(id: string, fields: {
     text?: string;
     done?: boolean;
+    estimated_minutes?: number | null;
+    scheduled_start?: string | null;
+    scheduled_end?: string | null;
+    priority?: number;
 }): Promise<void>;
 export declare function del(id: string): Promise<void>;
 export declare function toggle(id: string): Promise<Todo | null>;

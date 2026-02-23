@@ -7,4 +7,10 @@ export declare function buildSystemPrompt(opts: {
     soul?: string;
     memory?: string[];
     mode?: "process" | "chat";
+    existingTags?: string[];
+    mcpTools?: Array<{
+        name: string;
+        description: string;
+        parameters?: Record<string, unknown>;
+    }>;
 }): string;

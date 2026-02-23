@@ -1,5 +1,8 @@
 /**
  * AI provider — calls qwen-plus via OpenAI-compatible API.
+ *
+ * Environment variables are read lazily (on first call) because
+ * dotenv.config() in index.ts runs AFTER ESM imports are resolved.
  */
 export interface ChatMessage {
     role: "system" | "user" | "assistant";

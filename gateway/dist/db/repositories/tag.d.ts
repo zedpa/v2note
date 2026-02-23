@@ -3,6 +3,7 @@ export interface Tag {
     name: string;
 }
 export declare function upsert(name: string): Promise<Tag>;
+export declare function findByName(name: string): Promise<Tag | null>;
 export declare function findAll(): Promise<Tag[]>;
 export declare function findByRecordId(recordId: string): Promise<Tag[]>;
 export declare function addToRecord(recordId: string, tagId: string): Promise<void>;

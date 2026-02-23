@@ -12,89 +12,240 @@ import { customerRequestRepo } from "../db/repositories/index.js";
 import { settingChangeRepo } from "../db/repositories/index.js";
 import { tagRepo } from "../db/repositories/index.js";
 import { recordRepo } from "../db/repositories/index.js";
+import { getMCPRegistry } from "../mcp/registry.js";
+import { estimateBatchTodos } from "../proactive/time-estimator.js";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SKILLS_DIR = join(__dirname, "../../skills");
 /**
  * Process a single diary entry: run active skills to extract structured data.
  */
 export async function processEntry(payload) {
-    // 1. Load skills
-    const allSkills = loadSkills(SKILLS_DIR);
-    // Load device-specific skill config
-    const skillConfigs = await skillConfigRepo.findByDevice(payload.deviceId);
-    const activeSkills = filterActiveSkills(allSkills, skillConfigs.map((c) => ({ skill_name: c.skill_name, enabled: c.enabled })));
-    // 2. Load soul + memory for context
-    const soul = await loadSoul(payload.deviceId);
-    const memoryManager = new MemoryManager();
-    const memories = await memoryManager.loadContext(payload.deviceId);
-    // 3. Build prompt
-    const systemPrompt = buildSystemPrompt({
-        skills: activeSkills,
-        soul: soul?.content,
-        memory: memories,
-        mode: "process",
-    });
-    // 4. Call AI
-    const response = await chatCompletion([
-        { role: "system", content: systemPrompt },
-        { role: "user", content: payload.text },
-    ], { json: true, temperature: 0.3 });
-    // 5. Parse result
-    let result = {
+    const result = {
         todos: [],
         customer_requests: [],
         setting_changes: [],
         tags: [],
     };
     try {
-        const parsed = JSON.parse(response.content);
-        result.todos = Array.isArray(parsed.todos) ? parsed.todos : [];
-        result.customer_requests = Array.isArray(parsed.customer_requests)
-            ? parsed.customer_requests
-            : [];
-        result.setting_changes = Array.isArray(parsed.setting_changes)
-            ? parsed.setting_changes
-            : [];
-        result.tags = Array.isArray(parsed.tags) ? parsed.tags : [];
-    }
-    catch {
-        console.error("Failed to parse AI response:", response.content);
-    }
-    // 6. Write extracted data
-    if (result.todos.length > 0) {
-        await todoRepo.createMany(result.todos.map((text) => ({
-            record_id: payload.recordId,
-            text,
-            done: false,
-        })));
-    }
-    if (result.customer_requests.length > 0) {
-        await customerRequestRepo.create(result.customer_requests.map((text) => ({
-            record_id: payload.recordId,
-            text,
-            status: "pending",
-        })));
-    }
-    if (result.setting_changes.length > 0) {
-        await settingChangeRepo.create(result.setting_changes.map((text) => ({
-            record_id: payload.recordId,
-            text,
-            applied: false,
-        })));
-    }
-    // 7. Save tags
-    if (result.tags.length > 0) {
-        for (const tagName of result.tags) {
-            const tag = await tagRepo.upsert(tagName);
-            await tagRepo.addToRecord(payload.recordId, tag.id);
+        // 1. Load skills
+        console.log(`[process] Starting for record ${payload.recordId}, text length: ${payload.text.length}`);
+        const allSkills = loadSkills(SKILLS_DIR);
+        console.log(`[process] Loaded ${allSkills.length} skills: ${allSkills.map(s => s.name).join(", ")}`);
+        // Load skill config: prefer localConfig, fall back to server DB
+        let skillConfigs = [];
+        if (payload.localConfig?.skills?.configs) {
+            skillConfigs = payload.localConfig.skills.configs.map((c) => ({
+                skill_name: c.name,
+                enabled: c.enabled,
+            }));
+            console.log(`[process] Using local skill config`);
         }
+        else {
+            try {
+                skillConfigs = (await skillConfigRepo.findByDevice(payload.deviceId))
+                    .map((c) => ({ skill_name: c.skill_name, enabled: c.enabled }));
+            }
+            catch (err) {
+                console.warn(`[process] Failed to load skill config (table may not exist): ${err.message}`);
+            }
+        }
+        const activeSkills = filterActiveSkills(allSkills, skillConfigs);
+        console.log(`[process] Active skills: ${activeSkills.map(s => s.name).join(", ")}`);
+        if (activeSkills.length === 0) {
+            console.warn("[process] No active skills — nothing to extract");
+        }
+        // 2. Load soul + memory for context (non-critical, continue on failure)
+        // Prefer localConfig soul, fall back to server DB
+        let soulContent;
+        let memories = [];
+        if (payload.localConfig?.soul?.content) {
+            soulContent = payload.localConfig.soul.content;
+            console.log(`[process] Using local soul config`);
+        }
+        else {
+            try {
+                const soul = await loadSoul(payload.deviceId);
+                soulContent = soul?.content;
+            }
+            catch (err) {
+                console.warn(`[process] Failed to load soul: ${err.message}`);
+            }
+        }
+        try {
+            const memoryManager = new MemoryManager();
+            memories = await memoryManager.loadContext(payload.deviceId);
+        }
+        catch (err) {
+            console.warn(`[process] Failed to load memory: ${err.message}`);
+        }
+        // 3. Build prompt with MCP tools if available
+        const mcpRegistry = getMCPRegistry();
+        const mcpTools = mcpRegistry.hasTools() ? mcpRegistry.getToolsForPrompt() : undefined;
+        const systemPrompt = buildSystemPrompt({
+            skills: activeSkills,
+            soul: soulContent,
+            memory: memories,
+            mode: "process",
+            existingTags: payload.localConfig?.existingTags,
+            mcpTools,
+        });
+        console.log(`[process] System prompt length: ${systemPrompt.length}, MCP tools: ${mcpTools?.length ?? 0}`);
+        // 4. Call AI (with tool call loop)
+        console.log("[process] Calling AI...");
+        const messages = [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: payload.text },
+        ];
+        let response = await chatCompletion(messages, { json: true, temperature: 0.3 });
+        console.log(`[process] AI response length: ${response.content.length}, usage: ${JSON.stringify(response.usage)}`);
+        // Tool call loop: if AI requests tool calls, execute them and re-call AI
+        const MAX_TOOL_ROUNDS = 3;
+        for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
+            if (!response.content.trim())
+                break;
+            let parsed;
+            try {
+                parsed = JSON.parse(response.content);
+            }
+            catch {
+                break;
+            }
+            if (!Array.isArray(parsed.tool_calls) || parsed.tool_calls.length === 0)
+                break;
+            console.log(`[process] Tool call round ${round + 1}: ${parsed.tool_calls.length} calls`);
+            // Execute tool calls
+            const toolResults = [];
+            for (const call of parsed.tool_calls) {
+                try {
+                    const toolResult = await mcpRegistry.callTool(call.name, call.arguments ?? {});
+                    const text = toolResult.content.map((c) => c.text ?? "").join("\n");
+                    toolResults.push(`Tool "${call.name}" result: ${text}`);
+                    console.log(`[process] Tool ${call.name}: success`);
+                }
+                catch (err) {
+                    toolResults.push(`Tool "${call.name}" error: ${err.message}`);
+                    console.warn(`[process] Tool ${call.name}: ${err.message}`);
+                }
+            }
+            // Add tool results and re-call AI
+            messages.push({ role: "assistant", content: response.content });
+            messages.push({ role: "user", content: `工具调用结果：\n${toolResults.join("\n\n")}\n\n请基于工具结果，返回最终的 JSON 结果。` });
+            response = await chatCompletion(messages, { json: true, temperature: 0.3 });
+            console.log(`[process] AI re-response length: ${response.content.length}`);
+        }
+        // 5. Parse result
+        if (!response.content.trim()) {
+            console.error("[process] AI returned empty content");
+            result.error = "AI returned empty response";
+        }
+        else {
+            try {
+                const parsed = JSON.parse(response.content);
+                result.todos = Array.isArray(parsed.todos) ? parsed.todos : [];
+                result.customer_requests = Array.isArray(parsed.customer_requests)
+                    ? parsed.customer_requests
+                    : [];
+                result.setting_changes = Array.isArray(parsed.setting_changes)
+                    ? parsed.setting_changes
+                    : [];
+                result.tags = Array.isArray(parsed.tags) ? parsed.tags : [];
+                result.summary = typeof parsed.summary === "string" ? parsed.summary : undefined;
+                // Filter tags: only keep tags that exist in the provided existing tags list
+                if (payload.localConfig?.existingTags && result.tags.length > 0) {
+                    const existingSet = new Set(payload.localConfig.existingTags);
+                    result.tags = result.tags.filter((t) => existingSet.has(t));
+                }
+                console.log(`[process] Parsed: ${result.todos.length} todos, ${result.customer_requests.length} requests, ${result.tags.length} tags, summary: ${result.summary ? 'yes' : 'no'}`);
+            }
+            catch {
+                console.error("[process] Failed to parse AI response as JSON:", response.content.slice(0, 500));
+                result.error = "AI response is not valid JSON";
+            }
+        }
+        // 6. Write extracted data to DB
+        try {
+            if (result.todos.length > 0) {
+                await todoRepo.createMany(result.todos.map((text) => ({
+                    record_id: payload.recordId,
+                    text,
+                    done: false,
+                })));
+            }
+            if (result.customer_requests.length > 0) {
+                await customerRequestRepo.create(result.customer_requests.map((text) => ({
+                    record_id: payload.recordId,
+                    text,
+                    status: "pending",
+                })));
+            }
+            if (result.setting_changes.length > 0) {
+                await settingChangeRepo.create(result.setting_changes.map((text) => ({
+                    record_id: payload.recordId,
+                    text,
+                    applied: false,
+                })));
+            }
+            // 7. Save tags — only associate existing tags, never create new ones
+            if (result.tags.length > 0) {
+                for (const tagName of result.tags) {
+                    const tag = await tagRepo.findByName(tagName);
+                    if (tag) {
+                        await tagRepo.addToRecord(payload.recordId, tag.id);
+                    }
+                    else {
+                        console.log(`[process] Skipping unknown tag: ${tagName}`);
+                    }
+                }
+            }
+        }
+        catch (err) {
+            console.error(`[process] DB write error: ${err.message}`);
+            // Don't block — still update status and return result
+        }
+        // 8. Update record status
+        await recordRepo.updateStatus(payload.recordId, "completed");
+        console.log(`[process] Record ${payload.recordId} marked as completed`);
+        // 9. Background: estimate time for new todos
+        if (result.todos.length > 0) {
+            const pendingTodos = await todoRepo.findPendingByDevice(payload.deviceId);
+            const newTodos = pendingTodos.slice(-result.todos.length); // latest N todos
+            if (newTodos.length > 0) {
+                estimateBatchTodos(newTodos.map((t) => ({ id: t.id, text: t.text })), { soul: soulContent })
+                    .then(async (estimates) => {
+                    for (const [todoId, estimate] of estimates) {
+                        await todoRepo.update(todoId, {
+                            estimated_minutes: estimate.estimated_minutes,
+                            priority: estimate.priority,
+                        });
+                    }
+                    console.log(`[process] Time estimates updated for ${estimates.size} todos`);
+                })
+                    .catch((err) => {
+                    console.warn("[process] Time estimation failed:", err.message);
+                });
+            }
+        }
+        // 10. Background: maybe create long-term memory & update soul
+        const memoryManager = new MemoryManager();
+        const today = new Date().toISOString().split("T")[0];
+        memoryManager.maybeCreateMemory(payload.deviceId, payload.text, today).catch((e) => {
+            console.warn("[process] Memory creation failed:", e.message);
+        });
+        updateSoul(payload.deviceId, payload.text).catch((e) => {
+            console.warn("[process] Soul update failed:", e.message);
+        });
     }
-    // 8. Update record status
-    await recordRepo.updateStatus(payload.recordId, "completed");
-    // 9. Background: maybe create long-term memory & update soul
-    const today = new Date().toISOString().split("T")[0];
-    memoryManager.maybeCreateMemory(payload.deviceId, payload.text, today).catch(() => { });
-    updateSoul(payload.deviceId, payload.text).catch(() => { });
+    catch (err) {
+        console.error(`[process] Fatal error processing record ${payload.recordId}:`, err);
+        // Ensure record status is updated even on failure
+        try {
+            await recordRepo.updateStatus(payload.recordId, "error");
+        }
+        catch {
+            console.error("[process] Also failed to update record status to error");
+        }
+        result.error = err.message;
+    }
     return result;
 }
 //# sourceMappingURL=process.js.map

@@ -5,6 +5,17 @@ export interface ChatStartPayload {
         start: string;
         end: string;
     };
+    localConfig?: {
+        soul?: {
+            content: string;
+        };
+        skills?: {
+            configs: Array<{
+                name: string;
+                enabled: boolean;
+            }>;
+        };
+    };
 }
 /**
  * Start a review chat session.
