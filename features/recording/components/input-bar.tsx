@@ -7,7 +7,7 @@ import { usePCMRecorder } from "@/features/recording/hooks/use-pcm-recorder";
 import { getGatewayClient, type GatewayResponse } from "@/features/chat/lib/gateway-client";
 import { getDeviceId } from "@/shared/lib/device";
 import { emit } from "@/features/recording/lib/events";
-import { executeCommand, getCommandNames } from "@/features/commands/lib/registry";
+import { executeCommand, getCommandNames, getCommandDefs } from "@/features/commands/lib/registry";
 import type { CommandContext } from "@/features/commands/lib/registry";
 import { createManualNote } from "@/features/notes/lib/manual-note";
 import { toast } from "sonner";
@@ -17,10 +17,11 @@ type VoicePhase = "idle" | "pressing" | "recording" | "locked";
 
 interface InputBarProps {
   onStartReview?: (dateRange: { start: string; end: string }) => void;
+  onCommandDetected?: (command: string, args?: string[]) => void;
   commandContext?: Partial<CommandContext>;
 }
 
-export function InputBar({ onStartReview, commandContext }: InputBarProps) {
+export function InputBar({ onStartReview, onCommandDetected, commandContext }: InputBarProps) {
   const [mode, setMode] = useState<InputMode>("voice");
   const [text, setText] = useState("");
   const [voicePhase, setVoicePhase] = useState<VoicePhase>("idle");
@@ -49,8 +50,12 @@ export function InputBar({ onStartReview, commandContext }: InputBarProps) {
   useEffect(() => {
     if (text.startsWith("/") && text.length > 1) {
       const partial = text.slice(1).toLowerCase();
-      const matches = getCommandNames().filter((c) => c.startsWith(partial));
+      const matches = getCommandDefs()
+        .filter((c) => c.name.startsWith(partial) || c.aliases.some((a) => a.toLowerCase().startsWith(partial)))
+        .map((c) => c.name);
       setCommandSuggestions(matches);
+    } else if (text === "/") {
+      setCommandSuggestions(getCommandNames().slice(0, 6));
     } else {
       setCommandSuggestions([]);
     }
@@ -104,6 +109,9 @@ export function InputBar({ onStartReview, commandContext }: InputBarProps) {
         case "process.result":
           // AI processing done in background
           emit("recording:processed");
+          break;
+        case "command.detected":
+          onCommandDetected?.(msg.payload.command, msg.payload.args);
           break;
       }
     });

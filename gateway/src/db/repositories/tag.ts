@@ -15,6 +15,14 @@ export async function upsert(name: string): Promise<Tag> {
   return row!;
 }
 
+export async function findByName(name: string): Promise<Tag | null> {
+  const row = await queryOne<Tag>(
+    `SELECT * FROM tag WHERE name = $1`,
+    [name],
+  );
+  return row ?? null;
+}
+
 export async function findAll(): Promise<Tag[]> {
   return query<Tag>(`SELECT * FROM tag ORDER BY name`);
 }

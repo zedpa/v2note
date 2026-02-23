@@ -3,9 +3,16 @@
  * Handles connection, message sending, and event dispatching.
  */
 
+export interface LocalConfigPayload {
+  soul?: { content: string };
+  skills?: { configs: Array<{ name: string; enabled: boolean }> };
+  settings?: Record<string, unknown>;
+  existingTags?: string[];
+}
+
 export type GatewayMessage =
-  | { type: "process"; payload: { text: string; deviceId: string; recordId: string } }
-  | { type: "chat.start"; payload: { deviceId: string; mode: "review"; dateRange: { start: string; end: string } } }
+  | { type: "process"; payload: { text: string; deviceId: string; recordId: string; localConfig?: LocalConfigPayload } }
+  | { type: "chat.start"; payload: { deviceId: string; mode: "review"; dateRange: { start: string; end: string }; localConfig?: Pick<LocalConfigPayload, "soul" | "skills"> } }
   | { type: "chat.message"; payload: { text: string; deviceId: string } }
   | { type: "chat.end"; payload: { deviceId: string } }
   | { type: "todo.aggregate"; payload: { deviceId: string } }
@@ -22,6 +29,9 @@ export type GatewayResponse =
   | { type: "asr.sentence"; payload: { text: string; sentenceId: number; begin_time: number; end_time: number } }
   | { type: "asr.done"; payload: { transcript: string; recordId: string; duration: number } }
   | { type: "asr.error"; payload: { message: string } }
+  | { type: "command.detected"; payload: { command: string; args: string[] } }
+  | { type: "proactive.message"; payload: { text: string; action?: string } }
+  | { type: "proactive.todo_nudge"; payload: { todoId: string; text: string; suggestion: string } }
   | { type: "error"; payload: { message: string } };
 
 type MessageHandler = (msg: GatewayResponse) => void;

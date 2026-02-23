@@ -5,6 +5,11 @@ export interface Todo {
   record_id: string;
   text: string;
   done: boolean;
+  estimated_minutes: number | null;
+  scheduled_start: string | null;
+  scheduled_end: string | null;
+  priority: number;
+  completed_at: string | null;
   created_at: string;
 }
 
@@ -56,7 +61,14 @@ export async function createMany(
 
 export async function update(
   id: string,
-  fields: { text?: string; done?: boolean },
+  fields: {
+    text?: string;
+    done?: boolean;
+    estimated_minutes?: number | null;
+    scheduled_start?: string | null;
+    scheduled_end?: string | null;
+    priority?: number;
+  },
 ): Promise<void> {
   const sets: string[] = [];
   const params: any[] = [];
@@ -68,6 +80,22 @@ export async function update(
   if (fields.done !== undefined) {
     sets.push(`done = $${i++}`);
     params.push(fields.done);
+  }
+  if (fields.estimated_minutes !== undefined) {
+    sets.push(`estimated_minutes = $${i++}`);
+    params.push(fields.estimated_minutes);
+  }
+  if (fields.scheduled_start !== undefined) {
+    sets.push(`scheduled_start = $${i++}`);
+    params.push(fields.scheduled_start);
+  }
+  if (fields.scheduled_end !== undefined) {
+    sets.push(`scheduled_end = $${i++}`);
+    params.push(fields.scheduled_end);
+  }
+  if (fields.priority !== undefined) {
+    sets.push(`priority = $${i++}`);
+    params.push(fields.priority);
   }
   if (sets.length === 0) return;
   params.push(id);

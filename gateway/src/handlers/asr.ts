@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { recordRepo } from "../db/repositories/index.js";
 import { transcriptRepo } from "../db/repositories/index.js";
 import { processEntry } from "./process.js";
+import { matchVoiceCommand } from "./voice-commands.js";
 
 interface ASRSession {
   deviceId: string;
@@ -234,6 +235,20 @@ async function finishASR(clientWs: WsWebSocket, deviceId: string): Promise<void>
       type: "asr.done",
       payload: { transcript: "", recordId: "", duration: 0 },
     });
+    sessions.delete(deviceId);
+    return;
+  }
+
+  // Check if the transcript matches a voice command
+  const voiceCmd = matchVoiceCommand(transcript);
+  if (voiceCmd) {
+    console.log(`[asr] Voice command detected: /${voiceCmd.command}`);
+    sendToClient(clientWs, {
+      type: "command.detected",
+      payload: { command: voiceCmd.command, args: voiceCmd.args },
+    });
+    // Cleanup and return — don't create a record for voice commands
+    if (session.dashscopeWs) session.dashscopeWs.close();
     sessions.delete(deviceId);
     return;
   }

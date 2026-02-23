@@ -8,6 +8,8 @@ export function buildSystemPrompt(opts: {
   soul?: string;
   memory?: string[];
   mode?: "process" | "chat";
+  existingTags?: string[];
+  mcpTools?: Array<{ name: string; description: string; parameters?: Record<string, unknown> }>;
 }): string {
   const parts: string[] = [];
 
@@ -27,6 +29,16 @@ export function buildSystemPrompt(opts: {
   // Mode-specific instructions
   if (opts.mode === "process") {
     parts.push(`\n## 任务\n分析以下记录内容，按照激活的技能进行提取。你必须且只能返回一个合法的 JSON 对象，不要包含任何 markdown 代码块标记、注释或额外文字。`);
+
+    // De-colloquialization instructions
+    parts.push(`\n## 去口语化规则\n对输入文本进行书面化处理，生成 summary 字段：\n- 移除口语填充词：嗯、啊、那个、就是说、然后呢、对吧、你知道吗、这个、额、哦、呃\n- 移除重复词和无意义的语气词\n- 将口语化表达转为书面语\n- 保留原意，不添加或删减实质内容\n- 修正不通顺的句子结构\n- summary 应该是完整通顺的书面语段落`);
+
+    // Tag matching rules
+    if (opts.existingTags && opts.existingTags.length > 0) {
+      parts.push(`\n## 标签规则\n只能从以下已有标签中选择匹配的标签，**不要创建新标签**：\n${opts.existingTags.map(t => `- "${t}"`).join("\n")}\n如果没有合适的标签匹配，tags 返回空数组 []。`);
+    } else {
+      parts.push(`\n## 标签规则\ntags 返回空数组 []，不要创建任何标签。`);
+    }
   } else if (opts.mode === "chat") {
     parts.push(`\n## 任务\n你正在与用户进行复盘对话。基于记忆和用户画像，帮助用户回顾和总结。自然地对话，按需提出问题和洞察。`);
   }
@@ -39,6 +51,18 @@ export function buildSystemPrompt(opts: {
     }
   }
 
+  // MCP tools
+  if (opts.mcpTools && opts.mcpTools.length > 0) {
+    parts.push(`\n## 可用工具\n你可以调用以下工具来获取外部信息。如需使用工具，在 JSON 响应中添加 "tool_calls" 字段。`);
+    for (const tool of opts.mcpTools) {
+      parts.push(`\n### ${tool.name}\n${tool.description}`);
+      if (tool.parameters) {
+        parts.push(`参数: ${JSON.stringify(tool.parameters)}`);
+      }
+    }
+    parts.push(`\n工具调用格式：\n"tool_calls": [{"name": "工具名", "arguments": {...}}]`);
+  }
+
   // Output format for process mode
   if (opts.mode === "process") {
     const fields = opts.skills
@@ -47,15 +71,19 @@ export function buildSystemPrompt(opts: {
 
     if (fields.length > 0) {
       parts.push(`\n## 输出格式\n返回严格的 JSON 对象（不要用 \`\`\`json 包裹），包含以下字段：`);
+      parts.push(`- "summary": string — 去口语化后的书面文本`);
       for (const field of fields) {
         parts.push(`- "${field}": string[] — 提取的${field}列表`);
       }
-      parts.push(`- "tags": string[] — 自动标签`);
+      parts.push(`- "tags": string[] — 从已有标签中匹配的标签`);
+      if (opts.mcpTools && opts.mcpTools.length > 0) {
+        parts.push(`- "tool_calls": object[] — (可选) 需要调用的工具`);
+      }
       parts.push(`\n如果某个字段没有相关内容，返回空数组 []。不要包含额外的字段或注释。`);
-      parts.push(`\n示例输出：\n{"${fields[0]}": [], "tags": []}`);
+      parts.push(`\n示例输出：\n{"summary": "...", "${fields[0]}": [], "tags": []}`);
     } else {
       // Fallback: even without extract_fields, ensure JSON output
-      parts.push(`\n## 输出格式\n返回严格的 JSON 对象：\n{"todos": [], "customer_requests": [], "setting_changes": [], "tags": []}\n如果某个字段没有相关内容，返回空数组。`);
+      parts.push(`\n## 输出格式\n返回严格的 JSON 对象：\n{"summary": "", "todos": [], "customer_requests": [], "setting_changes": [], "tags": []}\n如果某个字段没有相关内容，返回空数组。`);
     }
   }
 

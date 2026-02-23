@@ -1,0 +1,15 @@
+[
+  {"name": "todos", "aliases": ["todo","待办"], "description": "显示待办日记卡", "category": "view"},
+  {"name": "today-todo", "aliases": ["今日","today"], "description": "今日任务甘特图", "category": "view"},
+  {"name": "settings", "aliases": ["设置"], "description": "JSON设置编辑", "category": "settings"},
+  {"name": "review", "aliases": ["复盘"], "description": "开始复盘对话", "category": "view"},
+  {"name": "search", "aliases": ["搜索"], "description": "搜索笔记", "category": "view"},
+  {"name": "skills", "aliases": ["技能"], "description": "管理技能", "category": "view"},
+  {"name": "stats", "aliases": ["统计"], "description": "查看统计", "category": "view"},
+  {"name": "help", "aliases": ["帮助"], "description": "显示帮助", "category": "system"},
+  {"name": "theme", "aliases": ["主题"], "description": "切换主题", "category": "settings"},
+  {"name": "export", "aliases": ["导出"], "description": "导出数据", "category": "action"},
+  {"name": "profile", "aliases": ["画像"], "description": "编辑AI画像", "category": "view"},
+  {"name": "ideas", "aliases": ["灵感"], "description": "查看灵感列表", "category": "view"},
+  {"name": "memory", "aliases": ["记忆"], "description": "查看AI记忆", "category": "view"}
+]

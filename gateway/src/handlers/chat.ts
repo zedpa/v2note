@@ -16,6 +16,10 @@ export interface ChatStartPayload {
   deviceId: string;
   mode: "review";
   dateRange: { start: string; end: string };
+  localConfig?: {
+    soul?: { content: string };
+    skills?: { configs: Array<{ name: string; enabled: boolean }> };
+  };
 }
 
 /**
@@ -29,8 +33,10 @@ export async function startChat(
   const session = getSession(payload.deviceId);
   session.mode = "chat";
 
-  // Load context
-  const soul = await loadSoul(payload.deviceId);
+  // Load context: prefer localConfig soul, fall back to server DB
+  const soul = payload.localConfig?.soul
+    ? { content: payload.localConfig.soul.content }
+    : await loadSoul(payload.deviceId);
   const memoryManager = new MemoryManager();
   const memories = await memoryManager.loadContext(
     payload.deviceId,

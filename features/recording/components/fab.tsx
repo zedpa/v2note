@@ -18,10 +18,11 @@ import { toast } from "sonner";
 
 interface FABProps {
   onStartReview?: (dateRange: { start: string; end: string }) => void;
+  onCommandDetected?: (command: string, args?: string[]) => void;
   commandContext?: Partial<CommandContext>;
 }
 
-export function FAB({ onStartReview, commandContext }: FABProps) {
+export function FAB({ onStartReview, onCommandDetected, commandContext }: FABProps) {
   const [showTextSheet, setShowTextSheet] = useState(false);
   const [displayDuration, setDisplayDuration] = useState(0);
   const [waveHeights, setWaveHeights] = useState<number[]>(
@@ -87,11 +88,14 @@ export function FAB({ onStartReview, commandContext }: FABProps) {
         case "process.result":
           emit("recording:processed");
           break;
+        case "command.detected":
+          onCommandDetected?.(msg.payload.command, msg.payload.args);
+          break;
       }
     });
 
     return () => unsub();
-  }, []);
+  }, [onCommandDetected]);
 
   // ── Recording actions ──
 

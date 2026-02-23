@@ -1,0 +1,63 @@
+{
+  "sections": [
+    {
+      "title": "通用",
+      "key": "general",
+      "fields": [
+        {
+          "key": "theme",
+          "label": "主题",
+          "type": "select",
+          "options": ["system", "light", "dark"],
+          "default": "system"
+        },
+        {
+          "key": "language",
+          "label": "语言",
+          "type": "select",
+          "options": ["zh-CN", "en-US"],
+          "default": "zh-CN"
+        }
+      ]
+    },
+    {
+      "title": "录音",
+      "key": "recording",
+      "fields": [
+        {
+          "key": "autoDeleteAudio",
+          "label": "处理后自动删除音频",
+          "type": "toggle",
+          "default": false
+        }
+      ]
+    },
+    {
+      "title": "用户类型",
+      "key": "user",
+      "fields": [
+        {
+          "key": "userType",
+          "label": "角色类型",
+          "type": "select",
+          "options": ["manager", "creator"],
+          "default": null
+        }
+      ]
+    },
+    {
+      "title": "AI 提醒",
+      "key": "proactive",
+      "fields": [
+        {
+          "key": "proactiveInterval",
+          "label": "提醒检查间隔 (分钟)",
+          "type": "number",
+          "default": 30,
+          "min": 5,
+          "max": 120
+        }
+      ]
+    }
+  ]
+}

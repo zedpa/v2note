@@ -21,6 +21,7 @@ import { registerExportRoutes } from "./routes/export.js";
 import { registerSyncRoutes } from "./routes/sync.js";
 import { registerMemoryRoutes } from "./routes/memory.js";
 import { registerSoulRoutes } from "./routes/soul.js";
+import { getProactiveEngine } from "./proactive/engine.js";
 
 // Load environment
 config({ path: "../.env.local" });
@@ -49,6 +50,9 @@ type GatewayResponse =
   | { type: "asr.sentence"; payload: { text: string; sentenceId: number; begin_time: number; end_time: number } }
   | { type: "asr.done"; payload: { transcript: string; recordId: string; duration: number } }
   | { type: "asr.error"; payload: { message: string } }
+  | { type: "command.detected"; payload: { command: string; args: string[] } }
+  | { type: "proactive.message"; payload: { text: string; action?: string } }
+  | { type: "proactive.todo_nudge"; payload: { todoId: string; text: string; suggestion: string } }
   | { type: "error"; payload: { message: string } };
 
 // ── HTTP Router ──
@@ -115,6 +119,9 @@ function send(ws: WebSocket, msg: GatewayResponse) {
     ws.send(JSON.stringify(msg));
   }
 }
+
+const proactiveEngine = getProactiveEngine();
+proactiveEngine.start();
 
 wss.on("connection", (ws) => {
   console.log("[gateway] Client connected");
@@ -190,6 +197,7 @@ wss.on("connection", (ws) => {
 
         case "asr.start": {
           connectionDeviceMap.set(ws, msg.payload.deviceId);
+          proactiveEngine.registerDevice(msg.payload.deviceId, ws);
           await startASR(ws, msg.payload.deviceId, msg.payload.locationText);
           break;
         }
@@ -224,6 +232,7 @@ wss.on("connection", (ws) => {
       cancelASR(deviceId);
       connectionDeviceMap.delete(ws);
     }
+    proactiveEngine.unregisterByWs(ws);
     console.log("[gateway] Client disconnected");
   });
 });

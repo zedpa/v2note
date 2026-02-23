@@ -1,6 +1,6 @@
 import { loadSkills, filterActiveSkills } from "../skills/loader.js";
 import { buildSystemPrompt } from "../skills/prompt-builder.js";
-import { chatCompletion } from "../ai/provider.js";
+import { chatCompletion, type ChatMessage } from "../ai/provider.js";
 import { MemoryManager } from "../memory/manager.js";
 import { updateSoul } from "../soul/manager.js";
 import { loadSoul } from "../soul/manager.js";
@@ -12,15 +12,25 @@ import { customerRequestRepo } from "../db/repositories/index.js";
 import { settingChangeRepo } from "../db/repositories/index.js";
 import { tagRepo } from "../db/repositories/index.js";
 import { recordRepo } from "../db/repositories/index.js";
+import { getMCPRegistry } from "../mcp/registry.js";
+import { estimateBatchTodos } from "../proactive/time-estimator.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SKILLS_DIR = join(__dirname, "../../skills");
+
+export interface LocalConfigPayload {
+  soul?: { content: string };
+  skills?: { configs: Array<{ name: string; enabled: boolean }> };
+  settings?: Record<string, unknown>;
+  existingTags?: string[];
+}
 
 export interface ProcessPayload {
   text: string;
   audioUrl?: string;
   deviceId: string;
   recordId: string;
+  localConfig?: LocalConfigPayload;
 }
 
 export interface ProcessResult {
@@ -28,6 +38,7 @@ export interface ProcessResult {
   customer_requests: string[];
   setting_changes: string[];
   tags: string[];
+  summary?: string;
   error?: string;
 }
 
@@ -48,13 +59,21 @@ export async function processEntry(payload: ProcessPayload): Promise<ProcessResu
     const allSkills = loadSkills(SKILLS_DIR);
     console.log(`[process] Loaded ${allSkills.length} skills: ${allSkills.map(s => s.name).join(", ")}`);
 
-    // Load device-specific skill config
+    // Load skill config: prefer localConfig, fall back to server DB
     let skillConfigs: Array<{ skill_name: string; enabled: boolean }> = [];
-    try {
-      skillConfigs = (await skillConfigRepo.findByDevice(payload.deviceId))
-        .map((c) => ({ skill_name: c.skill_name, enabled: c.enabled }));
-    } catch (err: any) {
-      console.warn(`[process] Failed to load skill config (table may not exist): ${err.message}`);
+    if (payload.localConfig?.skills?.configs) {
+      skillConfigs = payload.localConfig.skills.configs.map((c) => ({
+        skill_name: c.name,
+        enabled: c.enabled,
+      }));
+      console.log(`[process] Using local skill config`);
+    } else {
+      try {
+        skillConfigs = (await skillConfigRepo.findByDevice(payload.deviceId))
+          .map((c) => ({ skill_name: c.skill_name, enabled: c.enabled }));
+      } catch (err: any) {
+        console.warn(`[process] Failed to load skill config (table may not exist): ${err.message}`);
+      }
     }
 
     const activeSkills = filterActiveSkills(allSkills, skillConfigs);
@@ -65,14 +84,20 @@ export async function processEntry(payload: ProcessPayload): Promise<ProcessResu
     }
 
     // 2. Load soul + memory for context (non-critical, continue on failure)
+    // Prefer localConfig soul, fall back to server DB
     let soulContent: string | undefined;
     let memories: string[] = [];
 
-    try {
-      const soul = await loadSoul(payload.deviceId);
-      soulContent = soul?.content;
-    } catch (err: any) {
-      console.warn(`[process] Failed to load soul: ${err.message}`);
+    if (payload.localConfig?.soul?.content) {
+      soulContent = payload.localConfig.soul.content;
+      console.log(`[process] Using local soul config`);
+    } else {
+      try {
+        const soul = await loadSoul(payload.deviceId);
+        soulContent = soul?.content;
+      } catch (err: any) {
+        console.warn(`[process] Failed to load soul: ${err.message}`);
+      }
     }
 
     try {
@@ -82,25 +107,67 @@ export async function processEntry(payload: ProcessPayload): Promise<ProcessResu
       console.warn(`[process] Failed to load memory: ${err.message}`);
     }
 
-    // 3. Build prompt
+    // 3. Build prompt with MCP tools if available
+    const mcpRegistry = getMCPRegistry();
+    const mcpTools = mcpRegistry.hasTools() ? mcpRegistry.getToolsForPrompt() : undefined;
+
     const systemPrompt = buildSystemPrompt({
       skills: activeSkills,
       soul: soulContent,
       memory: memories,
       mode: "process",
+      existingTags: payload.localConfig?.existingTags,
+      mcpTools,
     });
-    console.log(`[process] System prompt length: ${systemPrompt.length}`);
+    console.log(`[process] System prompt length: ${systemPrompt.length}, MCP tools: ${mcpTools?.length ?? 0}`);
 
-    // 4. Call AI
+    // 4. Call AI (with tool call loop)
     console.log("[process] Calling AI...");
-    const response = await chatCompletion(
-      [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: payload.text },
-      ],
-      { json: true, temperature: 0.3 },
-    );
+    const messages: ChatMessage[] = [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: payload.text },
+    ];
+
+    let response = await chatCompletion(messages, { json: true, temperature: 0.3 });
     console.log(`[process] AI response length: ${response.content.length}, usage: ${JSON.stringify(response.usage)}`);
+
+    // Tool call loop: if AI requests tool calls, execute them and re-call AI
+    const MAX_TOOL_ROUNDS = 3;
+    for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
+      if (!response.content.trim()) break;
+
+      let parsed: any;
+      try {
+        parsed = JSON.parse(response.content);
+      } catch {
+        break;
+      }
+
+      if (!Array.isArray(parsed.tool_calls) || parsed.tool_calls.length === 0) break;
+
+      console.log(`[process] Tool call round ${round + 1}: ${parsed.tool_calls.length} calls`);
+
+      // Execute tool calls
+      const toolResults: string[] = [];
+      for (const call of parsed.tool_calls) {
+        try {
+          const toolResult = await mcpRegistry.callTool(call.name, call.arguments ?? {});
+          const text = toolResult.content.map((c: any) => c.text ?? "").join("\n");
+          toolResults.push(`Tool "${call.name}" result: ${text}`);
+          console.log(`[process] Tool ${call.name}: success`);
+        } catch (err: any) {
+          toolResults.push(`Tool "${call.name}" error: ${err.message}`);
+          console.warn(`[process] Tool ${call.name}: ${err.message}`);
+        }
+      }
+
+      // Add tool results and re-call AI
+      messages.push({ role: "assistant", content: response.content });
+      messages.push({ role: "user", content: `工具调用结果：\n${toolResults.join("\n\n")}\n\n请基于工具结果，返回最终的 JSON 结果。` });
+
+      response = await chatCompletion(messages, { json: true, temperature: 0.3 });
+      console.log(`[process] AI re-response length: ${response.content.length}`);
+    }
 
     // 5. Parse result
     if (!response.content.trim()) {
@@ -117,7 +184,15 @@ export async function processEntry(payload: ProcessPayload): Promise<ProcessResu
           ? parsed.setting_changes
           : [];
         result.tags = Array.isArray(parsed.tags) ? parsed.tags : [];
-        console.log(`[process] Parsed: ${result.todos.length} todos, ${result.customer_requests.length} requests, ${result.tags.length} tags`);
+        result.summary = typeof parsed.summary === "string" ? parsed.summary : undefined;
+
+        // Filter tags: only keep tags that exist in the provided existing tags list
+        if (payload.localConfig?.existingTags && result.tags.length > 0) {
+          const existingSet = new Set(payload.localConfig.existingTags);
+          result.tags = result.tags.filter((t: string) => existingSet.has(t));
+        }
+
+        console.log(`[process] Parsed: ${result.todos.length} todos, ${result.customer_requests.length} requests, ${result.tags.length} tags, summary: ${result.summary ? 'yes' : 'no'}`);
       } catch {
         console.error("[process] Failed to parse AI response as JSON:", response.content.slice(0, 500));
         result.error = "AI response is not valid JSON";
@@ -156,11 +231,15 @@ export async function processEntry(payload: ProcessPayload): Promise<ProcessResu
         );
       }
 
-      // 7. Save tags
+      // 7. Save tags — only associate existing tags, never create new ones
       if (result.tags.length > 0) {
         for (const tagName of result.tags) {
-          const tag = await tagRepo.upsert(tagName);
-          await tagRepo.addToRecord(payload.recordId, tag.id);
+          const tag = await tagRepo.findByName(tagName);
+          if (tag) {
+            await tagRepo.addToRecord(payload.recordId, tag.id);
+          } else {
+            console.log(`[process] Skipping unknown tag: ${tagName}`);
+          }
         }
       }
     } catch (err: any) {
@@ -172,7 +251,31 @@ export async function processEntry(payload: ProcessPayload): Promise<ProcessResu
     await recordRepo.updateStatus(payload.recordId, "completed");
     console.log(`[process] Record ${payload.recordId} marked as completed`);
 
-    // 9. Background: maybe create long-term memory & update soul
+    // 9. Background: estimate time for new todos
+    if (result.todos.length > 0) {
+      const pendingTodos = await todoRepo.findPendingByDevice(payload.deviceId);
+      const newTodos = pendingTodos.slice(-result.todos.length); // latest N todos
+      if (newTodos.length > 0) {
+        estimateBatchTodos(
+          newTodos.map((t) => ({ id: t.id, text: t.text })),
+          { soul: soulContent },
+        )
+          .then(async (estimates) => {
+            for (const [todoId, estimate] of estimates) {
+              await todoRepo.update(todoId, {
+                estimated_minutes: estimate.estimated_minutes,
+                priority: estimate.priority,
+              });
+            }
+            console.log(`[process] Time estimates updated for ${estimates.size} todos`);
+          })
+          .catch((err) => {
+            console.warn("[process] Time estimation failed:", err.message);
+          });
+      }
+    }
+
+    // 10. Background: maybe create long-term memory & update soul
     const memoryManager = new MemoryManager();
     const today = new Date().toISOString().split("T")[0];
     memoryManager.maybeCreateMemory(payload.deviceId, payload.text, today).catch((e) => {

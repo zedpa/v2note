@@ -1,9 +1,8 @@
 "use client";
 
-import { X, HelpCircle, Download, CreditCard, Info, Brain, FileText } from "lucide-react";
+import { X, HelpCircle, Download, CreditCard, Info, Brain, FileText, Zap, UserCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { StatsPanel } from "./stats-panel";
-import { SkillsPanel } from "./skills-panel";
 
 interface SidebarDrawerProps {
   open: boolean;
@@ -11,6 +10,8 @@ interface SidebarDrawerProps {
   onViewStats?: () => void;
   onViewMemory?: () => void;
   onViewReview?: () => void;
+  onViewSkills?: () => void;
+  onViewProfile?: () => void;
 }
 
 export function SidebarDrawer({
@@ -19,6 +20,8 @@ export function SidebarDrawer({
   onViewStats,
   onViewMemory,
   onViewReview,
+  onViewSkills,
+  onViewProfile,
 }: SidebarDrawerProps) {
   if (!open) return null;
 
@@ -65,13 +68,22 @@ export function SidebarDrawer({
 
           <div className="h-px bg-border/60 mx-4" />
 
-          {/* Skills */}
-          <SkillsPanel />
-
-          <div className="h-px bg-border/60 mx-4" />
-
           {/* Menu items */}
           <div className="p-4 space-y-1">
+            {onViewSkills && (
+              <MenuItem
+                icon={<Zap className="w-4 h-4" />}
+                label="技能管理"
+                onClick={() => { onClose(); onViewSkills(); }}
+              />
+            )}
+            {onViewProfile && (
+              <MenuItem
+                icon={<UserCircle className="w-4 h-4" />}
+                label="个人画像"
+                onClick={() => { onClose(); onViewProfile(); }}
+              />
+            )}
             {onViewMemory && (
               <MenuItem
                 icon={<Brain className="w-4 h-4" />}

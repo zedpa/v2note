@@ -8,7 +8,7 @@ import {
   DrawerContent,
   DrawerTitle,
 } from "@/components/ui/drawer";
-import { executeCommand, getCommandNames } from "@/features/commands/lib/registry";
+import { executeCommand, getCommandNames, getCommandDefs } from "@/features/commands/lib/registry";
 import type { CommandContext } from "@/features/commands/lib/registry";
 import { createManualNote } from "@/features/notes/lib/manual-note";
 import { emit } from "@/features/recording/lib/events";
@@ -46,8 +46,12 @@ export function TextBottomSheet({
   useEffect(() => {
     if (text.startsWith("/") && text.length > 1) {
       const partial = text.slice(1).toLowerCase();
-      const matches = getCommandNames().filter((c) => c.startsWith(partial));
+      const matches = getCommandDefs()
+        .filter((c) => c.name.startsWith(partial) || c.aliases.some((a) => a.toLowerCase().startsWith(partial)))
+        .map((c) => c.name);
       setSuggestions(matches);
+    } else if (text === "/") {
+      setSuggestions(getCommandNames().slice(0, 6));
     } else {
       setSuggestions([]);
     }
