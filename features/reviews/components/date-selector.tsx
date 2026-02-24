@@ -1,10 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import type { DateRange } from "react-day-picker";
-import { Calendar } from "@/components/ui/calendar";
-import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { Calendar, Clock, CalendarDays, Infinity } from "lucide-react";
 import type { Review } from "@/shared/lib/types";
 
 type PeriodType = Review["period"];
@@ -14,110 +11,82 @@ interface DateSelectorProps {
   generating: boolean;
 }
 
-function getWeekRange(offset: number) {
-  const now = new Date();
-  const day = now.getDay();
-  const monday = new Date(now);
-  monday.setDate(now.getDate() - (day === 0 ? 6 : day - 1) + offset * 7);
-  monday.setHours(0, 0, 0, 0);
-  const sunday = new Date(monday);
-  sunday.setDate(monday.getDate() + 6);
-  sunday.setHours(23, 59, 59, 999);
-  return { from: monday, to: sunday };
+function daysAgo(days: number): Date {
+  const d = new Date();
+  d.setDate(d.getDate() - days);
+  d.setHours(0, 0, 0, 0);
+  return d;
 }
 
-function getMonthRange(offset: number) {
-  const now = new Date();
-  const from = new Date(now.getFullYear(), now.getMonth() + offset, 1);
-  const to = new Date(now.getFullYear(), now.getMonth() + offset + 1, 0, 23, 59, 59, 999);
-  return { from, to };
+function endOfToday(): Date {
+  const d = new Date();
+  d.setHours(23, 59, 59, 999);
+  return d;
 }
 
 const SHORTCUTS = [
-  { label: "本周", fn: () => getWeekRange(0) },
-  { label: "上周", fn: () => getWeekRange(-1) },
-  { label: "本月", fn: () => getMonthRange(0) },
-  { label: "上月", fn: () => getMonthRange(-1) },
+  {
+    label: "近7天",
+    icon: Clock,
+    period: "weekly" as PeriodType,
+    getRange: () => ({ from: daysAgo(7), to: endOfToday() }),
+  },
+  {
+    label: "近1月",
+    icon: Calendar,
+    period: "monthly" as PeriodType,
+    getRange: () => ({ from: daysAgo(30), to: endOfToday() }),
+  },
+  {
+    label: "近半年",
+    icon: CalendarDays,
+    period: "monthly" as PeriodType,
+    getRange: () => ({ from: daysAgo(180), to: endOfToday() }),
+  },
+  {
+    label: "全部日记",
+    icon: Infinity,
+    period: "monthly" as PeriodType,
+    getRange: () => ({ from: new Date("2020-01-01"), to: endOfToday() }),
+  },
 ];
 
 export function DateSelector({ onGenerate, generating }: DateSelectorProps) {
-  const [period, setPeriod] = useState<PeriodType>("weekly");
-  const [range, setRange] = useState<DateRange | undefined>(undefined);
-
-  const handleShortcut = (from: Date, to: Date) => {
-    setRange({ from, to });
-  };
-
-  const handleGenerate = () => {
-    if (!range?.from || !range?.to) return;
-    onGenerate(period, range.from.toISOString(), range.to.toISOString());
+  const handleClick = (shortcut: (typeof SHORTCUTS)[number]) => {
+    if (generating) return;
+    const { from, to } = shortcut.getRange();
+    onGenerate(shortcut.period, from.toISOString(), to.toISOString());
   };
 
   return (
-    <div className="space-y-4">
-      {/* Period type pills */}
-      <div className="flex gap-2">
-        {(["daily", "weekly", "monthly"] as PeriodType[]).map((p) => (
-          <button
-            key={p}
-            type="button"
-            onClick={() => setPeriod(p)}
-            className={cn(
-              "px-3 py-1.5 rounded-full text-xs font-medium transition-colors",
-              period === p
-                ? "bg-primary text-primary-foreground"
-                : "bg-secondary/60 text-muted-foreground hover:bg-secondary",
-            )}
-          >
-            {p === "daily" ? "日" : p === "weekly" ? "周" : "月"}
-          </button>
-        ))}
+    <div className="space-y-3">
+      <p className="text-sm text-muted-foreground">选择复盘范围</p>
+      <div className="grid grid-cols-2 gap-3">
+        {SHORTCUTS.map((s) => {
+          const Icon = s.icon;
+          return (
+            <button
+              key={s.label}
+              type="button"
+              disabled={generating}
+              onClick={() => handleClick(s)}
+              className={cn(
+                "flex flex-col items-center gap-2 p-4 rounded-xl border border-border/60",
+                "hover:bg-secondary/60 hover:border-primary/30 transition-all",
+                "active:scale-[0.97] disabled:opacity-50 disabled:pointer-events-none",
+              )}
+            >
+              <Icon className="w-5 h-5 text-primary" />
+              <span className="text-sm font-medium">{s.label}</span>
+            </button>
+          );
+        })}
       </div>
-
-      {/* Shortcuts */}
-      <div className="flex gap-2 flex-wrap">
-        {SHORTCUTS.map((s) => (
-          <Button
-            key={s.label}
-            variant="outline"
-            size="sm"
-            className="text-xs"
-            onClick={() => {
-              const r = s.fn();
-              handleShortcut(r.from, r.to);
-            }}
-          >
-            {s.label}
-          </Button>
-        ))}
-      </div>
-
-      {/* Calendar */}
-      <div className="flex justify-center">
-        <Calendar
-          mode="range"
-          selected={range}
-          onSelect={setRange}
-          numberOfMonths={1}
-          disabled={{ after: new Date() }}
-        />
-      </div>
-
-      {/* Selected range display */}
-      {range?.from && range?.to && (
-        <p className="text-xs text-muted-foreground text-center">
-          {range.from.toLocaleDateString("zh-CN")} - {range.to.toLocaleDateString("zh-CN")}
+      {generating && (
+        <p className="text-xs text-center text-muted-foreground animate-pulse">
+          正在生成复盘...
         </p>
       )}
-
-      {/* Generate button */}
-      <Button
-        className="w-full"
-        onClick={handleGenerate}
-        disabled={!range?.from || !range?.to || generating}
-      >
-        {generating ? "生成中..." : "生成复盘"}
-      </Button>
     </div>
   );
 }

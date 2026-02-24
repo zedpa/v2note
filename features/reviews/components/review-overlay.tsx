@@ -1,13 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { ArrowLeft, Loader2, ChevronDown } from "lucide-react";
 import { useReviews } from "../hooks/use-reviews";
 import { DateSelector } from "./date-selector";
 import { ReviewResult } from "./review-result";
 import { ReviewList } from "./review-list";
+import { SkillsPanel } from "@/features/sidebar/components/skills-panel";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { SwipeBack } from "@/shared/components/swipe-back";
+import { cn } from "@/lib/utils";
 import type { Review } from "@/shared/lib/types";
 
 interface ReviewOverlayProps {
@@ -25,6 +27,7 @@ export function ReviewOverlay({ onClose }: ReviewOverlayProps) {
     start: string;
     end: string;
   } | null>(null);
+  const [skillsOpen, setSkillsOpen] = useState(false);
 
   const handleGenerate = async (
     period: Review["period"],
@@ -102,6 +105,29 @@ export function ReviewOverlay({ onClose }: ReviewOverlayProps) {
                   onGenerate={handleGenerate}
                   generating={generating}
                 />
+
+                {/* Collapsible skills panel */}
+                <div className="border border-border/60 rounded-xl overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={() => setSkillsOpen(!skillsOpen)}
+                    className="flex items-center justify-between w-full px-4 py-3 hover:bg-secondary/30 transition-colors"
+                  >
+                    <span className="text-sm font-medium">技能开关</span>
+                    <ChevronDown
+                      className={cn(
+                        "w-4 h-4 text-muted-foreground transition-transform",
+                        skillsOpen && "rotate-180",
+                      )}
+                    />
+                  </button>
+                  {skillsOpen && (
+                    <div className="border-t border-border/60">
+                      <SkillsPanel />
+                    </div>
+                  )}
+                </div>
+
                 {!loading && (
                   <ReviewList
                     reviews={reviews}

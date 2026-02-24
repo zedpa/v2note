@@ -53,26 +53,29 @@
 
 ## gene_ai_processing
 ### 功能描述
-AI 处理管道。转写文本经过去口语化处理，按激活技能提取结构化数据（待办、客户要求等），标签仅匹配已有标签。
+AI 处理管道。转写文本经过去口语化处理，按激活技能提取结构化数据（待办、客户要求等），标签仅匹配已有标签。基础人设由 Agent.md 定义，Soul 提供动态 AI 身份补充。
 
 ### 详细功能
 - 功能1：去口语化处理（移除"嗯""那个""就是说"等填充词）
 - 功能2：按技能提取 JSON 结构化数据
 - 功能3：标签仅匹配已有标签列表，不创建新标签
-- 功能4：生成 summary（书面化文本）
+- 功能4：生成 summary（书面化文本）并保存到 summary 表
 - 功能5：MCP 工具调用循环（最多 3 轮）
-- 功能6：结果写入数据库
+- 功能6：结果写入数据库（todos、customer_requests、setting_changes、tags、summary）
 - 功能7：后台触发时间估算和记忆更新
+- 功能8：Agent.md 静态人设 + Soul 动态 AI 身份定义注入 system prompt
 
 ### 关键文件
 - `gateway/src/handlers/process.ts` — 处理入口
-- `gateway/src/skills/prompt-builder.ts` — 系统 prompt 构建
+- `gateway/src/skills/prompt-builder.ts` — 系统 prompt 构建（加载 Agent.md）
 - `gateway/src/skills/loader.ts` — 技能加载
 - `gateway/src/skills/types.ts` — 技能类型
+- `gateway/Agent.md` — 静态 AI 行为逻辑定义
+- `gateway/src/soul/manager.ts` — AI 身份定义更新
 
 ### 测试描述
 - 输入：口语化文本 "嗯那个明天要开会啊然后就是说下午三点"
-- 输出：summary = "明天下午三点开会"，todos = ["明天下午三点开会"]，tags = []（无匹配标签）
+- 输出：summary 保存到数据库 = "明天下午三点开会"，前端日记卡片显示书面化文本
 
 ---
 
@@ -165,32 +168,33 @@ JSON 驱动的命令注册表。所有功能通过 /command 接入，支持文�
 
 ## gene_skills_management
 ### 功能描述
-全屏技能管理页面，替代侧边栏内嵌面板。技能配置存储在本地。
+技能管理面板，集成在复盘界面中（可折叠区域）。技能配置存储在本地。已从侧边栏移除独立入口。
 
 ### 详细功能
-- 功能1：全屏 overlay 展示技能列表
+- 功能1：复盘界面中可折叠的技能开关区域
 - 功能2：Switch 开关启用/停用技能
 - 功能3：折叠展开查看技能 prompt
 - 功能4：本地存储技能配置（首次从服务器迁移）
 - 功能5：发送录音时附带本地技能配置
 
 ### 关键文件
-- `features/skills/components/skills-page.tsx`
+- `features/sidebar/components/skills-panel.tsx` — 技能面板组件
+- `features/reviews/components/review-overlay.tsx` — 集成技能面板
 - `shared/lib/local-config.ts`（LocalSkills）
 - `shared/lib/api/skills.ts`
 
 ### 测试描述
-- 输入：打开技能管理 → 关闭某技能 → 重新录音
+- 输入：打开复盘 → 展开技能开关 → 关闭某技能 → 生成复盘
 - 输出：仅启用的技能参与 AI 处理
 
 ---
 
 ## gene_profile_editor
 ### 功能描述
-Soul/用户画像/工具配置编辑器。三个 tab 页分别编辑 AI 画像、用户信息和 MCP 工具配置。
+AI 身份定义/用户信息/工具配置编辑器。三个 tab 页分别编辑 AI 身份定义（Soul）、用户信息和 MCP 工具配置。
 
 ### 详细功能
-- 功能1：Soul tab — 编辑 AI 用户画像文本
+- 功能1：Soul tab — 编辑 AI 身份定义文本（用户对 AI 的要求、行为准则、交互风格）
 - 功能2：User tab — 编辑用户名称、简介、特征标签
 - 功能3：Tools tab — JSON 编辑器配置 MCP 工具服务器
 - 功能4：首次加载从服务器迁移数据到本地
@@ -201,8 +205,8 @@ Soul/用户画像/工具配置编辑器。三个 tab 页分别编辑 AI 画像�
 - `shared/lib/local-config.ts`
 
 ### 测试描述
-- 输入：打开画像编辑 → 修改 soul 内容 → 保存
-- 输出：后续 AI 处理使用新的 soul 内容
+- 输入：打开画像编辑 → 修改 AI 身份定义 → 保存
+- 输出：后续 AI 处理使用新的 AI 身份定义
 
 ---
 
@@ -252,6 +256,28 @@ Soul/用户画像/工具配置编辑器。三个 tab 页分别编辑 AI 画像�
 
 ---
 
+## gene_multiselect_delete
+### 功能描述
+笔记时间线长按多选与批量删除。长按卡片进入选择模式，底部工具栏提供删除操作。
+
+### 详细功能
+- 功能1：500ms 长按触发选择模式
+- 功能2：选择模式下点击切换选中状态
+- 功能3：选中卡片高亮 + CheckCircle 图标
+- 功能4：底部固定工具栏（已选计数、取消、删除）
+- 功能5：批量删除调用 useNotes().deleteNotes()
+- 功能6：选择模式下隐藏音频播放器避免误触
+
+### 关键文件
+- `features/notes/components/notes-timeline.tsx` — 时间线组件（选择逻辑 + 工具栏）
+- `features/notes/hooks/use-notes.ts` — deleteNotes 方法
+
+### 测试描述
+- 输入：长按日记卡片 → 选中多条 → 点击删除
+- 输出：进入选择模式 → 显示选中计数 → 删除后退出选择模式
+
+---
+
 ## gene_search
 ### 功能描述
 全文搜索功能。通过 /search 命令或 Header 搜索入口打开。
@@ -273,23 +299,26 @@ Soul/用户画像/工具配置编辑器。三个 tab 页分别编辑 AI 画像�
 
 ## gene_review_chat
 ### 功能描述
-复盘对话功能。基于时间范围内的录音记录，与 AI 进行复盘对话。
+复盘对话功能。基于时间范围内的录音记录，与 AI 进行复盘对话。日期选择简化为 4 个快捷按钮，集成技能开关。
 
 ### 详细功能
-- 功能1：选择日期范围启动复盘
+- 功能1：4 个日期快捷按钮（近7天、近1月、近半年、全部日记），点击直接生成
 - 功能2：加载范围内录音转写和记忆
 - 功能3：流式 AI 对话
-- 功能4：对话结束后更新 soul
+- 功能4：对话结束后更新 soul（AI 身份定义）
+- 功能5：可折叠技能开关面板（生成前调整技能）
+- 功能6：历史复盘列表
 
 ### 关键文件
 - `features/chat/components/chat-view.tsx`
 - `features/chat/hooks/use-chat.ts`
 - `gateway/src/handlers/chat.ts`
-- `features/reviews/components/review-overlay.tsx`
+- `features/reviews/components/review-overlay.tsx` — 复盘主界面
+- `features/reviews/components/date-selector.tsx` — 快捷日期选择
 
 ### 测试描述
-- 输入：/review 上周
-- 输出：打开复盘对话，AI 基于上周记录进行对话
+- 输入：打开复盘 → 点击"近7天"
+- 输出：直接生成复盘，AI 基于近 7 天记录进行对话
 
 ---
 

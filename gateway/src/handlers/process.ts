@@ -12,6 +12,7 @@ import { customerRequestRepo } from "../db/repositories/index.js";
 import { settingChangeRepo } from "../db/repositories/index.js";
 import { tagRepo } from "../db/repositories/index.js";
 import { recordRepo } from "../db/repositories/index.js";
+import { summaryRepo } from "../db/repositories/index.js";
 import { getMCPRegistry } from "../mcp/registry.js";
 import { estimateBatchTodos } from "../proactive/time-estimator.js";
 
@@ -242,16 +243,31 @@ export async function processEntry(payload: ProcessPayload): Promise<ProcessResu
           }
         }
       }
+
+      // 8. Save de-colloquialized summary to database
+      if (result.summary) {
+        const existing = await summaryRepo.findByRecordId(payload.recordId);
+        if (existing) {
+          await summaryRepo.update(payload.recordId, { short_summary: result.summary });
+        } else {
+          await summaryRepo.create({
+            record_id: payload.recordId,
+            title: result.summary.slice(0, 50),
+            short_summary: result.summary,
+          });
+        }
+        console.log(`[process] Summary saved for record ${payload.recordId}`);
+      }
     } catch (err: any) {
       console.error(`[process] DB write error: ${err.message}`);
       // Don't block — still update status and return result
     }
 
-    // 8. Update record status
+    // 9. Update record status
     await recordRepo.updateStatus(payload.recordId, "completed");
     console.log(`[process] Record ${payload.recordId} marked as completed`);
 
-    // 9. Background: estimate time for new todos
+    // 10. Background: estimate time for new todos
     if (result.todos.length > 0) {
       const pendingTodos = await todoRepo.findPendingByDevice(payload.deviceId);
       const newTodos = pendingTodos.slice(-result.todos.length); // latest N todos
@@ -275,7 +291,7 @@ export async function processEntry(payload: ProcessPayload): Promise<ProcessResu
       }
     }
 
-    // 10. Background: maybe create long-term memory & update soul
+    // 11. Background: maybe create long-term memory & update soul
     const memoryManager = new MemoryManager();
     const today = new Date().toISOString().split("T")[0];
     memoryManager.maybeCreateMemory(payload.deviceId, payload.text, today).catch((e) => {

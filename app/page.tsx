@@ -17,7 +17,6 @@ import { ReviewOverlay } from "@/features/reviews/components/review-overlay";
 import { TodoDiaryCard } from "@/features/todos/components/todo-diary-card";
 import { TodayGantt } from "@/features/todos/components/today-gantt";
 import { IdeaView } from "@/features/ideas/components/idea-view";
-import { SkillsPage } from "@/features/skills/components/skills-page";
 import { ProfileEditor } from "@/features/profile/components/profile-editor";
 import { SettingsEditor } from "@/features/settings/components/settings-editor";
 import { toast } from "sonner";
@@ -35,7 +34,6 @@ type OverlayName =
   | "todos"
   | "today-todo"
   | "ideas"
-  | "skills"
   | "profile"
   | "settings"
   | null;
@@ -99,7 +97,6 @@ export default function Page() {
         onViewStats={() => setActiveOverlay("stats")}
         onViewMemory={() => setActiveOverlay("memory")}
         onViewReview={() => setActiveOverlay("review")}
-        onViewSkills={() => setActiveOverlay("skills")}
         onViewProfile={() => setActiveOverlay("profile")}
       />
       <OfflineBanner />
@@ -193,9 +190,6 @@ export default function Page() {
             </div>
           </div>
         </SwipeBack>
-      )}
-      {activeOverlay === "skills" && (
-        <SkillsPage onClose={closeOverlay} />
       )}
       {activeOverlay === "profile" && (
         <ProfileEditor onClose={closeOverlay} />

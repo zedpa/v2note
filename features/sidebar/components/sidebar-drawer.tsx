@@ -1,6 +1,6 @@
 "use client";
 
-import { X, HelpCircle, Download, CreditCard, Info, Brain, FileText, Zap, UserCircle } from "lucide-react";
+import { X, HelpCircle, Download, CreditCard, Info, Brain, FileText, UserCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { StatsPanel } from "./stats-panel";
 
@@ -10,7 +10,6 @@ interface SidebarDrawerProps {
   onViewStats?: () => void;
   onViewMemory?: () => void;
   onViewReview?: () => void;
-  onViewSkills?: () => void;
   onViewProfile?: () => void;
 }
 
@@ -20,7 +19,6 @@ export function SidebarDrawer({
   onViewStats,
   onViewMemory,
   onViewReview,
-  onViewSkills,
   onViewProfile,
 }: SidebarDrawerProps) {
   if (!open) return null;
@@ -70,13 +68,6 @@ export function SidebarDrawer({
 
           {/* Menu items */}
           <div className="p-4 space-y-1">
-            {onViewSkills && (
-              <MenuItem
-                icon={<Zap className="w-4 h-4" />}
-                label="技能管理"
-                onClick={() => { onClose(); onViewSkills(); }}
-              />
-            )}
             {onViewProfile && (
               <MenuItem
                 icon={<UserCircle className="w-4 h-4" />}

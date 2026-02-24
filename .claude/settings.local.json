@@ -68,7 +68,10 @@
       "Bash(ufw status:*)",
       "Bash(git merge:*)",
       "Bash(git push:*)",
-      "Bash(git remote:*)"
+      "Bash(git remote:*)",
+      "Bash(git grep:*)",
+      "Bash(pushd:*)",
+      "Bash(pnpm tsc:*)"
     ]
   }
 }

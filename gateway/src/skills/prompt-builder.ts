@@ -1,4 +1,17 @@
+import { readFileSync } from "node:fs";
+import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 import type { Skill } from "./types.js";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+
+// Load Agent.md once at startup
+let agentMd: string;
+try {
+  agentMd = readFileSync(join(__dirname, "../../Agent.md"), "utf-8");
+} catch {
+  agentMd = "你是一个智能笔记助手，帮助用户整理和回顾语音/文字记录。";
+}
 
 /**
  * Build the system prompt by combining active skills, memory, and soul.
@@ -13,12 +26,12 @@ export function buildSystemPrompt(opts: {
 }): string {
   const parts: string[] = [];
 
-  // Base persona
-  parts.push(`你是一个智能笔记助手，帮助用户整理和回顾语音/文字记录。`);
+  // Base persona from Agent.md
+  parts.push(agentMd);
 
-  // Soul (user profile)
+  // Soul (AI identity definition)
   if (opts.soul) {
-    parts.push(`\n## 用户画像\n${opts.soul}`);
+    parts.push(`\n## AI 身份定义\n${opts.soul}`);
   }
 
   // Memory context

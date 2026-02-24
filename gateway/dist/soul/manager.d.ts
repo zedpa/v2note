@@ -4,11 +4,11 @@ export interface Soul {
     updated_at: string;
 }
 /**
- * Load the Soul (user profile) for a device.
+ * Load the Soul (AI identity definition) for a device.
  */
 export declare function loadSoul(deviceId: string): Promise<Soul | null>;
 /**
- * Update the Soul based on new interactions.
+ * Update the Soul (AI identity definition) based on new interactions.
  * The AI merges the existing soul with insights from the new interaction.
  */
 export declare function updateSoul(deviceId: string, newInteraction: string): Promise<void>;
