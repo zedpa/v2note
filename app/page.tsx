@@ -47,6 +47,7 @@ export default function Page() {
     start: string;
     end: string;
   } | null>(null);
+  const [chatInitialMessage, setChatInitialMessage] = useState<string | undefined>();
 
   useEffect(() => {
     initStatusBar();
@@ -70,6 +71,14 @@ export default function Page() {
 
   const handleStartReview = useCallback((range: { start: string; end: string }) => {
     setChatDateRange(range);
+    setChatInitialMessage(undefined);
+    setActiveOverlay("chat");
+  }, []);
+
+  const handleOpenCommandChat = useCallback((initialText: string) => {
+    const today = new Date().toISOString().split("T")[0];
+    setChatDateRange({ start: today, end: today });
+    setChatInitialMessage(initialText);
     setActiveOverlay("chat");
   }, []);
 
@@ -117,9 +126,11 @@ export default function Page() {
       <FAB
         onStartReview={(range) => {
           setChatDateRange(range);
+          setChatInitialMessage(undefined);
           setActiveOverlay("chat");
         }}
         onCommandDetected={handleCommandDetected}
+        onOpenCommandChat={handleOpenCommandChat}
         commandContext={{
           setTheme,
           exportData: handleExport,
@@ -145,7 +156,11 @@ export default function Page() {
       {activeOverlay === "chat" && chatDateRange && (
         <ChatView
           dateRange={chatDateRange}
-          onClose={closeOverlay}
+          onClose={() => {
+            closeOverlay();
+            setChatInitialMessage(undefined);
+          }}
+          initialMessage={chatInitialMessage}
         />
       )}
       {activeOverlay === "stats" && (

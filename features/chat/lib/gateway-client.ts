@@ -12,7 +12,16 @@ export interface LocalConfigPayload {
 
 export type GatewayMessage =
   | { type: "process"; payload: { text: string; deviceId: string; recordId: string; localConfig?: LocalConfigPayload } }
-  | { type: "chat.start"; payload: { deviceId: string; mode: "review"; dateRange: { start: string; end: string }; localConfig?: Pick<LocalConfigPayload, "soul" | "skills"> } }
+  | {
+      type: "chat.start";
+      payload: {
+        deviceId: string;
+        mode: "review" | "command";
+        dateRange: { start: string; end: string };
+        initialMessage?: string;
+        localConfig?: Pick<LocalConfigPayload, "soul" | "skills">;
+      };
+    }
   | { type: "chat.message"; payload: { text: string; deviceId: string } }
   | { type: "chat.end"; payload: { deviceId: string } }
   | { type: "todo.aggregate"; payload: { deviceId: string } }

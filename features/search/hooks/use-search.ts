@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useCallback } from "react";
 import { getDeviceId } from "@/shared/lib/device";
@@ -38,6 +38,7 @@ export function useSearch() {
           location: r.location_text,
           status: r.status,
           duration_seconds: r.duration_seconds,
+          audio_path: r.audio_path ?? null,
           created_at: r.created_at,
         };
       });

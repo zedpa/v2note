@@ -37,14 +37,15 @@ export function ChatBubble({ message, streaming }: ChatBubbleProps) {
             : "bg-card border border-border/60 text-foreground rounded-tl-sm",
         )}
       >
-        {message.content || (streaming && (
+        {message.content ? (
+          <p className="whitespace-pre-wrap">{message.content}</p>
+        ) : streaming ? (
           <span className="inline-flex gap-1">
             <span className="w-1.5 h-1.5 rounded-full bg-current animate-bounce" style={{ animationDelay: "0ms" }} />
             <span className="w-1.5 h-1.5 rounded-full bg-current animate-bounce" style={{ animationDelay: "150ms" }} />
             <span className="w-1.5 h-1.5 rounded-full bg-current animate-bounce" style={{ animationDelay: "300ms" }} />
           </span>
-        ))}
-        <p className="whitespace-pre-wrap">{message.content}</p>
+        ) : null}
       </div>
     </div>
   );

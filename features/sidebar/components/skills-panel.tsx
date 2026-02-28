@@ -26,6 +26,7 @@ const DEFAULT_SKILLS: SkillItem[] = [
   { name: "customer-request", description: "客户要求", enabled: true, always: false },
   { name: "setting-change", description: "设置修改", enabled: true, always: false },
   { name: "meta-question", description: "元问题钻取", enabled: false, always: false },
+  { name: "second-order-thinking", description: "二阶思考", enabled: false, always: false },
 ];
 
 export function SkillsPanel() {
@@ -42,14 +43,16 @@ export function SkillsPanel() {
         const data = await listSkills();
 
         if (data && data.length > 0) {
-          setSkills(
-            data.map((s: any) => ({
-              name: s.name,
-              description: s.description,
-              enabled: s.enabled,
-              always: s.always ?? false,
-            })),
-          );
+          const serverSkills: SkillItem[] = data.map((s: any) => ({
+            name: s.name,
+            description: s.description,
+            enabled: s.enabled,
+            always: s.always ?? false,
+          }));
+          // Merge: keep DEFAULT_SKILLS entries that server doesn't know yet
+          const serverNames = new Set(serverSkills.map((s) => s.name));
+          const localOnly = DEFAULT_SKILLS.filter((s) => !serverNames.has(s.name));
+          setSkills([...serverSkills, ...localOnly]);
         }
       } catch {
         // Use defaults

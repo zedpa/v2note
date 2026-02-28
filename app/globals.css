@@ -175,6 +175,51 @@
   animation: mood-shift 0.6s ease-out both;
 }
 
+/* Bottom sheet slide-up animation (reliable on Android) */
+@keyframes slide-up-sheet {
+  from {
+    transform: translateY(100%);
+    opacity: 0.6;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.animate-slide-up-sheet {
+  animation: slide-up-sheet 0.3s cubic-bezier(0.32, 0.72, 0, 1) both;
+}
+
+/* Recording immersive chip fly-in animation */
+@keyframes chip-fly-in {
+  0% {
+    opacity: 0;
+    transform: translateY(100px) scale(0.4);
+  }
+  60% {
+    transform: translateY(-10px) scale(1.06);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-chip-fly-in {
+  animation: chip-fly-in 0.55s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+/* Immersive overlay entrance */
+@keyframes immersive-enter {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.animate-immersive-enter {
+  animation: immersive-enter 0.25s ease-out both;
+}
+
 /* Safe area for mobile — with Android fallback (env returns 0 on Android) */
 .pb-safe {
   padding-bottom: env(safe-area-inset-bottom, 0px);

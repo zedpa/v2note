@@ -1,10 +1,11 @@
 export interface ChatStartPayload {
     deviceId: string;
-    mode: "review";
+    mode: "review" | "command";
     dateRange: {
         start: string;
         end: string;
     };
+    initialMessage?: string;
     localConfig?: {
         soul?: {
             content: string;

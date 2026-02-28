@@ -3,6 +3,7 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { getGatewayClient, type GatewayResponse } from "@/features/chat/lib/gateway-client";
 import { getDeviceId } from "@/shared/lib/device";
+import { loadLocalConfig } from "@/shared/lib/local-config";
 
 export interface ChatMessage {
   id: string;
@@ -11,7 +12,15 @@ export interface ChatMessage {
   timestamp: Date;
 }
 
-export function useChat(dateRange: { start: string; end: string }) {
+interface UseChatOptions {
+  mode?: "review" | "command";
+  initialMessage?: string;
+}
+
+export function useChat(
+  dateRange: { start: string; end: string },
+  options?: UseChatOptions,
+) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [streaming, setStreaming] = useState(false);
   const [connected, setConnected] = useState(false);
@@ -27,7 +36,6 @@ export function useChat(dateRange: { start: string; end: string }) {
       switch (msg.type) {
         case "chat.chunk": {
           streamingTextRef.current += msg.payload.text;
-          // Update the latest assistant message with streaming content
           setMessages((prev) => {
             const last = prev[prev.length - 1];
             if (last?.role === "assistant") {
@@ -73,7 +81,6 @@ export function useChat(dateRange: { start: string; end: string }) {
           resolve();
         }
       }, 100);
-      // Timeout after 5s
       setTimeout(() => {
         clearInterval(check);
         resolve();
@@ -82,24 +89,50 @@ export function useChat(dateRange: { start: string; end: string }) {
 
     // Start chat session
     const deviceId = await getDeviceId();
+    const localConfig = await loadLocalConfig();
+    const mode = options?.mode ?? "review";
     setStreaming(true);
     streamingTextRef.current = "";
 
-    // Add placeholder assistant message
-    setMessages([
-      {
-        id: crypto.randomUUID(),
-        role: "assistant",
-        content: "",
-        timestamp: new Date(),
-      },
-    ]);
+    // For command mode: show user's "/" message first, then assistant placeholder
+    if (mode === "command" && options?.initialMessage) {
+      setMessages([
+        {
+          id: crypto.randomUUID(),
+          role: "user",
+          content: options.initialMessage,
+          timestamp: new Date(),
+        },
+        {
+          id: crypto.randomUUID(),
+          role: "assistant",
+          content: "",
+          timestamp: new Date(),
+        },
+      ]);
+    } else {
+      // Review mode: just show assistant placeholder
+      setMessages([
+        {
+          id: crypto.randomUUID(),
+          role: "assistant",
+          content: "",
+          timestamp: new Date(),
+        },
+      ]);
+    }
 
     client.send({
       type: "chat.start",
-      payload: { deviceId, mode: "review", dateRange },
+      payload: {
+        deviceId,
+        mode,
+        dateRange,
+        initialMessage: options?.initialMessage,
+        localConfig,
+      },
     });
-  }, [dateRange]);
+  }, [dateRange, options?.mode, options?.initialMessage]);
 
   const send = useCallback(async (text: string) => {
     const client = getGatewayClient();

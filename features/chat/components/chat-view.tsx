@@ -10,11 +10,16 @@ import { SwipeBack } from "@/shared/components/swipe-back";
 interface ChatViewProps {
   dateRange: { start: string; end: string };
   onClose: () => void;
+  initialMessage?: string;
+  title?: string;
 }
 
-export function ChatView({ dateRange, onClose }: ChatViewProps) {
+export function ChatView({ dateRange, onClose, initialMessage, title }: ChatViewProps) {
   const { messages, send, streaming, connected, connect, disconnect } =
-    useChat(dateRange);
+    useChat(dateRange, {
+      mode: initialMessage ? "command" : "review",
+      initialMessage,
+    });
   const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -55,10 +60,19 @@ export function ChatView({ dateRange, onClose }: ChatViewProps) {
             <ArrowLeft className="w-5 h-5 text-foreground" />
           </button>
           <div className="flex-1">
-            <p className="text-sm font-semibold text-foreground">复盘</p>
-            <p className="text-[10px] text-muted-foreground">
-              {dateRange.start} - {dateRange.end}
+            <p className="text-sm font-semibold text-foreground">
+              {title ?? (initialMessage ? "指令模式" : "复盘")}
             </p>
+            {!initialMessage && (
+              <p className="text-[10px] text-muted-foreground">
+                {dateRange.start} - {dateRange.end}
+              </p>
+            )}
+            {initialMessage && (
+              <p className="text-[10px] text-muted-foreground">
+                通过对话修改设置、提示词、记忆等
+              </p>
+            )}
           </div>
           {!connected && (
             <span className="text-[10px] text-amber-500">连接中...</span>

@@ -3,12 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { Send } from "lucide-react";
 import { cn } from "@/lib/utils";
-import {
-  Drawer,
-  DrawerContent,
-  DrawerTitle,
-} from "@/components/ui/drawer";
-import { executeCommand, getCommandNames, getCommandDefs } from "@/features/commands/lib/registry";
+import { executeCommand, getCommandDefs } from "@/features/commands/lib/registry";
 import type { CommandContext } from "@/features/commands/lib/registry";
 import { createManualNote } from "@/features/notes/lib/manual-note";
 import { emit } from "@/features/recording/lib/events";
@@ -18,6 +13,7 @@ interface TextBottomSheetProps {
   open: boolean;
   onClose: () => void;
   onStartReview?: (dateRange: { start: string; end: string }) => void;
+  onCommandMode?: (text: string) => void;
   commandContext?: Partial<CommandContext>;
 }
 
@@ -25,33 +21,65 @@ export function TextBottomSheet({
   open,
   onClose,
   onStartReview,
+  onCommandMode,
   commandContext,
 }: TextBottomSheetProps) {
   const [text, setText] = useState("");
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
+  const [bottomOffset, setBottomOffset] = useState(0);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Auto-focus when opened
+  // ── visualViewport: keep sheet above keyboard ──
   useEffect(() => {
-    if (open) {
-      setTimeout(() => textareaRef.current?.focus(), 200);
-    } else {
+    if (!open) {
+      setBottomOffset(0);
+      return;
+    }
+
+    const vv = window.visualViewport;
+    if (!vv) return;
+
+    const update = () => {
+      const offset = window.innerHeight - vv.offsetTop - vv.height;
+      setBottomOffset(Math.max(0, offset));
+    };
+
+    vv.addEventListener("resize", update);
+    vv.addEventListener("scroll", update);
+    update();
+
+    return () => {
+      vv.removeEventListener("resize", update);
+      vv.removeEventListener("scroll", update);
+      setBottomOffset(0);
+    };
+  }, [open]);
+
+  // Clear state when closed
+  useEffect(() => {
+    if (!open) {
       setText("");
       setSuggestions([]);
     }
   }, [open]);
 
-  // Command autocomplete
+  // Command suggestions (not for "/" alone — that triggers command mode)
   useEffect(() => {
+    if (text === "/") {
+      setSuggestions([]);
+      return;
+    }
     if (text.startsWith("/") && text.length > 1) {
       const partial = text.slice(1).toLowerCase();
       const matches = getCommandDefs()
-        .filter((c) => c.name.startsWith(partial) || c.aliases.some((a) => a.toLowerCase().startsWith(partial)))
+        .filter(
+          (c) =>
+            c.name.startsWith(partial) ||
+            c.aliases.some((a) => a.toLowerCase().startsWith(partial)),
+        )
         .map((c) => c.name);
       setSuggestions(matches);
-    } else if (text === "/") {
-      setSuggestions(getCommandNames().slice(0, 6));
     } else {
       setSuggestions([]);
     }
@@ -59,17 +87,32 @@ export function TextBottomSheet({
 
   // Auto-resize textarea
   const handleInput = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setText(e.target.value);
+    const value = e.target.value;
+    setText(value);
+
+    // "/" alone (+ optional trailing whitespace from Android IME) → command mode
+    if (/^\/\s*$/.test(value)) {
+      onCommandMode?.("/");
+      onClose();
+      return;
+    }
+
     const ta = e.target;
     ta.style.height = "auto";
     ta.style.height = Math.min(ta.scrollHeight, 160) + "px";
-  }, []);
+  }, [onCommandMode, onClose]);
 
   const handleSubmit = useCallback(async () => {
     const trimmed = text.trim();
     if (!trimmed || submitting) return;
 
-    // Check for commands
+    // "/" alone → command mode
+    if (/^\/\s*$/.test(trimmed) || trimmed === "/") {
+      onCommandMode?.("/");
+      onClose();
+      return;
+    }
+
     const ctx: CommandContext = {
       ...commandContext,
       startReview: onStartReview,
@@ -96,13 +139,31 @@ export function TextBottomSheet({
     } finally {
       setSubmitting(false);
     }
-  }, [text, submitting, commandContext, onStartReview, onClose]);
+  }, [text, submitting, commandContext, onStartReview, onClose, onCommandMode]);
 
   return (
-    <Drawer open={open} onOpenChange={(o) => !o && onClose()}>
-      <DrawerContent className="max-w-lg mx-auto">
-        <DrawerTitle className="sr-only">输入文字</DrawerTitle>
-        <div className="px-4 pt-2 pb-4 pb-safe">
+    <>
+      {/* Backdrop */}
+      {open && (
+        <div
+          className="fixed inset-0 z-40 bg-black/20"
+          onClick={onClose}
+        />
+      )}
+
+      {/* Sheet — conditionally rendered for reliable Android display */}
+      {open && (
+      <div
+        className="fixed left-0 right-0 z-50 bg-background rounded-t-2xl shadow-2xl animate-slide-up-sheet"
+        style={{ bottom: `${bottomOffset}px` }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Handle */}
+        <div className="flex justify-center pt-2.5 pb-1">
+          <div className="w-10 h-1 rounded-full bg-muted-foreground/25" />
+        </div>
+
+        <div className="px-4 pt-1 pb-4 pb-safe">
           {/* Command suggestions */}
           {suggestions.length > 0 && (
             <div className="flex gap-1.5 flex-wrap mb-3">
@@ -122,6 +183,7 @@ export function TextBottomSheet({
           <div className="flex items-end gap-2">
             <textarea
               ref={textareaRef}
+              autoFocus
               value={text}
               onChange={handleInput}
               onKeyDown={(e) => {
@@ -150,7 +212,8 @@ export function TextBottomSheet({
             </button>
           </div>
         </div>
-      </DrawerContent>
-    </Drawer>
+      </div>
+      )}
+    </>
   );
 }

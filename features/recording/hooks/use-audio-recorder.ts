@@ -60,8 +60,8 @@ export function useAudioRecorder() {
     setDuration(0);
 
     return {
-      base64: result.value.recordDataBase64,
-      mimeType: result.value.mimeType,
+      base64: result.value.recordDataBase64 ?? "",
+      mimeType: result.value.mimeType ?? "audio/aac",
       duration: finalDuration,
     };
   }, []);

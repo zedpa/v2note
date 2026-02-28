@@ -14,8 +14,9 @@ const SKILLS_DIR = join(__dirname, "../../skills");
 
 export interface ChatStartPayload {
   deviceId: string;
-  mode: "review";
+  mode: "review" | "command";
   dateRange: { start: string; end: string };
+  initialMessage?: string;
   localConfig?: {
     soul?: { content: string };
     skills?: { configs: Array<{ name: string; enabled: boolean }> };
@@ -69,9 +70,13 @@ export async function startChat(
     }
   }
 
-  // Build skills
+  // Build skills — respect user's local skill config
   const allSkills = loadSkills(SKILLS_DIR);
-  const activeSkills = filterActiveSkills(allSkills);
+  const skillConfigs = payload.localConfig?.skills?.configs?.map((c) => ({
+    skill_name: c.name,
+    enabled: c.enabled,
+  }));
+  const activeSkills = filterActiveSkills(allSkills, skillConfigs);
 
   const systemPrompt = buildSystemPrompt({
     skills: activeSkills,
@@ -83,17 +88,23 @@ export async function startChat(
   // Set up session context
   session.context.setSystemPrompt(systemPrompt);
 
-  // Add the transcript context as a user message
-  if (transcriptSummary) {
-    session.context.addMessage({
-      role: "user",
-      content: `以下是 ${payload.dateRange.start} 到 ${payload.dateRange.end} 期间的记录内容：\n\n${transcriptSummary}\n\n请基于这些内容开始复盘对话。`,
-    });
+  if (payload.mode === "command") {
+    // Command mode: skip review, respond directly to the initial message
+    const msg = payload.initialMessage?.trim() || "/";
+    session.context.addMessage({ role: "user", content: msg });
   } else {
-    session.context.addMessage({
-      role: "user",
-      content: `请开始 ${payload.dateRange.start} 到 ${payload.dateRange.end} 的复盘。这段时间暂无录音记录。`,
-    });
+    // Review mode: load transcript context then stream initial review
+    if (transcriptSummary) {
+      session.context.addMessage({
+        role: "user",
+        content: `以下是 ${payload.dateRange.start} 到 ${payload.dateRange.end} 期间的记录内容：\n\n${transcriptSummary}\n\n请基于这些内容开始复盘对话。`,
+      });
+    } else {
+      session.context.addMessage({
+        role: "user",
+        content: `请开始 ${payload.dateRange.start} 到 ${payload.dateRange.end} 的复盘。这段时间暂无录音记录。`,
+      });
+    }
   }
 
   // Stream initial response

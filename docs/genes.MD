@@ -4,50 +4,96 @@
 
 ---
 
+## 版本记录
+
+| 版本 | 日期 | 变更内容 |
+|------|------|----------|
+| v2026.02.27e | 2026-02-27 | 新增二阶思考skill；修复chat模式skill选择不生效bug（chat.ts读取localConfig skill配置，use-chat.ts发送localConfig） |
+| v2026.02.27d | 2026-02-27 | 交互修复：FAB点击闪退bug修复(pointerdown preventDefault阻止click穿透backdrop)；移除录音阶段三色方向提示块；ChatBubble消息内容双重渲染修复；命令模式AI行为约束(仅修改设置,实事求是不承诺做不到的事) |
+| v2026.02.26d | 2026-02-26 | 录音交互优化：长按录音态新增三向拖拽渐变引导（左红取消/上橙指令/右绿常驻）；上滑松手进入语音指令模式（不新增日记）；右滑松手进入常驻录音界面；常驻界面改为中间方块暂停/继续，暂停后左X取消、右✓完成 |
+| v2026.02.27c | 2026-02-27 | Bug修复2：recording阶段不再进入全屏(只有locked才全屏)→恢复松开发送；全屏背景立即显示(不用opacity动画)→chips不再浮在内容上；chips移到屏幕中部(25%处)而非顶部；TextBottomSheet focus改为autoFocus→修复Android键盘不弹出 |
+| v2026.02.27b | 2026-02-27 | Bug修复：三色块贴状态栏无法点击→最小top 64px；TextBottomSheet手机不显示→条件渲染+动画；Android IME导致/匹配失败→正则修复；chat.start先于"/"消息触发复盘→command模式跳过复盘；Toast侵入状态栏→bottom-center+offset |
+| v2026.02.27 | 2026-02-27 | UI 优化：FAB 图标放大+上移30px；全屏沉浸录音三色块交互；输入框键盘吸附修复；/命令进入流式对话模式 |
+| v2026.02.25 | 2026-02-25 | 日记删除/复盘功能 |
+| v2026.02.22 | 2026-02-22 | 安卓侧滑返回修复 |
+| v2026.02.20 | 2026-02-20 | v6 基因架构重构 |
+
+---
+
 ## gene_voice_recording
 ### 功能描述
 语音录制与实时 ASR 转写。用户通过 FAB 按钮长按录音，PCM 音频流通过 WebSocket 发送到 Gateway，Gateway 连接阿里云 DashScope 实时语音识别服务。
 
+### 录音阶段（两阶段设计）
+- **recording 阶段**（长按开始）：FAB 保持可见，周围显示红色脉冲圆环；FAB 上方显示迷你波形 + 计时；支持三向拖拽手势（左取消 / 上指令 / 右常驻），无三色方向提示。指针捕获（setPointerCapture）确保滑动手势在 FAB 外也能追踪；pointerdown 调用 preventDefault 防止后续 click 穿透
+- **locked 阶段**（右滑锁定）：进入全屏常驻录音界面（RecordingImmersive），中间方块按钮负责暂停/继续
+
 ### 详细功能
-- 功能1：FAB 按钮手势控制（长按录音、松开发送、上滑锁定、左滑取消）
-- 功能2：PCM 音频采集（Web Audio API worklet）
+- 功能1：FAB 按钮手势控制（长按开始录音，松开立即发送，左滑/左上取消，右滑/右上锁定，正上滑松手转语音指令）
+- 功能2：PCM 音频采集（Web Audio API worklet），实时计算 RMS 音量
 - 功能3：WebSocket 二进制帧传输 PCM 数据
 - 功能4：Gateway 连接 DashScope Realtime ASR
 - 功能5：实时转写文本回传（partial + sentence 事件）
 - 功能6：录音完成后创建 record + transcript，触发 AI 处理
+- 功能7：全屏常驻录音界面（仅 locked 阶段）——中间方块按钮点击可暂停/继续；暂停后左侧显示 X（取消录音），右侧显示 ✓（完成录音）
+- 功能8：上滑语音指令模式——上滑松手后仅做转写并进入命令执行流程（不创建日记）
+- 功能9：音量响应声波可视化（中央波形随实际音量大小动态变化）
 
 ### 关键文件
-- `features/recording/components/fab.tsx` — FAB 组件
-- `features/recording/components/recording-immersive.tsx` — 锁定模式全屏录音
+- `features/recording/components/fab.tsx` — FAB 组件（图标放大，位置上移30px）
+- `features/recording/components/recording-immersive.tsx` — 全屏沉浸录音（三色块 + 音量波形）
 - `features/recording/hooks/use-pcm-recorder.ts` — PCM 录音 hook
 - `features/recording/hooks/use-fab-gestures.ts` — 手势 hook
 - `gateway/src/handlers/asr.ts` — ASR 处理器
 - `public/worklets/pcm-processor.js` — Web Audio worklet
 
+### UI 规格（v2026.02.27d）
+- FAB 按钮：`w-16 h-16`（64px），`bottom-[54px]`（上移30px）
+- Mic 图标：`w-8 h-8`（32px）
+- recording 阶段：仅显示波形+计时+拖拽提示气泡，无三色方向标签，无拖拽背景渐变
+- locked 阶段中心控件：方块按钮常驻居中；暂停后两侧浮出 X / ✓ 操作按钮
+
 ### 测试描述
-- 输入：长按 FAB 3 秒 → 说话 → 松开
-- 输出：显示实时转写文字 → 录音保存 → 创建笔记
+- 输入1：长按 FAB 后向右拖拽（或右上）并松手
+- 输出1：进入常驻录音界面，中心方块可暂停/继续；暂停后可点 X 取消或 ✓ 完成
+- 输入2：长按 FAB 后正上拖拽并松手
+- 输出2：进入语音指令流程（不新增日记），转写文本直接用于指令执行
+- 输入3：长按 FAB 后向左拖拽（或左上）并松手
+- 输出3：录音取消
 
 ---
 
 ## gene_text_input
 ### 功能描述
-文本输入与命令自动补全。TextBottomSheet 支持输入文字笔记或 /命令。
+文本输入与命令对话。TextBottomSheet 支持输入文字笔记，输入 / 立即进入流式命令对话模式（不再显示小型补全框）。
 
 ### 详细功能
-- 功能1：底部抽屉文本输入（Drawer 组件）
-- 功能2：/ 开头触发命令自动补全
-- 功能3：普通文本创建手动笔记（通过 API）
-- 功能4：命令执行通过 registry 路由
+- 功能1：自定义固定底部抽屉（取代 vaul Drawer，解决键盘跳位问题）
+- 功能2：visualViewport API 监听键盘高度，输入框始终贴键盘上边沿
+- 功能3：输入 "/" 后立即关闭输入框，进入流式 AI 指令对话（ChatView）
+- 功能4：命令模式 AI 行为约束——AI 仅能根据用户指令修改设置（soul/memory/skills/settings），必须实事求是，不承诺自己做不到的功能，不编造能力
+- 功能5：普通文本创建手动笔记（通过 API）
+- 功能6：命令执行通过 registry 路由（非 / 前缀时保持原有逻辑）
 
 ### 关键文件
-- `features/recording/components/text-bottom-sheet.tsx`
-- `features/recording/components/input-bar.tsx`
+- `features/recording/components/text-bottom-sheet.tsx` — 自定义底部抽屉（keyboard-safe）
+- `features/recording/components/fab.tsx` — 传递 onOpenCommandChat 回调
+- `features/chat/components/chat-view.tsx` — 支持 initialMessage 自动发送
+- `app/page.tsx` — 处理 onOpenCommandChat → 开启指令对话
 - `features/notes/lib/manual-note.ts`
 
+### UI 规格（v2026.02.27d）
+- 底部抽屉：条件渲染 `{open && <div>}`，animate-slide-up-sheet（避免 translate-y-full 在 Android 不触发）
+- 使用 visualViewport.resize 事件计算键盘偏移量 `bottom: ${bottomOffset}px`
+- "/" 检测：正则 `/^\/\s*$/` 兼容 Android IME 尾随空格/换行
+- "/" 触发 ChatView 时，通过 chat.start 中的 `mode:"command"+initialMessage` 直接响应，不先触发复盘
+- FAB 点击防穿透：FAB 的 pointerdown 调用 `e.preventDefault()` 阻止浏览器生成 click 事件，避免 click 打到 backdrop 导致 sheet 闪退
+
 ### 测试描述
-- 输入：点击 FAB → 输入 "/todos" → 回车
-- 输出：打开待办日记卡 overlay
+- 输入：点击 FAB → 输入 "/" → 立即跳转到 AI 对话界面
+- 输出：AI 列出所有可用命令，用户可通过对话执行配置操作
+- 输入：点击 FAB → 输入文字 → 回车
+- 输出：创建普通笔记
 
 ---
 
@@ -304,8 +350,9 @@ AI 身份定义/用户信息/工具配置编辑器。三个 tab 页分别编辑 
 ### 详细功能
 - 功能1：4 个日期快捷按钮（近7天、近1月、近半年、全部日记），点击直接生成
 - 功能2：加载范围内录音转写和记忆
-- 功能3：流式 AI 对话
+- 功能3：流式 AI 对话（ChatBubble 消息气泡，用户右对齐 / AI 左对齐，内容只渲染一次避免重叠）
 - 功能4：对话结束后更新 soul（AI 身份定义）
+- 功能7：命令模式约束——Gateway chat.ts 命令模式 system prompt 明确告知 AI：仅能修改 soul/memory/skills/settings，实事求是，不承诺做不到的能力
 - 功能5：可折叠技能开关面板（生成前调整技能）
 - 功能6：历史复盘列表
 
@@ -449,3 +496,28 @@ AI 主动提醒。通过 WebSocket 推送 toast 通知，提醒用户管理待�
 ### 测试描述
 - 输入：断开网络
 - 输出：显示离线横幅，本地浏览功能正常
+
+---
+
+## gene_second_order_thinking
+### 功能描述
+二阶思考技能。在复盘对话中引导 AI 分析用户记录中"问题背后的问题"，帮助用户看到盲点。纯行为引导 skill，无 extract_fields，不影响 process 管道。
+
+### 详细功能
+- 功能1：识别表层问题 — 用户在说什么事、遇到什么困难或决策
+- 功能2：追问根因 — 分析系统性因素（资源、流程、认知、关系、优先级）
+- 功能3：发现隐含假设 — 挖掘用户描述中未被质疑的假设
+- 功能4：输出洞察 — 用 1-2 句话点出"问题之上的问题"
+- 功能5：智能判断 — 流水账/日常记录不强行深度解读
+
+### 关键文件
+- `gateway/skills/second-order-thinking/SKILL.md` — 技能定义
+- `features/sidebar/components/skills-panel.tsx` — 技能面板（包含默认开关）
+
+### 测试描述
+- 输入：开启二阶思考 → 复盘包含 "项目又延期了" 的记录
+- 输出：AI 回复中包含深层洞察，如 "反复延期可能是估算习惯或范围管理机制缺失"
+- 输入：关闭二阶思考 → 复盘同样记录
+- 输出：AI 正常复盘，不做二阶分析
+- 输入：开启二阶思考 → 复盘 "今天买了杯咖啡" 的记录
+- 输出：AI 正常回复，不强行生成洞察
