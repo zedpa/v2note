@@ -137,7 +137,7 @@ export function ProfileOverlay({ onClose }: ProfileOverlayProps) {
                 免费额度
               </span>
               <span className="text-[10px] text-muted-foreground">
-                30 录音/月 · 10 AI 摘要/月
+                30 录音/月 · 10 AI 转写/月
               </span>
             </div>
             <div className="w-full h-2 bg-secondary rounded-full overflow-hidden">

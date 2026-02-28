@@ -44,7 +44,7 @@ export function buildSystemPrompt(opts: {
     parts.push(`\n## 任务\n分析以下记录内容，按照激活的技能进行提取。你必须且只能返回一个合法的 JSON 对象，不要包含任何 markdown 代码块标记、注释或额外文字。`);
 
     // De-colloquialization instructions
-    parts.push(`\n## 去口语化规则\n对输入文本进行书面化处理，生成 summary 字段：\n- 移除口语填充词：嗯、啊、那个、就是说、然后呢、对吧、你知道吗、这个、额、哦、呃\n- 移除重复词和无意义的语气词\n- 将口语化表达转为书面语\n- 保留原意，不添加或删减实质内容\n- 修正不通顺的句子结构\n- summary 应该是完整通顺的书面语段落`);
+    parts.push(`\n## 转写清理规则\n对输入文本进行最小化清理，生成 summary 字段：\n- 移除口语填充词：嗯、啊、那个、就是说、然后呢、对吧、你知道吗、这个、额、哦、呃\n- 移除重复词和无意义的语气词\n- 修正明显的错别字和语音识别错误\n- 严格保留原文的表述结构：短句还是短句，倒装还是倒装，不要改写句式\n- 不要将口语转为书面语，不要合并或拆分句子\n- 不添加或删减实质内容`);
 
     // Tag matching rules
     if (opts.existingTags && opts.existingTags.length > 0) {
@@ -84,7 +84,7 @@ export function buildSystemPrompt(opts: {
 
     if (fields.length > 0) {
       parts.push(`\n## 输出格式\n返回严格的 JSON 对象（不要用 \`\`\`json 包裹），包含以下字段：`);
-      parts.push(`- "summary": string — 去口语化后的书面文本`);
+      parts.push(`- "summary": string — 清理后的转写文本（仅去填充词和修错别字，保留原文结构）`);
       for (const field of fields) {
         parts.push(`- "${field}": string[] — 提取的${field}列表`);
       }

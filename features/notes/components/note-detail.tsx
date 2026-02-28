@@ -155,7 +155,7 @@ export function NoteDetail({ recordId, onClose }: NoteDetailProps) {
           <div className="p-4 rounded-2xl bg-card border border-border/60">
             <div className="flex items-center gap-2 mb-2">
               <FileText className="w-4 h-4 text-accent" />
-              <span className="text-xs font-semibold text-accent">AI 摘要</span>
+              <span className="text-xs font-semibold text-accent">AI 转写</span>
               {editor.editing !== "summary" && (
                 <button
                   type="button"
