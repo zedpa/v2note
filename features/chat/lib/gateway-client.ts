@@ -45,7 +45,7 @@ export type GatewayResponse =
 
 type MessageHandler = (msg: GatewayResponse) => void;
 
-const GATEWAY_URL = process.env.NEXT_PUBLIC_GATEWAY_URL ?? "ws://localhost:3001";
+import { getGatewayWsUrl } from "@/shared/lib/gateway-url";
 
 const MAX_RECONNECT_ATTEMPTS = 10;
 const BASE_RECONNECT_DELAY = 3000;
@@ -73,7 +73,7 @@ export class GatewayClient {
 
     this._connectPromise = new Promise<void>((resolve) => {
       try {
-        this.ws = new WebSocket(GATEWAY_URL);
+        this.ws = new WebSocket(getGatewayWsUrl());
 
         this.ws.onopen = () => {
           this._connected = true;

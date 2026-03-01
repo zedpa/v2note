@@ -21,6 +21,7 @@ export interface AIResponse {
 export declare function chatCompletion(messages: ChatMessage[], opts?: {
     json?: boolean;
     temperature?: number;
+    timeout?: number;
 }): Promise<AIResponse>;
 /**
  * Streaming AI call. Yields text chunks.

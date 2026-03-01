@@ -35,7 +35,9 @@ function getConfig() {
  * Non-streaming AI call. Returns the full response.
  */
 export async function chatCompletion(messages, opts) {
-    const { apiKey, baseUrl, model, timeout } = getConfig();
+    const config = getConfig();
+    const { apiKey, baseUrl, model } = config;
+    const timeout = opts?.timeout ?? config.timeout;
     if (!apiKey) {
         throw new Error("DASHSCOPE_API_KEY is not configured");
     }
