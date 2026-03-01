@@ -123,13 +123,15 @@ export async function processEntry(payload: ProcessPayload): Promise<ProcessResu
     console.log(`[process] System prompt length: ${systemPrompt.length}, MCP tools: ${mcpTools?.length ?? 0}`);
 
     // 4. Call AI (with tool call loop)
-    console.log("[process] Calling AI...");
+    // Dynamic timeout: base 60s + 20s per 1000 chars of input, capped at 5min
+    const dynamicTimeout = Math.min(300_000, 60_000 + Math.floor(payload.text.length / 1000) * 20_000);
+    console.log(`[process] Calling AI... (timeout: ${dynamicTimeout}ms, text: ${payload.text.length} chars)`);
     const messages: ChatMessage[] = [
       { role: "system", content: systemPrompt },
       { role: "user", content: payload.text },
     ];
 
-    let response = await chatCompletion(messages, { json: true, temperature: 0.3 });
+    let response = await chatCompletion(messages, { json: true, temperature: 0.3, timeout: dynamicTimeout });
     console.log(`[process] AI response length: ${response.content.length}, usage: ${JSON.stringify(response.usage)}`);
 
     // Tool call loop: if AI requests tool calls, execute them and re-call AI
@@ -166,7 +168,7 @@ export async function processEntry(payload: ProcessPayload): Promise<ProcessResu
       messages.push({ role: "assistant", content: response.content });
       messages.push({ role: "user", content: `工具调用结果：\n${toolResults.join("\n\n")}\n\n请基于工具结果，返回最终的 JSON 结果。` });
 
-      response = await chatCompletion(messages, { json: true, temperature: 0.3 });
+      response = await chatCompletion(messages, { json: true, temperature: 0.3, timeout: dynamicTimeout });
       console.log(`[process] AI re-response length: ${response.content.length}`);
     }
 

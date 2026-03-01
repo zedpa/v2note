@@ -11,7 +11,7 @@ export interface Device {
 export interface Record {
   id: string
   device_id: string
-  status: 'uploading' | 'uploaded' | 'processing' | 'completed' | 'failed'
+  status: 'uploading' | 'uploaded' | 'processing' | 'completed' | 'failed' | 'error'
   audio_path: string | null
   duration_seconds: number | null
   location_text: string | null

@@ -32,7 +32,7 @@ export function useSearch() {
           id: r.id,
           title: r.summary?.title ?? "",
           short_summary: r.summary?.short_summary ?? "",
-          tags: [],
+          tags: (r.tags ?? []).map((t: any) => t.name ?? t),
           date,
           time,
           location: r.location_text,

@@ -50,6 +50,47 @@ export function registerRecordRoutes(router: Router) {
     sendJson(res, items);
   });
 
+  // Search records (must be before :id to avoid "search" being captured as an id)
+  router.get("/api/v1/records/search", async (req, res, _params, query) => {
+    const deviceId = getDeviceId(req);
+    const q = query.q ?? "";
+    if (!q) {
+      sendJson(res, []);
+      return;
+    }
+    const records = await recordRepo.search(deviceId, q);
+
+    // Batch load summaries and tags (same as list route)
+    const ids = records.map((r) => r.id);
+    const [summaries, tagsByRecord] = await Promise.all([
+      ids.length > 0
+        ? Promise.all(ids.map((id) => summaryRepo.findByRecordId(id)))
+        : [],
+      ids.length > 0
+        ? Promise.all(
+            ids.map((id) =>
+              tagRepo.findByRecordId(id).then((tags) => ({ id, tags })),
+            ),
+          )
+        : [],
+    ]);
+
+    const summaryMap = Object.fromEntries(
+      summaries.filter(Boolean).map((s) => [s!.record_id, s]),
+    );
+    const tagMap = Object.fromEntries(
+      tagsByRecord.map((t) => [t.id, t.tags]),
+    );
+
+    const items = records.map((r) => ({
+      ...r,
+      summary: summaryMap[r.id] ?? null,
+      tags: tagMap[r.id] ?? [],
+    }));
+
+    sendJson(res, items);
+  });
+
   // Get single record (with all associations)
   router.get("/api/v1/records/:id", async (req, res, params) => {
     const record = await recordRepo.findById(params.id);
@@ -140,15 +181,4 @@ export function registerRecordRoutes(router: Router) {
     sendJson(res, { deleted: count });
   });
 
-  // Search records
-  router.get("/api/v1/records/search", async (req, res, _params, query) => {
-    const deviceId = getDeviceId(req);
-    const q = query.q ?? "";
-    if (!q) {
-      sendJson(res, []);
-      return;
-    }
-    const records = await recordRepo.search(deviceId, q);
-    sendJson(res, records);
-  });
 }

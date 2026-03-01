@@ -3,6 +3,8 @@
 import { X, HelpCircle, Download, CreditCard, Info, Brain, FileText, UserCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { StatsPanel } from "./stats-panel";
+import { getCommandDefs } from "@/features/commands/lib/registry";
+import { toast } from "sonner";
 
 interface SidebarDrawerProps {
   open: boolean;
@@ -11,6 +13,7 @@ interface SidebarDrawerProps {
   onViewMemory?: () => void;
   onViewReview?: () => void;
   onViewProfile?: () => void;
+  onExportData?: () => void;
 }
 
 export function SidebarDrawer({
@@ -20,6 +23,7 @@ export function SidebarDrawer({
   onViewMemory,
   onViewReview,
   onViewProfile,
+  onExportData,
 }: SidebarDrawerProps) {
   if (!open) return null;
 
@@ -89,10 +93,44 @@ export function SidebarDrawer({
                 onClick={() => { onClose(); onViewReview(); }}
               />
             )}
-            <MenuItem icon={<HelpCircle className="w-4 h-4" />} label="命令帮助" />
-            <MenuItem icon={<Download className="w-4 h-4" />} label="导出数据" />
-            <MenuItem icon={<CreditCard className="w-4 h-4" />} label="订阅状态" />
-            <MenuItem icon={<Info className="w-4 h-4" />} label="关于" />
+            <MenuItem
+              icon={<HelpCircle className="w-4 h-4" />}
+              label="命令帮助"
+              onClick={() => {
+                onClose();
+                const commands = getCommandDefs();
+                const helpText = commands.map((c) => `/${c.name} — ${c.description}`).join("\n");
+                toast(helpText, { duration: 8000 });
+              }}
+            />
+            <MenuItem
+              icon={<Download className="w-4 h-4" />}
+              label="导出数据"
+              onClick={() => {
+                onClose();
+                if (onExportData) {
+                  onExportData();
+                } else {
+                  toast("导出功能开发中...");
+                }
+              }}
+            />
+            <MenuItem
+              icon={<CreditCard className="w-4 h-4" />}
+              label="订阅状态"
+              onClick={() => {
+                onClose();
+                toast("当前为免费版本", { duration: 3000 });
+              }}
+            />
+            <MenuItem
+              icon={<Info className="w-4 h-4" />}
+              label="关于"
+              onClick={() => {
+                onClose();
+                toast("VoiceNote v2 — AI 个人助手", { duration: 3000 });
+              }}
+            />
           </div>
         </div>
       </div>

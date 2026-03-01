@@ -62,7 +62,9 @@ export default function Page() {
   useBackHandler(backHandler);
 
   const openOverlay = useCallback((name: string, _args?: string[]) => {
-    setActiveOverlay(name as OverlayName);
+    // /skills → route to review overlay (skills panel is integrated there)
+    const resolved = name === "skills" ? "review" : name;
+    setActiveOverlay(resolved as OverlayName);
   }, []);
 
   const closeOverlay = useCallback(() => {
@@ -161,6 +163,13 @@ export default function Page() {
             setChatInitialMessage(undefined);
           }}
           initialMessage={chatInitialMessage}
+          commandContext={{
+            setTheme,
+            exportData: handleExport,
+            startReview: handleStartReview,
+            showHelp,
+            openOverlay,
+          }}
         />
       )}
       {activeOverlay === "stats" && (

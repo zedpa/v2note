@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Edit3, Save, X } from "lucide-react";
 import { useSoul } from "../hooks/use-soul";
+import { MarkdownContent } from "@/shared/components/markdown-content";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 
@@ -71,9 +72,9 @@ export function SoulTab() {
               </button>
             </div>
             {soul?.content ? (
-              <div className="text-sm text-muted-foreground whitespace-pre-wrap leading-relaxed">
+              <MarkdownContent className="text-muted-foreground">
                 {soul.content}
-              </div>
+              </MarkdownContent>
             ) : (
               <p className="text-sm text-muted-foreground italic">
                 AI 尚未建立您的用户画像。随着使用，AI 会自动了解您的偏好和习惯。

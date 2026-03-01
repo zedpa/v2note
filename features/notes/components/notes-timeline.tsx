@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, useRef, useCallback } from "react";
-import { MapPin, Clock, Trash2, X, CheckCircle2 } from "lucide-react";
+import { MapPin, Clock, Trash2, X, CheckCircle2, Mic, Type } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useNotes } from "@/features/notes/hooks/use-notes";
 import { MiniAudioPlayer } from "./mini-audio-player";
@@ -245,7 +245,7 @@ function TimelineCard({
 
   // Only show skeleton if still processing AND no content available yet
   const hasContent = !!(note.short_summary || note.title !== "处理中...");
-  const isProcessing = note.status !== "completed" && !hasContent;
+  const isProcessing = note.status !== "completed" && note.status !== "error" && note.status !== "failed" && !hasContent;
 
   if (isProcessing) {
     return (
@@ -315,6 +315,21 @@ function TimelineCard({
               </>
             )}
           </div>
+
+          {/* Voice/text type indicator */}
+          {note.duration_seconds != null && note.duration_seconds > 0 ? (
+            <div className="flex items-center gap-1 text-muted-foreground/60 mb-1.5">
+              <Mic className="w-3 h-3" />
+              <span className="text-[11px]">
+                {Math.floor(note.duration_seconds / 60)}:{(note.duration_seconds % 60).toString().padStart(2, "0")}
+              </span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1 text-muted-foreground/60 mb-1.5">
+              <Type className="w-3 h-3" />
+              <span className="text-[11px]">文字</span>
+            </div>
+          )}
 
           {/* Content */}
           <p className="text-[15px] leading-[1.7] text-foreground line-clamp-5">

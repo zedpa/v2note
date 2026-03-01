@@ -1,6 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/utils";
+import { MarkdownContent } from "@/shared/components/markdown-content";
 import type { ChatMessage } from "@/features/chat/hooks/use-chat";
 
 interface ChatBubbleProps {
@@ -38,7 +39,11 @@ export function ChatBubble({ message, streaming }: ChatBubbleProps) {
         )}
       >
         {message.content ? (
-          <p className="whitespace-pre-wrap">{message.content}</p>
+          isUser ? (
+            <p className="whitespace-pre-wrap">{message.content}</p>
+          ) : (
+            <MarkdownContent>{message.content}</MarkdownContent>
+          )
         ) : streaming ? (
           <span className="inline-flex gap-1">
             <span className="w-1.5 h-1.5 rounded-full bg-current animate-bounce" style={{ animationDelay: "0ms" }} />

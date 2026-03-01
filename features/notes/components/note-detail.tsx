@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { X, Clock, MapPin, Tag, CheckSquare, Lightbulb, FileText, Pencil, Plus, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { api } from "@/shared/lib/api";
 import { useNoteDetail } from "@/features/notes/hooks/use-note-detail";
 import { useNoteEditor } from "@/features/notes/hooks/use-note-editor";
 import { SwipeBack } from "@/shared/components/swipe-back";
@@ -10,9 +11,10 @@ import { SwipeBack } from "@/shared/components/swipe-back";
 interface NoteDetailProps {
   recordId: string;
   onClose: () => void;
+  onDeleted?: () => void;
 }
 
-export function NoteDetail({ recordId, onClose }: NoteDetailProps) {
+export function NoteDetail({ recordId, onClose, onDeleted }: NoteDetailProps) {
   const { detail, loading, refetch } = useNoteDetail(recordId);
   const editor = useNoteEditor(detail, refetch);
 
@@ -43,9 +45,21 @@ export function NoteDetail({ recordId, onClose }: NoteDetailProps) {
   if (!detail) return null;
 
   const { record, transcript, summary, tags, todos, ideas } = detail;
+  const isTextNote = record.duration_seconds == null || record.duration_seconds === 0;
   const dt = new Date(record.created_at);
   const dateStr = `${dt.getFullYear()}年${dt.getMonth() + 1}月${dt.getDate()}日`;
   const timeStr = `${dt.getHours().toString().padStart(2, "0")}:${dt.getMinutes().toString().padStart(2, "0")}`;
+
+  const handleDelete = async () => {
+    if (!confirm("确定删除这条笔记吗？")) return;
+    try {
+      await api.delete("/api/v1/records", { ids: [recordId] });
+      onDeleted?.();
+      onClose();
+    } catch {
+      // silently fail
+    }
+  };
 
   return (
     <SwipeBack onClose={onClose}>
@@ -55,7 +69,12 @@ export function NoteDetail({ recordId, onClose }: NoteDetailProps) {
           <button type="button" onClick={onClose} className="p-2 rounded-xl bg-secondary hover:bg-secondary/70 transition-colors">
             <X className="w-5 h-5 text-muted-foreground" />
           </button>
-          <span className="text-xs text-muted-foreground">{dateStr}</span>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground">{dateStr}</span>
+            <button type="button" onClick={handleDelete} className="p-2 rounded-xl hover:bg-destructive/10 transition-colors">
+              <Trash2 className="w-4 h-4 text-destructive" />
+            </button>
+          </div>
         </div>
       </div>
 
@@ -155,7 +174,7 @@ export function NoteDetail({ recordId, onClose }: NoteDetailProps) {
           <div className="p-4 rounded-2xl bg-card border border-border/60">
             <div className="flex items-center gap-2 mb-2">
               <FileText className="w-4 h-4 text-accent" />
-              <span className="text-xs font-semibold text-accent">AI 转写</span>
+              <span className="text-xs font-semibold text-accent">{isTextNote ? "笔记内容" : "AI 转写"}</span>
               {editor.editing !== "summary" && (
                 <button
                   type="button"
@@ -200,8 +219,8 @@ export function NoteDetail({ recordId, onClose }: NoteDetailProps) {
           </div>
         )}
 
-        {/* Transcript */}
-        {transcript && transcript.text && (
+        {/* Transcript — hide for text notes */}
+        {!isTextNote && transcript && transcript.text && (
           <div>
             <h3 className="text-sm font-semibold text-foreground mb-2">转录原文</h3>
             <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">

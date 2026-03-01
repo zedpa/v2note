@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useCallback } from "react";
-import { MapPin, Clock, Sparkles, Check } from "lucide-react";
+import { MapPin, Clock, Sparkles, Check, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export interface Note {
@@ -55,7 +55,8 @@ export function NoteCard({
   const longPressTimer = useRef<NodeJS.Timeout | null>(null);
   const didLongPress = useRef(false);
 
-  const isProcessing = note.status && note.status !== "completed";
+  const isError = note.status === "error" || note.status === "failed";
+  const isProcessing = !isError && note.status != null && note.status !== "completed";
   const isSummary = note.type === "daily" || note.type === "weekly" || note.type === "monthly";
 
   // Processing placeholder card
@@ -77,6 +78,29 @@ export function NoteCard({
             <div className="h-3 bg-secondary rounded w-4/5" />
           </div>
           <div className="flex items-center gap-1 mt-3 text-muted-foreground">
+            <Clock className="w-3 h-3" />
+            <span className="text-[11px]">{note.time}</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Error placeholder card — processing failed, still show note with transcript fallback
+  if (isError) {
+    return (
+      <div className="flex gap-3 relative" onClick={onClick} role="button" tabIndex={0}>
+        <div className="flex flex-col items-center pt-1.5 shrink-0 w-5">
+          <div className="w-2.5 h-2.5 rounded-full shrink-0 ring-2 ring-background bg-destructive/60" />
+          {!isLast && <div className="w-px flex-1 bg-border mt-1.5" />}
+        </div>
+        <div className="flex-1 rounded-2xl p-4 mb-3 border border-destructive/20 bg-card/60">
+          <div className="flex items-center gap-2 mb-2">
+            <AlertCircle className="w-3.5 h-3.5 text-destructive/70" />
+            <span className="text-xs text-destructive/70">处理失败</span>
+          </div>
+          <p className="text-sm text-foreground/80 line-clamp-2">{note.title}</p>
+          <div className="flex items-center gap-1 mt-2 text-muted-foreground">
             <Clock className="w-3 h-3" />
             <span className="text-[11px]">{note.time}</span>
           </div>

@@ -3,7 +3,21 @@
 import { Mic, Calendar, Clock, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { MarkdownContent } from "@/shared/components/markdown-content";
 import type { Review } from "@/shared/lib/types";
+
+/** Replace ISO date strings with readable Chinese dates */
+function cleanDates(text: string): string {
+  return text.replace(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{3}Z/g, (match) => {
+    return new Date(match).toLocaleString("zh-CN", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  });
+}
 
 interface ReviewResultProps {
   review: Review;
@@ -40,9 +54,9 @@ export function ReviewResult({ review, onRegenerate, generating }: ReviewResultP
 
       {/* Review content */}
       <div className="rounded-lg border border-border/60 p-4">
-        <div className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">
-          {review.summary}
-        </div>
+        <MarkdownContent className="text-foreground">
+          {cleanDates(review.summary)}
+        </MarkdownContent>
       </div>
 
       {/* Regenerate button */}

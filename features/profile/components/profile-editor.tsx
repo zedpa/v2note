@@ -230,9 +230,22 @@ export function ProfileEditor({ onClose }: ProfileEditorProps) {
               value={toolsConfig}
               onChange={(e) => setToolsConfig(e.target.value)}
               className="w-full h-64 p-3 rounded-xl bg-secondary/30 border border-border/50 text-xs font-mono text-foreground resize-none outline-none focus:border-primary/50 transition-colors"
-              placeholder='[{"name": "calendar", "transport": "http", "url": "...", "enabled": true}]'
+              placeholder={`[\n  {\n    "name": "calendar",\n    "transport": "http",\n    "url": "https://example.com/mcp",\n    "enabled": true\n  }\n]`}
               spellCheck={false}
             />
+            {/* JSON validation hint */}
+            {toolsConfig && (() => {
+              try {
+                JSON.parse(toolsConfig);
+                return (
+                  <p className="text-[10px] text-green-600 mt-1.5">JSON 格式正确</p>
+                );
+              } catch {
+                return (
+                  <p className="text-[10px] text-destructive mt-1.5">JSON 格式错误，请检查语法</p>
+                );
+              }
+            })()}
           </div>
         )}
       </div>

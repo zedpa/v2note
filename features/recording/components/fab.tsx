@@ -1,7 +1,7 @@
 ﻿"use client";
 
 import { useState, useRef, useCallback, useEffect, useMemo } from "react";
-import { Mic } from "lucide-react";
+import { Mic, ArrowUp, ArrowLeft, ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { usePCMRecorder } from "@/features/recording/hooks/use-pcm-recorder";
 import { useFabGestures } from "@/features/recording/hooks/use-fab-gestures";
@@ -108,12 +108,20 @@ export function FAB({
 
           if (msg.payload.recordId) {
             emit("recording:uploaded");
-            emit("recording:processed");
+            // Don't emit recording:processed here — wait for process.result
           }
           break;
         }
         case "asr.error":
           toast.error(`识别错误: ${msg.payload.message}`);
+          stopTimers();
+          setDisplayDuration(0);
+          setConfirmedText("");
+          setPartialText("");
+          pausedRef.current = false;
+          setLockedPaused(false);
+          commandReleaseRef.current = false;
+          resetRef.current();
           break;
         case "process.result":
           emit("recording:processed");
@@ -135,7 +143,14 @@ export function FAB({
 
       const deviceId = await getDeviceId();
       const client = getGatewayClient();
-      if (!client.connected) client.connect();
+      if (!client.connected) {
+        client.connect();
+        const ready = await client.waitForReady();
+        if (!ready) {
+          toast.error("无法连接服务器，请检查网络");
+          return;
+        }
+      }
 
       client.send({ type: "asr.start", payload: { deviceId } });
 
@@ -258,30 +273,6 @@ export function FAB({
     };
   }, []);
 
-  const dragOverlayStyle = useMemo(() => {
-    const intensity = Math.max(0, Math.min(1, swipeProgress));
-    if (phase !== "recording" || swipeDirection === "none") return null;
-
-    if (swipeDirection === "right") {
-      const alpha = (0.12 + intensity * 0.42).toFixed(3);
-      return {
-        background: `linear-gradient(110deg, rgba(34,197,94,0) 30%, rgba(34,197,94,${alpha}) 100%)`,
-      };
-    }
-
-    if (swipeDirection === "left") {
-      const alpha = (0.12 + intensity * 0.42).toFixed(3);
-      return {
-        background: `linear-gradient(250deg, rgba(239,68,68,0) 30%, rgba(239,68,68,${alpha}) 100%)`,
-      };
-    }
-
-    const alpha = (0.12 + intensity * 0.42).toFixed(3);
-    return {
-      background: `linear-gradient(180deg, rgba(251,146,60,${alpha}) 0%, rgba(251,146,60,0) 62%)`,
-    };
-  }, [phase, swipeDirection, swipeProgress]);
-
   const dragHint = useMemo(() => {
     if (swipeDirection === "right") return "松手进入常驻录音";
     if (swipeDirection === "up") return "松手发送语音指令";
@@ -314,33 +305,65 @@ export function FAB({
     <>
       {phase === "recording" && (
         <div className="fixed inset-0 z-30 pointer-events-none">
-          {dragOverlayStyle && <div className="absolute inset-0 transition-all duration-75" style={dragOverlayStyle} />}
-
-          <div className="absolute bottom-[138px] left-0 right-0 flex flex-col items-center gap-1.5">
-            <div className="flex items-center justify-center gap-[3px] h-8">
-              {waveHeights.slice(0, 18).map((h, i) => (
-                <div
-                  key={i}
-                  className="rounded-full bg-primary transition-all duration-100"
-                  style={{
-                    width: "3px",
-                    height: `${Math.max(4, h * 0.45)}px`,
-                    opacity: 0.35 + (h / 54) * 0.65,
-                  }}
-                />
-              ))}
+          <div className="absolute bottom-[144px] left-0 right-0 flex flex-col items-center gap-2">
+            <div className="rounded-2xl border border-white/20 bg-black/35 backdrop-blur-md px-4 py-2.5 shadow-xl">
+              <div className="flex items-center justify-center gap-[3px] h-8">
+                {waveHeights.slice(0, 18).map((h, i) => (
+                  <div
+                    key={i}
+                    className="rounded-full bg-primary transition-all duration-100"
+                    style={{
+                      width: "3px",
+                      height: `${Math.max(4, h * 0.45)}px`,
+                      opacity: 0.35 + (h / 54) * 0.65,
+                    }}
+                  />
+                ))}
+              </div>
             </div>
-            <span className="text-sm tabular-nums text-foreground/70">{formatDuration(displayDuration)}</span>
+            <span className="text-sm tabular-nums text-foreground/75">{formatDuration(displayDuration)}</span>
           </div>
 
-          <div className="absolute top-24 left-0 right-0 flex justify-center">
-            <span className="px-4 py-2 rounded-full bg-black/25 text-white/90 text-sm">{dragHint}</span>
+          <div className="absolute top-[112px] left-0 right-0 flex justify-center">
+            <span className="px-4 py-1.5 rounded-full border border-white/15 bg-black/40 backdrop-blur-sm text-white/90 text-sm shadow-lg">
+              {dragHint}
+            </span>
           </div>
 
-          <div className="absolute bottom-[26px] left-6 right-6 flex justify-between items-center">
-            <span className="text-xs text-red-500/85 font-medium">← 取消</span>
-            <span className="text-xs text-orange-400/90 font-medium">↑ 指令</span>
-            <span className="text-xs text-emerald-500/90 font-medium">常驻 →</span>
+          <div className="absolute bottom-[132px] left-1/2 -translate-x-1/2 flex items-center gap-2">
+            <span
+              className={cn(
+                "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium border transition-all",
+                swipeDirection === "left"
+                  ? "bg-red-500/85 text-white border-red-300/80 scale-105"
+                  : "bg-black/35 text-white/70 border-white/15",
+              )}
+            >
+              <ArrowLeft className="w-3 h-3" />
+              取消
+            </span>
+            <span
+              className={cn(
+                "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium border transition-all",
+                swipeDirection === "up"
+                  ? "bg-amber-500/85 text-black border-amber-200 scale-105"
+                  : "bg-black/35 text-white/70 border-white/15",
+              )}
+            >
+              <ArrowUp className="w-3 h-3" />
+              指令
+            </span>
+            <span
+              className={cn(
+                "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium border transition-all",
+                swipeDirection === "right"
+                  ? "bg-emerald-500/85 text-white border-emerald-200/80 scale-105"
+                  : "bg-black/35 text-white/70 border-white/15",
+              )}
+            >
+              常驻
+              <ArrowRight className="w-3 h-3" />
+            </span>
           </div>
         </div>
       )}

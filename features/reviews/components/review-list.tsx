@@ -2,6 +2,7 @@
 
 import { Calendar } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { stripMarkdown } from "@/shared/components/markdown-content";
 import type { Review } from "@/shared/lib/types";
 
 interface ReviewListProps {
@@ -45,7 +46,7 @@ export function ReviewList({ reviews, onSelect }: ReviewListProps) {
             </span>
           </div>
           <p className="text-sm text-foreground line-clamp-2">
-            {review.summary}
+            {stripMarkdown(review.summary)}
           </p>
         </button>
       ))}

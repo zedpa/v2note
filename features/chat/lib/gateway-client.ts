@@ -47,11 +47,17 @@ type MessageHandler = (msg: GatewayResponse) => void;
 
 const GATEWAY_URL = process.env.NEXT_PUBLIC_GATEWAY_URL ?? "ws://localhost:3001";
 
+const MAX_RECONNECT_ATTEMPTS = 10;
+const BASE_RECONNECT_DELAY = 3000;
+
 export class GatewayClient {
   private ws: WebSocket | null = null;
   private handlers = new Set<MessageHandler>();
   private reconnectTimer: NodeJS.Timeout | null = null;
   private _connected = false;
+  private _connectPromise: Promise<void> | null = null;
+  private pendingMessages: GatewayMessage[] = [];
+  private reconnectAttempts = 0;
 
   get connected(): boolean {
     return this._connected;
@@ -59,46 +65,81 @@ export class GatewayClient {
 
   connect(): void {
     if (this.ws?.readyState === WebSocket.OPEN) return;
-
-    try {
-      this.ws = new WebSocket(GATEWAY_URL);
-
-      this.ws.onopen = () => {
-        this._connected = true;
-        console.log("[gateway-client] Connected");
-      };
-
-      this.ws.onmessage = (event) => {
-        try {
-          const msg: GatewayResponse = JSON.parse(event.data);
-          for (const handler of this.handlers) {
-            handler(msg);
-          }
-        } catch {
-          console.error("[gateway-client] Failed to parse message");
-        }
-      };
-
-      this.ws.onclose = () => {
-        this._connected = false;
-        console.log("[gateway-client] Disconnected");
-        // Auto-reconnect after 3 seconds
-        this.reconnectTimer = setTimeout(() => this.connect(), 3000);
-      };
-
-      this.ws.onerror = () => {
-        this._connected = false;
-      };
-    } catch {
-      this._connected = false;
+    if (this.ws?.readyState === WebSocket.CONNECTING) return;
+    // Manual connect resets retry counter
+    if (this.reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+      this.reconnectAttempts = 0;
     }
+
+    this._connectPromise = new Promise<void>((resolve) => {
+      try {
+        this.ws = new WebSocket(GATEWAY_URL);
+
+        this.ws.onopen = () => {
+          this._connected = true;
+          this.reconnectAttempts = 0;
+          console.log("[gateway-client] Connected");
+          if (this.pendingMessages.length > 0) {
+            for (const pending of this.pendingMessages) {
+              this.ws?.send(JSON.stringify(pending));
+            }
+            this.pendingMessages = [];
+          }
+          resolve();
+        };
+
+        this.ws.onmessage = (event) => {
+          try {
+            const msg: GatewayResponse = JSON.parse(event.data);
+            for (const handler of this.handlers) {
+              handler(msg);
+            }
+          } catch {
+            console.error("[gateway-client] Failed to parse message");
+          }
+        };
+
+        this.ws.onclose = () => {
+          this._connected = false;
+          this._connectPromise = null;
+          console.log("[gateway-client] Disconnected");
+          // Auto-reconnect with exponential backoff
+          if (this.reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+            const delay = BASE_RECONNECT_DELAY * Math.pow(2, Math.min(this.reconnectAttempts, 5));
+            this.reconnectAttempts++;
+            console.log(`[gateway-client] Reconnect attempt ${this.reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS} in ${delay}ms`);
+            this.reconnectTimer = setTimeout(() => this.connect(), delay);
+          } else {
+            console.log("[gateway-client] Max reconnect attempts reached, stopping");
+          }
+        };
+
+        this.ws.onerror = () => {
+          this._connected = false;
+          resolve(); // resolve even on error to unblock waiters
+        };
+      } catch {
+        this._connected = false;
+        resolve();
+      }
+    });
+  }
+
+  /** Wait until WebSocket is open (with timeout). */
+  async waitForReady(timeoutMs = 5000): Promise<boolean> {
+    if (this._connected) return true;
+    if (!this._connectPromise) this.connect();
+    const timeout = new Promise<void>((r) => setTimeout(r, timeoutMs));
+    await Promise.race([this._connectPromise, timeout]);
+    return this._connected;
   }
 
   send(msg: GatewayMessage): void {
     if (this.ws?.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify(msg));
     } else {
-      console.warn("[gateway-client] Not connected, message dropped");
+      this.pendingMessages.push(msg);
+      console.warn("[gateway-client] Not connected, message queued");
     }
   }
 
@@ -127,6 +168,8 @@ export class GatewayClient {
       this.ws = null;
     }
     this._connected = false;
+    this.pendingMessages = [];
+    this.reconnectAttempts = 0;
   }
 }
 

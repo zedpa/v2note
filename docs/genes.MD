@@ -8,6 +8,15 @@
 
 | 版本 | 日期 | 变更内容 |
 |------|------|----------|
+| v2026.03.01f | 2026-03-01 | react-markdown v9兼容修复：className prop已被移除，改为外层div包裹（修复命令模式/复盘/AI画像等所有MarkdownContent使用处崩溃） |
+| v2026.03.01e | 2026-03-01 | 搜索结果修复：(1)搜索API返回summary+tags数据（之前只返回record原始字段，导致搜索结果无标题无内容）；(2)前端use-search.ts正确映射tags字段 |
+| v2026.03.01d | 2026-03-01 | 指令模式修复3项：(1)disconnect改为同步避免与connect竞态；(2)”/”引导模式新增sessionStartedRef——send()自动补发chat.start解决”No active chat session”；(3)connectGenRef防止旧异步回调覆盖新连接状态 |
+| v2026.03.01c | 2026-03-01 | UX走查11项问题全部修复：(1)搜索路由顺序修正；(2)复盘/聊天markdown渲染（react-markdown）；(3)文字笔记详情隐藏冗余转录原文；(4)复盘列表卡片strip markdown预览；(5)详情页新增删除按钮；(6)AI画像markdown渲染；(7)AI记忆页添加编辑引导提示；(8)复盘ISO日期转中文格式；(9)”/”命令列表可点击chip；(10)笔记卡片语音/文字类型标识；(11)工具配置JSON实时校验 |
+| v2026.03.01b | 2026-03-01 | UX走查发现11项体验问题（详见下方 UX Issues Backlog） |
+| v2026.03.01 | 2026-03-01 | 命令系统修复5项：(1)”/”命令列表不再被Gateway连接阻塞，离线也能立即显示；(2)ChatView中输入”/todos”等命令可本地路由到对应overlay；(3)/skills路由到复盘界面（技能面板集成在此）；(4)侧边栏”命令帮助/导出/订阅/关于”添加onClick；(5)WebSocket重连改为指数退避+最大10次 |
+| v2026.02.28c | 2026-02-28 | 命令模式增强：输入”/”进入命令对话时前端直接返回本地命令列表（无需等待AI流式回复）；聊天链路增加连接就绪等待、消息排队与超时兜底，避免长时间 loading；本地联调环境默认WS改回 `ws://localhost:3001` |
+| v2026.02.28b | 2026-02-28 | 录音UI精修：recording阶段去除全屏渐变背景与底部三色标签，改为玻璃态波形卡+动态方向胶囊提示；locked常驻录音界面重做层次与按钮样式；前端WS默认fallback改为远程 `ws://47.99.68.126:3001` |
+| v2026.02.28 | 2026-02-28 | AI转写替代AI摘要：prompt改为仅去填充词+修错别字、严格保留原文句式结构；UI标签"AI摘要"→"AI转写"；ChatBubble内容双重渲染修复；技能面板合并逻辑（本地新增skill不被远程API覆盖） |
 | v2026.02.27e | 2026-02-27 | 新增二阶思考skill；修复chat模式skill选择不生效bug（chat.ts读取localConfig skill配置，use-chat.ts发送localConfig） |
 | v2026.02.27d | 2026-02-27 | 交互修复：FAB点击闪退bug修复(pointerdown preventDefault阻止click穿透backdrop)；移除录音阶段三色方向提示块；ChatBubble消息内容双重渲染修复；命令模式AI行为约束(仅修改设置,实事求是不承诺做不到的事) |
 | v2026.02.26d | 2026-02-26 | 录音交互优化：长按录音态新增三向拖拽渐变引导（左红取消/上橙指令/右绿常驻）；上滑松手进入语音指令模式（不新增日记）；右滑松手进入常驻录音界面；常驻界面改为中间方块暂停/继续，暂停后左X取消、右✓完成 |
@@ -17,6 +26,38 @@
 | v2026.02.25 | 2026-02-25 | 日记删除/复盘功能 |
 | v2026.02.22 | 2026-02-22 | 安卓侧滑返回修复 |
 | v2026.02.20 | 2026-02-20 | v6 基因架构重构 |
+
+---
+
+## UX Issues Backlog (v2026.03.01 走查) — 已全部修复 (v2026.03.01c)
+
+以下问题按严重程度排序，来源为完整用户视角UI走查。全部已在 v2026.03.01c 修复。
+
+### P0 — 功能性问题（阻断核心流程）
+
+| # | 问题 | 状态 | 修复内容 |
+|---|------|------|----------|
+| 1 | **搜索完全失效** | ✅ 已修复 | `gateway/src/routes/records.ts` 搜索路由移至 `/:id` 之前注册 |
+
+### P1 — 体验严重缺陷（影响核心使用感受）
+
+| # | 问题 | 状态 | 修复内容 |
+|---|------|------|----------|
+| 2 | **复盘结果markdown未渲染** | ✅ 已修复 | 新增 `shared/components/markdown-content.tsx`（react-markdown + Tailwind样式），用于 `review-result.tsx` 和 `chat-bubble.tsx`（仅assistant消息） |
+| 3 | **文字笔记详情页冗余** | ✅ 已修复 | `note-detail.tsx` 判断 `duration_seconds==null||0` 为文字笔记，隐藏"转录原文"区块，标签改为"笔记内容" |
+| 4 | **历史复盘卡片markdown未清理** | ✅ 已修复 | `review-list.tsx` 使用 `stripMarkdown()` 清理预览文本中的 `#`、`**`、`|` 等标记 |
+| 5 | **详情页无删除入口** | ✅ 已修复 | `note-detail.tsx` header新增Trash2删除按钮，confirm确认后调用 `api.delete`，新增 `onDeleted` 回调 |
+
+### P2 — 体验粗糙（影响专业感和信任感）
+
+| # | 问题 | 状态 | 修复内容 |
+|---|------|------|----------|
+| 6 | **AI画像显示原始markdown围栏** | ✅ 已修复 | `soul-tab.tsx` 使用 `<MarkdownContent>` 渲染画像内容 |
+| 7 | **AI记忆与个人画像内容重复** | ✅ 已修复 | `memory-soul-overlay.tsx` 在画像tab顶部添加"完整编辑请前往 侧边栏→个人画像"引导提示 |
+| 8 | **复盘结果中显示ISO日期格式** | ✅ 已修复 | `review-result.tsx` 新增 `cleanDates()` 将ISO日期正则替换为 `toLocaleString("zh-CN")` 中文格式 |
+| 9 | **命令列表不可点击** | ✅ 已修复 | `chat-view.tsx` 检测命令列表消息后渲染可点击command chip按钮，点击自动发送命令 |
+| 10 | **笔记卡片无类型标识** | ✅ 已修复 | `notes-timeline.tsx` 根据 `duration_seconds` 显示 Mic+时长（语音）或 Type+"文字"（文字笔记） |
+| 11 | **工具配置要求手写JSON** | ✅ 已修复 | `profile-editor.tsx` 新增实时JSON格式校验提示 + 更友好的placeholder示例 |
 
 ---
 
@@ -99,21 +140,28 @@
 
 ## gene_ai_processing
 ### 功能描述
-AI 处理管道。转写文本经过去口语化处理，按激活技能提取结构化数据（待办、客户要求等），标签仅匹配已有标签。基础人设由 Agent.md 定义，Soul 提供动态 AI 身份补充。
+AI 处理管道。转写文本经过最小化清理（去填充词+修错别字，严格保留原文句式结构），按激活技能提取结构化数据（待办、客户要求等），标签仅匹配已有标签。基础人设由 Agent.md 定义，Soul 提供动态 AI 身份补充。
 
 ### 详细功能
-- 功能1：去口语化处理（移除"嗯""那个""就是说"等填充词）
+- 功能1：转写清理（仅移除"嗯""那个""就是说"等填充词 + 修正错别字，不改写句式结构）
 - 功能2：按技能提取 JSON 结构化数据
 - 功能3：标签仅匹配已有标签列表，不创建新标签
-- 功能4：生成 summary（书面化文本）并保存到 summary 表
+- 功能4：生成 summary（清理后的转写文本，保留原文结构）并保存到 summary 表
 - 功能5：MCP 工具调用循环（最多 3 轮）
 - 功能6：结果写入数据库（todos、customer_requests、setting_changes、tags、summary）
 - 功能7：后台触发时间估算和记忆更新
 - 功能8：Agent.md 静态人设 + Soul 动态 AI 身份定义注入 system prompt
 
+### 转写清理规则（v2026.02.28）
+- 移除口语填充词和重复词
+- 修正明显的错别字和语音识别错误
+- **严格保留原文表述结构**：短句还是短句，倒装还是倒装
+- 不将口语转为书面语，不合并或拆分句子
+- 无填充词且无错别字时，转写结果应与原文完全一致
+
 ### 关键文件
 - `gateway/src/handlers/process.ts` — 处理入口
-- `gateway/src/skills/prompt-builder.ts` — 系统 prompt 构建（加载 Agent.md）
+- `gateway/src/skills/prompt-builder.ts` — 系统 prompt 构建（含转写清理规则）
 - `gateway/src/skills/loader.ts` — 技能加载
 - `gateway/src/skills/types.ts` — 技能类型
 - `gateway/Agent.md` — 静态 AI 行为逻辑定义
@@ -121,7 +169,9 @@ AI 处理管道。转写文本经过去口语化处理，按激活技能提取�
 
 ### 测试描述
 - 输入：口语化文本 "嗯那个明天要开会啊然后就是说下午三点"
-- 输出：summary 保存到数据库 = "明天下午三点开会"，前端日记卡片显示书面化文本
+- 输出：summary = "明天要开会，下午三点"（仅去填充词，保留原文句式）
+- 输入：无填充词文本 "现在这个录音怎么没有用呢？"
+- 输出：summary = "现在这个录音怎么没有用呢？"（与原文完全一致）
 
 ---
 
@@ -242,7 +292,7 @@ AI 身份定义/用户信息/工具配置编辑器。三个 tab 页分别编辑 
 ### 详细功能
 - 功能1：Soul tab — 编辑 AI 身份定义文本（用户对 AI 的要求、行为准则、交互风格）
 - 功能2：User tab — 编辑用户名称、简介、特征标签
-- 功能3：Tools tab — JSON 编辑器配置 MCP 工具服务器
+- 功能3：Tools tab — JSON 编辑器配置 MCP 工具服务器，实时JSON格式校验（绿色/红色提示）
 - 功能4：首次加载从服务器迁移数据到本地
 - 功能5：保存到本地配置
 
@@ -253,6 +303,8 @@ AI 身份定义/用户信息/工具配置编辑器。三个 tab 页分别编辑 
 ### 测试描述
 - 输入：打开画像编辑 → 修改 AI 身份定义 → 保存
 - 输出：后续 AI 处理使用新的 AI 身份定义
+- 输入：工具配置tab → 输入无效JSON
+- 输出：实时显示"JSON格式错误"红色提示
 
 ---
 
@@ -280,7 +332,7 @@ AI 身份定义/用户信息/工具配置编辑器。三个 tab 页分别编辑 
 
 ## gene_note_detail
 ### 功能描述
-笔记详情与编辑页面。展示录音转写、摘要、标签、待办等完整信息。
+笔记详情与编辑页面。展示录音转写、摘要、标签、待办等完整信息。支持单条删除。
 
 ### 详细功能
 - 功能1：全屏 overlay 展示笔记详情
@@ -288,6 +340,8 @@ AI 身份定义/用户信息/工具配置编辑器。三个 tab 页分别编辑 
 - 功能3：标签编辑（添加/删除）
 - 功能4：待办事项管理
 - 功能5：文本编辑器（markdown）
+- 功能6：单条删除按钮（header Trash2图标，confirm确认后调用 `api.delete`）
+- 功能7：文字笔记智能显示——`duration_seconds==null||0` 判定为文字笔记，隐藏"转录原文"区块，"AI转写"标签改为"笔记内容"
 
 ### 关键文件
 - `features/notes/components/note-detail.tsx`
@@ -299,12 +353,16 @@ AI 身份定义/用户信息/工具配置编辑器。三个 tab 页分别编辑 
 ### 测试描述
 - 输入：点击笔记卡片
 - 输出：显示完整笔记详情，可编辑标签和待办
+- 输入：点击详情页删除按钮 → 确认
+- 输出：笔记删除，返回时间线
+- 输入：打开文字笔记详情
+- 输出：不显示"转录原文"区块，标签为"笔记内容"
 
 ---
 
 ## gene_multiselect_delete
 ### 功能描述
-笔记时间线长按多选与批量删除。长按卡片进入选择模式，底部工具栏提供删除操作。
+笔记时间线长按多选与批量删除。长按卡片进入选择模式，底部工具栏提供删除操作。笔记卡片显示语音/文字类型标识。
 
 ### 详细功能
 - 功能1：500ms 长按触发选择模式
@@ -313,14 +371,17 @@ AI 身份定义/用户信息/工具配置编辑器。三个 tab 页分别编辑 
 - 功能4：底部固定工具栏（已选计数、取消、删除）
 - 功能5：批量删除调用 useNotes().deleteNotes()
 - 功能6：选择模式下隐藏音频播放器避免误触
+- 功能7：语音/文字类型标识——根据 `duration_seconds` 判断，语音笔记显示 Mic图标+时长，文字笔记显示 Type图标+"文字"
 
 ### 关键文件
-- `features/notes/components/notes-timeline.tsx` — 时间线组件（选择逻辑 + 工具栏）
+- `features/notes/components/notes-timeline.tsx` — 时间线组件（选择逻辑 + 工具栏 + 类型标识）
 - `features/notes/hooks/use-notes.ts` — deleteNotes 方法
 
 ### 测试描述
 - 输入：长按日记卡片 → 选中多条 → 点击删除
 - 输出：进入选择模式 → 显示选中计数 → 删除后退出选择模式
+- 输入：查看时间线
+- 输出：语音笔记显示麦克风图标+录音时长，文字笔记显示文字图标
 
 ---
 
@@ -329,17 +390,23 @@ AI 身份定义/用户信息/工具配置编辑器。三个 tab 页分别编辑 
 全文搜索功能。通过 /search 命令或 Header 搜索入口打开。
 
 ### 详细功能
-- 功能1：关键词搜索笔记标题和内容
-- 功能2：搜索结果高亮
+- 功能1：关键词搜索笔记标题和内容（ILIKE匹配transcript.text、summary.title、summary.short_summary）
+- 功能2：搜索结果包含完整summary和tags数据（与列表API一致的batch load模式）
 - 功能3：点击结果跳转到笔记详情
 
+### 路由注意事项
+- Gateway路由注册顺序：`/api/v1/records/search` 必须在 `/api/v1/records/:id` 之前注册（`gateway/src/routes/records.ts`），否则 "search" 会被当作 `:id` 参数匹配导致搜索失效
+- 搜索路由必须batch load summaries和tags（通过summaryRepo、tagRepo），不能只返回record原始字段，否则前端无法显示标题和内容
+
 ### 关键文件
-- `features/search/components/search-view.tsx`
-- `features/search/hooks/use-search.ts`
+- `features/search/components/search-view.tsx` — 搜索UI，使用NoteCard展示结果
+- `features/search/hooks/use-search.ts` — 搜索hook，映射API结果为NoteItem（含tags字段映射）
+- `gateway/src/routes/records.ts` — 搜索路由（注意注册顺序 + summary/tags batch load）
+- `gateway/src/db/repositories/record.ts` — search()方法（SELECT DISTINCT r.*）
 
 ### 测试描述
 - 输入：搜索关键词 "会议"
-- 输出：显示包含"会议"的笔记列表
+- 输出：显示包含"会议"的笔记列表，每条结果显示标题、摘要、标签
 
 ---
 
@@ -350,22 +417,33 @@ AI 身份定义/用户信息/工具配置编辑器。三个 tab 页分别编辑 
 ### 详细功能
 - 功能1：4 个日期快捷按钮（近7天、近1月、近半年、全部日记），点击直接生成
 - 功能2：加载范围内录音转写和记忆
-- 功能3：流式 AI 对话（ChatBubble 消息气泡，用户右对齐 / AI 左对齐，内容只渲染一次避免重叠）
+- 功能3：流式 AI 对话（ChatBubble 消息气泡，用户右对齐 / AI 左对齐，内容三元渲染避免重复）；assistant消息使用MarkdownContent渲染
 - 功能4：对话结束后更新 soul（AI 身份定义）
-- 功能7：命令模式约束——Gateway chat.ts 命令模式 system prompt 明确告知 AI：仅能修改 soul/memory/skills/settings，实事求是，不承诺做不到的能力
 - 功能5：可折叠技能开关面板（生成前调整技能）
-- 功能6：历史复盘列表
+- 功能6：历史复盘列表（preview使用stripMarkdown清理markdown标记）
+- 功能7：命令模式约束——Gateway chat.ts 命令模式 system prompt 明确告知 AI：仅能修改 soul/memory/skills/settings，实事求是，不承诺做不到的能力
+- 功能8：chat.start 发送 localConfig（含技能开关配置），Gateway chat.ts 用 filterActiveSkills 过滤，用户的技能开关在复盘对话中生效
+- 功能9：技能面板合并策略——服务端返回的技能优先，本地 DEFAULT_SKILLS 中服务端未知的技能追加保留
+- 功能10：复盘结果使用MarkdownContent渲染 + cleanDates()将ISO日期转中文格式
+- 功能11："/"命令列表可点击——ChatView检测到命令列表消息后渲染command chip按钮，点击先尝试本地命令执行再发送到gateway
+- 功能12：指令模式会话管理——`sessionStartedRef` 跟踪gateway会话状态，"/"引导模式下send()自动补发chat.start；`connectGenRef` 防止旧异步回调覆盖新连接；disconnect改为同步（fire-and-forget chat.end）避免与connect竞态
 
 ### 关键文件
-- `features/chat/components/chat-view.tsx`
+- `features/chat/components/chat-view.tsx` — 含命令chip渲染
+- `features/chat/components/chat-bubble.tsx` — assistant消息MarkdownContent
 - `features/chat/hooks/use-chat.ts`
+- `features/reviews/components/review-result.tsx` — MarkdownContent + cleanDates
+- `features/reviews/components/review-list.tsx` — stripMarkdown预览
+- `shared/components/markdown-content.tsx` — 共享markdown渲染+stripMarkdown工具
 - `gateway/src/handlers/chat.ts`
 - `features/reviews/components/review-overlay.tsx` — 复盘主界面
 - `features/reviews/components/date-selector.tsx` — 快捷日期选择
 
 ### 测试描述
 - 输入：打开复盘 → 点击"近7天"
-- 输出：直接生成复盘，AI 基于近 7 天记录进行对话
+- 输出：直接生成复盘，AI 基于近 7 天记录进行对话，markdown格式正确渲染
+- 输入："/"命令模式 → 命令列表显示
+- 输出：每个命令显示为可点击chip按钮
 
 ---
 
