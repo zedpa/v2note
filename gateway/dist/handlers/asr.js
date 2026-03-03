@@ -6,16 +6,20 @@ import { processEntry } from "./process.js";
 import { matchVoiceCommand } from "./voice-commands.js";
 const sessions = new Map();
 const DASHSCOPE_WS_URL = "wss://dashscope.aliyuncs.com/api-ws/v1/inference/";
+const DASHSCOPE_REST_URL = "https://dashscope.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation";
 /**
- * Start ASR session: connect to DashScope Realtime, send run-task.
+ * Start ASR session.
+ * - realtime: connect to DashScope Realtime WebSocket for streaming ASR.
+ * - upload: just accumulate PCM chunks; transcribe when recording stops.
  */
-export async function startASR(clientWs, deviceId, locationText) {
+export async function startASR(clientWs, deviceId, locationText, mode = "realtime") {
     const apiKey = process.env.DASHSCOPE_API_KEY;
     if (!apiKey)
         throw new Error("Missing DASHSCOPE_API_KEY");
     const taskId = randomUUID();
     const session = {
         deviceId,
+        mode,
         dashscopeWs: null,
         taskId,
         sentences: [],
@@ -23,9 +27,15 @@ export async function startASR(clientWs, deviceId, locationText) {
         locationText,
         audioChunks: [],
         saveAudio: false,
+        startTime: Date.now(),
     };
     sessions.set(deviceId, session);
-    // Connect to DashScope
+    if (mode === "upload") {
+        // Upload mode: no DashScope WebSocket, just accumulate chunks
+        console.log(`[asr] Upload mode started for device ${deviceId}`);
+        return;
+    }
+    // Realtime mode: connect to DashScope WebSocket
     const dsWs = new WsWebSocket(DASHSCOPE_WS_URL, {
         headers: { Authorization: `bearer ${apiKey}` },
     });
@@ -42,7 +52,7 @@ export async function startASR(clientWs, deviceId, locationText) {
                 task_group: "audio",
                 task: "asr",
                 function: "recognition",
-                model: "paraformer-realtime-v2",
+                model: "fun-asr-realtime",
                 parameters: {
                     format: "pcm",
                     sample_rate: 16000,
@@ -112,7 +122,7 @@ export async function startASR(clientWs, deviceId, locationText) {
             }
             if (header?.event === "task-finished") {
                 console.log(`[asr] Task finished: ${taskId}`);
-                finishASR(clientWs, deviceId).catch((err) => {
+                finishRealtimeASR(clientWs, deviceId).catch((err) => {
                     console.error("[asr] Finish error:", err);
                 });
                 return;
@@ -145,13 +155,21 @@ export async function startASR(clientWs, deviceId, locationText) {
     });
 }
 /**
- * Forward binary PCM audio chunk to DashScope.
+ * Forward binary PCM audio chunk.
+ * - realtime: sends to DashScope WebSocket
+ * - upload: accumulates in memory
  */
 export function sendAudioChunk(deviceId, chunk) {
     const session = sessions.get(deviceId);
-    if (!session?.dashscopeWs)
+    if (!session)
         return;
-    if (session.dashscopeWs.readyState === WsWebSocket.OPEN) {
+    if (session.mode === "upload") {
+        // Upload mode: always accumulate chunks
+        session.audioChunks.push(Buffer.from(chunk));
+        return;
+    }
+    // Realtime mode: forward to DashScope
+    if (session.dashscopeWs?.readyState === WsWebSocket.OPEN) {
         session.dashscopeWs.send(chunk);
     }
     if (session.saveAudio) {
@@ -159,15 +177,31 @@ export function sendAudioChunk(deviceId, chunk) {
     }
 }
 /**
- * Stop ASR: send finish-task to DashScope.
+ * Stop ASR session.
+ * - realtime: send finish-task to DashScope
+ * - upload: transcribe accumulated audio via REST API
  */
 export async function stopASR(clientWs, deviceId, saveAudio) {
     const session = sessions.get(deviceId);
-    if (!session?.dashscopeWs)
+    if (!session)
         return;
     if (saveAudio)
         session.saveAudio = true;
-    // Send finish-task
+    if (session.mode === "upload") {
+        // Upload mode: transcribe accumulated audio
+        finishUploadASR(clientWs, deviceId).catch((err) => {
+            console.error("[asr] Upload finish error:", err);
+            sendToClient(clientWs, {
+                type: "asr.error",
+                payload: { message: `识别失败: ${err.message}` },
+            });
+            sessions.delete(deviceId);
+        });
+        return;
+    }
+    // Realtime mode: send finish-task to DashScope
+    if (!session.dashscopeWs)
+        return;
     const finishMsg = {
         header: {
             action: "finish-task",
@@ -181,13 +215,12 @@ export async function stopASR(clientWs, deviceId, saveAudio) {
     if (session.dashscopeWs.readyState === WsWebSocket.OPEN) {
         session.dashscopeWs.send(JSON.stringify(finishMsg));
     }
-    // The task-finished event will trigger finishASR
+    // The task-finished event will trigger finishRealtimeASR
 }
 /**
- * Internal: called when DashScope sends task-finished.
- * Creates record + transcript and triggers AI processing.
+ * Internal: called when DashScope sends task-finished (realtime mode).
  */
-async function finishASR(clientWs, deviceId) {
+async function finishRealtimeASR(clientWs, deviceId) {
     const session = sessions.get(deviceId);
     if (!session)
         return;
@@ -209,7 +242,6 @@ async function finishASR(clientWs, deviceId) {
             type: "command.detected",
             payload: { command: voiceCmd.command, args: voiceCmd.args },
         });
-        // Cleanup and return — don't create a record for voice commands
         if (session.dashscopeWs)
             session.dashscopeWs.close();
         sessions.delete(deviceId);
@@ -219,9 +251,68 @@ async function finishASR(clientWs, deviceId) {
     const lastSentence = session.sentences[session.sentences.length - 1];
     const durationMs = lastSentence?.end_time ?? 0;
     const durationSeconds = Math.round(durationMs / 1000);
-    // Create record and transcript
+    await createRecordAndProcess(clientWs, session, transcript, durationSeconds);
+    // Cleanup
+    if (session.dashscopeWs) {
+        session.dashscopeWs.close();
+    }
+    sessions.delete(deviceId);
+}
+/**
+ * Internal: called when recording stops in upload mode.
+ * Converts PCM to WAV, calls DashScope REST API for transcription.
+ */
+async function finishUploadASR(clientWs, deviceId) {
+    const session = sessions.get(deviceId);
+    if (!session)
+        return;
+    const durationSeconds = Math.round((Date.now() - session.startTime) / 1000);
+    if (session.audioChunks.length === 0) {
+        sendToClient(clientWs, {
+            type: "asr.done",
+            payload: { transcript: "", recordId: "", duration: 0 },
+        });
+        sessions.delete(deviceId);
+        return;
+    }
+    // Notify client that transcription is in progress
+    sendToClient(clientWs, {
+        type: "asr.partial",
+        payload: { text: "正在识别录音...", sentenceId: 0 },
+    });
+    // Convert PCM chunks to WAV
+    const wavBuffer = pcmToWav(session.audioChunks);
+    console.log(`[asr] Upload mode: transcribing ${wavBuffer.length} bytes WAV for device ${deviceId}`);
+    // Call DashScope REST API
+    const transcript = await transcribeAudioFile(wavBuffer);
+    if (!transcript.trim()) {
+        sendToClient(clientWs, {
+            type: "asr.done",
+            payload: { transcript: "", recordId: "", duration: 0 },
+        });
+        sessions.delete(deviceId);
+        return;
+    }
+    // Check for voice commands
+    const voiceCmd = matchVoiceCommand(transcript);
+    if (voiceCmd) {
+        console.log(`[asr] Voice command detected: /${voiceCmd.command}`);
+        sendToClient(clientWs, {
+            type: "command.detected",
+            payload: { command: voiceCmd.command, args: voiceCmd.args },
+        });
+        sessions.delete(deviceId);
+        return;
+    }
+    await createRecordAndProcess(clientWs, session, transcript, durationSeconds);
+    sessions.delete(deviceId);
+}
+/**
+ * Shared logic: create record + transcript, trigger AI processing.
+ */
+async function createRecordAndProcess(clientWs, session, transcript, durationSeconds) {
     const record = await recordRepo.create({
-        device_id: deviceId,
+        device_id: session.deviceId,
         status: "processing",
         source: "voice",
         duration_seconds: durationSeconds,
@@ -244,7 +335,7 @@ async function finishASR(clientWs, deviceId) {
     if (session.saveAudio && session.audioChunks.length > 0) {
         try {
             const { uploadPCM } = await import("../storage/oss.js");
-            await uploadPCM(deviceId, session.audioChunks);
+            await uploadPCM(session.deviceId, session.audioChunks);
         }
         catch (err) {
             console.error("[asr] OSS upload failed:", err);
@@ -253,7 +344,7 @@ async function finishASR(clientWs, deviceId) {
     // Trigger AI processing in background
     processEntry({
         text: transcript,
-        deviceId,
+        deviceId: session.deviceId,
         recordId: record.id,
     })
         .then((result) => {
@@ -269,11 +360,83 @@ async function finishASR(clientWs, deviceId) {
             payload: { message: `AI processing failed: ${err.message}` },
         });
     });
-    // Cleanup
-    if (session.dashscopeWs) {
-        session.dashscopeWs.close();
+}
+/**
+ * Convert PCM Int16 chunks to a WAV buffer.
+ * PCM format: 16-bit signed, mono, 16kHz.
+ */
+function pcmToWav(chunks) {
+    const pcmData = Buffer.concat(chunks);
+    const header = Buffer.alloc(44);
+    const sampleRate = 16000;
+    const numChannels = 1;
+    const bitsPerSample = 16;
+    const byteRate = sampleRate * numChannels * (bitsPerSample / 8);
+    const blockAlign = numChannels * (bitsPerSample / 8);
+    // RIFF header
+    header.write("RIFF", 0);
+    header.writeUInt32LE(36 + pcmData.length, 4);
+    header.write("WAVE", 8);
+    // fmt sub-chunk
+    header.write("fmt ", 12);
+    header.writeUInt32LE(16, 16); // sub-chunk size
+    header.writeUInt16LE(1, 20); // PCM format
+    header.writeUInt16LE(numChannels, 22);
+    header.writeUInt32LE(sampleRate, 24);
+    header.writeUInt32LE(byteRate, 28);
+    header.writeUInt16LE(blockAlign, 32);
+    header.writeUInt16LE(bitsPerSample, 34);
+    // data sub-chunk
+    header.write("data", 36);
+    header.writeUInt32LE(pcmData.length, 40);
+    return Buffer.concat([header, pcmData]);
+}
+/**
+ * Call DashScope REST API to transcribe a WAV audio buffer.
+ * Uses qwen3-asr-flash model with base64 audio input (sync, up to 5min).
+ */
+async function transcribeAudioFile(wavBuffer) {
+    const apiKey = process.env.DASHSCOPE_API_KEY;
+    if (!apiKey)
+        throw new Error("Missing DASHSCOPE_API_KEY");
+    const base64Audio = wavBuffer.toString("base64");
+    const dataUri = `data:audio/wav;base64,${base64Audio}`;
+    const body = {
+        model: "qwen3-asr-flash",
+        input: {
+            messages: [
+                { role: "system", content: [{ text: "" }] },
+                { role: "user", content: [{ audio: dataUri }] },
+            ],
+        },
+        parameters: {
+            asr_options: { enable_itn: false },
+        },
+    };
+    const res = await fetch(DASHSCOPE_REST_URL, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+        const text = await res.text();
+        throw new Error(`DashScope transcription API error ${res.status}: ${text}`);
     }
-    sessions.delete(deviceId);
+    const data = await res.json();
+    // Response: { output: { choices: [{ message: { content: [{ text: "..." }] } }] } }
+    const choices = data.output?.choices;
+    if (Array.isArray(choices) && choices.length > 0) {
+        const content = choices[0]?.message?.content;
+        if (Array.isArray(content)) {
+            return content.map((c) => c.text ?? "").join("");
+        }
+        if (typeof content === "string")
+            return content;
+    }
+    return "";
 }
 /**
  * Cancel ASR session.
@@ -294,7 +457,7 @@ function sendToClient(ws, msg) {
     }
 }
 /**
- * Get the device ID for a given WebSocket connection.
+ * Check if a session exists for the given device.
  */
 export function getSessionDeviceId(deviceId) {
     return sessions.has(deviceId);

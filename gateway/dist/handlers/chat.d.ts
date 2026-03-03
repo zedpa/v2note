@@ -14,7 +14,12 @@ export interface ChatStartPayload {
             configs: Array<{
                 name: string;
                 enabled: boolean;
+                description?: string;
+                type?: string;
+                prompt?: string;
+                builtin?: boolean;
             }>;
+            selectedReviewSkill?: string;
         };
     };
 }
@@ -26,6 +31,8 @@ export interface ChatStartPayload {
 export declare function startChat(payload: ChatStartPayload): Promise<AsyncGenerator<string, void, undefined>>;
 /**
  * Send a message in an ongoing chat session.
+ * Supports built-in tool calls: if AI responds with tool_calls JSON,
+ * execute them and re-call AI for the final streaming response.
  */
 export declare function sendChatMessage(deviceId: string, text: string): Promise<AsyncGenerator<string, void, undefined>>;
 /**

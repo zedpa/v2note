@@ -8,6 +8,7 @@ import { startASR, sendAudioChunk, stopASR, cancelASR } from "./handlers/asr.js"
 import { getSession } from "./session/manager.js";
 import { Router } from "./router.js";
 import { sendJson, sendError } from "./lib/http-helpers.js";
+import { handleCors } from "./middleware/cors.js";
 import { registerDeviceRoutes } from "./routes/devices.js";
 import { registerRecordRoutes } from "./routes/records.js";
 import { registerTranscriptRoutes } from "./routes/transcripts.js";
@@ -44,12 +45,15 @@ registerMemoryRoutes(router);
 registerSoulRoutes(router);
 // ── HTTP Server ──
 const server = createServer(async (req, res) => {
+    // CORS for all requests (including /health and non-router paths)
+    if (handleCors(req, res))
+        return;
     // Health check (before router for speed)
     if (req.url === "/health") {
         sendJson(res, { status: "ok", timestamp: new Date().toISOString() });
         return;
     }
-    // Try router
+    // Try router (CORS already handled above)
     const handled = await router.handle(req, res);
     if (handled)
         return;
@@ -148,7 +152,7 @@ wss.on("connection", (ws) => {
                 case "asr.start": {
                     connectionDeviceMap.set(ws, msg.payload.deviceId);
                     proactiveEngine.registerDevice(msg.payload.deviceId, ws);
-                    await startASR(ws, msg.payload.deviceId, msg.payload.locationText);
+                    await startASR(ws, msg.payload.deviceId, msg.payload.locationText, msg.payload.mode);
                     break;
                 }
                 case "asr.stop": {

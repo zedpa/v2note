@@ -6,6 +6,10 @@ export interface LocalConfigPayload {
         configs: Array<{
             name: string;
             enabled: boolean;
+            description?: string;
+            type?: string;
+            prompt?: string;
+            builtin?: boolean;
         }>;
     };
     settings?: Record<string, unknown>;

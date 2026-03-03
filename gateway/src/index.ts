@@ -4,10 +4,11 @@ import { config } from "dotenv";
 import { processEntry, type ProcessPayload, type ProcessResult } from "./handlers/process.js";
 import { startChat, sendChatMessage, endChat, type ChatStartPayload } from "./handlers/chat.js";
 import { aggregateTodos } from "./handlers/todo.js";
-import { startASR, sendAudioChunk, stopASR, cancelASR } from "./handlers/asr.js";
+import { startASR, sendAudioChunk, stopASR, cancelASR, type ASRMode } from "./handlers/asr.js";
 import { getSession } from "./session/manager.js";
 import { Router } from "./router.js";
 import { sendJson, sendError } from "./lib/http-helpers.js";
+import { handleCors } from "./middleware/cors.js";
 import { registerDeviceRoutes } from "./routes/devices.js";
 import { registerRecordRoutes } from "./routes/records.js";
 import { registerTranscriptRoutes } from "./routes/transcripts.js";
@@ -37,7 +38,7 @@ type GatewayMessage =
   | { type: "chat.message"; payload: { text: string; deviceId: string } }
   | { type: "chat.end"; payload: { deviceId: string } }
   | { type: "todo.aggregate"; payload: { deviceId: string } }
-  | { type: "asr.start"; payload: { deviceId: string; locationText?: string } }
+  | { type: "asr.start"; payload: { deviceId: string; locationText?: string; mode?: ASRMode } }
   | { type: "asr.stop"; payload: { deviceId: string; saveAudio?: boolean } }
   | { type: "asr.cancel"; payload: { deviceId: string } };
 
@@ -77,13 +78,16 @@ registerSoulRoutes(router);
 // ── HTTP Server ──
 
 const server = createServer(async (req, res) => {
+  // CORS for all requests (including /health and non-router paths)
+  if (handleCors(req, res)) return;
+
   // Health check (before router for speed)
   if (req.url === "/health") {
     sendJson(res, { status: "ok", timestamp: new Date().toISOString() });
     return;
   }
 
-  // Try router
+  // Try router (CORS already handled above)
   const handled = await router.handle(req, res);
   if (handled) return;
 
@@ -198,7 +202,7 @@ wss.on("connection", (ws) => {
         case "asr.start": {
           connectionDeviceMap.set(ws, msg.payload.deviceId);
           proactiveEngine.registerDevice(msg.payload.deviceId, ws);
-          await startASR(ws, msg.payload.deviceId, msg.payload.locationText);
+          await startASR(ws, msg.payload.deviceId, msg.payload.locationText, msg.payload.mode);
           break;
         }
 

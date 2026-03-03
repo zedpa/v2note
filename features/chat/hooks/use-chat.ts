@@ -233,11 +233,7 @@ export function useChat(
   ]);
 
   const send = useCallback(async (text: string) => {
-    const client = getGatewayClient();
-    const deviceId = await getDeviceId();
-    const ready = await client.waitForReady(5000);
-
-    // Add user message
+    // Add user message immediately
     setMessages((prev) => [
       ...prev,
       {
@@ -247,6 +243,25 @@ export function useChat(
         timestamp: new Date(),
       },
     ]);
+
+    let deviceId: string;
+    try {
+      deviceId = await getDeviceId();
+    } catch {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: crypto.randomUUID(),
+          role: "assistant",
+          content: "无法连接服务器，请检查网络或在设置中配置正确的服务器地址。",
+          timestamp: new Date(),
+        },
+      ]);
+      return;
+    }
+
+    const client = getGatewayClient();
+    const ready = await client.waitForReady(5000);
 
     if (!ready) {
       setMessages((prev) => [

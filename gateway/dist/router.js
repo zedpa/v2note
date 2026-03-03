@@ -1,5 +1,4 @@
 import { sendError, HttpError } from "./lib/http-helpers.js";
-import { handleCors } from "./middleware/cors.js";
 export class Router {
     routes = [];
     get(path, handler) { this.addRoute("GET", path, handler); }
@@ -21,8 +20,7 @@ export class Router {
         });
     }
     async handle(req, res) {
-        if (handleCors(req, res))
-            return true;
+        // CORS is handled at the server level (index.ts), OPTIONS already returned before reaching here
         const urlObj = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
         const pathname = urlObj.pathname;
         const method = req.method ?? "GET";

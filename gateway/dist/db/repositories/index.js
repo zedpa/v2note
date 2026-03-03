@@ -12,4 +12,5 @@ export * as skillConfigRepo from "./skill-config.js";
 export * as customerRequestRepo from "./customer-request.js";
 export * as settingChangeRepo from "./setting-change.js";
 export * as subscriptionRepo from "./subscription.js";
+export * as customSkillRepo from "./custom-skill.js";
 //# sourceMappingURL=index.js.map
