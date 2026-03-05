@@ -12,6 +12,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const ASR_UPLOAD_SCRIPT = join(__dirname, "../../scripts/asr_transcribe.py");
 const ASR_REALTIME_SCRIPT = join(__dirname, "../../scripts/asr_realtime.py");
+const PYTHON = process.platform === "win32" ? "python" : "python3";
 const sessions = new Map();
 /**
  * Start ASR session.
@@ -42,7 +43,7 @@ export async function startASR(clientWs, deviceId, locationText, mode = "realtim
         return;
     }
     // Realtime mode: spawn Python streaming ASR process
-    const py = spawn("python", [ASR_REALTIME_SCRIPT], {
+    const py = spawn(PYTHON, [ASR_REALTIME_SCRIPT], {
         env: {
             ...process.env,
             DASHSCOPE_API_KEY: apiKey,
@@ -377,7 +378,7 @@ async function transcribeAudioFile(wavBuffer) {
     if (!apiKey)
         throw new Error("Missing DASHSCOPE_API_KEY");
     return new Promise((resolve, reject) => {
-        const py = spawn("python", [ASR_UPLOAD_SCRIPT], {
+        const py = spawn(PYTHON, [ASR_UPLOAD_SCRIPT], {
             env: {
                 ...process.env,
                 DASHSCOPE_API_KEY: apiKey,

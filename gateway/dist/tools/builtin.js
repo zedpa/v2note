@@ -2,7 +2,7 @@
  * Built-in tools that the AI can invoke during processing or chat.
  * These run in-process (no MCP server needed).
  */
-import { recordRepo, transcriptRepo, summaryRepo, customSkillRepo } from "../db/repositories/index.js";
+import { recordRepo, transcriptRepo, summaryRepo, customSkillRepo, todoRepo } from "../db/repositories/index.js";
 /**
  * Definitions exposed to the AI via system prompt.
  */
@@ -17,6 +17,22 @@ export const BUILTIN_TOOLS = [
                 title: { type: "string", description: "标题（可选，不超过50字）" },
             },
             required: ["content"],
+        },
+    },
+    {
+        name: "create_todo",
+        description: "创建一条新的待办事项。用户提出具体行动时使用此工具。",
+        parameters: {
+            type: "object",
+            properties: {
+                text: { type: "string", description: "待办文本（动词开头，简洁可执行）" },
+                link_record_id: { type: "string", description: "可选：关联到已有记录的ID" },
+                scheduled_start: { type: "string", description: "可选：开始时间（ISO字符串）" },
+                scheduled_end: { type: "string", description: "可选：结束时间（ISO字符串）" },
+                estimated_minutes: { type: "number", description: "可选：预估时长（分钟）" },
+                priority: { type: "number", description: "可选：优先级（整数，越大越高）" },
+            },
+            required: ["text"],
         },
     },
     {
@@ -57,6 +73,8 @@ export async function callBuiltinTool(name, args, deviceId) {
     switch (name) {
         case "create_diary":
             return handleCreateDiary(args, deviceId);
+        case "create_todo":
+            return handleCreateTodo(args, deviceId);
         case "delete_diary":
             return handleDeleteDiary(args, deviceId);
         case "create_skill":
@@ -64,6 +82,54 @@ export async function callBuiltinTool(name, args, deviceId) {
         default:
             return { success: false, message: `Unknown built-in tool: ${name}` };
     }
+}
+async function handleCreateTodo(args, deviceId) {
+    const text = String(args.text ?? "").trim();
+    if (!text) {
+        return { success: false, message: "text 不能为空" };
+    }
+    let recordId = String(args.link_record_id ?? "").trim();
+    if (recordId) {
+        const rec = await recordRepo.findById(recordId);
+        if (!rec) {
+            return { success: false, message: `关联记录 ${recordId} 不存在` };
+        }
+        if (rec.device_id !== deviceId) {
+            return { success: false, message: "无权关联此记录" };
+        }
+    }
+    else {
+        const rec = await recordRepo.create({
+            device_id: deviceId,
+            status: "completed",
+            source: "chat_tool",
+        });
+        recordId = rec.id;
+    }
+    const todo = await todoRepo.create({ record_id: recordId, text, done: false });
+    const updates = {};
+    if (args.scheduled_start !== undefined)
+        updates.scheduled_start = String(args.scheduled_start || "");
+    if (args.scheduled_end !== undefined)
+        updates.scheduled_end = String(args.scheduled_end || "");
+    if (args.estimated_minutes !== undefined)
+        updates.estimated_minutes = Number(args.estimated_minutes);
+    if (args.priority !== undefined)
+        updates.priority = Number(args.priority);
+    // Normalize empty ISO strings to null
+    if (updates.scheduled_start === "")
+        updates.scheduled_start = null;
+    if (updates.scheduled_end === "")
+        updates.scheduled_end = null;
+    const hasUpdates = Object.keys(updates).length > 0;
+    if (hasUpdates) {
+        await todoRepo.update(todo.id, updates);
+    }
+    return {
+        success: true,
+        message: `待办已创建: "${text}"`,
+        data: { todo_id: todo.id, record_id: recordId },
+    };
 }
 async function handleCreateDiary(args, deviceId) {
     const content = String(args.content ?? "").trim();

@@ -247,9 +247,22 @@ export function FAB({
     setPartialText("");
   }, [stopTimers, recorder]);
 
+  const fabRef = useRef<HTMLButtonElement>(null);
+  const pointerIdRef = useRef<number | null>(null);
+  const longPressTriggeredRef = useRef(false);
+
   const gestures = useFabGestures({
-    onTap: () => setShowTextSheet(true),
-    onLongPressStart: () => startRecording(),
+    onTap: () => {
+      // Tap is handled by onClick for better mobile compatibility
+    },
+    onLongPressStart: () => {
+      longPressTriggeredRef.current = true;
+      // Capture pointer only when entering recording (drag gestures need it)
+      if (fabRef.current && pointerIdRef.current !== null) {
+        try { fabRef.current.setPointerCapture(pointerIdRef.current); } catch {}
+      }
+      startRecording();
+    },
     onSwipeLeft: () => cancelRecording(),
     onSwipeRight: () => {
       // phase transitions to "locked" by gesture hook
@@ -393,11 +406,19 @@ export function FAB({
         )}
 
         <button
+          ref={fabRef}
           type="button"
           {...handlers}
           onPointerDown={(e) => {
-            e.currentTarget.setPointerCapture(e.pointerId);
+            longPressTriggeredRef.current = false;
+            pointerIdRef.current = e.pointerId;
             handlers.onPointerDown(e);
+          }}
+          onClick={() => {
+            // Primary tap handler — reliable on mobile (no setPointerCapture interference)
+            if (!longPressTriggeredRef.current) {
+              setShowTextSheet(true);
+            }
           }}
           className={cn(
             "relative flex items-center justify-center w-16 h-16 rounded-full select-none touch-none transition-transform duration-200",

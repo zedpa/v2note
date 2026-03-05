@@ -16,6 +16,7 @@ interface FabGestureResult {
     onPointerDown: (e: React.PointerEvent) => void;
     onPointerMove: (e: React.PointerEvent) => void;
     onPointerUp: (e: React.PointerEvent) => void;
+    onPointerCancel: (e: React.PointerEvent) => void;
   };
 }
 
@@ -154,6 +155,29 @@ export function useFabGestures(callbacks: FabGestureCallbacks): FabGestureResult
     [callbacks, resetSwipe, setPhaseSync],
   );
 
+  const onPointerCancel = useCallback(
+    (_e: React.PointerEvent) => {
+      if (longPressRef.current) {
+        clearTimeout(longPressRef.current);
+        longPressRef.current = null;
+      }
+      // If still in pressing phase, treat as aborted tap → reset only
+      if (phaseRef.current === "pressing") {
+        setPhaseSync("idle");
+        isPressingRef.current = false;
+        return;
+      }
+      // If recording, cancel recording
+      if (phaseRef.current === "recording") {
+        setPhaseSync("idle");
+        resetSwipe();
+        callbacks.onSwipeLeft(); // cancel
+      }
+      isPressingRef.current = false;
+    },
+    [callbacks, resetSwipe, setPhaseSync],
+  );
+
   const reset = useCallback(() => {
     if (longPressRef.current) {
       clearTimeout(longPressRef.current);
@@ -171,6 +195,6 @@ export function useFabGestures(callbacks: FabGestureCallbacks): FabGestureResult
     deltaX,
     deltaY,
     reset,
-    handlers: { onPointerDown, onPointerMove, onPointerUp },
+    handlers: { onPointerDown, onPointerMove, onPointerUp, onPointerCancel },
   };
 }
