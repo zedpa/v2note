@@ -11,6 +11,7 @@ import {
 } from "@/features/chat/lib/gateway-client";
 import { getDeviceId } from "@/shared/lib/device";
 import { emit } from "@/features/recording/lib/events";
+import { getSettings } from "@/shared/lib/local-config";
 import { TextBottomSheet } from "./text-bottom-sheet";
 import { RecordingImmersive } from "./recording-immersive";
 import type { CommandContext } from "@/features/commands/lib/registry";
@@ -135,13 +136,18 @@ export function FAB({
     return () => unsub();
   }, [onCommandDetected, onOpenCommandChat]);
 
+  const asrModeRef = useRef<"realtime" | "upload">("realtime");
+
   const startRecording = useCallback(async () => {
     try {
       pausedRef.current = false;
       setLockedPaused(false);
       commandReleaseRef.current = false;
 
-      const deviceId = await getDeviceId();
+      const [deviceId, settings] = await Promise.all([getDeviceId(), getSettings()]);
+      const asrMode = settings.asrMode ?? "realtime";
+      asrModeRef.current = asrMode;
+
       const client = getGatewayClient();
       if (!client.connected) {
         client.connect();
@@ -152,7 +158,7 @@ export function FAB({
         }
       }
 
-      client.send({ type: "asr.start", payload: { deviceId } });
+      client.send({ type: "asr.start", payload: { deviceId, mode: asrMode } });
 
       await recorder.startRecording({
         onPCMData: (chunk) => {

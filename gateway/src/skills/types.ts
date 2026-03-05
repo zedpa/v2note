@@ -1,6 +1,10 @@
+export type SkillType = "review" | "process";
+
 export interface SkillMetadata {
   extract_fields?: string[];
   always?: boolean;
+  type: SkillType;
+  builtin?: boolean;
 }
 
 export interface Skill {

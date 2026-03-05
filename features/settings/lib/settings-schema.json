@@ -25,6 +25,14 @@
       "key": "recording",
       "fields": [
         {
+          "key": "asrMode",
+          "label": "语音识别模式",
+          "type": "select",
+          "options": ["realtime", "upload"],
+          "optionLabels": ["实时识别（快速，准确率较低）", "录后识别（较慢，准确率更高）"],
+          "default": "realtime"
+        },
+        {
           "key": "autoDeleteAudio",
           "label": "处理后自动删除音频",
           "type": "toggle",

@@ -60,6 +60,26 @@ export function ChatView({ dateRange, onClose, initialMessage, title, commandCon
     }
   }, [messages]);
 
+  // Detect slash commands in AI responses and execute them
+  const prevStreamingRef = useRef(streaming);
+  useEffect(() => {
+    const wasStreaming = prevStreamingRef.current;
+    prevStreamingRef.current = streaming;
+
+    // Only trigger when streaming just finished
+    if (wasStreaming && !streaming && commandContext) {
+      const lastMsg = messages[messages.length - 1];
+      if (lastMsg?.role === "assistant" && lastMsg.content) {
+        const trimmed = lastMsg.content.trim();
+        // Check if the entire response is a slash command (e.g. "/settings")
+        if (trimmed.startsWith("/") && trimmed.length < 50) {
+          const result = executeCommand(trimmed, commandContext);
+          if (result?.handled) return;
+        }
+      }
+    }
+  }, [streaming, messages, commandContext]);
+
   const handleSend = useCallback(() => {
     const trimmed = input.trim();
     if (!trimmed || streaming) return;

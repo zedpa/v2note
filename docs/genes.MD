@@ -8,6 +8,7 @@
 
 | 版本 | 日期 | 变更内容 |
 |------|------|----------|
+| v2026.03.05 | 2026-03-05 | ASR引擎替换为Python SDK：(1)实时识别和录后识别均改用Python子进程调用DashScope SDK（`Recognition`类），替代原来的Node.js直接WebSocket/REST API调用；(2)实时模式通过`asr_realtime.py`——stdin接收PCM流、stdout输出JSON行事件（partial/sentence/complete）、EOF触发stop；(3)录后模式通过`asr_transcribe.py`——stdin接收WAV、stdout输出JSON结果；(4)默认模型统一为`fun-asr-realtime`；(5)两个模式均开启`disfluency_removal_enabled=True`去语气词；(6)Windows下设置`PYTHONIOENCODING=utf-8`解决中文乱码 |
 | v2026.03.03e | 2026-03-03 | 技能模块修复+SKILL.md重写：(1)skills-page CRUD改为本地优先保存(API同步后台执行)，离线/Gateway不可达时不再报错；(2)所有SKILL.md改为结构化MD格式(标题+规则+示例表格)；(3)todo-extract重写为SRO三元组模式(主体+动作+客体三要素齐全才识别为待办)，主体为"我"时省略主体；(4)review技能(二阶思考/元问题)、process技能(customer-request/setting-change)统一MD格式 |
 | v2026.03.03d | 2026-03-03 | 技能管理系统重构：(1)技能分类为review(复盘视角)/process(处理技能)两种类型；(2)复盘视角支持CRUD(创建/编辑/删除)，review-overlay改为RadioGroup单选；(3)AI内置工具新增create_skill，对话中自动创建复盘视角；(4)自定义技能存储custom_skill表；(5)process.ts仅加载process类型技能，chat.ts按selectedReviewSkill加载单个review技能；(6)/skills独立页面(不再redirect到review) |
 | v2026.03.03c | 2026-03-03 | 修复：(1)实时ASR模型名称错误——`qwen3-asr`不存在于FunASR WebSocket API，改为`fun-asr-realtime`；(2)chat.ts工具调用提取增加regex容错（extractToolCalls三级策略）；(3)AI回复中的斜杠命令（如`/settings`）自动执行而非仅显示文字 |
@@ -69,7 +70,7 @@
 
 ## gene_voice_recording
 ### 功能描述
-语音录制与 ASR 转写。支持两种识别模式：**实时识别**（fun-asr-realtime WebSocket 流式）和**录后识别**（qwen3-asr-flash REST API 整段识别）。用户可在设置中切换。实时模式边录边出文字但准确率较低；录后模式录音结束后统一识别，准确率更高。
+语音录制与 ASR 转写。支持两种识别模式：**实时识别**和**录后识别**，均通过 Python DashScope SDK 子进程实现（`fun-asr-realtime` 模型 + `disfluency_removal_enabled` 去语气词）。用户可在设置中切换。实时模式边录边出文字；录后模式录音结束后统一识别。
 
 ### 录音阶段（两阶段设计）
 - **recording 阶段**（长按开始）：FAB 保持可见，周围显示红色脉冲圆环；FAB 上方显示迷你波形 + 计时；支持三向拖拽手势（左取消 / 上指令 / 右常驻），无三色方向提示。指针捕获（setPointerCapture）确保滑动手势在 FAB 外也能追踪；pointerdown 调用 preventDefault 防止后续 click 穿透
@@ -79,8 +80,8 @@
 - 功能1：FAB 按钮手势控制（长按开始录音，松开立即发送，左滑/左上取消，右滑/右上锁定，正上滑松手转语音指令）
 - 功能2：PCM 音频采集（Web Audio API worklet），实时计算 RMS 音量
 - 功能3：WebSocket 二进制帧传输 PCM 数据
-- 功能4a：**实时识别模式** — Gateway 连接 DashScope FunASR WebSocket（fun-asr-realtime），实时转写文本回传（partial + sentence 事件）
-- 功能4b：**录后识别模式** — Gateway 累积 PCM 数据，录音结束后转换为 WAV，调用 DashScope REST API（qwen3-asr-flash）整段识别
+- 功能4a：**实时识别模式** — Gateway spawn Python 子进程 `asr_realtime.py`，通过 stdin 流式输入 PCM、stdout JSON 行输出事件（partial/sentence/complete），EOF 触发 stop。模型：fun-asr-realtime，去语气词已启用
+- 功能4b：**录后识别模式** — Gateway 累积 PCM 数据，录音结束后转换为 WAV，spawn Python 子进程 `asr_transcribe.py`，stdin 输入 WAV、stdout 输出 JSON 结果。模型：fun-asr-realtime（Recognition.call），去语气词已启用
 - 功能5：ASR 模式切换 — 设置页「语音识别模式」可选「实时识别」或「录后识别」，前端读取 asrMode 设置传给 Gateway
 - 功能6：录音完成后创建 record + transcript，触发 AI 处理
 - 功能7：全屏常驻录音界面（仅 locked 阶段）——中间方块按钮点击可暂停/继续；暂停后左侧显示 X（取消录音），右侧显示 ✓（完成录音）
@@ -92,7 +93,9 @@
 - `features/recording/components/recording-immersive.tsx` — 全屏沉浸录音（三色块 + 音量波形）
 - `features/recording/hooks/use-pcm-recorder.ts` — PCM 录音 hook
 - `features/recording/hooks/use-fab-gestures.ts` — 手势 hook
-- `gateway/src/handlers/asr.ts` — ASR 处理器
+- `gateway/src/handlers/asr.ts` — ASR 处理器（spawn Python 子进程，不再直接调用 DashScope API）
+- `gateway/scripts/asr_realtime.py` — Python 实时流式 ASR（stdin PCM → stdout JSON 行事件）
+- `gateway/scripts/asr_transcribe.py` — Python 录后 ASR（stdin WAV → stdout JSON 结果）
 - `public/worklets/pcm-processor.js` — Web Audio worklet
 - `shared/lib/gateway-url.ts` — Gateway URL 运行时管理（WebSocket + HTTP）
 - `shared/lib/api.ts` — REST API 客户端（HTML 响应容错）

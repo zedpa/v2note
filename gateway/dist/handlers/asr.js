@@ -1,15 +1,21 @@
 import { WebSocket as WsWebSocket } from "ws";
 import { randomUUID } from "node:crypto";
+import { spawn } from "node:child_process";
+import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+import { createInterface } from "node:readline";
 import { recordRepo } from "../db/repositories/index.js";
 import { transcriptRepo } from "../db/repositories/index.js";
 import { processEntry } from "./process.js";
 import { matchVoiceCommand } from "./voice-commands.js";
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const ASR_UPLOAD_SCRIPT = join(__dirname, "../../scripts/asr_transcribe.py");
+const ASR_REALTIME_SCRIPT = join(__dirname, "../../scripts/asr_realtime.py");
 const sessions = new Map();
-const DASHSCOPE_WS_URL = "wss://dashscope.aliyuncs.com/api-ws/v1/inference/";
-const DASHSCOPE_REST_URL = "https://dashscope.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation";
 /**
  * Start ASR session.
- * - realtime: connect to DashScope Realtime WebSocket for streaming ASR.
+ * - realtime: spawn Python realtime ASR subprocess for streaming recognition.
  * - upload: just accumulate PCM chunks; transcribe when recording stops.
  */
 export async function startASR(clientWs, deviceId, locationText, mode = "realtime") {
@@ -20,7 +26,7 @@ export async function startASR(clientWs, deviceId, locationText, mode = "realtim
     const session = {
         deviceId,
         mode,
-        dashscopeWs: null,
+        pythonProcess: null,
         taskId,
         sentences: [],
         partialText: "",
@@ -31,132 +37,122 @@ export async function startASR(clientWs, deviceId, locationText, mode = "realtim
     };
     sessions.set(deviceId, session);
     if (mode === "upload") {
-        // Upload mode: no DashScope WebSocket, just accumulate chunks
+        // Upload mode: no subprocess, just accumulate chunks
         console.log(`[asr] Upload mode started for device ${deviceId}`);
         return;
     }
-    // Realtime mode: connect to DashScope WebSocket
-    const dsWs = new WsWebSocket(DASHSCOPE_WS_URL, {
-        headers: { Authorization: `bearer ${apiKey}` },
+    // Realtime mode: spawn Python streaming ASR process
+    const py = spawn("python", [ASR_REALTIME_SCRIPT], {
+        env: {
+            ...process.env,
+            DASHSCOPE_API_KEY: apiKey,
+            ASR_MODEL: process.env.ASR_MODEL || "fun-asr-realtime",
+            PYTHONIOENCODING: "utf-8",
+        },
+        stdio: ["pipe", "pipe", "pipe"],
     });
-    session.dashscopeWs = dsWs;
-    dsWs.on("open", () => {
-        // Send run-task message
-        const runTask = {
-            header: {
-                action: "run-task",
-                task_id: taskId,
-                streaming: "duplex",
-            },
-            payload: {
-                task_group: "audio",
-                task: "asr",
-                function: "recognition",
-                model: "fun-asr-realtime",
-                parameters: {
-                    format: "pcm",
-                    sample_rate: 16000,
-                    vocabulary_id: "",
-                    disfluency_removal_enabled: false,
-                },
-                input: {},
-            },
-        };
-        dsWs.send(JSON.stringify(runTask));
-    });
-    dsWs.on("message", (data) => {
+    session.pythonProcess = py;
+    // Read JSON lines from Python stdout
+    const rl = createInterface({ input: py.stdout });
+    rl.on("line", (line) => {
         try {
-            const msg = JSON.parse(data.toString());
-            const header = msg.header;
-            const payload = msg.payload;
-            if (header?.event === "task-started") {
-                console.log(`[asr] Task started: ${taskId}`);
-                return;
-            }
-            if (header?.event === "result-generated") {
-                const output = payload?.output;
-                if (!output?.sentence)
-                    return;
-                const sentence = output.sentence;
-                const sid = sentence.sentence_id ?? 0;
-                if (sentence.end_time !== undefined && sentence.begin_time !== undefined) {
-                    // Confirmed sentence — deduplicate by sentence_id
-                    const existing = session.sentences.find((s) => s.sentenceId === sid);
-                    if (existing) {
-                        // Update existing sentence (DashScope refines same sentence_id)
-                        existing.text = sentence.text;
-                        existing.begin_time = sentence.begin_time;
-                        existing.end_time = sentence.end_time;
-                    }
-                    else {
-                        // New sentence
-                        session.sentences.push({
-                            text: sentence.text,
-                            sentenceId: sid,
-                            begin_time: sentence.begin_time,
-                            end_time: sentence.end_time,
-                        });
-                        sendToClient(clientWs, {
-                            type: "asr.sentence",
-                            payload: {
-                                text: sentence.text,
-                                sentenceId: sid,
-                                begin_time: sentence.begin_time,
-                                end_time: sentence.end_time,
-                            },
-                        });
-                    }
-                }
-                else {
-                    // Partial result
-                    session.partialText = sentence.text ?? "";
-                    sendToClient(clientWs, {
-                        type: "asr.partial",
-                        payload: {
-                            text: sentence.text ?? "",
-                            sentenceId: sid,
-                        },
-                    });
-                }
-                return;
-            }
-            if (header?.event === "task-finished") {
-                console.log(`[asr] Task finished: ${taskId}`);
-                finishRealtimeASR(clientWs, deviceId).catch((err) => {
-                    console.error("[asr] Finish error:", err);
-                });
-                return;
-            }
-            if (header?.event === "task-failed") {
-                const errMsg = header?.error_message ?? "ASR task failed";
-                console.error(`[asr] Task failed: ${errMsg}`);
-                sendToClient(clientWs, {
-                    type: "asr.error",
-                    payload: { message: errMsg },
-                });
-                sessions.delete(deviceId);
-                return;
-            }
+            const event = JSON.parse(line);
+            handleRealtimeEvent(clientWs, deviceId, event);
         }
         catch (err) {
-            console.error("[asr] Failed to parse DashScope message:", err);
+            console.error("[asr] Failed to parse Python event:", line, err);
         }
     });
-    dsWs.on("error", (err) => {
-        console.error("[asr] DashScope WS error:", err);
+    py.stderr.on("data", (data) => {
+        console.error(`[asr] Python stderr: ${data.toString().trim()}`);
+    });
+    py.on("error", (err) => {
+        console.error("[asr] Python process error:", err);
         sendToClient(clientWs, {
             type: "asr.error",
-            payload: { message: "ASR connection error" },
+            payload: { message: "ASR process error" },
         });
         sessions.delete(deviceId);
     });
-    dsWs.on("close", () => {
-        console.log(`[asr] DashScope WS closed for device ${deviceId}`);
+    py.on("close", (code) => {
+        console.log(`[asr] Python realtime process exited with code ${code} for device ${deviceId}`);
+        // If session still exists, the process ended (complete event should have been handled)
+        const sess = sessions.get(deviceId);
+        if (sess && sess.pythonProcess === py) {
+            finishRealtimeASR(clientWs, deviceId).catch((err) => {
+                console.error("[asr] Finish error:", err);
+            });
+        }
     });
+    console.log(`[asr] Realtime mode started (Python SDK) for device ${deviceId}`);
+}
+/**
+ * Handle a JSON event from the Python realtime ASR process.
+ */
+function handleRealtimeEvent(clientWs, deviceId, event) {
+    const session = sessions.get(deviceId);
+    if (!session)
+        return;
+    switch (event.type) {
+        case "started":
+            console.log(`[asr] Python ASR started for device ${deviceId}`);
+            break;
+        case "sentence": {
+            const sid = event.sentence_id ?? 0;
+            const existing = session.sentences.find((s) => s.sentenceId === sid);
+            if (existing) {
+                existing.text = event.text;
+                existing.begin_time = event.begin_time;
+                existing.end_time = event.end_time;
+            }
+            else {
+                session.sentences.push({
+                    text: event.text,
+                    sentenceId: sid,
+                    begin_time: event.begin_time,
+                    end_time: event.end_time,
+                });
+                sendToClient(clientWs, {
+                    type: "asr.sentence",
+                    payload: {
+                        text: event.text,
+                        sentenceId: sid,
+                        begin_time: event.begin_time,
+                        end_time: event.end_time,
+                    },
+                });
+            }
+            break;
+        }
+        case "partial":
+            session.partialText = event.text ?? "";
+            sendToClient(clientWs, {
+                type: "asr.partial",
+                payload: {
+                    text: event.text ?? "",
+                    sentenceId: event.sentence_id ?? 0,
+                },
+            });
+            break;
+        case "error":
+            console.error(`[asr] Python ASR error: ${event.message}`);
+            sendToClient(clientWs, {
+                type: "asr.error",
+                payload: { message: event.message },
+            });
+            break;
+        case "complete":
+            console.log(`[asr] Python ASR complete for device ${deviceId}`);
+            // Will be handled by the process close event or explicitly here
+            finishRealtimeASR(clientWs, deviceId).catch((err) => {
+                console.error("[asr] Finish error:", err);
+            });
+            break;
+    }
 }
 /**
  * Forward binary PCM audio chunk.
- * - realtime: sends to DashScope WebSocket
+ * - realtime: writes to Python subprocess stdin
  * - upload: accumulates in memory
  */
 export function sendAudioChunk(deviceId, chunk) {
@@ -168,9 +164,9 @@ export function sendAudioChunk(deviceId, chunk) {
         session.audioChunks.push(Buffer.from(chunk));
         return;
     }
-    // Realtime mode: forward to DashScope
-    if (session.dashscopeWs?.readyState === WsWebSocket.OPEN) {
-        session.dashscopeWs.send(chunk);
+    // Realtime mode: forward to Python process stdin
+    if (session.pythonProcess?.stdin?.writable) {
+        session.pythonProcess.stdin.write(chunk);
     }
     if (session.saveAudio) {
         session.audioChunks.push(Buffer.from(chunk));
@@ -178,8 +174,8 @@ export function sendAudioChunk(deviceId, chunk) {
 }
 /**
  * Stop ASR session.
- * - realtime: send finish-task to DashScope
- * - upload: transcribe accumulated audio via REST API
+ * - realtime: close Python subprocess stdin (signals EOF → stop)
+ * - upload: transcribe accumulated audio via Python subprocess
  */
 export async function stopASR(clientWs, deviceId, saveAudio) {
     const session = sessions.get(deviceId);
@@ -199,31 +195,21 @@ export async function stopASR(clientWs, deviceId, saveAudio) {
         });
         return;
     }
-    // Realtime mode: send finish-task to DashScope
-    if (!session.dashscopeWs)
-        return;
-    const finishMsg = {
-        header: {
-            action: "finish-task",
-            task_id: session.taskId,
-            streaming: "duplex",
-        },
-        payload: {
-            input: {},
-        },
-    };
-    if (session.dashscopeWs.readyState === WsWebSocket.OPEN) {
-        session.dashscopeWs.send(JSON.stringify(finishMsg));
+    // Realtime mode: close stdin to signal Python process to stop
+    if (session.pythonProcess?.stdin?.writable) {
+        session.pythonProcess.stdin.end();
     }
-    // The task-finished event will trigger finishRealtimeASR
+    // The "complete" event and process close will trigger finishRealtimeASR
 }
 /**
- * Internal: called when DashScope sends task-finished (realtime mode).
+ * Internal: called when Python ASR sends "complete" event or process exits (realtime mode).
  */
 async function finishRealtimeASR(clientWs, deviceId) {
     const session = sessions.get(deviceId);
     if (!session)
         return;
+    // Prevent double-finish
+    sessions.delete(deviceId);
     // Combine all confirmed sentences
     const transcript = session.sentences.map((s) => s.text).join("");
     if (!transcript.trim()) {
@@ -231,7 +217,6 @@ async function finishRealtimeASR(clientWs, deviceId) {
             type: "asr.done",
             payload: { transcript: "", recordId: "", duration: 0 },
         });
-        sessions.delete(deviceId);
         return;
     }
     // Check if the transcript matches a voice command
@@ -242,9 +227,6 @@ async function finishRealtimeASR(clientWs, deviceId) {
             type: "command.detected",
             payload: { command: voiceCmd.command, args: voiceCmd.args },
         });
-        if (session.dashscopeWs)
-            session.dashscopeWs.close();
-        sessions.delete(deviceId);
         return;
     }
     // Calculate duration from last sentence end_time
@@ -252,15 +234,10 @@ async function finishRealtimeASR(clientWs, deviceId) {
     const durationMs = lastSentence?.end_time ?? 0;
     const durationSeconds = Math.round(durationMs / 1000);
     await createRecordAndProcess(clientWs, session, transcript, durationSeconds);
-    // Cleanup
-    if (session.dashscopeWs) {
-        session.dashscopeWs.close();
-    }
-    sessions.delete(deviceId);
 }
 /**
  * Internal: called when recording stops in upload mode.
- * Converts PCM to WAV, calls DashScope REST API for transcription.
+ * Converts PCM to WAV, calls Python SDK for transcription.
  */
 async function finishUploadASR(clientWs, deviceId) {
     const session = sessions.get(deviceId);
@@ -283,7 +260,7 @@ async function finishUploadASR(clientWs, deviceId) {
     // Convert PCM chunks to WAV
     const wavBuffer = pcmToWav(session.audioChunks);
     console.log(`[asr] Upload mode: transcribing ${wavBuffer.length} bytes WAV for device ${deviceId}`);
-    // Call DashScope REST API
+    // Transcribe via Python SDK
     const transcript = await transcribeAudioFile(wavBuffer);
     if (!transcript.trim()) {
         sendToClient(clientWs, {
@@ -392,51 +369,56 @@ function pcmToWav(chunks) {
     return Buffer.concat([header, pcmData]);
 }
 /**
- * Call DashScope REST API to transcribe a WAV audio buffer.
- * Uses qwen3-asr-flash model with base64 audio input (sync, up to 5min).
+ * Transcribe a WAV audio buffer via Python DashScope SDK subprocess.
+ * Pipes WAV data to stdin, reads JSON result from stdout.
  */
 async function transcribeAudioFile(wavBuffer) {
     const apiKey = process.env.DASHSCOPE_API_KEY;
     if (!apiKey)
         throw new Error("Missing DASHSCOPE_API_KEY");
-    const base64Audio = wavBuffer.toString("base64");
-    const dataUri = `data:audio/wav;base64,${base64Audio}`;
-    const body = {
-        model: "qwen3-asr-flash",
-        input: {
-            messages: [
-                { role: "system", content: [{ text: "" }] },
-                { role: "user", content: [{ audio: dataUri }] },
-            ],
-        },
-        parameters: {
-            asr_options: { enable_itn: false },
-        },
-    };
-    const res = await fetch(DASHSCOPE_REST_URL, {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify(body),
+    return new Promise((resolve, reject) => {
+        const py = spawn("python", [ASR_UPLOAD_SCRIPT], {
+            env: {
+                ...process.env,
+                DASHSCOPE_API_KEY: apiKey,
+                ASR_MODEL: process.env.ASR_MODEL || "fun-asr-realtime",
+                PYTHONIOENCODING: "utf-8",
+            },
+            stdio: ["pipe", "pipe", "pipe"],
+        });
+        const stdoutChunks = [];
+        const stderrChunks = [];
+        py.stdout.on("data", (chunk) => stdoutChunks.push(chunk));
+        py.stderr.on("data", (chunk) => stderrChunks.push(chunk));
+        py.on("error", (err) => {
+            reject(new Error(`Failed to spawn Python ASR process: ${err.message}`));
+        });
+        py.on("close", (code) => {
+            const stdout = Buffer.concat(stdoutChunks).toString("utf-8").trim();
+            const stderr = Buffer.concat(stderrChunks).toString("utf-8").trim();
+            if (stderr) {
+                console.error(`[asr] Python stderr: ${stderr}`);
+            }
+            if (code !== 0) {
+                reject(new Error(`Python ASR exited with code ${code}: ${stdout || stderr}`));
+                return;
+            }
+            try {
+                const result = JSON.parse(stdout);
+                if (result.error) {
+                    reject(new Error(`Python ASR error: ${result.error}`));
+                    return;
+                }
+                resolve(result.text ?? "");
+            }
+            catch {
+                reject(new Error(`Failed to parse Python ASR output: ${stdout}`));
+            }
+        });
+        // Pipe WAV data to Python stdin
+        py.stdin.write(wavBuffer);
+        py.stdin.end();
     });
-    if (!res.ok) {
-        const text = await res.text();
-        throw new Error(`DashScope transcription API error ${res.status}: ${text}`);
-    }
-    const data = await res.json();
-    // Response: { output: { choices: [{ message: { content: [{ text: "..." }] } }] } }
-    const choices = data.output?.choices;
-    if (Array.isArray(choices) && choices.length > 0) {
-        const content = choices[0]?.message?.content;
-        if (Array.isArray(content)) {
-            return content.map((c) => c.text ?? "").join("");
-        }
-        if (typeof content === "string")
-            return content;
-    }
-    return "";
 }
 /**
  * Cancel ASR session.
@@ -445,8 +427,8 @@ export function cancelASR(deviceId) {
     const session = sessions.get(deviceId);
     if (!session)
         return;
-    if (session.dashscopeWs) {
-        session.dashscopeWs.close();
+    if (session.pythonProcess) {
+        session.pythonProcess.kill();
     }
     sessions.delete(deviceId);
     console.log(`[asr] Session cancelled for device ${deviceId}`);

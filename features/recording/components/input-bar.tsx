@@ -7,6 +7,7 @@ import { usePCMRecorder } from "@/features/recording/hooks/use-pcm-recorder";
 import { getGatewayClient, type GatewayResponse } from "@/features/chat/lib/gateway-client";
 import { getDeviceId } from "@/shared/lib/device";
 import { emit } from "@/features/recording/lib/events";
+import { getSettings } from "@/shared/lib/local-config";
 import { executeCommand, getCommandNames, getCommandDefs } from "@/features/commands/lib/registry";
 import type { CommandContext } from "@/features/commands/lib/registry";
 import { createManualNote } from "@/features/notes/lib/manual-note";
@@ -42,6 +43,7 @@ export function InputBar({ onStartReview, onCommandDetected, commandContext }: I
   const isPressingRef = useRef(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const gatewayUnsubRef = useRef<(() => void) | null>(null);
+  const asrModeRef = useRef<"realtime" | "upload">("realtime");
 
   const SLIDE_UP_THRESHOLD = 80;
   const SLIDE_LEFT_THRESHOLD = 100;
@@ -167,12 +169,15 @@ export function InputBar({ onStartReview, onCommandDetected, commandContext }: I
       longPressRef.current = setTimeout(async () => {
         if (isPressingRef.current) {
           try {
-            const deviceId = await getDeviceId();
+            const [deviceId, settings] = await Promise.all([getDeviceId(), getSettings()]);
+            const asrMode = settings.asrMode ?? "realtime";
+            asrModeRef.current = asrMode;
+
             const client = getGatewayClient();
             if (!client.connected) client.connect();
 
             // Start ASR on gateway
-            client.send({ type: "asr.start", payload: { deviceId } });
+            client.send({ type: "asr.start", payload: { deviceId, mode: asrMode } });
 
             // Start PCM recording, sending chunks to gateway
             await recorder.startRecording({

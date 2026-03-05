@@ -27,7 +27,7 @@ function getConfig() {
     _baseUrl =
       process.env.AI_BASE_URL ??
       "https://dashscope.aliyuncs.com/compatible-mode/v1";
-    _model = process.env.AI_MODEL ?? "qwen-plus";
+    _model = process.env.AI_MODEL ?? "qwen3-max";
     _timeout = parseInt(process.env.AI_TIMEOUT ?? "60000", 10);
 
     if (!_apiKey) {

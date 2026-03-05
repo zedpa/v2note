@@ -5,7 +5,17 @@
 
 export interface LocalConfigPayload {
   soul?: { content: string };
-  skills?: { configs: Array<{ name: string; enabled: boolean }> };
+  skills?: {
+    configs: Array<{
+      name: string;
+      enabled: boolean;
+      description?: string;
+      type?: "review" | "process";
+      prompt?: string;
+      builtin?: boolean;
+    }>;
+    selectedReviewSkill?: string;
+  };
   settings?: Record<string, unknown>;
   existingTags?: string[];
 }
@@ -25,7 +35,7 @@ export type GatewayMessage =
   | { type: "chat.message"; payload: { text: string; deviceId: string } }
   | { type: "chat.end"; payload: { deviceId: string } }
   | { type: "todo.aggregate"; payload: { deviceId: string } }
-  | { type: "asr.start"; payload: { deviceId: string; locationText?: string } }
+  | { type: "asr.start"; payload: { deviceId: string; locationText?: string; mode?: "realtime" | "upload" } }
   | { type: "asr.stop"; payload: { deviceId: string; saveAudio?: boolean } }
   | { type: "asr.cancel"; payload: { deviceId: string } };
 

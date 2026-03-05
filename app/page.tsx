@@ -19,6 +19,7 @@ import { TodayGantt } from "@/features/todos/components/today-gantt";
 import { IdeaView } from "@/features/ideas/components/idea-view";
 import { ProfileEditor } from "@/features/profile/components/profile-editor";
 import { SettingsEditor } from "@/features/settings/components/settings-editor";
+import { SkillsPage } from "@/features/skills/components/skills-page";
 import { toast } from "sonner";
 import { getCommandDefs } from "@/features/commands/lib/registry";
 import { NudgeToastListener } from "@/features/proactive/components/nudge-toast";
@@ -31,6 +32,7 @@ type OverlayName =
   | "stats"
   | "memory"
   | "review"
+  | "skills"
   | "todos"
   | "today-todo"
   | "ideas"
@@ -62,9 +64,7 @@ export default function Page() {
   useBackHandler(backHandler);
 
   const openOverlay = useCallback((name: string, _args?: string[]) => {
-    // /skills → route to review overlay (skills panel is integrated there)
-    const resolved = name === "skills" ? "review" : name;
-    setActiveOverlay(resolved as OverlayName);
+    setActiveOverlay(name as OverlayName);
   }, []);
 
   const closeOverlay = useCallback(() => {
@@ -217,6 +217,9 @@ export default function Page() {
       )}
       {activeOverlay === "profile" && (
         <ProfileEditor onClose={closeOverlay} />
+      )}
+      {activeOverlay === "skills" && (
+        <SkillsPage onClose={closeOverlay} />
       )}
       {activeOverlay === "settings" && (
         <SettingsEditor

@@ -1,4 +1,4 @@
-import { loadSkills, filterActiveSkills } from "../skills/loader.js";
+import { loadSkills, filterActiveSkills, mergeWithCustomSkills } from "../skills/loader.js";
 import { buildSystemPrompt } from "../skills/prompt-builder.js";
 import { chatCompletion, type ChatMessage } from "../ai/provider.js";
 import { MemoryManager } from "../memory/manager.js";
@@ -14,6 +14,7 @@ import { tagRepo } from "../db/repositories/index.js";
 import { recordRepo } from "../db/repositories/index.js";
 import { summaryRepo } from "../db/repositories/index.js";
 import { getMCPRegistry } from "../mcp/registry.js";
+import { isBuiltinTool, callBuiltinTool } from "../tools/builtin.js";
 import { estimateBatchTodos } from "../proactive/time-estimator.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -21,7 +22,7 @@ const SKILLS_DIR = join(__dirname, "../../skills");
 
 export interface LocalConfigPayload {
   soul?: { content: string };
-  skills?: { configs: Array<{ name: string; enabled: boolean }> };
+  skills?: { configs: Array<{ name: string; enabled: boolean; description?: string; type?: string; prompt?: string; builtin?: boolean }> };
   settings?: Record<string, unknown>;
   existingTags?: string[];
 }
@@ -57,7 +58,8 @@ export async function processEntry(payload: ProcessPayload): Promise<ProcessResu
   try {
     // 1. Load skills
     console.log(`[process] Starting for record ${payload.recordId}, text length: ${payload.text.length}`);
-    const allSkills = loadSkills(SKILLS_DIR);
+    const builtinSkills = loadSkills(SKILLS_DIR);
+    const allSkills = mergeWithCustomSkills(builtinSkills, payload.localConfig?.skills?.configs as any);
     console.log(`[process] Loaded ${allSkills.length} skills: ${allSkills.map(s => s.name).join(", ")}`);
 
     // Load skill config: prefer localConfig, fall back to server DB
@@ -77,8 +79,9 @@ export async function processEntry(payload: ProcessPayload): Promise<ProcessResu
       }
     }
 
-    const activeSkills = filterActiveSkills(allSkills, skillConfigs);
-    console.log(`[process] Active skills: ${activeSkills.map(s => s.name).join(", ")}`);
+    // Process handler: only use process-type skills
+    const activeSkills = filterActiveSkills(allSkills, skillConfigs, "process");
+    console.log(`[process] Active process skills: ${activeSkills.map(s => s.name).join(", ")}`);
 
     if (activeSkills.length === 0) {
       console.warn("[process] No active skills — nothing to extract");
@@ -150,14 +153,20 @@ export async function processEntry(payload: ProcessPayload): Promise<ProcessResu
 
       console.log(`[process] Tool call round ${round + 1}: ${parsed.tool_calls.length} calls`);
 
-      // Execute tool calls
+      // Execute tool calls (built-in tools first, then MCP)
       const toolResults: string[] = [];
       for (const call of parsed.tool_calls) {
         try {
-          const toolResult = await mcpRegistry.callTool(call.name, call.arguments ?? {});
-          const text = toolResult.content.map((c: any) => c.text ?? "").join("\n");
-          toolResults.push(`Tool "${call.name}" result: ${text}`);
-          console.log(`[process] Tool ${call.name}: success`);
+          if (isBuiltinTool(call.name)) {
+            const res = await callBuiltinTool(call.name, call.arguments ?? {}, payload.deviceId);
+            toolResults.push(`Tool "${call.name}" result: ${res.message}`);
+            console.log(`[process] Built-in tool ${call.name}: ${res.success ? "success" : "failed"}`);
+          } else {
+            const toolResult = await mcpRegistry.callTool(call.name, call.arguments ?? {});
+            const text = toolResult.content.map((c: any) => c.text ?? "").join("\n");
+            toolResults.push(`Tool "${call.name}" result: ${text}`);
+            console.log(`[process] Tool ${call.name}: success`);
+          }
         } catch (err: any) {
           toolResults.push(`Tool "${call.name}" error: ${err.message}`);
           console.warn(`[process] Tool ${call.name}: ${err.message}`);

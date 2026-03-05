@@ -1,15 +1,19 @@
 "use client";
 
-import { useState } from "react";
-import { ArrowLeft, Loader2, ChevronDown } from "lucide-react";
+import { useState, useEffect } from "react";
+import { ArrowLeft, Loader2 } from "lucide-react";
 import { useReviews } from "../hooks/use-reviews";
 import { DateSelector } from "./date-selector";
 import { ReviewResult } from "./review-result";
 import { ReviewList } from "./review-list";
-import { SkillsPanel } from "@/features/sidebar/components/skills-panel";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { SwipeBack } from "@/shared/components/swipe-back";
-import { cn } from "@/lib/utils";
+import {
+  getSkills,
+  setSkills,
+  type LocalSkillConfig,
+} from "@/shared/lib/local-config";
 import type { Review } from "@/shared/lib/types";
 
 interface ReviewOverlayProps {
@@ -27,7 +31,36 @@ export function ReviewOverlay({ onClose }: ReviewOverlayProps) {
     start: string;
     end: string;
   } | null>(null);
-  const [skillsOpen, setSkillsOpen] = useState(false);
+
+  // Review skill selection
+  const [reviewSkills, setReviewSkills] = useState<LocalSkillConfig[]>([]);
+  const [selectedSkill, setSelectedSkill] = useState<string>("");
+
+  useEffect(() => {
+    async function loadReviewSkills() {
+      const local = await getSkills();
+      if (local?.configs) {
+        const reviews = local.configs.filter(
+          (c) => c.type === "review" && c.enabled,
+        );
+        setReviewSkills(reviews);
+        setSelectedSkill(local.selectedReviewSkill ?? "");
+      }
+    }
+    loadReviewSkills();
+  }, []);
+
+  const handleSkillChange = async (value: string) => {
+    setSelectedSkill(value);
+    const local = await getSkills();
+    if (local) {
+      await setSkills({
+        ...local,
+        selectedReviewSkill: value || undefined,
+        updatedAt: new Date().toISOString(),
+      });
+    }
+  };
 
   const handleGenerate = async (
     period: Review["period"],
@@ -106,27 +139,48 @@ export function ReviewOverlay({ onClose }: ReviewOverlayProps) {
                   generating={generating}
                 />
 
-                {/* Collapsible skills panel */}
-                <div className="border border-border/60 rounded-xl overflow-hidden">
-                  <button
-                    type="button"
-                    onClick={() => setSkillsOpen(!skillsOpen)}
-                    className="flex items-center justify-between w-full px-4 py-3 hover:bg-secondary/30 transition-colors"
-                  >
-                    <span className="text-sm font-medium">技能开关</span>
-                    <ChevronDown
-                      className={cn(
-                        "w-4 h-4 text-muted-foreground transition-transform",
-                        skillsOpen && "rotate-180",
-                      )}
-                    />
-                  </button>
-                  {skillsOpen && (
-                    <div className="border-t border-border/60">
-                      <SkillsPanel />
-                    </div>
-                  )}
-                </div>
+                {/* Review skill selector */}
+                {reviewSkills.length > 0 && (
+                  <div className="border border-border/60 rounded-xl p-4">
+                    <h3 className="text-sm font-medium mb-3">复盘视角</h3>
+                    <RadioGroup
+                      value={selectedSkill}
+                      onValueChange={handleSkillChange}
+                    >
+                      <div className="flex items-center gap-2">
+                        <RadioGroupItem value="" id="review-none" />
+                        <label
+                          htmlFor="review-none"
+                          className="text-sm text-muted-foreground cursor-pointer"
+                        >
+                          无视角（默认对话）
+                        </label>
+                      </div>
+                      {reviewSkills.map((skill) => (
+                        <div
+                          key={skill.name}
+                          className="flex items-center gap-2"
+                        >
+                          <RadioGroupItem
+                            value={skill.name}
+                            id={`review-${skill.name}`}
+                          />
+                          <label
+                            htmlFor={`review-${skill.name}`}
+                            className="text-sm cursor-pointer"
+                          >
+                            {skill.name}
+                            {skill.description && (
+                              <span className="text-muted-foreground ml-1.5 text-xs">
+                                {skill.description}
+                              </span>
+                            )}
+                          </label>
+                        </div>
+                      ))}
+                    </RadioGroup>
+                  </div>
+                )}
 
                 {!loading && (
                   <ReviewList

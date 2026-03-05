@@ -105,11 +105,14 @@ export function SettingsEditor({ onClose, onThemeChange }: SettingsEditorProps) 
                         }
                         className="text-sm bg-secondary/50 border border-border/50 rounded-lg px-2 py-1.5 outline-none"
                       >
-                        {"options" in field && (field.options as string[]).map((opt) => (
-                          <option key={opt ?? "null"} value={String(opt)}>
-                            {opt ?? "未设置"}
-                          </option>
-                        ))}
+                        {"options" in field && (field.options as string[]).map((opt, idx) => {
+                          const labels = "optionLabels" in field ? (field as any).optionLabels as string[] : null;
+                          return (
+                            <option key={opt ?? "null"} value={String(opt)}>
+                              {labels?.[idx] ?? opt ?? "未设置"}
+                            </option>
+                          );
+                        })}
                       </select>
                     )}
 

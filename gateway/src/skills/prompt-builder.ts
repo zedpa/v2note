@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Skill } from "./types.js";
+import { BUILTIN_TOOLS } from "../tools/builtin.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -64,16 +65,35 @@ export function buildSystemPrompt(opts: {
     }
   }
 
-  // MCP tools
-  if (opts.mcpTools && opts.mcpTools.length > 0) {
-    parts.push(`\n## 可用工具\n你可以调用以下工具来获取外部信息。如需使用工具，在 JSON 响应中添加 "tool_calls" 字段。`);
-    for (const tool of opts.mcpTools) {
+  // Built-in tools + MCP tools
+  const allTools = [
+    ...BUILTIN_TOOLS.map((t) => ({ name: t.name, description: t.description, parameters: t.parameters })),
+    ...(opts.mcpTools ?? []),
+  ];
+  if (allTools.length > 0) {
+    parts.push(`\n## 可用工具\n你可以调用以下工具来执行操作。`);
+    for (const tool of allTools) {
       parts.push(`\n### ${tool.name}\n${tool.description}`);
       if (tool.parameters) {
         parts.push(`参数: ${JSON.stringify(tool.parameters)}`);
       }
     }
-    parts.push(`\n工具调用格式：\n"tool_calls": [{"name": "工具名", "arguments": {...}}]`);
+    if (opts.mode === "chat") {
+      parts.push(`\n## 工具调用规则（重要）
+当你需要调用工具时，你的**整条回复**必须是且仅是一个 JSON 对象，不要包含任何其他文字。格式：
+{"tool_calls": [{"name": "工具名", "arguments": {...}}]}
+
+错误示范（不要这样做）：
+好的，我来帮你记录。{"tool_calls": [...]}
+
+正确示范：
+{"tool_calls": [{"name": "create_diary", "arguments": {"content": "明天开会", "title": "开会"}}]}
+
+工具执行后系统会自动把结果告诉你，届时你再用自然语言回复用户。
+如果不需要调用工具，正常用自然语言回复即可。`);
+    } else {
+      parts.push(`\n工具调用格式：\n"tool_calls": [{"name": "工具名", "arguments": {...}}]`);
+    }
   }
 
   // Output format for process mode
@@ -89,7 +109,7 @@ export function buildSystemPrompt(opts: {
         parts.push(`- "${field}": string[] — 提取的${field}列表`);
       }
       parts.push(`- "tags": string[] — 从已有标签中匹配的标签`);
-      if (opts.mcpTools && opts.mcpTools.length > 0) {
+      if (allTools.length > 0) {
         parts.push(`- "tool_calls": object[] — (可选) 需要调用的工具`);
       }
       parts.push(`\n如果某个字段没有相关内容，返回空数组 []。不要包含额外的字段或注释。`);

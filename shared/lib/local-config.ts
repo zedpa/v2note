@@ -50,14 +50,19 @@ export interface LocalSkillConfig {
   name: string;
   enabled: boolean;
   description?: string;
+  type?: "review" | "process";
+  prompt?: string;
+  builtin?: boolean;
 }
 
 export interface LocalSkills {
   configs: LocalSkillConfig[];
+  selectedReviewSkill?: string;
   updatedAt: string;
 }
 
 export interface LocalSettings {
+  asrMode: "realtime" | "upload";
   autoDeleteAudio: boolean;
   userType: "manager" | "creator" | null;
   proactiveInterval: number; // minutes
@@ -83,6 +88,7 @@ export interface LocalConfig {
 // ── Default Values ──
 
 const DEFAULT_SETTINGS: LocalSettings = {
+  asrMode: "realtime",
   autoDeleteAudio: false,
   userType: null,
   proactiveInterval: 30,
