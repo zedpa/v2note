@@ -16,6 +16,8 @@ interface NudgeAction {
 export function useProactiveNudge(opts?: {
   onOpenTodos?: () => void;
   onOpenTodayTodo?: () => void;
+  onOpenBriefing?: () => void;
+  onOpenSummary?: () => void;
 }) {
   useEffect(() => {
     const client = getGatewayClient();
@@ -48,11 +50,44 @@ export function useProactiveNudge(opts?: {
           });
           break;
         }
+
+        case "proactive.morning_briefing": {
+          toast(msg.payload.text, {
+            duration: 15000,
+            action: {
+              label: "查看简报",
+              onClick: () => opts?.onOpenBriefing?.(),
+            },
+          });
+          break;
+        }
+
+        case "proactive.relay_reminder": {
+          toast(msg.payload.text, {
+            duration: 12000,
+            action: {
+              label: "查看简报",
+              onClick: () => opts?.onOpenBriefing?.(),
+            },
+          });
+          break;
+        }
+
+        case "proactive.evening_summary": {
+          toast(msg.payload.text, {
+            duration: 15000,
+            action: {
+              label: "查看总结",
+              onClick: () => opts?.onOpenSummary?.(),
+            },
+          });
+          break;
+        }
       }
     });
 
     return () => unsub();
-  }, [opts?.onOpenTodos, opts?.onOpenTodayTodo]);
+  }, [opts?.onOpenTodos, opts?.onOpenTodayTodo, opts?.onOpenBriefing, opts?.onOpenSummary]);
 }
 
 /**
@@ -62,10 +97,14 @@ export function useProactiveNudge(opts?: {
 export function NudgeToastListener({
   onOpenTodos,
   onOpenTodayTodo,
+  onOpenBriefing,
+  onOpenSummary,
 }: {
   onOpenTodos?: () => void;
   onOpenTodayTodo?: () => void;
+  onOpenBriefing?: () => void;
+  onOpenSummary?: () => void;
 }) {
-  useProactiveNudge({ onOpenTodos, onOpenTodayTodo });
+  useProactiveNudge({ onOpenTodos, onOpenTodayTodo, onOpenBriefing, onOpenSummary });
   return null;
 }

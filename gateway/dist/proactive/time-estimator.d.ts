@@ -9,6 +9,12 @@ export interface TimeEstimate {
     suggested_end?: string;
     reasoning?: string;
 }
+export interface TodoEnrichment extends TimeEstimate {
+    domain: string;
+    impact: number;
+    ai_actionable: boolean;
+    ai_action_plan?: string[];
+}
 /**
  * Estimate time and priority for a todo item.
  */
@@ -17,11 +23,12 @@ export declare function estimateTodoTime(todoText: string, context?: {
     existingTodos?: string[];
 }): Promise<TimeEstimate>;
 /**
- * Estimate time for multiple todos in a single AI call.
+ * Estimate time, priority, domain, impact, and AI actionability for multiple todos.
  */
 export declare function estimateBatchTodos(todos: Array<{
     id: string;
     text: string;
 }>, context?: {
     soul?: string;
-}): Promise<Map<string, TimeEstimate>>;
+    memories?: string[];
+}): Promise<Map<string, TodoEnrichment>>;

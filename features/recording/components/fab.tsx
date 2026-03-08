@@ -51,6 +51,12 @@ export function FAB({
   const pausedRef = useRef(false);
   const commandReleaseRef = useRef(false);
 
+  // Pre-capture: start mic on press, buffer PCM until ASR is ready
+  const preBufferRef = useRef<ArrayBuffer[]>([]);
+  const streamingRef = useRef(false);
+  const preCaptureAbortRef = useRef(false);
+  const gwClientRef = useRef<ReturnType<typeof getGatewayClient> | null>(null);
+
   const startTimers = useCallback(() => {
     setDisplayDuration(0);
 
@@ -138,8 +144,70 @@ export function FAB({
 
   const asrModeRef = useRef<"realtime" | "upload">("realtime");
 
+  /** Start mic immediately on press — buffer PCM until ASR is ready */
+  const startPreCapture = useCallback(async () => {
+    console.log("[FAB] Starting pre-capture...");
+    preBufferRef.current = [];
+    streamingRef.current = false;
+    preCaptureAbortRef.current = false;
+    gwClientRef.current = null;
+
+    try {
+      await recorder.startRecording({
+        onPCMData: (chunk) => {
+          if (pausedRef.current) return;
+
+          if (!streamingRef.current) {
+            // Pre-buffer phase: store a copy
+            if (preBufferRef.current.length < 5) {
+                console.log(`[FAB] Buffering chunk, size: ${chunk.byteLength}, total buffered: ${preBufferRef.current.length + 1}`);
+            }
+            preBufferRef.current.push(chunk.slice(0));
+          } else {
+            // Streaming phase: send to gateway
+            gwClientRef.current?.sendBinary(chunk);
+            const view = new Int16Array(chunk);
+            let sum = 0;
+            for (let i = 0; i < view.length; i++) {
+              const v = view[i] / 32768;
+              sum += v * v;
+            }
+            const rms = Math.sqrt(sum / view.length);
+            volumeRef.current = Math.min(1, rms * 5);
+          }
+        },
+        onError: (err) => {
+          toast.error(`录音错误: ${err.message}`);
+          resetRef.current();
+        },
+      });
+
+      // If aborted while awaiting mic permission, clean up
+      if (preCaptureAbortRef.current) {
+        console.log("[FAB] Pre-capture aborted after init, cleaning up");
+        recorder.cancelRecording();
+        preBufferRef.current = [];
+      }
+    } catch {
+      // Mic permission denied or other error — startRecording will retry
+    }
+  }, [recorder]);
+
+  const stopPreCapture = useCallback(() => {
+    console.log(`[FAB] Stopping pre-capture (Quick Release), discarding ${preBufferRef.current.length} chunks`);
+    preCaptureAbortRef.current = true;
+    if (recorder.isActive.current) {
+      recorder.cancelRecording();
+    }
+    preBufferRef.current = [];
+    streamingRef.current = false;
+    gwClientRef.current = null;
+  }, [recorder]);
+
+  /** Connect ASR, flush pre-buffer, switch to live streaming */
   const startRecording = useCallback(async () => {
     try {
+      console.log(`[FAB] Long press confirmed. Flushing pre-buffer to gateway: ${preBufferRef.current.length} chunks`);
       pausedRef.current = false;
       setLockedPaused(false);
       commandReleaseRef.current = false;
@@ -154,31 +222,42 @@ export function FAB({
         const ready = await client.waitForReady();
         if (!ready) {
           toast.error("无法连接服务器，请检查网络");
+          stopPreCapture();
           return;
         }
       }
+      gwClientRef.current = client;
 
       client.send({ type: "asr.start", payload: { deviceId, mode: asrMode } });
 
-      await recorder.startRecording({
-        onPCMData: (chunk) => {
-          if (pausedRef.current) return;
+      // Flush pre-buffered audio (captured during pressing phase)
+      for (const chunk of preBufferRef.current) {
+        client.sendBinary(chunk);
+      }
+      preBufferRef.current = [];
+      streamingRef.current = true;
 
-          client.sendBinary(chunk);
-          const view = new Int16Array(chunk);
-          let sum = 0;
-          for (let i = 0; i < view.length; i++) {
-            const v = view[i] / 32768;
-            sum += v * v;
-          }
-          const rms = Math.sqrt(sum / view.length);
-          volumeRef.current = Math.min(1, rms * 5);
-        },
-        onError: (err) => {
-          toast.error(`录音错误: ${err.message}`);
-          resetRef.current();
-        },
-      });
+      // If pre-capture didn't start the mic (e.g. permission delay), start now
+      if (!recorder.isActive.current) {
+        await recorder.startRecording({
+          onPCMData: (chunk) => {
+            if (pausedRef.current) return;
+            client.sendBinary(chunk);
+            const view = new Int16Array(chunk);
+            let sum = 0;
+            for (let i = 0; i < view.length; i++) {
+              const v = view[i] / 32768;
+              sum += v * v;
+            }
+            const rms = Math.sqrt(sum / view.length);
+            volumeRef.current = Math.min(1, rms * 5);
+          },
+          onError: (err) => {
+            toast.error(`录音错误: ${err.message}`);
+            resetRef.current();
+          },
+        });
+      }
 
       setConfirmedText("");
       setPartialText("");
@@ -191,15 +270,19 @@ export function FAB({
         toast.error(`无法开始录音: ${msg}`);
       }
       stopTimers();
+      stopPreCapture();
       resetRef.current();
     }
-  }, [recorder, startTimers, stopTimers]);
+  }, [recorder, startTimers, stopTimers, stopPreCapture]);
 
   const finishRecording = useCallback(
     async (asCommand: boolean) => {
       stopTimers();
       pausedRef.current = false;
       setLockedPaused(false);
+      streamingRef.current = false;
+      preBufferRef.current = [];
+      gwClientRef.current = null;
 
       try {
         recorder.stopRecording();
@@ -231,6 +314,9 @@ export function FAB({
     pausedRef.current = false;
     setLockedPaused(false);
     commandReleaseRef.current = false;
+    streamingRef.current = false;
+    preBufferRef.current = [];
+    gwClientRef.current = null;
 
     recorder.cancelRecording();
 
@@ -253,7 +339,8 @@ export function FAB({
 
   const gestures = useFabGestures({
     onTap: () => {
-      // Tap is handled by onClick for better mobile compatibility
+      // Cancel pre-capture mic on tap
+      stopPreCapture();
     },
     onLongPressStart: () => {
       longPressTriggeredRef.current = true;
@@ -284,6 +371,14 @@ export function FAB({
       return next;
     });
   }, []);
+
+  // Clean up pre-capture if phase returns to idle without explicit tap
+  // (e.g. pointerCancel during pressing phase)
+  useEffect(() => {
+    if (phase === "idle" && !streamingRef.current && recorder.isActive.current) {
+      stopPreCapture();
+    }
+  }, [phase, recorder.isActive, stopPreCapture]);
 
   useEffect(() => {
     return () => {
@@ -412,6 +507,7 @@ export function FAB({
           onPointerDown={(e) => {
             longPressTriggeredRef.current = false;
             pointerIdRef.current = e.pointerId;
+            startPreCapture(); // Start mic immediately — buffer until ASR ready
             handlers.onPointerDown(e);
           }}
           onClick={() => {

@@ -23,9 +23,20 @@ export async function startASR(clientWs, deviceId, locationText, mode = "realtim
     const apiKey = process.env.DASHSCOPE_API_KEY;
     if (!apiKey)
         throw new Error("Missing DASHSCOPE_API_KEY");
+    const existingSession = sessions.get(deviceId);
+    if (existingSession) {
+        if (existingSession.pythonProcess) {
+            console.log(`[asr] Killing existing Python process (PID: ${existingSession.pythonProcess.pid}) for device ${deviceId}`);
+            // Send SIGKILL to ensure immediate termination
+            existingSession.pythonProcess.kill('SIGKILL');
+        }
+        sessions.delete(deviceId);
+        console.warn(`[asr] Replaced existing ASR session for device ${deviceId}`);
+    }
     const taskId = randomUUID();
     const session = {
         deviceId,
+        ownerWs: clientWs,
         mode,
         pythonProcess: null,
         taskId,
@@ -52,23 +63,28 @@ export async function startASR(clientWs, deviceId, locationText, mode = "realtim
         },
         stdio: ["pipe", "pipe", "pipe"],
     });
+    // Debug: log Python process PID
+    console.log(`[asr] Spawned Python process (PID: ${py.pid}) for device ${deviceId}, task ${taskId}`);
     session.pythonProcess = py;
     // Read JSON lines from Python stdout
     const rl = createInterface({ input: py.stdout });
     rl.on("line", (line) => {
         try {
             const event = JSON.parse(line);
-            handleRealtimeEvent(clientWs, deviceId, event);
+            handleRealtimeEvent(clientWs, deviceId, taskId, event);
         }
         catch (err) {
             console.error("[asr] Failed to parse Python event:", line, err);
         }
     });
     py.stderr.on("data", (data) => {
-        console.error(`[asr] Python stderr: ${data.toString().trim()}`);
+        console.error(`[asr] Python stderr (PID: ${py.pid}): ${data.toString().trim()}`);
     });
     py.on("error", (err) => {
-        console.error("[asr] Python process error:", err);
+        const sess = sessions.get(deviceId);
+        if (!sess || sess.taskId !== taskId || sess.pythonProcess !== py)
+            return;
+        console.error(`[asr] Python process error (PID: ${py.pid}):`, err);
         sendToClient(clientWs, {
             type: "asr.error",
             payload: { message: "ASR process error" },
@@ -76,13 +92,16 @@ export async function startASR(clientWs, deviceId, locationText, mode = "realtim
         sessions.delete(deviceId);
     });
     py.on("close", (code) => {
-        console.log(`[asr] Python realtime process exited with code ${code} for device ${deviceId}`);
-        // If session still exists, the process ended (complete event should have been handled)
+        console.log(`[asr] Python realtime process (PID: ${py.pid}) exited with code ${code} for device ${deviceId}`);
         const sess = sessions.get(deviceId);
-        if (sess && sess.pythonProcess === py) {
-            finishRealtimeASR(clientWs, deviceId).catch((err) => {
+        // Only finish if this is still the active session AND it hasn't been replaced
+        if (sess && sess.taskId === taskId && sess.pythonProcess === py) {
+            finishRealtimeASR(clientWs, deviceId, taskId).catch((err) => {
                 console.error("[asr] Finish error:", err);
             });
+        }
+        else {
+            console.log(`[asr] Python process (PID: ${py.pid}) close event ignored (session replaced or mismatched)`);
         }
     });
     console.log(`[asr] Realtime mode started (Python SDK) for device ${deviceId}`);
@@ -90,9 +109,9 @@ export async function startASR(clientWs, deviceId, locationText, mode = "realtim
 /**
  * Handle a JSON event from the Python realtime ASR process.
  */
-function handleRealtimeEvent(clientWs, deviceId, event) {
+function handleRealtimeEvent(clientWs, deviceId, taskId, event) {
     const session = sessions.get(deviceId);
-    if (!session)
+    if (!session || session.taskId !== taskId || session.ownerWs !== clientWs)
         return;
     switch (event.type) {
         case "started":
@@ -144,8 +163,7 @@ function handleRealtimeEvent(clientWs, deviceId, event) {
             break;
         case "complete":
             console.log(`[asr] Python ASR complete for device ${deviceId}`);
-            // Will be handled by the process close event or explicitly here
-            finishRealtimeASR(clientWs, deviceId).catch((err) => {
+            finishRealtimeASR(clientWs, deviceId, taskId).catch((err) => {
                 console.error("[asr] Finish error:", err);
             });
             break;
@@ -156,10 +174,16 @@ function handleRealtimeEvent(clientWs, deviceId, event) {
  * - realtime: writes to Python subprocess stdin
  * - upload: accumulates in memory
  */
-export function sendAudioChunk(deviceId, chunk) {
+export function sendAudioChunk(deviceId, chunk, sourceWs) {
     const session = sessions.get(deviceId);
     if (!session)
         return;
+    if (sourceWs && session.ownerWs !== sourceWs)
+        return;
+    // Debug: log first few chunks
+    if (session.audioChunks.length < 5) {
+        console.log(`[asr] Received chunk for ${deviceId}: ${chunk.length} bytes`);
+    }
     if (session.mode === "upload") {
         // Upload mode: always accumulate chunks
         session.audioChunks.push(Buffer.from(chunk));
@@ -167,7 +191,19 @@ export function sendAudioChunk(deviceId, chunk) {
     }
     // Realtime mode: forward to Python process stdin
     if (session.pythonProcess?.stdin?.writable) {
-        session.pythonProcess.stdin.write(chunk);
+        try {
+            session.pythonProcess.stdin.write(chunk, (err) => {
+                if (err) {
+                    console.error(`[asr] Write error to Python (PID: ${session.pythonProcess?.pid}):`, err);
+                }
+            });
+        }
+        catch (err) {
+            console.error(`[asr] Write exception to Python (PID: ${session.pythonProcess?.pid}):`, err);
+        }
+    }
+    else {
+        console.warn(`[asr] Python stdin not writable for device ${deviceId}`);
     }
     if (session.saveAudio) {
         session.audioChunks.push(Buffer.from(chunk));
@@ -182,11 +218,12 @@ export async function stopASR(clientWs, deviceId, saveAudio) {
     const session = sessions.get(deviceId);
     if (!session)
         return;
+    if (session.ownerWs !== clientWs)
+        return;
     if (saveAudio)
         session.saveAudio = true;
     if (session.mode === "upload") {
-        // Upload mode: transcribe accumulated audio
-        finishUploadASR(clientWs, deviceId).catch((err) => {
+        finishUploadASR(clientWs, deviceId, session.taskId).catch((err) => {
             console.error("[asr] Upload finish error:", err);
             sendToClient(clientWs, {
                 type: "asr.error",
@@ -205,9 +242,10 @@ export async function stopASR(clientWs, deviceId, saveAudio) {
 /**
  * Internal: called when Python ASR sends "complete" event or process exits (realtime mode).
  */
-async function finishRealtimeASR(clientWs, deviceId) {
+async function finishRealtimeASR(clientWs, deviceId, expectedTaskId) {
     const session = sessions.get(deviceId);
-    if (!session)
+    // Remove "session.ownerWs !== clientWs" check for internal cleanup
+    if (!session || session.taskId !== expectedTaskId)
         return;
     // Prevent double-finish
     sessions.delete(deviceId);
@@ -240,9 +278,9 @@ async function finishRealtimeASR(clientWs, deviceId) {
  * Internal: called when recording stops in upload mode.
  * Converts PCM to WAV, calls Python SDK for transcription.
  */
-async function finishUploadASR(clientWs, deviceId) {
+async function finishUploadASR(clientWs, deviceId, expectedTaskId) {
     const session = sessions.get(deviceId);
-    if (!session)
+    if (!session || session.taskId !== expectedTaskId || session.ownerWs !== clientWs)
         return;
     const durationSeconds = Math.round((Date.now() - session.startTime) / 1000);
     if (session.audioChunks.length === 0) {
@@ -326,6 +364,7 @@ async function createRecordAndProcess(clientWs, session, transcript, durationSec
         recordId: record.id,
     })
         .then((result) => {
+        console.log(`[asr] Process result for ${record.id}: ${JSON.stringify(result)}`);
         sendToClient(clientWs, {
             type: "process.result",
             payload: result,
@@ -424,12 +463,15 @@ async function transcribeAudioFile(wavBuffer) {
 /**
  * Cancel ASR session.
  */
-export function cancelASR(deviceId) {
+export function cancelASR(deviceId, clientWs) {
     const session = sessions.get(deviceId);
     if (!session)
         return;
+    if (clientWs && session.ownerWs !== clientWs)
+        return;
     if (session.pythonProcess) {
-        session.pythonProcess.kill();
+        console.log(`[asr] Cancelling session, killing Python process (PID: ${session.pythonProcess.pid})`);
+        session.pythonProcess.kill('SIGKILL');
     }
     sessions.delete(deviceId);
     console.log(`[asr] Session cancelled for device ${deviceId}`);

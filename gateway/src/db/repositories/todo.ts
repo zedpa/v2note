@@ -11,6 +11,17 @@ export interface Todo {
   priority: number;
   completed_at: string | null;
   created_at: string;
+  category?: string;
+  relay_meta?: {
+    source_person?: string;
+    target_person?: string;
+    context?: string;
+    direction?: "outgoing" | "incoming";
+  };
+  domain?: string;
+  impact?: number;
+  ai_actionable?: boolean;
+  ai_action_plan?: string[];
 }
 
 export async function findByDevice(deviceId: string): Promise<Todo[]> {
@@ -68,6 +79,10 @@ export async function update(
     scheduled_start?: string | null;
     scheduled_end?: string | null;
     priority?: number;
+    domain?: string;
+    impact?: number;
+    ai_actionable?: boolean;
+    ai_action_plan?: string[] | null;
   },
 ): Promise<void> {
   const sets: string[] = [];
@@ -96,6 +111,22 @@ export async function update(
   if (fields.priority !== undefined) {
     sets.push(`priority = $${i++}`);
     params.push(fields.priority);
+  }
+  if (fields.domain !== undefined) {
+    sets.push(`domain = $${i++}`);
+    params.push(fields.domain);
+  }
+  if (fields.impact !== undefined) {
+    sets.push(`impact = $${i++}`);
+    params.push(fields.impact);
+  }
+  if (fields.ai_actionable !== undefined) {
+    sets.push(`ai_actionable = $${i++}`);
+    params.push(fields.ai_actionable);
+  }
+  if (fields.ai_action_plan !== undefined) {
+    sets.push(`ai_action_plan = $${i++}`);
+    params.push(JSON.stringify(fields.ai_action_plan));
   }
   if (sets.length === 0) return;
   params.push(id);
@@ -140,4 +171,35 @@ export async function findPendingByDevice(deviceId: string): Promise<Todo[]> {
      ORDER BY t.created_at ASC`,
     [deviceId],
   );
+}
+
+export async function findRelayByDevice(deviceId: string): Promise<Todo[]> {
+  return query<Todo>(
+    `SELECT t.* FROM todo t
+     JOIN record r ON r.id = t.record_id
+     WHERE r.device_id = $1 AND t.category = 'relay' AND t.done = false
+     ORDER BY t.created_at ASC`,
+    [deviceId],
+  );
+}
+
+export async function createWithCategory(fields: {
+  record_id: string;
+  text: string;
+  done?: boolean;
+  category?: string;
+  relay_meta?: Record<string, unknown>;
+}): Promise<Todo> {
+  const row = await queryOne<Todo>(
+    `INSERT INTO todo (record_id, text, done, category, relay_meta)
+     VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+    [
+      fields.record_id,
+      fields.text,
+      fields.done ?? false,
+      fields.category ?? "action",
+      fields.relay_meta ? JSON.stringify(fields.relay_meta) : null,
+    ],
+  );
+  return row!;
 }

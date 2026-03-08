@@ -22,11 +22,13 @@ export function ChatBubble({ message, streaming }: ChatBubbleProps) {
       {/* Avatar */}
       <div
         className={cn(
-          "w-8 h-8 rounded-full flex items-center justify-center shrink-0 text-xs",
-          isUser ? "bg-primary/10" : "bg-secondary",
+          "w-8 h-8 rounded-full flex items-center justify-center shrink-0 text-xs font-display font-semibold",
+          isUser
+            ? "bg-gradient-to-br from-primary/20 to-primary/10 text-primary"
+            : "bg-gradient-to-br from-accent/15 to-secondary text-accent",
         )}
       >
-        {isUser ? "👤" : "🤖"}
+        {isUser ? "U" : "AI"}
       </div>
 
       {/* Bubble */}

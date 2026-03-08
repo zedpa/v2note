@@ -7,7 +7,11 @@ import { MarkdownContent } from "@/shared/components/markdown-content";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 
-export function SoulTab() {
+interface SoulTabProps {
+  title?: string;
+}
+
+export function SoulTab({ title = "用户画像" }: SoulTabProps) {
   const { soul, loading, saving, updateSoul } = useSoul();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState("");
@@ -24,9 +28,9 @@ export function SoulTab() {
 
   if (loading) {
     return (
-      <div className="p-4 space-y-3 animate-pulse">
-        <div className="h-4 bg-secondary rounded w-32" />
-        <div className="h-32 bg-secondary rounded" />
+      <div className="p-4 space-y-3">
+        <div className="h-4 animate-shimmer rounded w-32" />
+        <div className="h-32 animate-shimmer rounded" style={{ animationDelay: "0.15s" }} />
       </div>
     );
   }
@@ -62,7 +66,7 @@ export function SoulTab() {
         ) : (
           <div>
             <div className="flex items-start justify-between mb-3">
-              <h3 className="text-sm font-medium text-foreground">用户画像</h3>
+              <h3 className="text-sm font-medium text-foreground">{title}</h3>
               <button
                 type="button"
                 onClick={startEditing}

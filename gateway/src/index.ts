@@ -22,6 +22,8 @@ import { registerExportRoutes } from "./routes/export.js";
 import { registerSyncRoutes } from "./routes/sync.js";
 import { registerMemoryRoutes } from "./routes/memory.js";
 import { registerSoulRoutes } from "./routes/soul.js";
+import { registerDailyLoopRoutes } from "./routes/daily-loop.js";
+import { registerMCPServerRoutes } from "./mcp/server.js";
 import { getProactiveEngine } from "./proactive/engine.js";
 
 // Load environment
@@ -54,6 +56,9 @@ type GatewayResponse =
   | { type: "command.detected"; payload: { command: string; args: string[] } }
   | { type: "proactive.message"; payload: { text: string; action?: string } }
   | { type: "proactive.todo_nudge"; payload: { todoId: string; text: string; suggestion: string } }
+  | { type: "proactive.morning_briefing"; payload: { text: string } }
+  | { type: "proactive.relay_reminder"; payload: { text: string; count: number } }
+  | { type: "proactive.evening_summary"; payload: { text: string } }
   | { type: "error"; payload: { message: string } };
 
 // ── HTTP Router ──
@@ -74,6 +79,8 @@ registerExportRoutes(router);
 registerSyncRoutes(router);
 registerMemoryRoutes(router);
 registerSoulRoutes(router);
+registerDailyLoopRoutes(router);
+registerMCPServerRoutes(router);
 
 // ── HTTP Server ──
 
@@ -125,7 +132,9 @@ function send(ws: WebSocket, msg: GatewayResponse) {
 }
 
 const proactiveEngine = getProactiveEngine();
-proactiveEngine.start();
+proactiveEngine.start().catch((err) => {
+  console.error("[gateway] Proactive engine start failed:", err.message);
+});
 
 wss.on("connection", (ws) => {
   console.log("[gateway] Client connected");
@@ -135,7 +144,7 @@ wss.on("connection", (ws) => {
     if (isBinary) {
       const deviceId = connectionDeviceMap.get(ws);
       if (deviceId) {
-        sendAudioChunk(deviceId, Buffer.from(raw as Buffer));
+        sendAudioChunk(deviceId, Buffer.from(raw as Buffer), ws);
       }
       return;
     }
@@ -207,13 +216,20 @@ wss.on("connection", (ws) => {
         }
 
         case "asr.stop": {
-          await stopASR(ws, msg.payload.deviceId, msg.payload.saveAudio);
+          const deviceId = connectionDeviceMap.get(ws);
+          if (deviceId) {
+            await stopASR(ws, deviceId, msg.payload.saveAudio);
+            connectionDeviceMap.delete(ws);
+          }
           break;
         }
 
         case "asr.cancel": {
-          cancelASR(msg.payload.deviceId);
-          connectionDeviceMap.delete(ws);
+          const deviceId = connectionDeviceMap.get(ws);
+          if (deviceId) {
+            cancelASR(deviceId, ws);
+            connectionDeviceMap.delete(ws);
+          }
           break;
         }
 
@@ -233,7 +249,7 @@ wss.on("connection", (ws) => {
     // Cleanup ASR session on disconnect
     const deviceId = connectionDeviceMap.get(ws);
     if (deviceId) {
-      cancelASR(deviceId);
+      cancelASR(deviceId, ws);
       connectionDeviceMap.delete(ws);
     }
     proactiveEngine.unregisterByWs(ws);

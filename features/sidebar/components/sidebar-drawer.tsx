@@ -1,6 +1,6 @@
 "use client";
 
-import { X, HelpCircle, Download, CreditCard, Info, Brain, FileText, UserCircle } from "lucide-react";
+import { X, HelpCircle, Download, CreditCard, Info, Brain, UserCircle, Sun, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { StatsPanel } from "./stats-panel";
 import { getCommandDefs } from "@/features/commands/lib/registry";
@@ -11,8 +11,9 @@ interface SidebarDrawerProps {
   onClose: () => void;
   onViewStats?: () => void;
   onViewMemory?: () => void;
-  onViewReview?: () => void;
   onViewProfile?: () => void;
+  onViewBriefing?: () => void;
+  onViewSettings?: () => void;
   onExportData?: () => void;
 }
 
@@ -21,8 +22,9 @@ export function SidebarDrawer({
   onClose,
   onViewStats,
   onViewMemory,
-  onViewReview,
   onViewProfile,
+  onViewBriefing,
+  onViewSettings,
   onExportData,
 }: SidebarDrawerProps) {
   if (!open) return null;
@@ -50,7 +52,7 @@ export function SidebarDrawer({
               <span className="text-lg">🎙</span>
             </div>
             <div>
-              <p className="text-sm font-semibold text-foreground">VoiceNote</p>
+              <p className="text-sm font-display font-bold text-foreground">VoiceNote</p>
               <p className="text-[10px] text-muted-foreground">AI 个人助手</p>
             </div>
           </div>
@@ -70,67 +72,98 @@ export function SidebarDrawer({
 
           <div className="h-px bg-border/60 mx-4" />
 
-          {/* Menu items */}
-          <div className="p-4 space-y-1">
-            {onViewProfile && (
-              <MenuItem
-                icon={<UserCircle className="w-4 h-4" />}
-                label="个人画像"
-                onClick={() => { onClose(); onViewProfile(); }}
-              />
-            )}
-            {onViewMemory && (
-              <MenuItem
-                icon={<Brain className="w-4 h-4" />}
-                label="AI 记忆"
-                onClick={() => { onClose(); onViewMemory(); }}
-              />
-            )}
-            {onViewReview && (
-              <MenuItem
-                icon={<FileText className="w-4 h-4" />}
-                label="复盘记录"
-                onClick={() => { onClose(); onViewReview(); }}
-              />
-            )}
-            <MenuItem
-              icon={<HelpCircle className="w-4 h-4" />}
-              label="命令帮助"
-              onClick={() => {
-                onClose();
-                const commands = getCommandDefs();
-                const helpText = commands.map((c) => `/${c.name} — ${c.description}`).join("\n");
-                toast(helpText, { duration: 8000 });
-              }}
-            />
-            <MenuItem
-              icon={<Download className="w-4 h-4" />}
-              label="导出数据"
-              onClick={() => {
-                onClose();
-                if (onExportData) {
-                  onExportData();
-                } else {
-                  toast("导出功能开发中...");
-                }
-              }}
-            />
-            <MenuItem
-              icon={<CreditCard className="w-4 h-4" />}
-              label="订阅状态"
-              onClick={() => {
-                onClose();
-                toast("当前为免费版本", { duration: 3000 });
-              }}
-            />
-            <MenuItem
-              icon={<Info className="w-4 h-4" />}
-              label="关于"
-              onClick={() => {
-                onClose();
-                toast("VoiceNote v2 — AI 个人助手", { duration: 3000 });
-              }}
-            />
+          {/* Menu items — grouped by function */}
+          <div className="p-4 space-y-4">
+            {/* AI Features */}
+            <div>
+              <p className="text-[10px] font-display font-semibold text-muted-foreground/50 uppercase tracking-wider px-3 mb-1.5">AI 功能</p>
+              <div className="space-y-0.5">
+                {onViewBriefing && (
+                  <MenuItem
+                    icon={<Sun className="w-4 h-4" />}
+                    label="今日简报"
+                    onClick={() => { onClose(); onViewBriefing(); }}
+                  />
+                )}
+                {onViewProfile && (
+                  <MenuItem
+                    icon={<UserCircle className="w-4 h-4" />}
+                    label="个人画像"
+                    onClick={() => { onClose(); onViewProfile(); }}
+                  />
+                )}
+                {onViewMemory && (
+                  <MenuItem
+                    icon={<Brain className="w-4 h-4" />}
+                    label="AI 记忆"
+                    onClick={() => { onClose(); onViewMemory(); }}
+                  />
+                )}
+              </div>
+            </div>
+
+            <div className="h-px bg-border/40 mx-3" />
+
+            {/* Tools */}
+            <div>
+              <p className="text-[10px] font-display font-semibold text-muted-foreground/50 uppercase tracking-wider px-3 mb-1.5">工具</p>
+              <div className="space-y-0.5">
+                <MenuItem
+                  icon={<HelpCircle className="w-4 h-4" />}
+                  label="命令帮助"
+                  onClick={() => {
+                    onClose();
+                    const commands = getCommandDefs();
+                    const helpText = commands.map((c) => `/${c.name} — ${c.description}`).join("\n");
+                    toast(helpText, { duration: 8000 });
+                  }}
+                />
+                <MenuItem
+                  icon={<Download className="w-4 h-4" />}
+                  label="导出数据"
+                  onClick={() => {
+                    onClose();
+                    if (onExportData) {
+                      onExportData();
+                    } else {
+                      toast("导出功能开发中...");
+                    }
+                  }}
+                />
+              </div>
+            </div>
+
+            <div className="h-px bg-border/40 mx-3" />
+
+            {/* System */}
+            <div>
+              <p className="text-[10px] font-display font-semibold text-muted-foreground/50 uppercase tracking-wider px-3 mb-1.5">系统</p>
+              <div className="space-y-0.5">
+                {onViewSettings && (
+                  <MenuItem
+                    icon={<Settings className="w-4 h-4" />}
+                    label="设置"
+                    onClick={() => { onClose(); onViewSettings(); }}
+                  />
+                )}
+                <MenuItem
+                  icon={<CreditCard className="w-4 h-4" />}
+                  label="订阅状态"
+                  onClick={() => {
+                    onClose();
+                    toast("当前为免费版本", { duration: 3000 });
+                  }}
+                />
+                <MenuItem
+                  icon={<Info className="w-4 h-4" />}
+                  label="关于"
+                  onClick={() => {
+                    onClose();
+                    toast("VoiceNote v2 — AI 个人助手", { duration: 3000 });
+                  }}
+                />
+              </div>
+            </div>
           </div>
         </div>
       </div>

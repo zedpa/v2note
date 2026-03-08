@@ -51,6 +51,9 @@ export type GatewayResponse =
   | { type: "command.detected"; payload: { command: string; args: string[] } }
   | { type: "proactive.message"; payload: { text: string; action?: string } }
   | { type: "proactive.todo_nudge"; payload: { todoId: string; text: string; suggestion: string } }
+  | { type: "proactive.morning_briefing"; payload: { text: string } }
+  | { type: "proactive.relay_reminder"; payload: { text: string; count: number } }
+  | { type: "proactive.evening_summary"; payload: { text: string } }
   | { type: "error"; payload: { message: string } };
 
 type MessageHandler = (msg: GatewayResponse) => void;

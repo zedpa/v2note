@@ -97,12 +97,13 @@ export function NotesTimeline({ filter, onNoteClick }: NotesTimelineProps) {
         {[1, 2, 3].map((i) => (
           <div
             key={i}
-            className="rounded-2xl p-5 bg-card shadow-sm animate-pulse"
+            className="rounded-2xl p-5 bg-card shadow-sm"
+            style={{ animationDelay: `${i * 100}ms` }}
           >
-            <div className="h-2.5 bg-secondary rounded w-20 mb-4" />
-            <div className="h-3 bg-secondary rounded w-full mb-2.5" />
-            <div className="h-3 bg-secondary rounded w-4/5 mb-2.5" />
-            <div className="h-3 bg-secondary rounded w-2/3" />
+            <div className="h-2.5 animate-shimmer rounded w-20 mb-4" />
+            <div className="h-3 animate-shimmer rounded w-full mb-2.5" />
+            <div className="h-3 animate-shimmer rounded w-4/5 mb-2.5" style={{ animationDelay: "0.15s" }} />
+            <div className="h-3 animate-shimmer rounded w-2/3" style={{ animationDelay: "0.3s" }} />
           </div>
         ))}
       </div>
@@ -111,13 +112,29 @@ export function NotesTimeline({ filter, onNoteClick }: NotesTimelineProps) {
 
   if (groups.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
-        <div className="w-14 h-14 rounded-full bg-secondary/50 flex items-center justify-center mb-4">
-          <span className="text-xl font-light">0</span>
+      <div className="flex flex-col items-center justify-center py-24 px-8">
+        {/* Animated waveform illustration */}
+        <div className="relative w-40 h-20 mb-6">
+          <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-primary/8 via-accent/5 to-primary/3" />
+          <div className="absolute inset-0 flex items-center justify-center gap-[3px]">
+            {Array.from({ length: 16 }).map((_, i) => (
+              <div
+                key={i}
+                className="w-[3px] rounded-full bg-primary/25 animate-waveform"
+                style={{
+                  height: "12px",
+                  animationDelay: `${i * 0.12}s`,
+                  animationDuration: `${1.2 + Math.sin(i) * 0.4}s`,
+                }}
+              />
+            ))}
+          </div>
         </div>
-        <p className="text-sm">暂无笔记</p>
-        <p className="text-xs mt-1.5 text-muted-foreground/70">
-          点击右下角按钮开始记录
+        <p className="text-base font-display font-semibold text-foreground/80 mb-1.5">
+          开始你的第一条记录
+        </p>
+        <p className="text-sm text-muted-foreground/60 text-center leading-relaxed">
+          点击下方麦克风，用语音捕捉想法
         </p>
       </div>
     );
@@ -132,7 +149,7 @@ export function NotesTimeline({ filter, onNoteClick }: NotesTimelineProps) {
           <div key={group.date} className="mb-6">
             {/* Day header — editorial style */}
             <div className="flex items-baseline gap-2.5 py-3">
-              <span className="text-3xl font-light text-foreground/80 leading-none tabular-nums">
+              <span className="text-3xl font-display font-light text-foreground/80 leading-none tabular-nums">
                 {group.day}
               </span>
               <span className="text-xs text-muted-foreground tracking-wide">
@@ -257,10 +274,10 @@ function TimelineCard({
           <div className="w-4 h-4 rounded-full border-2 border-primary/30 border-t-primary animate-spin" />
           <span className="text-sm text-foreground/60">AI 处理中...</span>
         </div>
-        <div className="space-y-2.5 animate-pulse">
-          <div className="h-3 bg-secondary rounded w-3/4" />
-          <div className="h-3 bg-secondary rounded w-full" />
-          <div className="h-3 bg-secondary rounded w-2/3" />
+        <div className="space-y-2.5">
+          <div className="h-3 animate-shimmer rounded w-3/4" />
+          <div className="h-3 animate-shimmer rounded w-full" style={{ animationDelay: "0.1s" }} />
+          <div className="h-3 animate-shimmer rounded w-2/3" style={{ animationDelay: "0.2s" }} />
         </div>
         <div className="flex items-center gap-1 mt-3 text-muted-foreground/60">
           <Clock className="w-3 h-3" />

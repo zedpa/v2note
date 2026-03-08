@@ -3,7 +3,7 @@ import type { Skill } from "../skills/types.js";
 import { buildSystemPrompt } from "../skills/prompt-builder.js";
 import { chatCompletion, chatCompletionStream } from "../ai/provider.js";
 import { MemoryManager } from "../memory/manager.js";
-import { loadSoul, updateSoul } from "../soul/manager.js";
+import { updateSoul } from "../soul/manager.js";
 import { getSession } from "../session/manager.js";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -39,15 +39,15 @@ export async function startChat(
   const session = getSession(payload.deviceId);
   session.mode = "chat";
 
-  // Load context: prefer localConfig soul, fall back to server DB
-  const soul = payload.localConfig?.soul
-    ? { content: payload.localConfig.soul.content }
-    : await loadSoul(payload.deviceId);
+  // Load context in parallel using tiered loader (soul + memories)
   const memoryManager = new MemoryManager();
-  const memories = await memoryManager.loadContext(
-    payload.deviceId,
-    payload.dateRange,
-  );
+  const loaded = await memoryManager.loadRelevantContext(payload.deviceId, {
+    mode: "chat",
+    dateRange: payload.dateRange,
+    localSoul: payload.localConfig?.soul?.content,
+  });
+  const soul = loaded.soul ? { content: loaded.soul } : undefined;
+  const memories = loaded.memories;
 
   // Load records from the date range for context
   const records = await recordRepo.findByDeviceAndDateRange(

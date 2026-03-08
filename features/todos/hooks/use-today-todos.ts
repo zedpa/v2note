@@ -10,6 +10,9 @@ export interface TodayTodo extends TodoItem {
   scheduled_start?: string;
   scheduled_end?: string;
   priority?: number;
+  domain?: string;
+  impact?: number;
+  ai_actionable?: boolean;
 }
 
 export function useTodayTodos() {
@@ -45,6 +48,9 @@ export function useTodayTodos() {
           scheduled_start: t.scheduled_start,
           scheduled_end: t.scheduled_end,
           priority: t.priority,
+          domain: t.domain,
+          impact: t.impact,
+          ai_actionable: t.ai_actionable,
         }));
 
       setTodos(todayItems);

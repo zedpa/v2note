@@ -45,7 +45,7 @@ export function RecordingImmersive({
           常驻录音
         </div>
 
-        <p className="text-6xl font-light text-white tabular-nums tracking-[0.28em]">
+        <p className="text-6xl font-mono font-light text-white tabular-nums tracking-[0.28em]">
           {formatDuration(duration)}
         </p>
 

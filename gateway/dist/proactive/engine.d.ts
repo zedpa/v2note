@@ -1,43 +1,39 @@
 /**
- * Proactive Push Engine — periodically checks connected devices' todo state
+ * Proactive Push Engine — checks connected devices' todo state
  * and sends reminders via WebSocket.
+ *
+ * Enhanced with BullMQ for persistent, Redis-backed job scheduling.
+ * Gracefully falls back to setInterval when Redis is unavailable.
+ *
+ * BullMQ advantages over setInterval:
+ * - Persistent jobs survive gateway restarts
+ * - Precise cron scheduling (7:30 AM, 2:00 PM, 8:00 PM)
+ * - Built-in retry with exponential backoff
+ * - Multi-process safe (multiple gateways share one queue)
  */
 import { WebSocket } from "ws";
 export declare class ProactiveEngine {
     private devices;
-    private timer;
     private intervalMs;
-    /**
-     * Set the check interval in minutes.
-     */
+    private dailyPushSent;
+    private fallbackTimer;
+    private queue;
+    private worker;
+    private redisAvailable;
     setInterval(minutes: number): void;
-    /**
-     * Register a device connection for proactive monitoring.
-     */
     registerDevice(deviceId: string, ws: WebSocket): void;
-    /**
-     * Unregister a device connection.
-     */
     unregisterDevice(deviceId: string): void;
-    /**
-     * Unregister by WebSocket reference (for disconnect cleanup).
-     */
     unregisterByWs(ws: WebSocket): void;
     /**
-     * Start the periodic check loop.
+     * Start the engine. Tries BullMQ first, falls back to setInterval.
      */
-    start(): void;
-    /**
-     * Stop the periodic check loop.
-     */
+    start(): Promise<void>;
     stop(): void;
-    /**
-     * Check all connected devices for pending todos and send nudges.
-     */
+    private tryStartBullMQ;
+    private registerDeviceSchedulers;
+    private handleTimedPush;
+    private startFallbackTimer;
     checkAll(): Promise<void>;
-    /**
-     * Check a single device for pending todos.
-     */
     private checkDevice;
     private sendNudge;
     private sendMessage;

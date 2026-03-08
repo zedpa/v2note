@@ -16,8 +16,15 @@ export function usePCMRecorder() {
   const workletRef = useRef<AudioWorkletNode | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const startTimeRef = useRef(0);
+  // Synchronous ref to prevent double recording (React state is async)
+  const activeRef = useRef(false);
 
   const startRecording = useCallback(async (callbacks: PCMRecorderCallbacks) => {
+    if (activeRef.current) {
+      console.log("[usePCMRecorder] Already active, skipping duplicate start");
+      return;
+    }
+    activeRef.current = true;
     let step = "init";
     try {
       // Step 1: Request microphone
@@ -34,7 +41,9 @@ export function usePCMRecorder() {
 
       // Step 2: Create AudioContext
       step = "AudioContext";
+      // Try to use 16kHz context directly. If not supported, it will fall back to hardware rate
       const ctx = new AudioContext({ sampleRate: 16000 });
+      console.log(`[usePCMRecorder] AudioContext created. SampleRate: ${ctx.sampleRate}, State: ${ctx.state}`);
       contextRef.current = ctx;
 
       // Step 3: Load worklet
@@ -44,10 +53,17 @@ export function usePCMRecorder() {
       // Step 4: Connect nodes
       step = "connect";
       const source = ctx.createMediaStreamSource(stream);
-      const worklet = new AudioWorkletNode(ctx, "pcm-processor");
+      // Pass actual sampleRate to worklet to handle downsampling if needed
+      const worklet = new AudioWorkletNode(ctx, "pcm-processor", {
+        processorOptions: { sampleRate: ctx.sampleRate },
+      });
       workletRef.current = worklet;
 
       worklet.port.onmessage = (event) => {
+        // Log first chunk for debug
+        if (event.data.byteLength > 0 && Math.random() < 0.01) {
+           console.log(`[usePCMRecorder] Received chunk: ${event.data.byteLength} bytes`);
+        }
         callbacks.onPCMData(event.data);
       };
 
@@ -61,11 +77,13 @@ export function usePCMRecorder() {
         setDuration(Math.floor((Date.now() - startTimeRef.current) / 1000));
       }, 1000);
     } catch (err: any) {
+      activeRef.current = false;
       callbacks.onError(new Error(`[${step}] ${err.message ?? "unknown"}`));
     }
   }, []);
 
   const stopRecording = useCallback((): number => {
+    activeRef.current = false;
     if (timerRef.current) {
       clearInterval(timerRef.current);
       timerRef.current = null;
@@ -99,6 +117,7 @@ export function usePCMRecorder() {
 
   return {
     isRecording,
+    isActive: activeRef,
     duration,
     startRecording,
     stopRecording,

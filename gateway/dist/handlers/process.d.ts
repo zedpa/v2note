@@ -22,11 +22,19 @@ export interface ProcessPayload {
     recordId: string;
     localConfig?: LocalConfigPayload;
 }
+export interface RelayExtract {
+    text: string;
+    source_person?: string;
+    target_person?: string;
+    context?: string;
+    direction?: "outgoing" | "incoming";
+}
 export interface ProcessResult {
     todos: string[];
     customer_requests: string[];
     setting_changes: string[];
     tags: string[];
+    relays: RelayExtract[];
     summary?: string;
     error?: string;
 }

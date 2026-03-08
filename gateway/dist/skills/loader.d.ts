@@ -18,6 +18,21 @@ export declare function mergeWithCustomSkills(builtinSkills: Skill[], customConf
     builtin?: boolean;
 }>): Skill[];
 /**
+ * Generate a compact skill manifest for metadata-only injection.
+ * Only names + descriptions, no full prompt text.
+ * This goes into the hot tier to give the AI awareness of capabilities
+ * without consuming tokens on full instructions.
+ */
+export declare function getSkillManifest(skills: Skill[]): string;
+/**
+ * Determine which skills need full prompt text vs metadata-only,
+ * based on whether the input text contains relevant keywords.
+ */
+export declare function partitionSkillsByRelevance(skills: Skill[], inputText?: string): {
+    fullText: Skill[];
+    metadataOnly: Skill[];
+};
+/**
  * Filter skills by enabled status and device-specific config.
  * Optionally filter by skill type.
  */

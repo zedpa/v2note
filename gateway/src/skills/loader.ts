@@ -87,6 +87,63 @@ export function mergeWithCustomSkills(
 }
 
 /**
+ * Generate a compact skill manifest for metadata-only injection.
+ * Only names + descriptions, no full prompt text.
+ * This goes into the hot tier to give the AI awareness of capabilities
+ * without consuming tokens on full instructions.
+ */
+export function getSkillManifest(skills: Skill[]): string {
+  return skills
+    .map((s) => {
+      const fields = s.metadata.extract_fields;
+      const fieldHint = fields?.length ? ` [提取: ${fields.join(", ")}]` : "";
+      return `- ${s.name}: ${s.description}${fieldHint}`;
+    })
+    .join("\n");
+}
+
+/**
+ * Determine which skills need full prompt text vs metadata-only,
+ * based on whether the input text contains relevant keywords.
+ */
+export function partitionSkillsByRelevance(
+  skills: Skill[],
+  inputText?: string,
+): { fullText: Skill[]; metadataOnly: Skill[] } {
+  if (!inputText) {
+    // No input — include all as full text (safe fallback)
+    return { fullText: skills, metadataOnly: [] };
+  }
+
+  const inputLower = inputText.toLowerCase();
+  const fullText: Skill[] = [];
+  const metadataOnly: Skill[] = [];
+
+  for (const skill of skills) {
+    // Skills with always=true always get full text
+    if (skill.metadata.always) {
+      fullText.push(skill);
+      continue;
+    }
+
+    // Check if input contains keywords from skill description or name
+    const keywords = [
+      skill.name,
+      ...skill.description.split(/[\s,，。]+/).filter((w) => w.length >= 2),
+    ];
+    const isRelevant = keywords.some((kw) => inputLower.includes(kw.toLowerCase()));
+
+    if (isRelevant) {
+      fullText.push(skill);
+    } else {
+      metadataOnly.push(skill);
+    }
+  }
+
+  return { fullText, metadataOnly };
+}
+
+/**
  * Filter skills by enabled status and device-specific config.
  * Optionally filter by skill type.
  */

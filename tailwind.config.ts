@@ -70,7 +70,9 @@ const config: Config = {
         sm: 'calc(var(--radius) - 4px)',
       },
       fontFamily: {
-        mono: ['ui-monospace', 'SFMono-Regular', 'SF Mono', 'Menlo', 'monospace'],
+        body: ['var(--font-body)', 'var(--font-display)', 'system-ui', 'sans-serif'],
+        display: ['var(--font-display)', 'var(--font-body)', 'system-ui', 'sans-serif'],
+        mono: ['var(--font-mono)', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
       },
       keyframes: {
         'card-enter': {
@@ -78,26 +80,35 @@ const config: Config = {
           to: { opacity: '1', transform: 'translateY(0)' },
         },
         'accordion-down': {
-          from: {
-            height: '0',
-          },
-          to: {
-            height: 'var(--radix-accordion-content-height)',
-          },
+          from: { height: '0' },
+          to: { height: 'var(--radix-accordion-content-height)' },
         },
         'accordion-up': {
-          from: {
-            height: 'var(--radix-accordion-content-height)',
-          },
-          to: {
-            height: '0',
-          },
+          from: { height: 'var(--radix-accordion-content-height)' },
+          to: { height: '0' },
+        },
+        'todo-check-circle': {
+          '0%': { transform: 'scale(1)' },
+          '30%': { transform: 'scale(0.85)' },
+          '60%': { transform: 'scale(1.15)' },
+          '100%': { transform: 'scale(1)' },
+        },
+        'todo-check-mark': {
+          from: { transform: 'scale(0)', opacity: '0' },
+          to: { transform: 'scale(1)', opacity: '1' },
+        },
+        'impact-fill': {
+          from: { transform: 'scaleX(0)' },
+          to: { transform: 'scaleX(1)' },
         },
       },
       animation: {
         'card-enter': 'card-enter 0.4s cubic-bezier(0.22,1,0.36,1) both',
         'accordion-down': 'accordion-down 0.2s ease-out',
         'accordion-up': 'accordion-up 0.2s ease-out',
+        'todo-check-circle': 'todo-check-circle 0.4s cubic-bezier(0.34,1.56,0.64,1)',
+        'todo-check-mark': 'todo-check-mark 0.3s cubic-bezier(0.34,1.56,0.64,1) 0.15s both',
+        'impact-fill': 'impact-fill 0.6s cubic-bezier(0.22,1,0.36,1) both',
       },
     },
   },

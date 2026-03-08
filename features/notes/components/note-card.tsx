@@ -16,19 +16,27 @@ export interface Note {
   status?: string;
 }
 
-const TAG_STYLES: Record<string, string> = {
-  work: "bg-primary/10 text-primary",
-  meeting: "bg-accent/10 text-accent",
-  idea: "bg-amber-50 text-amber-600",
-  personal: "bg-teal-50 text-teal-600",
-  todo: "bg-rose-50 text-rose-600",
-  study: "bg-sky-50 text-sky-600",
-  health: "bg-emerald-50 text-emerald-600",
-  travel: "bg-indigo-50 text-indigo-600",
+const TAG_STYLES: Record<string, { bg: string; fg: string }> = {
+  work: { bg: "var(--tag-work-bg)", fg: "var(--tag-work-fg)" },
+  meeting: { bg: "var(--tag-meeting-bg)", fg: "var(--tag-meeting-fg)" },
+  idea: { bg: "var(--tag-idea-bg)", fg: "var(--tag-idea-fg)" },
+  personal: { bg: "var(--tag-personal-bg)", fg: "var(--tag-personal-fg)" },
+  todo: { bg: "var(--tag-todo-bg)", fg: "var(--tag-todo-fg)" },
+  study: { bg: "var(--tag-study-bg)", fg: "var(--tag-study-fg)" },
+  health: { bg: "var(--tag-health-bg)", fg: "var(--tag-health-fg)" },
+  travel: { bg: "var(--tag-travel-bg)", fg: "var(--tag-travel-fg)" },
 };
 
-function getTagStyle(tag: string) {
-  return TAG_STYLES[tag.toLowerCase()] || "bg-secondary text-secondary-foreground";
+function getTagStyle(tag: string): { className: string; style?: React.CSSProperties } {
+  const entry = TAG_STYLES[tag.toLowerCase()];
+  if (!entry) return { className: "bg-secondary text-secondary-foreground" };
+  return {
+    className: "",
+    style: {
+      backgroundColor: `hsl(${entry.bg})`,
+      color: `hsl(${entry.fg})`,
+    },
+  };
 }
 
 const LONG_PRESS_MS = 500;
@@ -72,10 +80,10 @@ export function NoteCard({
             <div className="w-4 h-4 rounded-full border-2 border-primary/30 border-t-primary animate-spin" />
             <span className="text-sm font-semibold text-foreground/70">AI 处理中...</span>
           </div>
-          <div className="space-y-2 animate-pulse">
-            <div className="h-3 bg-secondary rounded w-2/3" />
-            <div className="h-3 bg-secondary rounded w-full" />
-            <div className="h-3 bg-secondary rounded w-4/5" />
+          <div className="space-y-2">
+            <div className="h-3 animate-shimmer rounded w-2/3" />
+            <div className="h-3 animate-shimmer rounded w-full" style={{ animationDelay: "0.1s" }} />
+            <div className="h-3 animate-shimmer rounded w-4/5" style={{ animationDelay: "0.2s" }} />
           </div>
           <div className="flex items-center gap-1 mt-3 text-muted-foreground">
             <Clock className="w-3 h-3" />
@@ -213,17 +221,21 @@ export function NoteCard({
         {/* Tags */}
         {note.tags.length > 0 && (
           <div className="flex flex-wrap gap-1.5 mt-2.5">
-            {note.tags.map((tag) => (
-              <span
-                key={tag}
-                className={cn(
-                  "text-[10px] font-medium px-2 py-0.5 rounded-full",
-                  getTagStyle(tag),
-                )}
-              >
-                {tag}
-              </span>
-            ))}
+            {note.tags.map((tag) => {
+              const tagStyle = getTagStyle(tag);
+              return (
+                <span
+                  key={tag}
+                  className={cn(
+                    "text-[10px] font-medium px-2 py-0.5 rounded-full",
+                    tagStyle.className,
+                  )}
+                  style={tagStyle.style}
+                >
+                  {tag}
+                </span>
+              );
+            })}
           </div>
         )}
 

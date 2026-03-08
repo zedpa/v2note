@@ -14,16 +14,16 @@ import { OfflineBanner } from "@/shared/components/offline-banner";
 import { StatsDashboard } from "@/features/sidebar/components/stats-dashboard";
 import { MemorySoulOverlay } from "@/features/memory/components/memory-soul-overlay";
 import { ReviewOverlay } from "@/features/reviews/components/review-overlay";
-import { TodoDiaryCard } from "@/features/todos/components/todo-diary-card";
+import { TodoPanel } from "@/features/todos/components/todo-panel";
 import { TodayGantt } from "@/features/todos/components/today-gantt";
-import { IdeaView } from "@/features/ideas/components/idea-view";
 import { ProfileEditor } from "@/features/profile/components/profile-editor";
 import { SettingsEditor } from "@/features/settings/components/settings-editor";
 import { SkillsPage } from "@/features/skills/components/skills-page";
+import { MorningBriefing } from "@/features/daily/components/morning-briefing";
+import { EveningSummary } from "@/features/daily/components/evening-summary";
 import { toast } from "sonner";
 import { getCommandDefs } from "@/features/commands/lib/registry";
 import { NudgeToastListener } from "@/features/proactive/components/nudge-toast";
-import { SwipeBack } from "@/shared/components/swipe-back";
 import { useBackHandler } from "@/shared/hooks/use-back-handler";
 
 type OverlayName =
@@ -35,9 +35,10 @@ type OverlayName =
   | "skills"
   | "todos"
   | "today-todo"
-  | "ideas"
   | "profile"
   | "settings"
+  | "morning-briefing"
+  | "evening-summary"
   | null;
 
 export default function Page() {
@@ -53,6 +54,19 @@ export default function Page() {
 
   useEffect(() => {
     initStatusBar();
+  }, []);
+
+  // Auto-show morning briefing (7-10am, once per day)
+  useEffect(() => {
+    const hour = new Date().getHours();
+    if (hour >= 7 && hour < 10) {
+      const today = new Date().toISOString().split("T")[0];
+      const key = `briefing_shown_${today}`;
+      if (!localStorage.getItem(key)) {
+        localStorage.setItem(key, "1");
+        setActiveOverlay("morning-briefing");
+      }
+    }
   }, []);
 
   const backHandler = useMemo(() => {
@@ -107,18 +121,23 @@ export default function Page() {
         onClose={() => setShowSidebar(false)}
         onViewStats={() => setActiveOverlay("stats")}
         onViewMemory={() => setActiveOverlay("memory")}
-        onViewReview={() => setActiveOverlay("review")}
         onViewProfile={() => setActiveOverlay("profile")}
+        onViewBriefing={() => setActiveOverlay("morning-briefing")}
+        onViewSettings={() => setActiveOverlay("settings")}
       />
       <OfflineBanner />
       <NudgeToastListener
         onOpenTodos={() => setActiveOverlay("todos")}
         onOpenTodayTodo={() => setActiveOverlay("today-todo")}
+        onOpenBriefing={() => setActiveOverlay("morning-briefing")}
+        onOpenSummary={() => setActiveOverlay("evening-summary")}
       />
 
       <NewHeader
         onSearchClick={() => setActiveOverlay("search")}
         onAvatarClick={() => setShowSidebar(true)}
+        onInsightClick={() => setActiveOverlay("review")}
+        onTodosClick={() => setActiveOverlay("todos")}
       />
 
       <main className="pb-6">
@@ -181,39 +200,16 @@ export default function Page() {
       {activeOverlay === "review" && (
         <ReviewOverlay onClose={closeOverlay} />
       )}
-      {activeOverlay === "todos" && (
-        <TodoDiaryCard
-          onClose={closeOverlay}
-          onNoteClick={(id) => {
-            closeOverlay();
-            setDetailId(id);
-          }}
-        />
-      )}
+      <TodoPanel
+        open={activeOverlay === "todos"}
+        onClose={closeOverlay}
+        onNoteClick={(id) => {
+          closeOverlay();
+          setDetailId(id);
+        }}
+      />
       {activeOverlay === "today-todo" && (
         <TodayGantt onClose={closeOverlay} />
-      )}
-      {activeOverlay === "ideas" && (
-        <SwipeBack onClose={closeOverlay}>
-          <div className="flex flex-col min-h-dvh pt-safe">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-border/60">
-              <h1 className="text-lg font-bold text-foreground">灵感</h1>
-              <button
-                type="button"
-                onClick={closeOverlay}
-                className="p-2 rounded-full hover:bg-secondary/60 transition-colors"
-              >
-                <span className="text-muted-foreground text-lg">&times;</span>
-              </button>
-            </div>
-            <div className="flex-1 overflow-y-auto">
-              <IdeaView onNoteClick={(id) => {
-                closeOverlay();
-                setDetailId(id);
-              }} />
-            </div>
-          </div>
-        </SwipeBack>
       )}
       {activeOverlay === "profile" && (
         <ProfileEditor onClose={closeOverlay} />
@@ -226,6 +222,12 @@ export default function Page() {
           onClose={closeOverlay}
           onThemeChange={setTheme}
         />
+      )}
+      {activeOverlay === "morning-briefing" && (
+        <MorningBriefing onClose={closeOverlay} />
+      )}
+      {activeOverlay === "evening-summary" && (
+        <EveningSummary onClose={closeOverlay} />
       )}
     </div>
   );

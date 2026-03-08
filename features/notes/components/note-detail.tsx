@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { X, Clock, MapPin, Tag, CheckSquare, Lightbulb, FileText, Pencil, Plus, Trash2 } from "lucide-react";
+import { X, Clock, MapPin, Tag, CheckSquare, FileText, Pencil, Plus, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { api } from "@/shared/lib/api";
 import { useNoteDetail } from "@/features/notes/hooks/use-note-detail";
@@ -19,11 +19,9 @@ export function NoteDetail({ recordId, onClose, onDeleted }: NoteDetailProps) {
   const editor = useNoteEditor(detail, refetch);
 
   // Inline edit state
-  const [editTitle, setEditTitle] = useState("");
   const [editSummary, setEditSummary] = useState("");
   const [newTag, setNewTag] = useState("");
   const [newTodo, setNewTodo] = useState("");
-  const [newIdea, setNewIdea] = useState("");
 
   if (loading) {
     return (
@@ -44,7 +42,7 @@ export function NoteDetail({ recordId, onClose, onDeleted }: NoteDetailProps) {
 
   if (!detail) return null;
 
-  const { record, transcript, summary, tags, todos, ideas } = detail;
+  const { record, transcript, summary, tags, todos } = detail;
   const isTextNote = record.duration_seconds == null || record.duration_seconds === 0;
   const dt = new Date(record.created_at);
   const dateStr = `${dt.getFullYear()}年${dt.getMonth() + 1}月${dt.getDate()}日`;
@@ -79,46 +77,6 @@ export function NoteDetail({ recordId, onClose, onDeleted }: NoteDetailProps) {
       </div>
 
       <div className="px-4 py-6 space-y-6 pb-20">
-        {/* Title — editable */}
-        {editor.editing === "title" ? (
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={editTitle}
-              onChange={(e) => setEditTitle(e.target.value)}
-              className="flex-1 text-xl font-bold bg-secondary rounded-xl px-3 py-2 outline-none"
-              autoFocus
-            />
-            <button
-              type="button"
-              onClick={() => editor.saveTitle(editTitle)}
-              className="px-3 py-2 rounded-xl bg-primary text-primary-foreground text-sm"
-            >
-              保存
-            </button>
-            <button
-              type="button"
-              onClick={editor.cancelEdit}
-              className="px-3 py-2 rounded-xl bg-secondary text-sm"
-            >
-              取消
-            </button>
-          </div>
-        ) : (
-          <div className="flex items-start gap-2 group">
-            <h1 className="text-xl font-bold text-foreground flex-1">
-              {summary?.title ?? "未命名笔记"}
-            </h1>
-            <button
-              type="button"
-              onClick={() => { setEditTitle(summary?.title ?? ""); editor.startEdit("title"); }}
-              className="p-1.5 rounded-lg opacity-0 group-hover:opacity-100 hover:bg-secondary transition-all"
-            >
-              <Pencil className="w-3.5 h-3.5 text-muted-foreground" />
-            </button>
-          </div>
-        )}
-
         {/* Meta */}
         <div className="flex items-center gap-4 text-muted-foreground">
           <div className="flex items-center gap-1">
@@ -295,47 +253,6 @@ export function NoteDetail({ recordId, onClose, onDeleted }: NoteDetailProps) {
           </div>
         </div>
 
-        {/* Ideas — editable */}
-        <div>
-          <div className="flex items-center gap-2 mb-3">
-            <Lightbulb className="w-4 h-4 text-amber-500" />
-            <h3 className="text-sm font-semibold text-foreground">想法与灵感</h3>
-          </div>
-          <div className="space-y-2">
-            {ideas.map((idea) => (
-              <div
-                key={idea.id}
-                className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/20 border border-amber-100 dark:border-amber-900/30 group flex items-start gap-2"
-              >
-                <p className="text-sm text-foreground flex-1">{idea.text}</p>
-                <button
-                  type="button"
-                  onClick={() => editor.deleteIdea(idea.id)}
-                  className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-destructive/10 transition-all flex-shrink-0"
-                >
-                  <Trash2 className="w-3 h-3 text-destructive" />
-                </button>
-              </div>
-            ))}
-            {/* Add idea inline */}
-            <div className="flex items-center gap-2 p-2">
-              <Plus className="w-4 h-4 text-amber-400/40" />
-              <input
-                type="text"
-                value={newIdea}
-                onChange={(e) => setNewIdea(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && newIdea.trim()) {
-                    editor.addIdea(newIdea.trim());
-                    setNewIdea("");
-                  }
-                }}
-                placeholder="添加灵感..."
-                className="flex-1 text-sm bg-transparent outline-none placeholder:text-muted-foreground/40"
-              />
-            </div>
-          </div>
-        </div>
       </div>
     </SwipeBack>
   );

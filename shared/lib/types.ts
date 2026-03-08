@@ -171,6 +171,10 @@ export interface TodoItem {
   source: string | null
   record_id: string
   created_at: string
+  domain?: string
+  impact?: number
+  ai_actionable?: boolean
+  ai_action_plan?: string[]
 }
 
 export interface IdeaItem {

@@ -11,7 +11,7 @@ export declare function startASR(clientWs: WsWebSocket, deviceId: string, locati
  * - realtime: writes to Python subprocess stdin
  * - upload: accumulates in memory
  */
-export declare function sendAudioChunk(deviceId: string, chunk: Buffer): void;
+export declare function sendAudioChunk(deviceId: string, chunk: Buffer, sourceWs?: WsWebSocket): void;
 /**
  * Stop ASR session.
  * - realtime: close Python subprocess stdin (signals EOF → stop)
@@ -21,7 +21,7 @@ export declare function stopASR(clientWs: WsWebSocket, deviceId: string, saveAud
 /**
  * Cancel ASR session.
  */
-export declare function cancelASR(deviceId: string): void;
+export declare function cancelASR(deviceId: string, clientWs?: WsWebSocket): void;
 /**
  * Check if a session exists for the given device.
  */

@@ -1,56 +1,69 @@
 /**
- * Proactive Push Engine — periodically checks connected devices' todo state
+ * Proactive Push Engine — checks connected devices' todo state
  * and sends reminders via WebSocket.
+ *
+ * Enhanced with BullMQ for persistent, Redis-backed job scheduling.
+ * Gracefully falls back to setInterval when Redis is unavailable.
+ *
+ * BullMQ advantages over setInterval:
+ * - Persistent jobs survive gateway restarts
+ * - Precise cron scheduling (7:30 AM, 2:00 PM, 8:00 PM)
+ * - Built-in retry with exponential backoff
+ * - Multi-process safe (multiple gateways share one queue)
  */
 
 import { WebSocket } from "ws";
 import { todoRepo } from "../db/repositories/index.js";
+import * as dailyBriefingRepo from "../db/repositories/daily-briefing.js";
 
 interface ConnectedDevice {
   deviceId: string;
   ws: WebSocket;
-  lastNudge: number; // timestamp of last nudge
+  lastNudge: number;
 }
+
+// BullMQ types (dynamically imported to avoid hard dependency on Redis)
+type BullQueue = any;
+type BullWorker = any;
 
 export class ProactiveEngine {
   private devices = new Map<string, ConnectedDevice>();
-  private timer: NodeJS.Timeout | null = null;
-  private intervalMs = 30 * 60 * 1000; // default 30 minutes
+  private intervalMs = 30 * 60 * 1000; // 30 minutes
+  private dailyPushSent = new Set<string>();
 
-  /**
-   * Set the check interval in minutes.
-   */
+  // Fallback timer (used when Redis unavailable)
+  private fallbackTimer: NodeJS.Timeout | null = null;
+
+  // BullMQ instances (populated if Redis is available)
+  private queue: BullQueue | null = null;
+  private worker: BullWorker | null = null;
+  private redisAvailable = false;
+
   setInterval(minutes: number): void {
     this.intervalMs = minutes * 60 * 1000;
-    if (this.timer) {
+    if (this.fallbackTimer) {
       this.stop();
       this.start();
     }
   }
 
-  /**
-   * Register a device connection for proactive monitoring.
-   */
   registerDevice(deviceId: string, ws: WebSocket): void {
-    this.devices.set(deviceId, {
-      deviceId,
-      ws,
-      lastNudge: 0,
-    });
+    this.devices.set(deviceId, { deviceId, ws, lastNudge: 0 });
     console.log(`[proactive] Device registered: ${deviceId} (total: ${this.devices.size})`);
+
+    // Register per-device BullMQ schedulers if Redis is available
+    if (this.redisAvailable && this.queue) {
+      this.registerDeviceSchedulers(deviceId).catch((err) => {
+        console.warn(`[proactive] Failed to register device schedulers: ${err.message}`);
+      });
+    }
   }
 
-  /**
-   * Unregister a device connection.
-   */
   unregisterDevice(deviceId: string): void {
     this.devices.delete(deviceId);
     console.log(`[proactive] Device unregistered: ${deviceId} (total: ${this.devices.size})`);
   }
 
-  /**
-   * Unregister by WebSocket reference (for disconnect cleanup).
-   */
   unregisterByWs(ws: WebSocket): void {
     for (const [deviceId, device] of this.devices) {
       if (device.ws === ws) {
@@ -62,49 +75,181 @@ export class ProactiveEngine {
   }
 
   /**
-   * Start the periodic check loop.
+   * Start the engine. Tries BullMQ first, falls back to setInterval.
    */
-  start(): void {
-    if (this.timer) return;
-
-    this.timer = setInterval(() => {
-      this.checkAll().catch((err) => {
-        console.error("[proactive] Check error:", err.message);
-      });
-    }, this.intervalMs);
-
-    console.log(`[proactive] Engine started (interval: ${this.intervalMs / 1000}s)`);
+  async start(): Promise<void> {
+    try {
+      await this.tryStartBullMQ();
+    } catch (err: any) {
+      console.warn(`[proactive] BullMQ unavailable (${err.message}), using fallback timer`);
+      this.startFallbackTimer();
+    }
   }
 
-  /**
-   * Stop the periodic check loop.
-   */
   stop(): void {
-    if (this.timer) {
-      clearInterval(this.timer);
-      this.timer = null;
+    if (this.fallbackTimer) {
+      clearInterval(this.fallbackTimer);
+      this.fallbackTimer = null;
     }
+    if (this.worker) {
+      this.worker.close().catch(() => {});
+      this.worker = null;
+    }
+    if (this.queue) {
+      this.queue.close().catch(() => {});
+      this.queue = null;
+    }
+    this.redisAvailable = false;
     console.log("[proactive] Engine stopped");
   }
 
-  /**
-   * Check all connected devices for pending todos and send nudges.
-   */
+  // ── BullMQ setup ──
+
+  private async tryStartBullMQ(): Promise<void> {
+    // Dynamic import to avoid hard dependency
+    const { Queue, Worker } = await import("bullmq");
+
+    const redisHost = process.env.REDIS_HOST || "localhost";
+    const redisPort = parseInt(process.env.REDIS_PORT || "6379", 10);
+    const redisPassword = process.env.REDIS_PASSWORD;
+
+    // Use plain connection config (avoids ioredis version mismatch with bullmq's internal copy)
+    const connectionConfig = { host: redisHost, port: redisPort, password: redisPassword };
+
+    // Test Redis by creating a temporary queue
+    const testQueue = new Queue("__proactive-test", { connection: connectionConfig });
+    await testQueue.close();
+
+    // Redis is available — setup BullMQ
+    this.queue = new Queue("proactive-engine", {
+      connection: connectionConfig,
+      defaultJobOptions: {
+        attempts: 3,
+        backoff: { type: "exponential", delay: 5000 },
+        removeOnComplete: { count: 100 },
+        removeOnFail: { count: 500 },
+      },
+    });
+
+    this.worker = new Worker(
+      "proactive-engine",
+      async (job: any) => {
+        switch (job.name) {
+          case "check-all-devices":
+            await this.checkAll();
+            break;
+          case "morning-briefing":
+            await this.handleTimedPush(job.data.deviceId, "morning");
+            break;
+          case "relay-reminder":
+            await this.handleTimedPush(job.data.deviceId, "relay");
+            break;
+          case "evening-summary":
+            await this.handleTimedPush(job.data.deviceId, "evening");
+            break;
+        }
+      },
+      { connection: connectionConfig, concurrency: 5 },
+    );
+
+    this.worker.on("failed", (job: any, err: Error) => {
+      console.error(`[proactive:bullmq] ${job?.name} failed:`, err.message);
+    });
+
+    // Setup repeatable schedulers (idempotent)
+    await this.queue.upsertJobScheduler(
+      "check-all-scheduler",
+      { every: this.intervalMs },
+      { name: "check-all-devices", data: {} },
+    );
+
+    this.redisAvailable = true;
+    console.log(`[proactive] Engine started with BullMQ (Redis: ${redisHost}:${redisPort})`);
+  }
+
+  private async registerDeviceSchedulers(deviceId: string): Promise<void> {
+    if (!this.queue) return;
+
+    await this.queue.upsertJobScheduler(
+      `morning-${deviceId}`,
+      { pattern: "30 7 * * *" },
+      { name: "morning-briefing", data: { deviceId } },
+    );
+    await this.queue.upsertJobScheduler(
+      `relay-${deviceId}`,
+      { pattern: "0 14 * * *" },
+      { name: "relay-reminder", data: { deviceId } },
+    );
+    await this.queue.upsertJobScheduler(
+      `evening-${deviceId}`,
+      { pattern: "0 20 * * *" },
+      { name: "evening-summary", data: { deviceId } },
+    );
+  }
+
+  private async handleTimedPush(deviceId: string | undefined, type: "morning" | "relay" | "evening"): Promise<void> {
+    // BullMQ scheduled job: push to all connected devices or specific device
+    const targets = deviceId
+      ? [this.devices.get(deviceId)].filter(Boolean) as ConnectedDevice[]
+      : Array.from(this.devices.values());
+
+    for (const device of targets) {
+      if (device.ws.readyState !== WebSocket.OPEN) continue;
+
+      switch (type) {
+        case "morning":
+          this.sendMessage(device, {
+            type: "proactive.morning_briefing",
+            payload: { text: "新的一天开始了，查看今日简报" },
+          });
+          break;
+        case "relay": {
+          try {
+            const relays = await todoRepo.findRelayByDevice(device.deviceId);
+            if (relays.length > 0) {
+              this.sendMessage(device, {
+                type: "proactive.relay_reminder",
+                payload: { text: `你有 ${relays.length} 条信息还需要转达`, count: relays.length },
+              });
+            }
+          } catch { /* table may not exist */ }
+          break;
+        }
+        case "evening":
+          this.sendMessage(device, {
+            type: "proactive.evening_summary",
+            payload: { text: "今天辛苦了，看看日终总结" },
+          });
+          break;
+      }
+    }
+  }
+
+  // ── Fallback timer (when Redis unavailable) ──
+
+  private startFallbackTimer(): void {
+    if (this.fallbackTimer) return;
+    this.fallbackTimer = setInterval(() => {
+      this.checkAll().catch((err) => {
+        console.error("[proactive] Fallback check error:", err.message);
+      });
+    }, this.intervalMs);
+    console.log(`[proactive] Fallback timer started (interval: ${this.intervalMs / 1000}s)`);
+  }
+
+  // ── Core check logic (shared by BullMQ and fallback) ──
+
   async checkAll(): Promise<void> {
     const now = Date.now();
 
     for (const [deviceId, device] of this.devices) {
-      // Skip if ws is closed
       if (device.ws.readyState !== WebSocket.OPEN) {
         this.devices.delete(deviceId);
         continue;
       }
-
-      // Skip if recently nudged
       if (now - device.lastNudge < this.intervalMs * 0.8) {
         continue;
       }
-
       try {
         await this.checkDevice(device);
       } catch (err: any) {
@@ -113,46 +258,93 @@ export class ProactiveEngine {
     }
   }
 
-  /**
-   * Check a single device for pending todos.
-   */
   private async checkDevice(device: ConnectedDevice): Promise<void> {
-    const pending = await todoRepo.findPendingByDevice(device.deviceId);
+    const now = new Date();
+    const hour = now.getHours();
+    const today = now.toISOString().split("T")[0];
+    const nudgeKey = `${device.deviceId}:${today}`;
 
+    // Time-aware pushes (only used in fallback mode — BullMQ uses cron)
+    if (!this.redisAvailable) {
+      if (hour >= 7 && hour < 9) {
+        const briefingKey = `morning:${nudgeKey}`;
+        if (!this.dailyPushSent.has(briefingKey)) {
+          try {
+            const cached = await dailyBriefingRepo.findByDeviceAndDate(device.deviceId, today, "morning");
+            if (!cached) {
+              this.sendMessage(device, {
+                type: "proactive.morning_briefing",
+                payload: { text: "新的一天开始了，查看今日简报" },
+              });
+              this.dailyPushSent.add(briefingKey);
+              device.lastNudge = Date.now();
+              return;
+            }
+          } catch { /* table may not exist */ }
+        }
+      }
+
+      if (hour >= 14 && hour < 17) {
+        const relayKey = `relay:${nudgeKey}`;
+        if (!this.dailyPushSent.has(relayKey)) {
+          try {
+            const relays = await todoRepo.findRelayByDevice(device.deviceId);
+            if (relays.length > 0) {
+              this.sendMessage(device, {
+                type: "proactive.relay_reminder",
+                payload: { text: `你有 ${relays.length} 条信息还需要转达`, count: relays.length },
+              });
+              this.dailyPushSent.add(relayKey);
+              device.lastNudge = Date.now();
+              return;
+            }
+          } catch { /* table may not exist */ }
+        }
+      }
+
+      if (hour >= 20 && hour < 22) {
+        const eveningKey = `evening:${nudgeKey}`;
+        if (!this.dailyPushSent.has(eveningKey)) {
+          this.sendMessage(device, {
+            type: "proactive.evening_summary",
+            payload: { text: "今天辛苦了，看看日终总结" },
+          });
+          this.dailyPushSent.add(eveningKey);
+          device.lastNudge = Date.now();
+          return;
+        }
+      }
+    }
+
+    // Standard todo checks
+    const pending = await todoRepo.findPendingByDevice(device.deviceId);
     if (pending.length === 0) return;
 
-    // Find todos without scheduled time
-    const unscheduled = pending.filter(
-      (t) => !(t as any).scheduled_start,
-    );
-
-    // Find overdue todos (scheduled_end is in the past)
+    const unscheduled = pending.filter((t) => !(t as any).scheduled_start);
     const overdue = pending.filter((t) => {
       const end = (t as any).scheduled_end;
       if (!end) return false;
-      return new Date(end).getTime() < Date.now();
+      const impact = (t as any).impact ?? 5;
+      return new Date(end).getTime() < Date.now() && impact >= 4;
     });
 
-    // Send nudge for the most important item
+    overdue.sort((a, b) => ((b as any).impact ?? 5) - ((a as any).impact ?? 5));
+
     if (overdue.length > 0) {
       const todo = overdue[0];
+      const isAiActionable = (todo as any).ai_actionable === true;
+      const suggestion = isAiActionable
+        ? `"${todo.text}" 已超时，要不要让AI帮你处理？`
+        : `"${todo.text}" 已超过预定时间，需要现在处理吗？`;
       this.sendNudge(device, {
         type: "proactive.todo_nudge",
-        payload: {
-          todoId: todo.id,
-          text: todo.text,
-          suggestion: `"${todo.text}" 已超过预定时间，需要现在处理吗？`,
-        },
+        payload: { todoId: todo.id, text: todo.text, suggestion, ai_actionable: isAiActionable },
       });
       device.lastNudge = Date.now();
     } else if (unscheduled.length > 0) {
-      const count = unscheduled.length;
       this.sendMessage(device, {
         type: "proactive.message",
-        payload: {
-          text: `你有 ${count} 项待办还没有安排时间，要现在安排吗？`,
-          action: "schedule",
-        },
+        payload: { text: `你有 ${unscheduled.length} 项待办还没有安排时间，要现在安排吗？`, action: "schedule" },
       });
       device.lastNudge = Date.now();
     }

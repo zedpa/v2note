@@ -4,19 +4,14 @@ import { useState, useEffect } from "react";
 import { X, Save } from "lucide-react";
 import { toast } from "sonner";
 import {
-  getSoul,
-  setSoul,
   getUserProfile,
   setUserProfile,
   getTools,
   setTools,
-  type LocalSoul,
   type LocalUser,
-  type LocalTools,
   type LocalToolServer,
 } from "@/shared/lib/local-config";
-import { getSoul as apiGetSoul } from "@/shared/lib/api/soul";
-import { getDeviceId } from "@/shared/lib/device";
+import { SoulTab } from "@/features/memory/components/soul-tab";
 
 type Tab = "soul" | "user" | "tools";
 
@@ -26,7 +21,6 @@ interface ProfileEditorProps {
 
 export function ProfileEditor({ onClose }: ProfileEditorProps) {
   const [tab, setTab] = useState<Tab>("soul");
-  const [soulContent, setSoulContent] = useState("");
   const [userName, setUserName] = useState("");
   const [userDescription, setUserDescription] = useState("");
   const [userTraits, setUserTraits] = useState("");
@@ -37,26 +31,6 @@ export function ProfileEditor({ onClose }: ProfileEditorProps) {
   useEffect(() => {
     async function load() {
       try {
-        // Load soul
-        let soul = await getSoul();
-        if (!soul) {
-          // Migrate from server
-          try {
-            await getDeviceId();
-            const serverSoul = await apiGetSoul();
-            if (serverSoul?.content) {
-              soul = {
-                content: serverSoul.content,
-                updatedAt: new Date().toISOString(),
-              };
-              await setSoul(soul);
-            }
-          } catch {
-            // Server unavailable, start fresh
-          }
-        }
-        if (soul) setSoulContent(soul.content);
-
         // Load user profile
         const user = await getUserProfile();
         if (user) {
@@ -85,10 +59,7 @@ export function ProfileEditor({ onClose }: ProfileEditorProps) {
     try {
       const now = new Date().toISOString();
 
-      if (tab === "soul") {
-        await setSoul({ content: soulContent, updatedAt: now });
-        toast("用户画像已保存");
-      } else if (tab === "user") {
+      if (tab === "user") {
         const user: LocalUser = {
           name: userName || undefined,
           description: userDescription || undefined,
@@ -117,7 +88,7 @@ export function ProfileEditor({ onClose }: ProfileEditorProps) {
   };
 
   const tabs: { key: Tab; label: string }[] = [
-    { key: "soul", label: "AI画像" },
+    { key: "soul", label: "用户画像" },
     { key: "user", label: "用户信息" },
     { key: "tools", label: "工具配置" },
   ];
@@ -172,17 +143,7 @@ export function ProfileEditor({ onClose }: ProfileEditorProps) {
             <span className="text-sm text-muted-foreground">加载中...</span>
           </div>
         ) : tab === "soul" ? (
-          <div>
-            <p className="text-xs text-muted-foreground mb-3">
-              AI 通过画像了解你，提供更个性化的服务。画像会随着你的使用自动更新。
-            </p>
-            <textarea
-              value={soulContent}
-              onChange={(e) => setSoulContent(e.target.value)}
-              className="w-full h-64 p-3 rounded-xl bg-secondary/30 border border-border/50 text-sm text-foreground resize-none outline-none focus:border-primary/50 transition-colors"
-              placeholder="描述你自己，让 AI 更好地理解你..."
-            />
-          </div>
+          <SoulTab />
         ) : tab === "user" ? (
           <div className="space-y-4">
             <div>

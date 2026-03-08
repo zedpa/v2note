@@ -3,7 +3,6 @@ import { buildSystemPrompt } from "../skills/prompt-builder.js";
 import { chatCompletion } from "../ai/provider.js";
 import { MemoryManager } from "../memory/manager.js";
 import { updateSoul } from "../soul/manager.js";
-import { loadSoul } from "../soul/manager.js";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { skillConfigRepo } from "../db/repositories/index.js";
@@ -27,6 +26,7 @@ export async function processEntry(payload) {
         customer_requests: [],
         setting_changes: [],
         tags: [],
+        relays: [],
     };
     try {
         // 1. Load skills
@@ -58,31 +58,25 @@ export async function processEntry(payload) {
         if (activeSkills.length === 0) {
             console.warn("[process] No active skills — nothing to extract");
         }
-        // 2. Load soul + memory for context (non-critical, continue on failure)
-        // Prefer localConfig soul, fall back to server DB
+        // 2. Load context using tiered loader (parallel, relevance-filtered)
+        // Process mode: skips soul (not needed for extraction), limits memories
         let soulContent;
         let memories = [];
-        if (payload.localConfig?.soul?.content) {
-            soulContent = payload.localConfig.soul.content;
-            console.log(`[process] Using local soul config`);
-        }
-        else {
-            try {
-                const soul = await loadSoul(payload.deviceId);
-                soulContent = soul?.content;
-            }
-            catch (err) {
-                console.warn(`[process] Failed to load soul: ${err.message}`);
-            }
-        }
+        const memoryManager = new MemoryManager();
         try {
-            const memoryManager = new MemoryManager();
-            memories = await memoryManager.loadContext(payload.deviceId);
+            const loaded = await memoryManager.loadRelevantContext(payload.deviceId, {
+                mode: "process",
+                inputText: payload.text,
+                localSoul: payload.localConfig?.soul?.content,
+            });
+            soulContent = loaded.soul; // undefined in process mode (by design)
+            memories = loaded.memories;
+            console.log(`[process] Context loaded: ${memories.length} relevant memories (soul: ${soulContent ? 'yes' : 'skipped'})`);
         }
         catch (err) {
-            console.warn(`[process] Failed to load memory: ${err.message}`);
+            console.warn(`[process] Failed to load context: ${err.message}`);
         }
-        // 3. Build prompt with MCP tools if available
+        // 3. Build prompt with MCP tools if available (tiered: hot + warm)
         const mcpRegistry = getMCPRegistry();
         const mcpTools = mcpRegistry.hasTools() ? mcpRegistry.getToolsForPrompt() : undefined;
         const systemPrompt = buildSystemPrompt({
@@ -92,6 +86,7 @@ export async function processEntry(payload) {
             mode: "process",
             existingTags: payload.localConfig?.existingTags,
             mcpTools,
+            inputText: payload.text,
         });
         console.log(`[process] System prompt length: ${systemPrompt.length}, MCP tools: ${mcpTools?.length ?? 0}`);
         // 4. Call AI (with tool call loop)
@@ -103,6 +98,9 @@ export async function processEntry(payload) {
             { role: "user", content: payload.text },
         ];
         let response = await chatCompletion(messages, { json: true, temperature: 0.3, timeout: dynamicTimeout });
+        if (!response) {
+            throw new Error("AI provider returned null response");
+        }
         console.log(`[process] AI response length: ${response.content.length}, usage: ${JSON.stringify(response.usage)}`);
         // Tool call loop: if AI requests tool calls, execute them and re-call AI
         const MAX_TOOL_ROUNDS = 3;
@@ -162,13 +160,14 @@ export async function processEntry(payload) {
                     ? parsed.setting_changes
                     : [];
                 result.tags = Array.isArray(parsed.tags) ? parsed.tags : [];
+                result.relays = Array.isArray(parsed.relays) ? parsed.relays : [];
                 result.summary = typeof parsed.summary === "string" ? parsed.summary : undefined;
                 // Filter tags: only keep tags that exist in the provided existing tags list
                 if (payload.localConfig?.existingTags && result.tags.length > 0) {
                     const existingSet = new Set(payload.localConfig.existingTags);
                     result.tags = result.tags.filter((t) => existingSet.has(t));
                 }
-                console.log(`[process] Parsed: ${result.todos.length} todos, ${result.customer_requests.length} requests, ${result.tags.length} tags, summary: ${result.summary ? 'yes' : 'no'}`);
+                console.log(`[process] Parsed: ${result.todos.length} todos, ${result.customer_requests.length} requests, ${result.relays.length} relays, ${result.tags.length} tags, summary: ${result.summary ? 'yes' : 'no'}`);
             }
             catch {
                 console.error("[process] Failed to parse AI response as JSON:", response.content.slice(0, 500));
@@ -190,6 +189,24 @@ export async function processEntry(payload) {
                     text,
                     status: "pending",
                 })));
+            }
+            // Write relay todos
+            if (result.relays.length > 0) {
+                for (const relay of result.relays) {
+                    await todoRepo.createWithCategory({
+                        record_id: payload.recordId,
+                        text: relay.text,
+                        done: false,
+                        category: "relay",
+                        relay_meta: {
+                            source_person: relay.source_person,
+                            target_person: relay.target_person,
+                            context: relay.context,
+                            direction: relay.direction,
+                        },
+                    });
+                }
+                console.log(`[process] Created ${result.relays.length} relay todos`);
             }
             if (result.setting_changes.length > 0) {
                 await settingChangeRepo.create(result.setting_changes.map((text) => ({
@@ -233,28 +250,35 @@ export async function processEntry(payload) {
         // 9. Update record status
         await recordRepo.updateStatus(payload.recordId, "completed");
         console.log(`[process] Record ${payload.recordId} marked as completed`);
-        // 10. Background: estimate time for new todos
+        // 10. Background: enrich new todos (time, priority, domain, impact, actionability)
         if (result.todos.length > 0) {
             const pendingTodos = await todoRepo.findPendingByDevice(payload.deviceId);
             const newTodos = pendingTodos.slice(-result.todos.length); // latest N todos
             if (newTodos.length > 0) {
-                estimateBatchTodos(newTodos.map((t) => ({ id: t.id, text: t.text })), { soul: soulContent })
+                // Use already-loaded relevant memories (includes goals from loader)
+                const goalMemories = memories.length > 0
+                    ? memories.filter((m) => m.includes("[目标]")).concat(memories.filter((m) => !m.includes("[目标]")).slice(0, 5))
+                    : [];
+                estimateBatchTodos(newTodos.map((t) => ({ id: t.id, text: t.text })), { soul: soulContent, memories: goalMemories })
                     .then(async (estimates) => {
                     for (const [todoId, estimate] of estimates) {
                         await todoRepo.update(todoId, {
                             estimated_minutes: estimate.estimated_minutes,
                             priority: estimate.priority,
+                            domain: estimate.domain,
+                            impact: estimate.impact,
+                            ai_actionable: estimate.ai_actionable,
+                            ai_action_plan: estimate.ai_action_plan ?? null,
                         });
                     }
-                    console.log(`[process] Time estimates updated for ${estimates.size} todos`);
+                    console.log(`[process] Todo enrichment updated for ${estimates.size} todos`);
                 })
                     .catch((err) => {
-                    console.warn("[process] Time estimation failed:", err.message);
+                    console.warn("[process] Todo enrichment failed:", err.message);
                 });
             }
         }
         // 11. Background: maybe create long-term memory & update soul
-        const memoryManager = new MemoryManager();
         const today = new Date().toISOString().split("T")[0];
         memoryManager.maybeCreateMemory(payload.deviceId, payload.text, today).catch((e) => {
             console.warn("[process] Memory creation failed:", e.message);

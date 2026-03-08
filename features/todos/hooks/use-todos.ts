@@ -24,6 +24,10 @@ export function useTodos() {
         source: null,
         record_id: t.record_id,
         created_at: t.created_at,
+        domain: t.domain,
+        impact: t.impact,
+        ai_actionable: t.ai_actionable,
+        ai_action_plan: t.ai_action_plan,
       }));
 
       setTodos(items);
