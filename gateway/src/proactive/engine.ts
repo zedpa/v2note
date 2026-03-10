@@ -108,7 +108,6 @@ export class ProactiveEngine {
   private async tryStartBullMQ(): Promise<void> {
     // Dynamic import to avoid hard dependency
     const { Queue, Worker } = await import("bullmq");
-
     const redisHost = process.env.REDIS_HOST || "localhost";
     const redisPort = parseInt(process.env.REDIS_PORT || "6379", 10);
     const redisPassword = process.env.REDIS_PASSWORD;
@@ -116,9 +115,17 @@ export class ProactiveEngine {
     // Use plain connection config (avoids ioredis version mismatch with bullmq's internal copy)
     const connectionConfig = { host: redisHost, port: redisPort, password: redisPassword };
 
-    // Test Redis by creating a temporary queue
-    const testQueue = new Queue("__proactive-test", { connection: connectionConfig });
-    await testQueue.close();
+    // Test Redis connectivity with a raw TCP check (fast-fail, 3s timeout)
+    const net = await import("node:net");
+    await new Promise<void>((resolve, reject) => {
+      const sock = net.createConnection({ host: redisHost, port: redisPort }, () => {
+        sock.destroy();
+        resolve();
+      });
+      sock.setTimeout(3000);
+      sock.on("timeout", () => { sock.destroy(); reject(new Error(`Redis timeout ${redisHost}:${redisPort}`)); });
+      sock.on("error", (err) => { sock.destroy(); reject(err); });
+    });
 
     // Redis is available — setup BullMQ
     this.queue = new Queue("proactive-engine", {
@@ -154,6 +161,10 @@ export class ProactiveEngine {
 
     this.worker.on("failed", (job: any, err: Error) => {
       console.error(`[proactive:bullmq] ${job?.name} failed:`, err.message);
+    });
+
+    this.worker.on("error", (err: Error) => {
+      console.error(`[proactive:bullmq] Worker error:`, err.message);
     });
 
     // Setup repeatable schedulers (idempotent)

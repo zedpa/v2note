@@ -91,9 +91,17 @@ export class ProactiveEngine {
         const redisPassword = process.env.REDIS_PASSWORD;
         // Use plain connection config (avoids ioredis version mismatch with bullmq's internal copy)
         const connectionConfig = { host: redisHost, port: redisPort, password: redisPassword };
-        // Test Redis by creating a temporary queue
-        const testQueue = new Queue("__proactive-test", { connection: connectionConfig });
-        await testQueue.close();
+        // Test Redis connectivity with a raw TCP check (fast-fail, 3s timeout)
+        const net = await import("node:net");
+        await new Promise((resolve, reject) => {
+            const sock = net.createConnection({ host: redisHost, port: redisPort }, () => {
+                sock.destroy();
+                resolve();
+            });
+            sock.setTimeout(3000);
+            sock.on("timeout", () => { sock.destroy(); reject(new Error(`Redis timeout ${redisHost}:${redisPort}`)); });
+            sock.on("error", (err) => { sock.destroy(); reject(err); });
+        });
         // Redis is available — setup BullMQ
         this.queue = new Queue("proactive-engine", {
             connection: connectionConfig,
@@ -122,6 +130,9 @@ export class ProactiveEngine {
         }, { connection: connectionConfig, concurrency: 5 });
         this.worker.on("failed", (job, err) => {
             console.error(`[proactive:bullmq] ${job?.name} failed:`, err.message);
+        });
+        this.worker.on("error", (err) => {
+            console.error(`[proactive:bullmq] Worker error:`, err.message);
         });
         // Setup repeatable schedulers (idempotent)
         await this.queue.upsertJobScheduler("check-all-scheduler", { every: this.intervalMs }, { name: "check-all-devices", data: {} });
