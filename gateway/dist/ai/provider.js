@@ -53,7 +53,7 @@ export async function chatCompletion(messages, opts) {
     const { provider, model, timeout } = getProvider();
     const effectiveTimeout = opts?.timeout ?? timeout;
     const result = await generateText({
-        model: provider(model),
+        model: provider.chat(model),
         messages: messages,
         temperature: opts?.temperature ?? 0.7,
         maxRetries: 1,
@@ -77,7 +77,7 @@ export async function chatCompletion(messages, opts) {
 export async function* chatCompletionStream(messages, opts) {
     const { provider, model, timeout } = getProvider();
     const result = streamText({
-        model: provider(model),
+        model: provider.chat(model),
         messages: messages,
         temperature: opts?.temperature ?? 0.7,
         maxRetries: 1,
@@ -100,7 +100,7 @@ export async function generateStructured(messages, schema, opts) {
     const { provider, model, timeout } = getProvider();
     const effectiveTimeout = opts?.timeout ?? timeout;
     const result = await generateObject({
-        model: provider(model),
+        model: provider.chat(model),
         messages: messages,
         schema,
         schemaName: opts?.schemaName,
