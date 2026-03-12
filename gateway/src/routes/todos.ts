@@ -22,7 +22,14 @@ export function registerTodoRoutes(router: Router) {
 
   // Update todo
   router.patch("/api/v1/todos/:id", async (req, res, params) => {
-    const body = await readBody<{ text?: string; done?: boolean }>(req);
+    const body = await readBody<{
+      text?: string;
+      done?: boolean;
+      scheduled_start?: string | null;
+      scheduled_end?: string | null;
+      estimated_minutes?: number | null;
+      priority?: number;
+    }>(req);
     await todoRepo.update(params.id, body);
     sendJson(res, { ok: true });
   });

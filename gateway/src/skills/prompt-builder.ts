@@ -70,7 +70,12 @@ export function buildTieredContext(opts: ContextBuildOptions): ContextTier {
 
   // Soul — only for chat/briefing, not process (process extracts data, doesn't need personality)
   if (opts.soul && opts.mode !== "process") {
-    warm.push(`## AI 身份定义\n${opts.soul}`);
+    warm.push(`## AI 人格定义\n${opts.soul}`);
+  }
+
+  // User profile — factual info about the user (separated from soul)
+  if (opts.userProfile && opts.mode !== "process") {
+    warm.push(`## 用户画像\n${opts.userProfile}`);
   }
 
   // Memories — pre-filtered by relevance in context/loader.ts
@@ -194,22 +199,30 @@ export function buildTieredContext(opts: ContextBuildOptions): ContextTier {
 export function buildSystemPrompt(opts: {
   skills: Skill[];
   soul?: string;
+  userProfile?: string;
   memory?: string[];
   mode?: "process" | "chat";
   existingTags?: string[];
   mcpTools?: Array<{ name: string; description: string; parameters?: Record<string, unknown> }>;
   /** Input text for relevance-based skill filtering */
   inputText?: string;
+  /** Pre-built pending intent context to inject into warm tier */
+  pendingIntentContext?: string;
 }): string {
   const tiered = buildTieredContext({
     mode: opts.mode ?? "process",
     skills: opts.skills,
     soul: opts.soul,
+    userProfile: opts.userProfile,
     memories: opts.memory,
     existingTags: opts.existingTags,
     mcpTools: opts.mcpTools,
     inputText: opts.inputText,
   });
 
-  return [tiered.hot, tiered.warm].filter(Boolean).join("\n");
+  const parts = [tiered.hot, tiered.warm];
+  if (opts.pendingIntentContext) {
+    parts.push(opts.pendingIntentContext);
+  }
+  return parts.filter(Boolean).join("\n");
 }

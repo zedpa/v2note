@@ -3,7 +3,7 @@
  * These run in-process (no MCP server needed).
  */
 
-import { recordRepo, transcriptRepo, summaryRepo, customSkillRepo, todoRepo } from "../db/repositories/index.js";
+import { recordRepo, transcriptRepo, summaryRepo, customSkillRepo, todoRepo, goalRepo, pendingIntentRepo, notebookRepo } from "../db/repositories/index.js";
 
 export interface BuiltinToolDef {
   name: string;
@@ -73,6 +73,59 @@ export const BUILTIN_TOOLS: BuiltinToolDef[] = [
       required: ["name", "prompt"],
     },
   },
+  {
+    name: "update_todo",
+    description: "更新待办事项的时间安排、文本或优先级。用户要求修改待办时间、重命名待办等场景使用。",
+    parameters: {
+      type: "object",
+      properties: {
+        todo_id: { type: "string", description: "待办事项 ID" },
+        text: { type: "string", description: "可选：新的待办文本" },
+        scheduled_start: { type: "string", description: "可选：开始时间（ISO字符串）" },
+        scheduled_end: { type: "string", description: "可选：结束时间（ISO字符串）" },
+        estimated_minutes: { type: "number", description: "可选：预估时长（分钟）" },
+        priority: { type: "number", description: "可选：优先级（整数，越大越高）" },
+      },
+      required: ["todo_id"],
+    },
+  },
+  {
+    name: "create_goal",
+    description: "创建一个用户确认的目标。当用户明确表示某件事是他的目标时使用。",
+    parameters: {
+      type: "object",
+      properties: {
+        title: { type: "string", description: "目标标题" },
+        parent_id: { type: "string", description: "父目标ID（可选）" },
+      },
+      required: ["title"],
+    },
+  },
+  {
+    name: "create_notebook",
+    description: "创建一个项目笔记本。用户要求记录特定项目/主题的日记时使用。",
+    parameters: {
+      type: "object",
+      properties: {
+        name: { type: "string", description: "笔记本名称（英文短横线格式，如 project-alpha）" },
+        description: { type: "string", description: "笔记本描述" },
+        color: { type: "string", description: "笔记本颜色（hex格式，如 #6366f1）" },
+      },
+      required: ["name"],
+    },
+  },
+  {
+    name: "confirm_intent",
+    description: "确认或处理一个待确认的意图。用户对之前提到的愿望/目标做出明确回应时使用。",
+    parameters: {
+      type: "object",
+      properties: {
+        intent_id: { type: "string", description: "待确认意图的ID" },
+        action: { type: "string", enum: ["promote_goal", "promote_todo", "dismiss"], description: "处理动作" },
+      },
+      required: ["intent_id", "action"],
+    },
+  },
 ];
 
 /**
@@ -99,6 +152,14 @@ export async function callBuiltinTool(
       return handleDeleteDiary(args, deviceId);
     case "create_skill":
       return handleCreateSkill(args, deviceId);
+    case "update_todo":
+      return handleUpdateTodo(args, deviceId);
+    case "create_goal":
+      return handleCreateGoal(args, deviceId);
+    case "create_notebook":
+      return handleCreateNotebook(args, deviceId);
+    case "confirm_intent":
+      return handleConfirmIntent(args, deviceId);
     default:
       return { success: false, message: `Unknown built-in tool: ${name}` };
   }
@@ -258,5 +319,146 @@ async function handleCreateSkill(
     success: true,
     message: `复盘视角「${name}」已创建`,
     data: { id: skill.id, name: skill.name },
+  };
+}
+
+async function handleUpdateTodo(
+  args: Record<string, unknown>,
+  deviceId: string,
+): Promise<ToolCallResult> {
+  const todoId = String(args.todo_id ?? "").trim();
+  if (!todoId) {
+    return { success: false, message: "todo_id 不能为空" };
+  }
+
+  const updates: Record<string, any> = {};
+  if (args.text !== undefined) updates.text = String(args.text);
+  if (args.scheduled_start !== undefined) updates.scheduled_start = args.scheduled_start ? String(args.scheduled_start) : null;
+  if (args.scheduled_end !== undefined) updates.scheduled_end = args.scheduled_end ? String(args.scheduled_end) : null;
+  if (args.estimated_minutes !== undefined) updates.estimated_minutes = Number(args.estimated_minutes);
+  if (args.priority !== undefined) updates.priority = Number(args.priority);
+
+  if (Object.keys(updates).length === 0) {
+    return { success: false, message: "没有提供需要更新的字段" };
+  }
+
+  await todoRepo.update(todoId, updates);
+  console.log(`[builtin-tool] update_todo: ${todoId} updated for device ${deviceId}`);
+
+  return {
+    success: true,
+    message: `待办已更新 (ID: ${todoId})`,
+    data: { todo_id: todoId, ...updates },
+  };
+}
+
+async function handleCreateGoal(
+  args: Record<string, unknown>,
+  deviceId: string,
+): Promise<ToolCallResult> {
+  const title = String(args.title ?? "").trim();
+  if (!title) {
+    return { success: false, message: "title 不能为空" };
+  }
+
+  const parentId = args.parent_id ? String(args.parent_id) : undefined;
+  const goal = await goalRepo.create({
+    device_id: deviceId,
+    title,
+    parent_id: parentId,
+    source: "chat",
+  });
+
+  console.log(`[builtin-tool] create_goal: "${title}" created for device ${deviceId}`);
+
+  return {
+    success: true,
+    message: `目标已创建: "${title}"`,
+    data: { goal_id: goal.id },
+  };
+}
+
+async function handleCreateNotebook(
+  args: Record<string, unknown>,
+  deviceId: string,
+): Promise<ToolCallResult> {
+  const name = String(args.name ?? "").trim();
+  if (!name) {
+    return { success: false, message: "name 不能为空" };
+  }
+
+  const description = String(args.description ?? "").trim();
+  const color = args.color ? String(args.color).trim() : undefined;
+  const notebook = await notebookRepo.findOrCreate(deviceId, name, description, false, color);
+  console.log(`[builtin-tool] create_notebook: "${name}" created for device ${deviceId}`);
+
+  return {
+    success: true,
+    message: `笔记本「${name}」已创建`,
+    data: { notebook_id: notebook.id, name: notebook.name },
+  };
+}
+
+async function handleConfirmIntent(
+  args: Record<string, unknown>,
+  deviceId: string,
+): Promise<ToolCallResult> {
+  const intentId = String(args.intent_id ?? "").trim();
+  const action = String(args.action ?? "").trim();
+
+  if (!intentId) {
+    return { success: false, message: "intent_id 不能为空" };
+  }
+  if (!["promote_goal", "promote_todo", "dismiss"].includes(action)) {
+    return { success: false, message: `无效的 action: ${action}` };
+  }
+
+  const intent = await pendingIntentRepo.findById(intentId);
+  if (!intent) {
+    return { success: false, message: `意图 ${intentId} 不存在` };
+  }
+  if (intent.device_id !== deviceId) {
+    return { success: false, message: "无权操作此意图" };
+  }
+
+  if (action === "promote_goal") {
+    const goal = await goalRepo.create({
+      device_id: deviceId,
+      title: intent.text,
+      source: "speech",
+    });
+    await pendingIntentRepo.updateStatus(intentId, "promoted", goal.id);
+    return {
+      success: true,
+      message: `已将「${intent.text}」确认为目标`,
+      data: { goal_id: goal.id },
+    };
+  }
+
+  if (action === "promote_todo") {
+    // Create a record + todo for the promoted intent
+    const record = await recordRepo.create({
+      device_id: deviceId,
+      status: "completed",
+      source: "chat_tool",
+    });
+    const todo = await todoRepo.create({
+      record_id: record.id,
+      text: intent.text,
+      done: false,
+    });
+    await pendingIntentRepo.updateStatus(intentId, "promoted", todo.id);
+    return {
+      success: true,
+      message: `已将「${intent.text}」转为待办`,
+      data: { todo_id: todo.id },
+    };
+  }
+
+  // dismiss
+  await pendingIntentRepo.updateStatus(intentId, "dismissed");
+  return {
+    success: true,
+    message: `已忽略「${intent.text}」`,
   };
 }

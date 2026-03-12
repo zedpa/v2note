@@ -19,6 +19,8 @@ import { TodayGantt } from "@/features/todos/components/today-gantt";
 import { ProfileEditor } from "@/features/profile/components/profile-editor";
 import { SettingsEditor } from "@/features/settings/components/settings-editor";
 import { SkillsPage } from "@/features/skills/components/skills-page";
+import { NotebookList } from "@/features/diary/components/notebook-list";
+import { DiaryView } from "@/features/diary/components/diary-view";
 import { MorningBriefing } from "@/features/daily/components/morning-briefing";
 import { EveningSummary } from "@/features/daily/components/evening-summary";
 import { toast } from "sonner";
@@ -37,6 +39,7 @@ type OverlayName =
   | "today-todo"
   | "profile"
   | "settings"
+  | "notebooks"
   | "morning-briefing"
   | "evening-summary"
   | null;
@@ -51,6 +54,15 @@ export default function Page() {
     end: string;
   } | null>(null);
   const [chatInitialMessage, setChatInitialMessage] = useState<string | undefined>();
+  /** null = voice notes timeline, string = diary notebook name */
+  const [activeNotebook, setActiveNotebook] = useState<string | null>(null);
+  const [activeNotebookColor, setActiveNotebookColor] = useState<string | null>(null);
+
+  const NOTEBOOK_LABEL_MAP: Record<string, string> = {
+    "ai-self": "AI 工作日志",
+    default: "日常日记",
+  };
+  const activeNotebookName = activeNotebook ? (NOTEBOOK_LABEL_MAP[activeNotebook] ?? activeNotebook) : null;
 
   useEffect(() => {
     initStatusBar();
@@ -138,10 +150,17 @@ export default function Page() {
         onAvatarClick={() => setShowSidebar(true)}
         onInsightClick={() => setActiveOverlay("review")}
         onTodosClick={() => setActiveOverlay("todos")}
+        onNotebookClick={() => setActiveOverlay("notebooks")}
+        activeNotebookName={activeNotebookName}
+        activeNotebookColor={activeNotebookColor}
       />
 
       <main className="pb-6">
-        <NotesTimeline onNoteClick={(id) => setDetailId(id)} />
+        {activeNotebook === null ? (
+          <NotesTimeline onNoteClick={(id) => setDetailId(id)} />
+        ) : (
+          <DiaryView notebook={activeNotebook} />
+        )}
       </main>
 
       <FAB
@@ -221,6 +240,16 @@ export default function Page() {
         <SettingsEditor
           onClose={closeOverlay}
           onThemeChange={setTheme}
+        />
+      )}
+      {activeOverlay === "notebooks" && (
+        <NotebookList
+          activeNotebook={activeNotebook}
+          onClose={closeOverlay}
+          onSelect={(name, color) => {
+            setActiveNotebook(name);
+            setActiveNotebookColor(name ? (color ?? null) : null);
+          }}
         />
       )}
       {activeOverlay === "morning-briefing" && (

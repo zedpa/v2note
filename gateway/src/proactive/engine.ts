@@ -15,6 +15,7 @@
 import { WebSocket } from "ws";
 import { todoRepo } from "../db/repositories/index.js";
 import * as dailyBriefingRepo from "../db/repositories/daily-briefing.js";
+import { regenerateSummary, extractToMemory } from "../diary/manager.js";
 
 interface ConnectedDevice {
   deviceId: string;
@@ -231,6 +232,15 @@ export class ProactiveEngine {
             type: "proactive.evening_summary",
             payload: { text: "今天辛苦了，看看日终总结" },
           });
+          // Regenerate diary summaries for today
+          const today = new Date().toISOString().split("T")[0];
+          regenerateSummary(device.deviceId, "default", today).catch(() => {});
+          regenerateSummary(device.deviceId, "ai-self", today).catch(() => {});
+          // Weekly deep memory extraction (every Sunday)
+          if (new Date().getDay() === 0) {
+            const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString().split("T")[0];
+            extractToMemory(device.deviceId, { start: weekAgo, end: today }).catch(() => {});
+          }
           break;
       }
     }

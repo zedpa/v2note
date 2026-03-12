@@ -14,3 +14,8 @@ export * as settingChangeRepo from "./setting-change.js";
 export * as subscriptionRepo from "./subscription.js";
 export * as customSkillRepo from "./custom-skill.js";
 export * as dailyBriefingRepo from "./daily-briefing.js";
+export * as goalRepo from "./goal.js";
+export * as pendingIntentRepo from "./pending-intent.js";
+export * as userProfileRepo from "./user-profile.js";
+export * as aiDiaryRepo from "./ai-diary.js";
+export * as notebookRepo from "./notebook.js";

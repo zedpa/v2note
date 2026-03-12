@@ -1,12 +1,15 @@
 "use client";
 
-import { Search, User, Sparkles, ListChecks } from "lucide-react";
+import { Search, User, Sparkles, ListChecks, BookOpen } from "lucide-react";
 
 interface NewHeaderProps {
   onSearchClick: () => void;
   onAvatarClick: () => void;
   onInsightClick: () => void;
   onTodosClick: () => void;
+  onNotebookClick?: () => void;
+  activeNotebookName?: string | null;
+  activeNotebookColor?: string | null;
 }
 
 export function NewHeader({
@@ -14,11 +17,14 @@ export function NewHeader({
   onAvatarClick,
   onInsightClick,
   onTodosClick,
+  onNotebookClick,
+  activeNotebookName,
+  activeNotebookColor,
 }: NewHeaderProps) {
   return (
     <header className="sticky top-0 z-30 bg-background/80 backdrop-blur-xl pt-safe">
       <div className="flex items-center justify-between px-4 pt-1 pb-3">
-        {/* Left side — avatar + insight */}
+        {/* Left side — avatar + insight + notebook */}
         <div className="flex items-center gap-2">
           <button
             type="button"
@@ -37,6 +43,31 @@ export function NewHeader({
             <Sparkles className="w-3.5 h-3.5 text-muted-foreground" />
             <span className="text-xs font-medium text-muted-foreground">洞察</span>
           </button>
+
+          {onNotebookClick && (
+            <button
+              type="button"
+              onClick={onNotebookClick}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-secondary/60 hover:bg-secondary transition-colors"
+            >
+              {activeNotebookName ? (
+                <>
+                  <span
+                    className="w-2.5 h-2.5 rounded-full shrink-0"
+                    style={{ backgroundColor: activeNotebookColor || "#6366f1" }}
+                  />
+                  <span className="text-xs font-medium text-foreground max-w-[5rem] truncate">
+                    {activeNotebookName}
+                  </span>
+                </>
+              ) : (
+                <>
+                  <BookOpen className="w-3.5 h-3.5 text-muted-foreground" />
+                  <span className="text-xs font-medium text-muted-foreground">笔记本</span>
+                </>
+              )}
+            </button>
+          )}
         </div>
 
         {/* Right side — search + todo */}

@@ -4,11 +4,14 @@ import { buildSystemPrompt } from "../skills/prompt-builder.js";
 import { chatCompletion, chatCompletionStream } from "../ai/provider.js";
 import { MemoryManager } from "../memory/manager.js";
 import { updateSoul } from "../soul/manager.js";
+import { updateProfile } from "../profile/manager.js";
+import { appendToDiary } from "../diary/manager.js";
 import { getSession } from "../session/manager.js";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { recordRepo } from "../db/repositories/index.js";
 import { transcriptRepo } from "../db/repositories/index.js";
+import { pendingIntentRepo } from "../db/repositories/index.js";
 import { isBuiltinTool, callBuiltinTool } from "../tools/builtin.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -98,11 +101,28 @@ export async function startChat(
     activeSkills = [];
   }
 
+  // Load pending intents for natural follow-up in conversation
+  let pendingIntentContext = "";
+  try {
+    const pendingIntents = await pendingIntentRepo.findPendingByDevice(payload.deviceId);
+    if (pendingIntents.length > 0) {
+      const lines = pendingIntents.slice(0, 5).map((pi) => {
+        const date = new Date(pi.created_at).toLocaleDateString("zh-CN");
+        return `- [${pi.intent_type}] "${pi.text}"${pi.context ? ` (${pi.context})` : ""} (${date}, id: ${pi.id})`;
+      });
+      pendingIntentContext = `\n## 待确认意图\n以下是用户近期提到但未确认的愿望/目标，在对话中自然地跟进（不要一开口就问，找合适时机）：\n${lines.join("\n")}\n不要逐条审问用户，自然聊天中确认即可。确认后使用 confirm_intent 工具处理。`;
+    }
+  } catch (err: any) {
+    console.warn(`[chat] Failed to load pending intents: ${err.message}`);
+  }
+
   const systemPrompt = buildSystemPrompt({
     skills: activeSkills,
     soul: soul?.content,
+    userProfile: loaded.userProfile,
     memory: memories,
     mode: "chat",
+    pendingIntentContext,
   });
 
   // Set up session context
@@ -269,8 +289,11 @@ export async function endChat(deviceId: string): Promise<void> {
       .map((m) => `${m.role}: ${m.content.slice(0, 200)}`)
       .join("\n");
 
-    // Update soul with conversation insights
+    // Update soul and profile with conversation insights
     updateSoul(deviceId, `[复盘对话] ${summary}`).catch(() => {});
+    updateProfile(deviceId, `[复盘对话] ${summary}`).catch(() => {});
+    // Append conversation summary to AI self-diary
+    appendToDiary(deviceId, "ai-self", `[对话摘要] ${summary.slice(0, 500)}`).catch(() => {});
   }
 
   session.mode = "idle";

@@ -13,7 +13,14 @@ export async function createTodo(fields: {
 
 export async function updateTodo(
   id: string,
-  fields: { text?: string; done?: boolean },
+  fields: {
+    text?: string;
+    done?: boolean;
+    scheduled_start?: string | null;
+    scheduled_end?: string | null;
+    estimated_minutes?: number | null;
+    priority?: number;
+  },
 ): Promise<void> {
   await api.patch(`/api/v1/todos/${id}`, fields);
 }

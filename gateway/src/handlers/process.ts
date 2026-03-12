@@ -3,6 +3,8 @@ import { buildSystemPrompt } from "../skills/prompt-builder.js";
 import { chatCompletion, type ChatMessage } from "../ai/provider.js";
 import { MemoryManager } from "../memory/manager.js";
 import { updateSoul } from "../soul/manager.js";
+import { updateProfile } from "../profile/manager.js";
+import { appendToDiary } from "../diary/manager.js";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { skillConfigRepo } from "../db/repositories/index.js";
@@ -12,6 +14,9 @@ import { settingChangeRepo } from "../db/repositories/index.js";
 import { tagRepo } from "../db/repositories/index.js";
 import { recordRepo } from "../db/repositories/index.js";
 import { summaryRepo } from "../db/repositories/index.js";
+import { goalRepo } from "../db/repositories/index.js";
+import { pendingIntentRepo } from "../db/repositories/index.js";
+import { extractKeywords } from "../lib/text-utils.js";
 import { getMCPRegistry } from "../mcp/registry.js";
 import { isBuiltinTool, callBuiltinTool } from "../tools/builtin.js";
 import { estimateBatchTodos } from "../proactive/time-estimator.js";
@@ -42,8 +47,16 @@ export interface RelayExtract {
   direction?: "outgoing" | "incoming";
 }
 
+export interface IntentSignal {
+  type: "task" | "wish" | "goal" | "complaint" | "reflection";
+  text: string;
+  context?: string;
+}
+
 export interface ProcessResult {
   todos: string[];
+  intents: IntentSignal[];
+  pending_followups: number;
   customer_requests: string[];
   setting_changes: string[];
   tags: string[];
@@ -58,6 +71,8 @@ export interface ProcessResult {
 export async function processEntry(payload: ProcessPayload): Promise<ProcessResult> {
   const result: ProcessResult = {
     todos: [],
+    intents: [],
+    pending_followups: 0,
     customer_requests: [],
     setting_changes: [],
     tags: [],
@@ -198,7 +213,20 @@ export async function processEntry(payload: ProcessPayload): Promise<ProcessResu
     } else {
       try {
         const parsed = JSON.parse(response.content);
-        result.todos = Array.isArray(parsed.todos) ? parsed.todos : [];
+
+        // New format: intents array (from intent-classify skill)
+        if (Array.isArray(parsed.intents)) {
+          result.intents = parsed.intents;
+          // task type → backward-compatible todos
+          result.todos = parsed.intents
+            .filter((i: any) => i.type === "task")
+            .map((i: any) => i.text);
+        } else {
+          // Old format fallback (from todo-extract)
+          result.todos = Array.isArray(parsed.todos) ? parsed.todos : [];
+          result.intents = result.todos.map((t) => ({ type: "task" as const, text: t }));
+        }
+
         result.customer_requests = Array.isArray(parsed.customer_requests)
           ? parsed.customer_requests
           : [];
@@ -215,7 +243,7 @@ export async function processEntry(payload: ProcessPayload): Promise<ProcessResu
           result.tags = result.tags.filter((t: string) => existingSet.has(t));
         }
 
-        console.log(`[process] Parsed: ${result.todos.length} todos, ${result.customer_requests.length} requests, ${result.relays.length} relays, ${result.tags.length} tags, summary: ${result.summary ? 'yes' : 'no'}`);
+        console.log(`[process] Parsed: ${result.todos.length} todos, ${result.intents.length} intents, ${result.customer_requests.length} requests, ${result.relays.length} relays, ${result.tags.length} tags, summary: ${result.summary ? 'yes' : 'no'}`);
       } catch {
         console.error("[process] Failed to parse AI response as JSON:", response.content.slice(0, 500));
         result.error = "AI response is not valid JSON";
@@ -261,6 +289,59 @@ export async function processEntry(payload: ProcessPayload): Promise<ProcessResu
           });
         }
         console.log(`[process] Created ${result.relays.length} relay todos`);
+      }
+
+      // Route non-task intents to pending_intent table
+      const nonTaskIntents = result.intents.filter((i) => i.type !== "task");
+      for (const intent of nonTaskIntents) {
+        if (intent.type === "wish" || intent.type === "goal") {
+          await pendingIntentRepo.create({
+            device_id: payload.deviceId,
+            record_id: payload.recordId,
+            intent_type: intent.type,
+            text: intent.text,
+            context: intent.context,
+          });
+        }
+        // complaint → handled by updateSoul (soul system naturally absorbs)
+        // reflection → handled by maybeCreateMemory
+      }
+      result.pending_followups = nonTaskIntents.filter(
+        (i) => i.type === "wish" || i.type === "goal",
+      ).length;
+      if (result.pending_followups > 0) {
+        console.log(`[process] Created ${result.pending_followups} pending intents`);
+      }
+
+      // Auto-link new todos to active goals by keyword matching
+      if (result.todos.length > 0) {
+        try {
+          const activeGoals = await goalRepo.findActiveByDevice(payload.deviceId);
+          if (activeGoals.length > 0) {
+            const recentTodos = await todoRepo.findByRecordId(payload.recordId);
+            for (const todo of recentTodos) {
+              const todoKeywords = extractKeywords(todo.text);
+              let bestGoal: { id: string; score: number } | null = null;
+              for (const goal of activeGoals) {
+                const goalKeywords = extractKeywords(goal.title);
+                let overlap = 0;
+                for (const kw of todoKeywords) {
+                  if (goalKeywords.has(kw)) overlap++;
+                }
+                const score = goalKeywords.size > 0 ? overlap / goalKeywords.size : 0;
+                if (score > 0.3 && (!bestGoal || score > bestGoal.score)) {
+                  bestGoal = { id: goal.id, score };
+                }
+              }
+              if (bestGoal) {
+                await todoRepo.update(todo.id, { goal_id: bestGoal.id } as any);
+                console.log(`[process] Linked todo "${todo.text}" to goal ${bestGoal.id} (score: ${bestGoal.score.toFixed(2)})`);
+              }
+            }
+          }
+        } catch (err: any) {
+          console.warn(`[process] Goal linking failed: ${err.message}`);
+        }
       }
 
       if (result.setting_changes.length > 0) {
@@ -313,12 +394,21 @@ export async function processEntry(payload: ProcessPayload): Promise<ProcessResu
       const pendingTodos = await todoRepo.findPendingByDevice(payload.deviceId);
       const newTodos = pendingTodos.slice(-result.todos.length); // latest N todos
       if (newTodos.length > 0) {
-        // Use already-loaded relevant memories (includes goals from loader)
-        const goalMemories = memories.length > 0
-          ? memories.filter((m) => m.includes("[目标]")).concat(
-              memories.filter((m) => !m.includes("[目标]")).slice(0, 5),
-            )
-          : [];
+        // Prefer goal table data over [目标] memory hack
+        let goalMemories: string[] = [];
+        try {
+          const activeGoals = await goalRepo.findActiveByDevice(payload.deviceId);
+          if (activeGoals.length > 0) {
+            goalMemories = activeGoals.map((g) => `[目标] ${g.title}`);
+          } else {
+            goalMemories = memories.filter((m) => m.includes("[目标]"));
+          }
+          goalMemories = goalMemories.concat(
+            memories.filter((m) => !m.includes("[目标]")).slice(0, 5),
+          );
+        } catch {
+          goalMemories = memories.slice(0, 10);
+        }
 
         estimateBatchTodos(
           newTodos.map((t) => ({ id: t.id, text: t.text })),
@@ -343,13 +433,23 @@ export async function processEntry(payload: ProcessPayload): Promise<ProcessResu
       }
     }
 
-    // 11. Background: maybe create long-term memory & update soul
+    // 11. Background: maybe create long-term memory, update soul & profile
     const today = new Date().toISOString().split("T")[0];
     memoryManager.maybeCreateMemory(payload.deviceId, payload.text, today).catch((e) => {
       console.warn("[process] Memory creation failed:", e.message);
     });
     updateSoul(payload.deviceId, payload.text).catch((e) => {
       console.warn("[process] Soul update failed:", e.message);
+    });
+    updateProfile(payload.deviceId, payload.text).catch((e) => {
+      console.warn("[process] Profile update failed:", e.message);
+    });
+    // Append to daily diary
+    const diaryLine = result.summary
+      ? `[${new Date().toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })}] ${result.summary}`
+      : `[${new Date().toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })}] ${payload.text.slice(0, 200)}`;
+    appendToDiary(payload.deviceId, "default", diaryLine).catch((e) => {
+      console.warn("[process] Diary append failed:", e.message);
     });
   } catch (err: any) {
     console.error(`[process] Fatal error processing record ${payload.recordId}:`, err);

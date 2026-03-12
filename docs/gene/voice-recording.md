@@ -4,8 +4,8 @@
 
 ### 录音阶段（三阶段设计）
 - **pressing 阶段**（按下即刻）：立即启动麦克风（pre-capture），PCM 数据缓存到 `preBufferRef`。如果是 tap 则取消麦克风并丢弃缓冲。消除 300ms 长按检测延迟导致的开头语音丢失
-- **recording 阶段**（300ms 长按触发）：连接 ASR，flush 缓冲区到 gateway，切换到实时流模式。FAB 周围显示红色脉冲圆环 + 迷你波形 + 计时；支持三向拖拽手势（左取消 / 上指令 / 右常驻）。setPointerCapture 延迟到此阶段才调用；onClick 作为主 tap 处理器，用同步 ref（longPressTriggeredRef）判断是否进入录音
-- **locked 阶段**（右滑锁定）：进入全屏常驻录音界面（RecordingImmersive），中间方块按钮负责暂停/继续
+- **recording 阶段**（300ms 长按触发）：连接 ASR，flush 缓冲区到 gateway，切换到实时流模式。进入全屏暗色剧场模式——32根大波形随方向变色、边缘56x56方向图标（X取消/Command指令/Lock常驻）选中1.3x放大+彩色发光、方向感知 radial gradient 光晕、text-5xl 计时器+红色呼吸灯、FAB 弹性跟随手指。详见 [recording-immersive.md](./recording-immersive.md)
+- **locked 阶段**（右滑锁定）：进入全屏常驻录音界面（RecordingImmersive），text-7xl超大计时器、大波形容器、三按钮横排（取消/暂停/完成）
 
 ### 详细功能
 - 功能1：FAB 按钮手势控制（长按开始录音，松开立即发送，左滑/左上取消，右滑/右上锁定，正上滑松手转语音指令）

@@ -1,7 +1,7 @@
-﻿"use client";
+"use client";
 
 import { useState, useRef, useCallback, useEffect, useMemo } from "react";
-import { Mic, ArrowUp, ArrowLeft, ArrowRight } from "lucide-react";
+import { Mic, X, Command, Lock, Send } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { usePCMRecorder } from "@/features/recording/hooks/use-pcm-recorder";
 import { useFabGestures } from "@/features/recording/hooks/use-fab-gestures";
@@ -38,7 +38,7 @@ export function FAB({
 }: FABProps) {
   const [showTextSheet, setShowTextSheet] = useState(false);
   const [displayDuration, setDisplayDuration] = useState(0);
-  const [waveHeights, setWaveHeights] = useState<number[]>(Array(24).fill(12));
+  const [waveHeights, setWaveHeights] = useState<number[]>(Array(32).fill(8));
   const [confirmedText, setConfirmedText] = useState("");
   const [partialText, setPartialText] = useState("");
   const [lockedPaused, setLockedPaused] = useState(false);
@@ -51,7 +51,6 @@ export function FAB({
   const pausedRef = useRef(false);
   const commandReleaseRef = useRef(false);
 
-  // Pre-capture: start mic on press, buffer PCM until ASR is ready
   const preBufferRef = useRef<ArrayBuffer[]>([]);
   const streamingRef = useRef(false);
   const preCaptureAbortRef = useRef(false);
@@ -69,14 +68,14 @@ export function FAB({
     waveRef.current = setInterval(() => {
       const vol = pausedRef.current ? 0 : volumeRef.current;
       setWaveHeights(
-        Array(24)
+        Array(32)
           .fill(0)
           .map(() => {
             const noise = Math.random() * 0.5 + 0.5;
-            return Math.max(5, vol * 46 * noise + 7);
+            return Math.max(4, vol * 60 * noise + 6);
           }),
       );
-    }, 100);
+    }, 80);
   }, []);
 
   const stopTimers = useCallback(() => {
@@ -85,7 +84,7 @@ export function FAB({
     timerRef.current = null;
     waveRef.current = null;
     volumeRef.current = 0;
-    setWaveHeights(Array(24).fill(12));
+    setWaveHeights(Array(32).fill(8));
   }, []);
 
   useEffect(() => {
@@ -115,7 +114,6 @@ export function FAB({
 
           if (msg.payload.recordId) {
             emit("recording:uploaded");
-            // Don't emit recording:processed here — wait for process.result
           }
           break;
         }
@@ -144,9 +142,7 @@ export function FAB({
 
   const asrModeRef = useRef<"realtime" | "upload">("realtime");
 
-  /** Start mic immediately on press — buffer PCM until ASR is ready */
   const startPreCapture = useCallback(async () => {
-    console.log("[FAB] Starting pre-capture...");
     preBufferRef.current = [];
     streamingRef.current = false;
     preCaptureAbortRef.current = false;
@@ -158,13 +154,8 @@ export function FAB({
           if (pausedRef.current) return;
 
           if (!streamingRef.current) {
-            // Pre-buffer phase: store a copy
-            if (preBufferRef.current.length < 5) {
-                console.log(`[FAB] Buffering chunk, size: ${chunk.byteLength}, total buffered: ${preBufferRef.current.length + 1}`);
-            }
             preBufferRef.current.push(chunk.slice(0));
           } else {
-            // Streaming phase: send to gateway
             gwClientRef.current?.sendBinary(chunk);
             const view = new Int16Array(chunk);
             let sum = 0;
@@ -182,19 +173,16 @@ export function FAB({
         },
       });
 
-      // If aborted while awaiting mic permission, clean up
       if (preCaptureAbortRef.current) {
-        console.log("[FAB] Pre-capture aborted after init, cleaning up");
         recorder.cancelRecording();
         preBufferRef.current = [];
       }
     } catch {
-      // Mic permission denied or other error — startRecording will retry
+      // Mic permission denied
     }
   }, [recorder]);
 
   const stopPreCapture = useCallback(() => {
-    console.log(`[FAB] Stopping pre-capture (Quick Release), discarding ${preBufferRef.current.length} chunks`);
     preCaptureAbortRef.current = true;
     if (recorder.isActive.current) {
       recorder.cancelRecording();
@@ -204,10 +192,8 @@ export function FAB({
     gwClientRef.current = null;
   }, [recorder]);
 
-  /** Connect ASR, flush pre-buffer, switch to live streaming */
   const startRecording = useCallback(async () => {
     try {
-      console.log(`[FAB] Long press confirmed. Flushing pre-buffer to gateway: ${preBufferRef.current.length} chunks`);
       pausedRef.current = false;
       setLockedPaused(false);
       commandReleaseRef.current = false;
@@ -230,14 +216,12 @@ export function FAB({
 
       client.send({ type: "asr.start", payload: { deviceId, mode: asrMode } });
 
-      // Flush pre-buffered audio (captured during pressing phase)
       for (const chunk of preBufferRef.current) {
         client.sendBinary(chunk);
       }
       preBufferRef.current = [];
       streamingRef.current = true;
 
-      // If pre-capture didn't start the mic (e.g. permission delay), start now
       if (!recorder.isActive.current) {
         await recorder.startRecording({
           onPCMData: (chunk) => {
@@ -339,12 +323,10 @@ export function FAB({
 
   const gestures = useFabGestures({
     onTap: () => {
-      // Cancel pre-capture mic on tap
       stopPreCapture();
     },
     onLongPressStart: () => {
       longPressTriggeredRef.current = true;
-      // Capture pointer only when entering recording (drag gestures need it)
       if (fabRef.current && pointerIdRef.current !== null) {
         try { fabRef.current.setPointerCapture(pointerIdRef.current); } catch {}
       }
@@ -358,7 +340,7 @@ export function FAB({
     onRelease: () => finishRecording(false),
   });
 
-  const { phase, swipeDirection, swipeProgress, reset, handlers } = gestures;
+  const { phase, swipeDirection, swipeProgress, deltaX, deltaY, reset, handlers } = gestures;
   resetRef.current = reset;
 
   const toggleLockedPause = useCallback(() => {
@@ -372,8 +354,6 @@ export function FAB({
     });
   }, []);
 
-  // Clean up pre-capture if phase returns to idle without explicit tap
-  // (e.g. pointerCancel during pressing phase)
   useEffect(() => {
     if (phase === "idle" && !streamingRef.current && recorder.isActive.current) {
       stopPreCapture();
@@ -387,12 +367,13 @@ export function FAB({
     };
   }, []);
 
-  const dragHint = useMemo(() => {
-    if (swipeDirection === "right") return "松手进入常驻录音";
-    if (swipeDirection === "up") return "松手发送语音指令";
-    if (swipeDirection === "left") return "松手取消录音";
-    return "松开发送";
-  }, [swipeDirection]);
+  // ─── Swipe-aware visual state ───
+  const activeDirection = swipeDirection;
+  const progress = swipeProgress;
+
+  // FAB follows finger with elastic damping
+  const fabOffsetX = phase === "recording" ? deltaX * 0.35 : 0;
+  const fabOffsetY = phase === "recording" ? Math.min(0, -deltaY * 0.35) : 0;
 
   if (phase === "locked") {
     return (
@@ -417,75 +398,203 @@ export function FAB({
 
   return (
     <>
+      {/* ─── RECORDING: Full-screen immersive backdrop ─── */}
       {phase === "recording" && (
-        <div className="fixed inset-0 z-30 pointer-events-none">
-          <div className="absolute bottom-[144px] left-0 right-0 flex flex-col items-center gap-2">
-            <div className="rounded-2xl border border-white/20 bg-black/35 backdrop-blur-md px-4 py-2.5 shadow-xl">
-              <div className="flex items-center justify-center gap-[3px] h-8">
-                {waveHeights.slice(0, 18).map((h, i) => (
+        <div className="fixed inset-0 z-30 pointer-events-none select-none">
+          {/* Dark theater backdrop */}
+          <div
+            className="absolute inset-0 transition-opacity duration-300"
+            style={{
+              background: "radial-gradient(ellipse 120% 100% at 50% 100%, rgba(0,0,0,0.88) 0%, rgba(0,0,0,0.95) 100%)",
+            }}
+          />
+
+          {/* Colored glow based on swipe direction */}
+          <div
+            className="absolute inset-0 transition-all duration-200"
+            style={{
+              background:
+                activeDirection === "left"
+                  ? `radial-gradient(circle at ${30 - progress * 15}% 75%, rgba(239,68,68,${0.15 + progress * 0.2}) 0%, transparent 55%)`
+                  : activeDirection === "up"
+                    ? `radial-gradient(circle at 50% ${45 - progress * 20}%, rgba(245,158,11,${0.15 + progress * 0.2}) 0%, transparent 55%)`
+                    : activeDirection === "right"
+                      ? `radial-gradient(circle at ${70 + progress * 15}% 75%, rgba(16,185,129,${0.15 + progress * 0.2}) 0%, transparent 55%)`
+                      : "radial-gradient(circle at 50% 85%, rgba(249,115,22,0.12) 0%, transparent 50%)",
+            }}
+          />
+
+          {/* ─── TOP: Timer + status ─── */}
+          <div className="absolute top-0 left-0 right-0 pt-safe flex flex-col items-center pt-16">
+            <div className="flex items-center gap-2.5 mb-3">
+              <div className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse shadow-[0_0_8px_rgba(239,68,68,0.6)]" />
+              <span className="text-[13px] tracking-[0.2em] text-white/50 uppercase font-medium">录音中</span>
+            </div>
+            <p className="text-5xl font-mono font-extralight text-white/90 tabular-nums tracking-[0.15em]">
+              {formatDuration(displayDuration)}
+            </p>
+          </div>
+
+          {/* ─── CENTER: Large waveform ─── */}
+          <div className="absolute left-6 right-6 top-1/2 -translate-y-1/2 flex items-center justify-center">
+            <div className="flex items-center justify-center gap-[4px] h-28 w-full max-w-sm">
+              {waveHeights.map((h, i) => {
+                const centerDist = Math.abs(i - 15.5) / 15.5;
+                const falloff = 1 - centerDist * 0.4;
+                const finalH = Math.max(4, h * falloff * 1.8);
+                return (
                   <div
                     key={i}
-                    className="rounded-full bg-primary transition-all duration-100"
+                    className="rounded-full transition-all duration-[80ms]"
                     style={{
-                      width: "3px",
-                      height: `${Math.max(4, h * 0.45)}px`,
-                      opacity: 0.35 + (h / 54) * 0.65,
+                      width: "4px",
+                      height: `${finalH}px`,
+                      backgroundColor:
+                        activeDirection === "left"
+                          ? `rgba(239,68,68,${0.4 + (finalH / 100) * 0.6})`
+                          : activeDirection === "up"
+                            ? `rgba(245,158,11,${0.4 + (finalH / 100) * 0.6})`
+                            : activeDirection === "right"
+                              ? `rgba(16,185,129,${0.4 + (finalH / 100) * 0.6})`
+                              : `rgba(249,115,22,${0.35 + (finalH / 100) * 0.65})`,
                     }}
                   />
-                ))}
-              </div>
+                );
+              })}
             </div>
-            <span className="text-sm tabular-nums text-foreground/75">{formatDuration(displayDuration)}</span>
           </div>
 
-          <div className="absolute top-[112px] left-0 right-0 flex justify-center">
-            <span className="px-4 py-1.5 rounded-full border border-white/15 bg-black/40 backdrop-blur-sm text-white/90 text-sm shadow-lg">
-              {dragHint}
-            </span>
+          {/* ─── Real-time transcript ─── */}
+          {(confirmedText || partialText) && (
+            <div className="absolute left-8 right-8 top-[58%] flex justify-center">
+              <p className="text-center text-base leading-relaxed max-w-xs">
+                <span className="text-white/80">{confirmedText}</span>
+                <span className="text-white/35">{partialText}</span>
+              </p>
+            </div>
+          )}
+
+          {/* ─── SWIPE ZONES: Large directional labels ─── */}
+          {/* LEFT — Cancel */}
+          <div
+            className="absolute left-0 top-1/2 -translate-y-1/2 flex items-center transition-all duration-200"
+            style={{
+              opacity: activeDirection === "left" ? 0.7 + progress * 0.3 : activeDirection === "none" ? 0.35 : 0.1,
+              transform: `translateY(-50%) translateX(${activeDirection === "left" ? 8 + progress * 12 : 8}px) scale(${activeDirection === "left" ? 1 + progress * 0.3 : 1})`,
+            }}
+          >
+            <div className={cn(
+              "flex flex-col items-center gap-2 transition-all duration-200",
+            )}>
+              <div className={cn(
+                "w-14 h-14 rounded-2xl flex items-center justify-center transition-all duration-200",
+                activeDirection === "left"
+                  ? "bg-red-500/30 shadow-[0_0_30px_rgba(239,68,68,0.3)]"
+                  : "bg-white/8",
+              )}>
+                <X className={cn(
+                  "transition-all duration-200",
+                  activeDirection === "left" ? "w-7 h-7 text-red-400" : "w-5 h-5 text-white/40",
+                )} />
+              </div>
+              <span className={cn(
+                "font-semibold tracking-wider transition-all duration-200",
+                activeDirection === "left"
+                  ? "text-base text-red-400"
+                  : "text-xs text-white/30",
+              )}>
+                取消
+              </span>
+            </div>
           </div>
 
-          <div className="absolute bottom-[132px] left-1/2 -translate-x-1/2 flex items-center gap-2">
-            <span
-              className={cn(
-                "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium border transition-all",
-                swipeDirection === "left"
-                  ? "bg-red-500/85 text-white border-red-300/80 scale-105"
-                  : "bg-black/35 text-white/70 border-white/15",
-              )}
-            >
-              <ArrowLeft className="w-3 h-3" />
-              取消
-            </span>
-            <span
-              className={cn(
-                "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium border transition-all",
-                swipeDirection === "up"
-                  ? "bg-amber-500/85 text-black border-amber-200 scale-105"
-                  : "bg-black/35 text-white/70 border-white/15",
-              )}
-            >
-              <ArrowUp className="w-3 h-3" />
-              指令
-            </span>
-            <span
-              className={cn(
-                "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium border transition-all",
-                swipeDirection === "right"
-                  ? "bg-emerald-500/85 text-white border-emerald-200/80 scale-105"
-                  : "bg-black/35 text-white/70 border-white/15",
-              )}
-            >
-              常驻
-              <ArrowRight className="w-3 h-3" />
-            </span>
+          {/* RIGHT — Lock */}
+          <div
+            className="absolute right-0 top-1/2 -translate-y-1/2 flex items-center transition-all duration-200"
+            style={{
+              opacity: activeDirection === "right" ? 0.7 + progress * 0.3 : activeDirection === "none" ? 0.35 : 0.1,
+              transform: `translateY(-50%) translateX(${activeDirection === "right" ? -8 - progress * 12 : -8}px) scale(${activeDirection === "right" ? 1 + progress * 0.3 : 1})`,
+            }}
+          >
+            <div className="flex flex-col items-center gap-2">
+              <div className={cn(
+                "w-14 h-14 rounded-2xl flex items-center justify-center transition-all duration-200",
+                activeDirection === "right"
+                  ? "bg-emerald-500/30 shadow-[0_0_30px_rgba(16,185,129,0.3)]"
+                  : "bg-white/8",
+              )}>
+                <Lock className={cn(
+                  "transition-all duration-200",
+                  activeDirection === "right" ? "w-7 h-7 text-emerald-400" : "w-5 h-5 text-white/40",
+                )} />
+              </div>
+              <span className={cn(
+                "font-semibold tracking-wider transition-all duration-200",
+                activeDirection === "right"
+                  ? "text-base text-emerald-400"
+                  : "text-xs text-white/30",
+              )}>
+                常驻
+              </span>
+            </div>
+          </div>
+
+          {/* UP — Command */}
+          <div
+            className="absolute top-[28%] left-1/2 -translate-x-1/2 flex items-center transition-all duration-200"
+            style={{
+              opacity: activeDirection === "up" ? 0.7 + progress * 0.3 : activeDirection === "none" ? 0.35 : 0.1,
+              transform: `translateX(-50%) translateY(${activeDirection === "up" ? -progress * 16 : 0}px) scale(${activeDirection === "up" ? 1 + progress * 0.3 : 1})`,
+            }}
+          >
+            <div className="flex flex-col items-center gap-2">
+              <div className={cn(
+                "w-14 h-14 rounded-2xl flex items-center justify-center transition-all duration-200",
+                activeDirection === "up"
+                  ? "bg-amber-500/30 shadow-[0_0_30px_rgba(245,158,11,0.3)]"
+                  : "bg-white/8",
+              )}>
+                <Command className={cn(
+                  "transition-all duration-200",
+                  activeDirection === "up" ? "w-7 h-7 text-amber-400" : "w-5 h-5 text-white/40",
+                )} />
+              </div>
+              <span className={cn(
+                "font-semibold tracking-wider transition-all duration-200",
+                activeDirection === "up"
+                  ? "text-base text-amber-400"
+                  : "text-xs text-white/30",
+              )}>
+                指令
+              </span>
+            </div>
+          </div>
+
+          {/* BOTTOM CENTER — Release to send hint */}
+          <div
+            className="absolute bottom-[160px] left-1/2 -translate-x-1/2 transition-all duration-200"
+            style={{
+              opacity: activeDirection === "none" ? 0.8 : 0.2,
+              transform: `translateX(-50%) scale(${activeDirection === "none" ? 1 : 0.85})`,
+            }}
+          >
+            <div className="flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-white/10 backdrop-blur-sm border border-white/10">
+              <Send className="w-4 h-4 text-white/50" />
+              <span className="text-sm text-white/70 font-medium">松开发送</span>
+            </div>
           </div>
         </div>
       )}
 
+      {/* ─── FAB Button ─── */}
       <div
         className="fixed bottom-[54px] left-1/2 z-40"
-        style={{ transform: "translateX(-50%)" }}
+        style={{
+          transform: `translateX(-50%) translateX(${fabOffsetX}px) translateY(${fabOffsetY}px)`,
+          transition: phase === "recording" ? "none" : "transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)",
+        }}
       >
+        {/* Pressing ripples */}
         {phase === "pressing" && (
           <>
             <div className="absolute inset-0 rounded-full bg-primary/20 animate-fab-ripple" />
@@ -496,8 +605,12 @@ export function FAB({
           </>
         )}
 
+        {/* Recording ring — larger, more dramatic */}
         {phase === "recording" && (
-          <div className="absolute -inset-1 rounded-full border-2 border-destructive/50 animate-pulse pointer-events-none" />
+          <>
+            <div className="absolute -inset-3 rounded-full border-2 border-primary/40 animate-pulse pointer-events-none" />
+            <div className="absolute -inset-6 rounded-full border border-primary/15 animate-pulse pointer-events-none" style={{ animationDelay: "0.5s" }} />
+          </>
         )}
 
         <button
@@ -507,23 +620,26 @@ export function FAB({
           onPointerDown={(e) => {
             longPressTriggeredRef.current = false;
             pointerIdRef.current = e.pointerId;
-            startPreCapture(); // Start mic immediately — buffer until ASR ready
+            startPreCapture();
             handlers.onPointerDown(e);
           }}
           onClick={() => {
-            // Primary tap handler — reliable on mobile (no setPointerCapture interference)
             if (!longPressTriggeredRef.current) {
               setShowTextSheet(true);
             }
           }}
           className={cn(
-            "relative flex items-center justify-center w-16 h-16 rounded-full select-none touch-none transition-transform duration-200",
+            "relative flex items-center justify-center rounded-full select-none touch-none transition-all duration-200",
             "bg-primary text-primary-foreground shadow-lg shadow-primary/30",
-            phase === "pressing" && "scale-110",
-            phase === "idle" && "animate-fab-breathe",
+            phase === "idle" && "w-16 h-16 animate-fab-breathe",
+            phase === "pressing" && "w-[72px] h-[72px] scale-105",
+            phase === "recording" && "w-16 h-16",
           )}
         >
-          <Mic className="w-8 h-8" />
+          <Mic className={cn(
+            "transition-all duration-200",
+            phase === "recording" ? "w-7 h-7" : "w-8 h-8",
+          )} />
         </button>
       </div>
 

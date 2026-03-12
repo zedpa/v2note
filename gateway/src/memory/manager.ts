@@ -57,6 +57,7 @@ export class MemoryManager {
     },
   ): Promise<{
     soul?: string;
+    userProfile?: string;
     memories: string[];
     rawMemories: MemoryEntry[];
   }> {

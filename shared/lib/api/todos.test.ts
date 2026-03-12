@@ -1,0 +1,84 @@
+import { describe, it, expect, vi, beforeEach } from "vitest";
+
+// Mock the api module
+vi.mock("../api", () => ({
+  api: {
+    get: vi.fn(),
+    post: vi.fn(),
+    patch: vi.fn(),
+    delete: vi.fn(),
+  },
+}));
+
+import { updateTodo, listTodos, createTodo, deleteTodo } from "./todos";
+import { api } from "../api";
+
+describe("todos API", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  describe("updateTodo", () => {
+    it("sends PATCH with scheduling fields", async () => {
+      vi.mocked(api.patch).mockResolvedValue(undefined);
+
+      await updateTodo("todo-1", {
+        scheduled_start: "2026-03-15T10:00:00",
+        scheduled_end: "2026-03-15T11:00:00",
+        estimated_minutes: 60,
+        priority: 5,
+      });
+
+      expect(api.patch).toHaveBeenCalledWith("/api/v1/todos/todo-1", {
+        scheduled_start: "2026-03-15T10:00:00",
+        scheduled_end: "2026-03-15T11:00:00",
+        estimated_minutes: 60,
+        priority: 5,
+      });
+    });
+
+    it("sends PATCH with text and done", async () => {
+      vi.mocked(api.patch).mockResolvedValue(undefined);
+
+      await updateTodo("todo-1", { text: "New text", done: true });
+
+      expect(api.patch).toHaveBeenCalledWith("/api/v1/todos/todo-1", {
+        text: "New text",
+        done: true,
+      });
+    });
+
+    it("sends PATCH to clear scheduling (null values)", async () => {
+      vi.mocked(api.patch).mockResolvedValue(undefined);
+
+      await updateTodo("todo-1", {
+        scheduled_start: null,
+        scheduled_end: null,
+        estimated_minutes: null,
+      });
+
+      expect(api.patch).toHaveBeenCalledWith("/api/v1/todos/todo-1", {
+        scheduled_start: null,
+        scheduled_end: null,
+        estimated_minutes: null,
+      });
+    });
+  });
+
+  describe("listTodos", () => {
+    it("calls GET /api/v1/todos", async () => {
+      vi.mocked(api.get).mockResolvedValue([]);
+      const result = await listTodos();
+      expect(api.get).toHaveBeenCalledWith("/api/v1/todos");
+      expect(result).toEqual([]);
+    });
+  });
+
+  describe("deleteTodo", () => {
+    it("calls DELETE with correct path", async () => {
+      vi.mocked(api.delete).mockResolvedValue(undefined);
+      await deleteTodo("todo-1");
+      expect(api.delete).toHaveBeenCalledWith("/api/v1/todos/todo-1");
+    });
+  });
+});

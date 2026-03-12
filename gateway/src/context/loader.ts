@@ -10,15 +10,10 @@
 
 import { loadMemory, type MemoryEntry } from "../memory/long-term.js";
 import { loadSoul } from "../soul/manager.js";
+import { loadProfile } from "../profile/manager.js";
+import { goalRepo } from "../db/repositories/index.js";
+import { extractKeywords } from "../lib/text-utils.js";
 import type { ContextMode } from "./tiers.js";
-
-/** Chinese stopwords to exclude from keyword matching */
-const STOPWORDS = new Set([
-  "的", "了", "在", "是", "我", "有", "和", "就", "不", "人", "都", "一",
-  "一个", "上", "也", "很", "到", "说", "要", "去", "你", "会", "着", "没有",
-  "看", "好", "自己", "这", "他", "她", "它", "们", "那", "被", "从", "把",
-  "还", "能", "对", "吗", "呢", "吧", "啊", "嗯", "哦", "额", "呃",
-]);
 
 /** Memory limits per mode */
 const MEMORY_LIMITS: Record<ContextMode, number> = {
@@ -30,9 +25,13 @@ const MEMORY_LIMITS: Record<ContextMode, number> = {
 
 export interface LoadedContext {
   soul?: string;
+  /** User profile (factual info, separated from soul) */
+  userProfile?: string;
   memories: string[];
   /** Raw memory entries (for downstream use like goal extraction) */
   rawMemories: MemoryEntry[];
+  /** Active goals from goal table */
+  goals: Array<{ id: string; title: string }>;
 }
 
 /**
@@ -49,28 +48,37 @@ export async function loadWarmContext(opts: {
   const needsSoul = opts.mode !== "process"; // process mode doesn't need soul
   const memoryLimit = MEMORY_LIMITS[opts.mode] ?? 10;
 
-  // Parallel loading
-  const [soul, rawMemories] = await Promise.all([
+  // Parallel loading (soul + profile + memories + goals)
+  const [soul, profile, rawMemories, activeGoals] = await Promise.all([
     needsSoul && !opts.localSoul
       ? loadSoulSafe(opts.deviceId)
       : Promise.resolve(undefined),
+    loadProfileSafe(opts.deviceId),
     loadMemorySafe(opts.deviceId, opts.dateRange),
+    loadGoalsSafe(opts.deviceId),
   ]);
 
   const soulContent = opts.localSoul ?? soul?.content;
+  const profileContent = profile?.content;
 
   // Relevance-filter memories
-  const ranked = rankMemories(rawMemories, opts.inputText, memoryLimit);
+  // When goal table has data, [目标] memories are demoted to normal processing
+  const hasGoalTableData = activeGoals.length > 0;
+  const ranked = rankMemories(rawMemories, opts.inputText, memoryLimit, hasGoalTableData);
 
   // Format as context strings
   const memories = ranked.map(
     (m) => `[${m.source_date ?? "未知日期"}] ${m.content}`,
   );
 
+  const goals = activeGoals.map((g) => ({ id: g.id, title: g.title }));
+
   return {
     soul: soulContent,
+    userProfile: profileContent,
     memories,
     rawMemories: ranked,
+    goals,
   };
 }
 
@@ -82,17 +90,20 @@ function rankMemories(
   memories: MemoryEntry[],
   inputText: string | undefined,
   limit: number,
+  hasGoalTableData = false,
 ): MemoryEntry[] {
   if (memories.length === 0) return [];
 
-  // Goals ([目标] prefixed) always surface — they're high-value context
-  const goals = memories.filter((m) => m.content.startsWith("[目标]"));
-  const nonGoals = memories.filter((m) => !m.content.startsWith("[目标]"));
+  // When goal table has data, [目标] memories are treated as normal memories
+  const goalMemories = hasGoalTableData
+    ? []
+    : memories.filter((m) => m.content.startsWith("[目标]"));
+  const nonGoals = hasGoalTableData
+    ? memories
+    : memories.filter((m) => !m.content.startsWith("[目标]"));
 
   if (!inputText) {
-    // No input text — fall back to importance-based selection
-    // Goals first, then by importance
-    return [...goals, ...nonGoals].slice(0, limit);
+    return [...goalMemories, ...nonGoals].slice(0, limit);
   }
 
   const inputKeywords = extractKeywords(inputText);
@@ -106,11 +117,11 @@ function rankMemories(
   scored.sort((a, b) => b.score - a.score);
 
   // Goals always included + top-scored non-goals
-  const goalSlots = Math.min(goals.length, Math.ceil(limit * 0.4));
+  const goalSlots = Math.min(goalMemories.length, Math.ceil(limit * 0.4));
   const nonGoalSlots = limit - goalSlots;
 
   return [
-    ...goals.slice(0, goalSlots),
+    ...goalMemories.slice(0, goalSlots),
     ...scored.slice(0, nonGoalSlots).map((s) => s.memory),
   ];
 }
@@ -150,30 +161,14 @@ function computeRelevanceScore(
   return keywordScore * 0.4 + importanceScore * 0.3 + recencyScore * 0.3;
 }
 
-/**
- * Extract keywords from Chinese/mixed text.
- * Uses character bigrams + word-level split for broad matching.
- */
-function extractKeywords(text: string): Set<string> {
-  const keywords = new Set<string>();
-
-  // Split on whitespace and common punctuation
-  const words = text.split(/[\s,，。！？、；：""''（）()《》\[\]【】\-—…·]+/);
-  for (const word of words) {
-    const w = word.trim().toLowerCase();
-    if (w.length >= 2 && !STOPWORDS.has(w)) {
-      keywords.add(w);
-    }
+/** Safe profile loading (never throws) */
+async function loadProfileSafe(deviceId: string) {
+  try {
+    return await loadProfile(deviceId);
+  } catch (err: any) {
+    console.warn(`[context-loader] Failed to load profile: ${err.message}`);
+    return undefined;
   }
-
-  // Add character bigrams for Chinese text
-  const cleaned = text.replace(/[a-zA-Z0-9\s\p{P}]/gu, "");
-  for (let i = 0; i < cleaned.length - 1; i++) {
-    const bigram = cleaned.slice(i, i + 2);
-    keywords.add(bigram);
-  }
-
-  return keywords;
 }
 
 /** Safe soul loading (never throws) */
@@ -195,6 +190,18 @@ async function loadMemorySafe(
     return await loadMemory(deviceId, dateRange);
   } catch (err: any) {
     console.warn(`[context-loader] Failed to load memories: ${err.message}`);
+    return [];
+  }
+}
+
+/** Safe goals loading (never throws) */
+async function loadGoalsSafe(
+  deviceId: string,
+): Promise<Array<{ id: string; title: string }>> {
+  try {
+    return await goalRepo.findActiveByDevice(deviceId);
+  } catch (err: any) {
+    console.warn(`[context-loader] Failed to load goals: ${err.message}`);
     return [];
   }
 }

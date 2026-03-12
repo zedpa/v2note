@@ -171,10 +171,38 @@ export interface TodoItem {
   source: string | null
   record_id: string
   created_at: string
+  scheduled_start?: string
+  scheduled_end?: string
+  estimated_minutes?: number
+  priority?: number
   domain?: string
   impact?: number
   ai_actionable?: boolean
   ai_action_plan?: string[]
+  goal_id?: string
+}
+
+export interface Goal {
+  id: string
+  device_id: string
+  title: string
+  parent_id: string | null
+  status: 'active' | 'paused' | 'completed' | 'abandoned'
+  source: 'speech' | 'chat' | 'manual'
+  created_at: string
+  updated_at: string
+}
+
+export interface PendingIntent {
+  id: string
+  device_id: string
+  record_id: string | null
+  intent_type: 'wish' | 'goal' | 'complaint' | 'reflection'
+  text: string
+  context: string | null
+  status: 'pending' | 'confirmed' | 'dismissed' | 'promoted'
+  promoted_to: string | null
+  created_at: string
 }
 
 export interface IdeaItem {

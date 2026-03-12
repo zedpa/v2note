@@ -24,6 +24,8 @@ export interface ContextBuildOptions {
   mode: ContextMode;
   skills: Skill[];
   soul?: string;
+  /** User profile (factual info, separated from soul) */
+  userProfile?: string;
   memories?: string[];
   existingTags?: string[];
   mcpTools?: Array<{ name: string; description: string; parameters?: Record<string, unknown> }>;

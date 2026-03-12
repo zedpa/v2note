@@ -1,6 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/utils";
+import { Flame } from "lucide-react";
 import { getDomainStyle } from "@/features/todos/lib/domain-config";
 
 interface ImpactDotsProps {
@@ -8,29 +9,44 @@ interface ImpactDotsProps {
   domain?: string;
 }
 
+/**
+ * Impact visual indicator:
+ * - 1-3 (low): nothing shown
+ * - 4-6 (medium): small text label
+ * - 7-8 (high): flame icon
+ * - 9-10 (critical): pulsing flame + label
+ */
 export function ImpactDots({ impact, domain }: ImpactDotsProps) {
-  const filled = Math.ceil(impact / 2);
-  const { fgStyle } = getDomainStyle(domain);
-  const isHighImpact = impact >= 9;
+  if (impact <= 3) return null;
+
+  if (impact <= 6) {
+    return (
+      <span className="text-[9px] font-mono text-muted-foreground/70 px-1">
+        {impact}
+      </span>
+    );
+  }
+
+  const isCritical = impact >= 9;
 
   return (
-    <div className="flex items-center gap-0.5">
-      {Array.from({ length: 5 }, (_, i) => (
-        <div
-          key={i}
-          className={cn(
-            "w-1.5 h-1.5 rounded-full transition-all",
-            i < filled ? "opacity-100" : "opacity-20",
-            isHighImpact && i < filled && "animate-impact-pulse",
-          )}
-          style={{
-            backgroundColor: i < filled
-              ? fgStyle.color
-              : `hsl(var(--muted-foreground) / 0.3)`,
-            animationDelay: isHighImpact ? `${i * 100}ms` : undefined,
-          }}
-        />
-      ))}
+    <div
+      className={cn(
+        "flex items-center gap-0.5",
+        isCritical && "animate-pulse",
+      )}
+    >
+      <Flame
+        className={cn(
+          "w-3 h-3",
+          isCritical ? "text-orange-500" : "text-orange-400",
+        )}
+      />
+      {isCritical && (
+        <span className="text-[9px] font-semibold text-orange-500">
+          {impact}
+        </span>
+      )}
     </div>
   );
 }

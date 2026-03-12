@@ -9,30 +9,45 @@ import { cn } from "@/lib/utils";
 import { useTodos } from "@/features/todos/hooks/use-todos";
 import { useTodayTodos, type TodayTodo } from "@/features/todos/hooks/use-today-todos";
 import { ImpactDots } from "@/features/todos/components/impact-dots";
+import { TodoDetailSheet } from "@/features/todos/components/todo-detail-sheet";
 import { getDomainStyle } from "@/features/todos/lib/domain-config";
 import { listMemories } from "@/shared/lib/api/memory";
-import type { MemoryEntry, TodoItem } from "@/shared/lib/types";
+import { listGoals } from "@/shared/lib/api/goals";
+import type { MemoryEntry, TodoItem, Goal } from "@/shared/lib/types";
 
 interface TodoPanelProps {
   open: boolean;
   onClose: () => void;
   onNoteClick?: (noteId: string) => void;
+  onAskAI?: (message: string) => void;
 }
 
 type Tab = "today" | "all" | "goals";
 
-export function TodoPanel({ open, onClose, onNoteClick }: TodoPanelProps) {
+export function TodoPanel({ open, onClose, onNoteClick, onAskAI }: TodoPanelProps) {
   const [tab, setTab] = useState<Tab>("today");
-  const [goals, setGoals] = useState<MemoryEntry[]>([]);
+  const [goals, setGoals] = useState<Goal[]>([]);
+  const [legacyGoals, setLegacyGoals] = useState<MemoryEntry[]>([]);
   const [goalsLoading, setGoalsLoading] = useState(false);
+  const [selectedTodo, setSelectedTodo] = useState<TodoItem | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
 
-  // Load goals (memories prefixed with [目标])
+  // Load goals from goal table, fallback to [目标] memories
   useEffect(() => {
     if (!open) return;
     setGoalsLoading(true);
-    listMemories({ limit: 50 })
-      .then((memories) => {
-        setGoals(memories.filter((m) => m.content.startsWith("[目标]")));
+    listGoals()
+      .then((g) => {
+        setGoals(g);
+        // If goal table is empty, fallback to legacy [目标] memories
+        if (g.length === 0) {
+          return listMemories({ limit: 50 }).then((memories) => {
+            setLegacyGoals(memories.filter((m) => m.content.startsWith("[目标]")));
+          });
+        } else {
+          setLegacyGoals([]);
+        }
       })
       .catch(() => {})
       .finally(() => setGoalsLoading(false));
@@ -98,18 +113,27 @@ export function TodoPanel({ open, onClose, onNoteClick }: TodoPanelProps) {
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto">
-          {tab === "today" && <TodayTab onNoteClick={onNoteClick} />}
-          {tab === "all" && <AllTodosTab onNoteClick={onNoteClick} />}
-          {tab === "goals" && <GoalsTab goals={goals} loading={goalsLoading} />}
+          {tab === "today" && <TodayTab onNoteClick={onNoteClick} onSelectTodo={(t) => { setSelectedTodo(t); setDetailOpen(true); }} key={refreshKey} />}
+          {tab === "all" && <AllTodosTab onNoteClick={onNoteClick} onSelectTodo={(t) => { setSelectedTodo(t); setDetailOpen(true); }} key={refreshKey} />}
+          {tab === "goals" && <GoalsTab goals={goals} legacyGoals={legacyGoals} loading={goalsLoading} />}
         </div>
       </div>
+
+      {/* Detail sheet */}
+      <TodoDetailSheet
+        todo={selectedTodo}
+        open={detailOpen}
+        onClose={() => setDetailOpen(false)}
+        onUpdated={() => setRefreshKey((k) => k + 1)}
+        onAskAI={onAskAI}
+      />
     </>
   );
 }
 
 /* ── Today Tab: timeline + scheduled tasks ── */
 
-function TodayTab({ onNoteClick }: { onNoteClick?: (id: string) => void }) {
+function TodayTab({ onNoteClick, onSelectTodo }: { onNoteClick?: (id: string) => void; onSelectTodo?: (todo: TodoItem) => void }) {
   const { todos, loading, toggleTodo } = useTodayTodos();
 
   const now = new Date();
@@ -183,7 +207,7 @@ function TodayTab({ onNoteClick }: { onNoteClick?: (id: string) => void }) {
                 border: `1.5px solid ${fgStyle.color}40`,
                 backgroundColor: bgStyle.backgroundColor,
               }}
-              onClick={() => toggleTodo(todo.id)}
+              onClick={() => onSelectTodo?.(todo)}
             >
               <div className="absolute left-0 top-0 bottom-0 w-[2px]" style={{ backgroundColor: fgStyle.color }} />
               <div className="flex items-center gap-1.5 px-2 py-1 pl-2.5">
@@ -214,6 +238,7 @@ function TodayTab({ onNoteClick }: { onNoteClick?: (id: string) => void }) {
                 todo={todo}
                 onToggle={() => toggleTodo(todo.id)}
                 onNoteClick={onNoteClick}
+                onSelectTodo={onSelectTodo}
               />
             ))}
           </div>
@@ -225,7 +250,7 @@ function TodayTab({ onNoteClick }: { onNoteClick?: (id: string) => void }) {
 
 /* ── All Todos Tab: grouped by domain ── */
 
-function AllTodosTab({ onNoteClick }: { onNoteClick?: (id: string) => void }) {
+function AllTodosTab({ onNoteClick, onSelectTodo }: { onNoteClick?: (id: string) => void; onSelectTodo?: (todo: TodoItem) => void }) {
   const { todos, loading, toggleTodo } = useTodos();
 
   const pending = todos.filter((t) => !t.done);
@@ -289,6 +314,7 @@ function AllTodosTab({ onNoteClick }: { onNoteClick?: (id: string) => void }) {
                   todo={todo}
                   onToggle={() => toggleTodo(todo.id)}
                   onNoteClick={onNoteClick}
+                  onSelectTodo={onSelectTodo}
                 />
               ))}
             </div>
@@ -322,7 +348,7 @@ function AllTodosTab({ onNoteClick }: { onNoteClick?: (id: string) => void }) {
 
 /* ── Goals Tab ── */
 
-function GoalsTab({ goals, loading }: { goals: MemoryEntry[]; loading: boolean }) {
+function GoalsTab({ goals, legacyGoals, loading }: { goals: Goal[]; legacyGoals: MemoryEntry[]; loading: boolean }) {
   if (loading) {
     return (
       <div className="p-4 space-y-3">
@@ -333,7 +359,7 @@ function GoalsTab({ goals, loading }: { goals: MemoryEntry[]; loading: boolean }
     );
   }
 
-  if (goals.length === 0) {
+  if (goals.length === 0 && legacyGoals.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
         <Target className="w-10 h-10 mb-3 opacity-30" />
@@ -343,9 +369,46 @@ function GoalsTab({ goals, loading }: { goals: MemoryEntry[]; loading: boolean }
     );
   }
 
+  // Render goal table data
+  if (goals.length > 0) {
+    return (
+      <div className="p-3 space-y-2">
+        {goals.map((goal) => (
+          <div
+            key={goal.id}
+            className="relative p-3 rounded-lg border border-amber-500/20 bg-amber-500/5 overflow-hidden"
+          >
+            <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-amber-500 rounded-l-lg" />
+            <div className="flex items-start gap-2 pl-1">
+              <Target className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm text-foreground leading-snug">{goal.title}</p>
+                <div className="flex items-center gap-2 mt-1.5">
+                  <span className="text-[9px] font-mono text-muted-foreground">
+                    {new Date(goal.created_at).toLocaleDateString("zh-CN")}
+                  </span>
+                  <span className="text-[9px] font-mono px-1.5 py-0.5 rounded-full bg-amber-500/10 text-amber-600">
+                    {goal.source === "speech" ? "语音" : goal.source === "chat" ? "对话" : "手动"}
+                  </span>
+                  {goal.status !== "active" && (
+                    <span className="text-[9px] font-mono px-1.5 py-0.5 rounded-full bg-secondary text-muted-foreground">
+                      {goal.status === "completed" ? "已完成" : goal.status === "paused" ? "暂停" : "放弃"}
+                    </span>
+                  )}
+                </div>
+              </div>
+              <ChevronRight className="w-4 h-4 text-muted-foreground/40 shrink-0" />
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  // Fallback: legacy [目标] memories
   return (
     <div className="p-3 space-y-2">
-      {goals.map((goal) => {
+      {legacyGoals.map((goal) => {
         const text = goal.content.replace(/^\[目标\]\s*/, "");
         const importance = goal.importance;
         return (
@@ -395,24 +458,30 @@ function CompactTodoRow({
   todo,
   onToggle,
   onNoteClick,
+  onSelectTodo,
 }: {
   todo: TodoItem;
   onToggle: () => void;
   onNoteClick?: (id: string) => void;
+  onSelectTodo?: (todo: TodoItem) => void;
 }) {
   const { fgStyle, bgStyle } = getDomainStyle(todo.domain);
+  const isAI = todo.ai_actionable && !todo.done;
   return (
     <div
-      className="relative flex items-center gap-2 px-2.5 py-2 rounded-md border overflow-hidden transition-colors hover:bg-secondary/30"
-      style={{ borderColor: `${fgStyle.color}20` }}
+      className={cn(
+        "relative flex items-center gap-2 px-2.5 py-2 rounded-md border overflow-hidden transition-colors hover:bg-secondary/30",
+        isAI && "bg-violet-500/5 border-violet-500/20",
+      )}
+      style={isAI ? undefined : { borderColor: `${fgStyle.color}20` }}
     >
-      <div className="absolute left-0 top-0 bottom-0 w-[2px]" style={{ backgroundColor: fgStyle.color }} />
+      <div className="absolute left-0 top-0 bottom-0 w-[2px]" style={{ backgroundColor: isAI ? "hsl(var(--chart-4, 262 83% 58%))" : fgStyle.color }} />
       <button type="button" onClick={onToggle} className="shrink-0">
         <TodoCheckbox done={todo.done} color={fgStyle.color} small />
       </button>
       <button
         type="button"
-        onClick={() => onNoteClick?.(todo.record_id)}
+        onClick={() => onSelectTodo?.(todo)}
         className="flex-1 min-w-0 text-left"
       >
         <p className={cn(
@@ -423,10 +492,10 @@ function CompactTodoRow({
         </p>
       </button>
       <div className="flex items-center gap-1 shrink-0">
-        {todo.ai_actionable && (
-          <Sparkles className="w-3 h-3 text-amber-500" />
+        {isAI && (
+          <Sparkles className="w-3 h-3 text-violet-500" />
         )}
-        {(todo.impact ?? 0) >= 5 && (
+        {(todo.impact ?? 0) >= 4 && (
           <ImpactDots impact={todo.impact ?? 5} domain={todo.domain} />
         )}
       </div>

@@ -5,7 +5,7 @@ type: process
 metadata:
   openclaw:
     extract_fields: ["todos"]
-    always: true
+    always: false
 ---
 
 # 待办提取

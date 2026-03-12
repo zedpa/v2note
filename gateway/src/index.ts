@@ -23,6 +23,9 @@ import { registerSyncRoutes } from "./routes/sync.js";
 import { registerMemoryRoutes } from "./routes/memory.js";
 import { registerSoulRoutes } from "./routes/soul.js";
 import { registerDailyLoopRoutes } from "./routes/daily-loop.js";
+import { registerGoalRoutes } from "./routes/goals.js";
+import { registerProfileRoutes } from "./routes/profile.js";
+import { registerNotebookRoutes } from "./routes/notebooks.js";
 import { registerMCPServerRoutes } from "./mcp/server.js";
 import { getProactiveEngine } from "./proactive/engine.js";
 
@@ -80,6 +83,9 @@ registerSyncRoutes(router);
 registerMemoryRoutes(router);
 registerSoulRoutes(router);
 registerDailyLoopRoutes(router);
+registerGoalRoutes(router);
+registerProfileRoutes(router);
+registerNotebookRoutes(router);
 registerMCPServerRoutes(router);
 
 // ── HTTP Server ──

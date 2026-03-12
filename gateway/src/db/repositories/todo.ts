@@ -83,6 +83,7 @@ export async function update(
     impact?: number;
     ai_actionable?: boolean;
     ai_action_plan?: string[] | null;
+    goal_id?: string | null;
   },
 ): Promise<void> {
   const sets: string[] = [];
@@ -127,6 +128,10 @@ export async function update(
   if (fields.ai_action_plan !== undefined) {
     sets.push(`ai_action_plan = $${i++}`);
     params.push(JSON.stringify(fields.ai_action_plan));
+  }
+  if (fields.goal_id !== undefined) {
+    sets.push(`goal_id = $${i++}`);
+    params.push(fields.goal_id);
   }
   if (sets.length === 0) return;
   params.push(id);

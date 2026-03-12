@@ -5,15 +5,7 @@ import { getDeviceId } from "@/shared/lib/device";
 import type { TodoItem } from "@/shared/lib/types";
 import { listTodos, updateTodo } from "@/shared/lib/api/todos";
 
-export interface TodayTodo extends TodoItem {
-  estimated_minutes?: number;
-  scheduled_start?: string;
-  scheduled_end?: string;
-  priority?: number;
-  domain?: string;
-  impact?: number;
-  ai_actionable?: boolean;
-}
+export type TodayTodo = TodoItem;
 
 export function useTodayTodos() {
   const [todos, setTodos] = useState<TodayTodo[]>([]);
