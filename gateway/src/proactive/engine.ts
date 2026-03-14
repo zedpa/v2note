@@ -19,6 +19,7 @@ import { regenerateSummary, extractToMemory } from "../diary/manager.js";
 
 interface ConnectedDevice {
   deviceId: string;
+  userId?: string;
   ws: WebSocket;
   lastNudge: number;
 }
@@ -48,8 +49,8 @@ export class ProactiveEngine {
     }
   }
 
-  registerDevice(deviceId: string, ws: WebSocket): void {
-    this.devices.set(deviceId, { deviceId, ws, lastNudge: 0 });
+  registerDevice(deviceId: string, ws: WebSocket, userId?: string): void {
+    this.devices.set(deviceId, { deviceId, userId, ws, lastNudge: 0 });
     console.log(`[proactive] Device registered: ${deviceId} (total: ${this.devices.size})`);
 
     // Register per-device BullMQ schedulers if Redis is available
@@ -58,6 +59,11 @@ export class ProactiveEngine {
         console.warn(`[proactive] Failed to register device schedulers: ${err.message}`);
       });
     }
+  }
+
+  setDeviceUserId(deviceId: string, userId: string): void {
+    const device = this.devices.get(deviceId);
+    if (device) device.userId = userId;
   }
 
   unregisterDevice(deviceId: string): void {
@@ -217,7 +223,9 @@ export class ProactiveEngine {
           break;
         case "relay": {
           try {
-            const relays = await todoRepo.findRelayByDevice(device.deviceId);
+            const relays = device.userId
+              ? await todoRepo.findRelayByUser(device.userId)
+              : await todoRepo.findRelayByDevice(device.deviceId);
             if (relays.length > 0) {
               this.sendMessage(device, {
                 type: "proactive.relay_reminder",
@@ -309,7 +317,9 @@ export class ProactiveEngine {
         const relayKey = `relay:${nudgeKey}`;
         if (!this.dailyPushSent.has(relayKey)) {
           try {
-            const relays = await todoRepo.findRelayByDevice(device.deviceId);
+            const relays = device.userId
+              ? await todoRepo.findRelayByUser(device.userId)
+              : await todoRepo.findRelayByDevice(device.deviceId);
             if (relays.length > 0) {
               this.sendMessage(device, {
                 type: "proactive.relay_reminder",
@@ -338,7 +348,9 @@ export class ProactiveEngine {
     }
 
     // Standard todo checks
-    const pending = await todoRepo.findPendingByDevice(device.deviceId);
+    const pending = device.userId
+      ? await todoRepo.findPendingByUser(device.userId)
+      : await todoRepo.findPendingByDevice(device.deviceId);
     if (pending.length === 0) return;
 
     const unscheduled = pending.filter((t) => !(t as any).scheduled_start);

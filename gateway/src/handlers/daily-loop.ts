@@ -35,6 +35,7 @@ export interface SummaryResult {
 
 export async function generateMorningBriefing(
   deviceId: string,
+  userId?: string,
 ): Promise<BriefingResult> {
   const today = new Date().toISOString().split("T")[0];
 
@@ -50,7 +51,9 @@ export async function generateMorningBriefing(
   }
 
   // 1. Load all pending todos
-  const pendingTodos = await todoRepo.findPendingByDevice(deviceId);
+  const pendingTodos = userId
+    ? await todoRepo.findPendingByUser(userId)
+    : await todoRepo.findPendingByDevice(deviceId);
 
   // Categorize todos
   const now = new Date();
@@ -100,11 +103,9 @@ export async function generateMorningBriefing(
   // 4. Yesterday's stats
   const yesterdayStart = `${yesterday}T00:00:00Z`;
   const yesterdayEnd = `${yesterday}T23:59:59Z`;
-  const yesterdayStats = await todoRepo.countByDateRange(
-    deviceId,
-    yesterdayStart,
-    yesterdayEnd,
-  );
+  const yesterdayStats = userId
+    ? await todoRepo.countByUserDateRange(userId, yesterdayStart, yesterdayEnd)
+    : await todoRepo.countByDateRange(deviceId, yesterdayStart, yesterdayEnd);
 
   // 5. Calculate streak (simplified: count consecutive days with records)
   let streak = 0;
@@ -112,11 +113,9 @@ export async function generateMorningBriefing(
     for (let i = 1; i <= 30; i++) {
       const d = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
       const ds = d.toISOString().split("T")[0];
-      const count = await todoRepo.countByDateRange(
-        deviceId,
-        `${ds}T00:00:00Z`,
-        `${ds}T23:59:59Z`,
-      );
+      const count = userId
+        ? await todoRepo.countByUserDateRange(userId, `${ds}T00:00:00Z`, `${ds}T23:59:59Z`)
+        : await todoRepo.countByDateRange(deviceId, `${ds}T00:00:00Z`, `${ds}T23:59:59Z`);
       if (count.total > 0) {
         streak++;
       } else {
@@ -279,6 +278,7 @@ ${memoryContext}
 
 export async function generateEveningSummary(
   deviceId: string,
+  userId?: string,
 ): Promise<SummaryResult> {
   const today = new Date().toISOString().split("T")[0];
 
@@ -294,7 +294,9 @@ export async function generateEveningSummary(
   }
 
   // 1. Today's completed todos
-  const allTodos = await todoRepo.findByDevice(deviceId);
+  const allTodos = userId
+    ? await todoRepo.findByUser(userId)
+    : await todoRepo.findByDevice(deviceId);
   const todayDone = allTodos.filter(
     (t) => t.done && t.completed_at && t.completed_at.startsWith(today),
   );
@@ -302,7 +304,9 @@ export async function generateEveningSummary(
   // 2. Today's new records count
   let newRecordCount = 0;
   try {
-    const records = await recordRepo.findByDevice(deviceId, { limit: 100 });
+    const records = userId
+      ? await recordRepo.findByUser(userId, { limit: 100 })
+      : await recordRepo.findByDevice(deviceId, { limit: 100 });
     newRecordCount = records.filter(
       (r: any) => r.created_at && r.created_at.startsWith(today),
     ).length;
@@ -311,7 +315,9 @@ export async function generateEveningSummary(
   }
 
   // 3. Still pending items
-  const pending = await todoRepo.findPendingByDevice(deviceId);
+  const pending = userId
+    ? await todoRepo.findPendingByUser(userId)
+    : await todoRepo.findPendingByDevice(deviceId);
 
   // 4. Relay status
   const relayTodos = allTodos.filter(

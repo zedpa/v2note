@@ -1,12 +1,15 @@
 import type { Router } from "../router.js";
-import { readBody, sendJson, getDeviceId } from "../lib/http-helpers.js";
+import { readBody, sendJson, getDeviceId, getUserId } from "../lib/http-helpers.js";
 import { goalRepo, pendingIntentRepo } from "../db/repositories/index.js";
 
 export function registerGoalRoutes(router: Router) {
   // List active goals
   router.get("/api/v1/goals", async (req, res) => {
+    const userId = getUserId(req);
     const deviceId = getDeviceId(req);
-    const goals = await goalRepo.findActiveByDevice(deviceId);
+    const goals = userId
+      ? await goalRepo.findActiveByUser(userId)
+      : await goalRepo.findActiveByDevice(deviceId);
     sendJson(res, goals);
   });
 
@@ -37,8 +40,11 @@ export function registerGoalRoutes(router: Router) {
 
   // List pending intents
   router.get("/api/v1/intents/pending", async (req, res) => {
+    const userId = getUserId(req);
     const deviceId = getDeviceId(req);
-    const intents = await pendingIntentRepo.findPendingByDevice(deviceId);
+    const intents = userId
+      ? await pendingIntentRepo.findPendingByUser(userId)
+      : await pendingIntentRepo.findPendingByDevice(deviceId);
     sendJson(res, intents);
   });
 }

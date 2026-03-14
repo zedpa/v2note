@@ -1,5 +1,5 @@
 import type { Router } from "../router.js";
-import { sendJson, getDeviceId } from "../lib/http-helpers.js";
+import { sendJson, getDeviceId, getUserId } from "../lib/http-helpers.js";
 import { recordRepo, todoRepo, subscriptionRepo } from "../db/repositories/index.js";
 import { query } from "../db/pool.js";
 
@@ -7,6 +7,7 @@ export function registerStatsRoutes(router: Router) {
   // Week stats
   router.get("/api/v1/stats/week", async (req, res) => {
     const deviceId = getDeviceId(req);
+    const userId = getUserId(req);
     const now = new Date();
     const dayOfWeek = now.getDay();
     const monday = new Date(now);
@@ -16,10 +17,15 @@ export function registerStatsRoutes(router: Router) {
     sunday.setDate(monday.getDate() + 6);
     sunday.setHours(23, 59, 59, 999);
 
-    const [recordCount, todoStats] = await Promise.all([
-      recordRepo.countByDateRange(deviceId, monday.toISOString(), sunday.toISOString()),
-      todoRepo.countByDateRange(deviceId, monday.toISOString(), sunday.toISOString()),
-    ]);
+    const [recordCount, todoStats] = userId
+      ? await Promise.all([
+          recordRepo.countByUserDateRange(userId, monday.toISOString(), sunday.toISOString()),
+          todoRepo.countByUserDateRange(userId, monday.toISOString(), sunday.toISOString()),
+        ])
+      : await Promise.all([
+          recordRepo.countByDateRange(deviceId, monday.toISOString(), sunday.toISOString()),
+          todoRepo.countByDateRange(deviceId, monday.toISOString(), sunday.toISOString()),
+        ]);
 
     sendJson(res, {
       recordCount,
@@ -31,7 +37,10 @@ export function registerStatsRoutes(router: Router) {
   // Usage stats
   router.get("/api/v1/stats/usage", async (req, res) => {
     const deviceId = getDeviceId(req);
-    const stats = await subscriptionRepo.getUsageStats(deviceId);
+    const userId = getUserId(req);
+    const stats = userId
+      ? await subscriptionRepo.getUsageStatsByUser(userId)
+      : await subscriptionRepo.getUsageStats(deviceId);
     sendJson(res, {
       monthlyCount: stats.monthly_count,
       limit: stats.limit,
@@ -41,13 +50,16 @@ export function registerStatsRoutes(router: Router) {
   // Daily trend: last 30 days record counts
   router.get("/api/v1/stats/daily-trend", async (req, res) => {
     const deviceId = getDeviceId(req);
+    const userId = getUserId(req);
+    const idCol = userId ? "user_id" : "device_id";
+    const idVal = userId ?? deviceId;
     const rows = await query<{ date: string; count: string }>(
       `SELECT DATE(created_at)::text AS date, COUNT(*)::text AS count
        FROM record
-       WHERE device_id = $1 AND created_at >= NOW() - INTERVAL '30 days'
+       WHERE ${idCol} = $1 AND created_at >= NOW() - INTERVAL '30 days'
        GROUP BY DATE(created_at)
        ORDER BY date ASC`,
-      [deviceId],
+      [idVal],
     );
     sendJson(res, rows.map((r) => ({ date: r.date, count: parseInt(r.count, 10) })));
   });
@@ -55,16 +67,19 @@ export function registerStatsRoutes(router: Router) {
   // Tag distribution: top tags by usage
   router.get("/api/v1/stats/tag-distribution", async (req, res) => {
     const deviceId = getDeviceId(req);
+    const userId = getUserId(req);
+    const idCol = userId ? "r.user_id" : "r.device_id";
+    const idVal = userId ?? deviceId;
     const rows = await query<{ name: string; count: string }>(
       `SELECT t.name, COUNT(*)::text AS count
        FROM record_tag rt
        JOIN tag t ON t.id = rt.tag_id
        JOIN record r ON r.id = rt.record_id
-       WHERE r.device_id = $1
+       WHERE ${idCol} = $1
        GROUP BY t.name
        ORDER BY COUNT(*) DESC
        LIMIT 10`,
-      [deviceId],
+      [idVal],
     );
     sendJson(res, rows.map((r) => ({ name: r.name, count: parseInt(r.count, 10) })));
   });
@@ -72,6 +87,9 @@ export function registerStatsRoutes(router: Router) {
   // Todo trend: last 30 days created vs completed
   router.get("/api/v1/stats/todo-trend", async (req, res) => {
     const deviceId = getDeviceId(req);
+    const userId = getUserId(req);
+    const idCol = userId ? "r.user_id" : "r.device_id";
+    const idVal = userId ?? deviceId;
     const rows = await query<{ date: string; created: string; completed: string }>(
       `SELECT d.date::text,
               COALESCE(c.created, 0)::text AS created,
@@ -85,18 +103,18 @@ export function registerStatsRoutes(router: Router) {
          SELECT DATE(t.created_at) AS date, COUNT(*) AS created
          FROM todo t
          JOIN record r ON r.id = t.record_id
-         WHERE r.device_id = $1 AND t.created_at >= NOW() - INTERVAL '30 days'
+         WHERE ${idCol} = $1 AND t.created_at >= NOW() - INTERVAL '30 days'
          GROUP BY DATE(t.created_at)
        ) c ON c.date = d.date
        LEFT JOIN (
          SELECT DATE(t.created_at) AS date, COUNT(*) AS completed
          FROM todo t
          JOIN record r ON r.id = t.record_id
-         WHERE r.device_id = $1 AND t.done = true AND t.created_at >= NOW() - INTERVAL '30 days'
+         WHERE ${idCol} = $1 AND t.done = true AND t.created_at >= NOW() - INTERVAL '30 days'
          GROUP BY DATE(t.created_at)
        ) co ON co.date = d.date
        ORDER BY d.date ASC`,
-      [deviceId],
+      [idVal],
     );
     sendJson(res, rows.map((r) => ({
       date: r.date,

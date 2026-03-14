@@ -188,6 +188,25 @@ export async function countByDateRange(
   };
 }
 
+export async function countByUserDateRange(
+  userId: string,
+  start: string,
+  end: string,
+): Promise<{ total: number; done: number }> {
+  const row = await queryOne<{ total: string; done: string }>(
+    `SELECT COUNT(*)::text AS total,
+            COUNT(*) FILTER (WHERE t.done)::text AS done
+     FROM todo t
+     JOIN record r ON r.id = t.record_id
+     WHERE r.user_id = $1 AND t.created_at >= $2 AND t.created_at <= $3`,
+    [userId, start, end],
+  );
+  return {
+    total: parseInt(row?.total ?? "0", 10),
+    done: parseInt(row?.done ?? "0", 10),
+  };
+}
+
 export async function findPendingByDevice(deviceId: string): Promise<Todo[]> {
   return query<Todo>(
     `SELECT t.* FROM todo t
@@ -205,6 +224,16 @@ export async function findRelayByDevice(deviceId: string): Promise<Todo[]> {
      WHERE r.device_id = $1 AND t.category = 'relay' AND t.done = false
      ORDER BY t.created_at ASC`,
     [deviceId],
+  );
+}
+
+export async function findRelayByUser(userId: string): Promise<Todo[]> {
+  return query<Todo>(
+    `SELECT t.* FROM todo t
+     JOIN record r ON r.id = t.record_id
+     WHERE r.user_id = $1 AND t.category = 'relay' AND t.done = false
+     ORDER BY t.created_at ASC`,
+    [userId],
   );
 }
 

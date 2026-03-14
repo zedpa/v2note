@@ -1,5 +1,5 @@
 import type { Router } from "../router.js";
-import { readBody, sendJson, sendError, getDeviceId } from "../lib/http-helpers.js";
+import { readBody, sendJson, sendError, getDeviceId, getUserId } from "../lib/http-helpers.js";
 import { skillConfigRepo, customSkillRepo } from "../db/repositories/index.js";
 import { loadSkills } from "../skills/loader.js";
 import { join, dirname } from "node:path";
@@ -12,8 +12,11 @@ export function registerSkillRoutes(router: Router) {
   // List skills (built-in + custom, merged)
   router.get("/api/v1/skills", async (req, res) => {
     const deviceId = getDeviceId(req);
+    const userId = getUserId(req);
     const builtinSkills = loadSkills(SKILLS_DIR);
-    const configs = await skillConfigRepo.findByDevice(deviceId);
+    const configs = userId
+      ? await skillConfigRepo.findByUser(userId)
+      : await skillConfigRepo.findByDevice(deviceId);
     const configMap = Object.fromEntries(configs.map((c) => [c.skill_name, c]));
 
     // Built-in skills
@@ -28,7 +31,9 @@ export function registerSkillRoutes(router: Router) {
 
     // Custom skills from DB
     try {
-      const customs = await customSkillRepo.findByDevice(deviceId);
+      const customs = userId
+        ? await customSkillRepo.findByUser(userId)
+        : await customSkillRepo.findByDevice(deviceId);
       for (const cs of customs) {
         items.push({
           name: cs.name,
@@ -51,12 +56,15 @@ export function registerSkillRoutes(router: Router) {
   // Get single skill detail
   router.get("/api/v1/skills/:name", async (req, res, params) => {
     const deviceId = getDeviceId(req);
+    const userId = getUserId(req);
 
     // Check built-in first
     const allSkills = loadSkills(SKILLS_DIR);
     const skill = allSkills.find((s) => s.name === params.name);
     if (skill) {
-      const configs = await skillConfigRepo.findByDevice(deviceId);
+      const configs = userId
+        ? await skillConfigRepo.findByUser(userId)
+        : await skillConfigRepo.findByDevice(deviceId);
       const cfg = configs.find((c) => c.skill_name === params.name);
       sendJson(res, {
         name: skill.name,
@@ -72,7 +80,9 @@ export function registerSkillRoutes(router: Router) {
 
     // Check custom skills
     try {
-      const custom = await customSkillRepo.findByDeviceAndName(deviceId, params.name);
+      const custom = userId
+        ? await customSkillRepo.findByUserAndName(userId, params.name)
+        : await customSkillRepo.findByDeviceAndName(deviceId, params.name);
       if (custom) {
         sendJson(res, {
           name: custom.name,
@@ -97,18 +107,29 @@ export function registerSkillRoutes(router: Router) {
   // Toggle skill (built-in)
   router.patch("/api/v1/skills/:name", async (req, res, params) => {
     const deviceId = getDeviceId(req);
+    const userId = getUserId(req);
     const { enabled } = await readBody<{ enabled: boolean }>(req);
-    await skillConfigRepo.upsert({
-      device_id: deviceId,
-      skill_name: params.name,
-      enabled,
-    });
+    if (userId) {
+      await skillConfigRepo.upsertByUser({
+        user_id: userId,
+        device_id: deviceId,
+        skill_name: params.name,
+        enabled,
+      });
+    } else {
+      await skillConfigRepo.upsert({
+        device_id: deviceId,
+        skill_name: params.name,
+        enabled,
+      });
+    }
     sendJson(res, { ok: true });
   });
 
   // Create custom skill
   router.post("/api/v1/skills", async (req, res) => {
     const deviceId = getDeviceId(req);
+    const userId = getUserId(req);
     const body = await readBody<{
       name: string;
       description?: string;
@@ -121,7 +142,9 @@ export function registerSkillRoutes(router: Router) {
       return;
     }
 
-    const existing = await customSkillRepo.findByDeviceAndName(deviceId, body.name);
+    const existing = userId
+      ? await customSkillRepo.findByUserAndName(userId, body.name)
+      : await customSkillRepo.findByDeviceAndName(deviceId, body.name);
     if (existing) {
       sendError(res, `Skill "${body.name}" already exists`, 409);
       return;
@@ -142,6 +165,7 @@ export function registerSkillRoutes(router: Router) {
   // Update custom skill
   router.put("/api/v1/skills/:name", async (req, res, params) => {
     const deviceId = getDeviceId(req);
+    const userId = getUserId(req);
 
     // Only allow editing non-builtin skills
     const builtinSkills = loadSkills(SKILLS_DIR);
@@ -150,7 +174,9 @@ export function registerSkillRoutes(router: Router) {
       return;
     }
 
-    const custom = await customSkillRepo.findByDeviceAndName(deviceId, params.name);
+    const custom = userId
+      ? await customSkillRepo.findByUserAndName(userId, params.name)
+      : await customSkillRepo.findByDeviceAndName(deviceId, params.name);
     if (!custom) {
       sendError(res, "Skill not found", 404);
       return;
@@ -171,6 +197,7 @@ export function registerSkillRoutes(router: Router) {
   // Delete custom skill
   router.delete("/api/v1/skills/:name", async (req, res, params) => {
     const deviceId = getDeviceId(req);
+    const userId = getUserId(req);
 
     // Only allow deleting non-builtin skills
     const builtinSkills = loadSkills(SKILLS_DIR);
@@ -179,7 +206,9 @@ export function registerSkillRoutes(router: Router) {
       return;
     }
 
-    const count = await customSkillRepo.deleteByName(deviceId, params.name);
+    const count = userId
+      ? await customSkillRepo.deleteByUserAndName(userId, params.name)
+      : await customSkillRepo.deleteByName(deviceId, params.name);
     if (count === 0) {
       sendError(res, "Skill not found", 404);
       return;

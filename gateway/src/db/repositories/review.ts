@@ -29,6 +29,23 @@ export async function findByDevice(
   );
 }
 
+export async function findByUser(
+  userId: string,
+  period?: string,
+): Promise<Review[]> {
+  if (period) {
+    return query<Review>(
+      `SELECT * FROM review WHERE user_id = $1 AND period = $2
+       ORDER BY period_start DESC`,
+      [userId, period],
+    );
+  }
+  return query<Review>(
+    `SELECT * FROM review WHERE user_id = $1 ORDER BY period_start DESC`,
+    [userId],
+  );
+}
+
 export async function create(fields: {
   device_id: string;
   period: string;

@@ -41,3 +41,25 @@ export async function upsert(fields: {
     ],
   );
 }
+
+export async function upsertByUser(fields: {
+  user_id: string;
+  device_id: string;
+  skill_name: string;
+  enabled: boolean;
+  config?: any;
+}): Promise<void> {
+  await execute(
+    `INSERT INTO skill_config (user_id, device_id, skill_name, enabled, config)
+     VALUES ($1, $2, $3, $4, $5)
+     ON CONFLICT (device_id, skill_name)
+     DO UPDATE SET enabled = $4, config = $5, user_id = $1`,
+    [
+      fields.user_id,
+      fields.device_id,
+      fields.skill_name,
+      fields.enabled,
+      fields.config ? JSON.stringify(fields.config) : "{}",
+    ],
+  );
+}

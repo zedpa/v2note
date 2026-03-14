@@ -1,12 +1,15 @@
 import type { Router } from "../router.js";
-import { readBody, sendJson, getDeviceId } from "../lib/http-helpers.js";
+import { readBody, sendJson, getDeviceId, getUserId } from "../lib/http-helpers.js";
 import { ideaRepo } from "../db/repositories/index.js";
 
 export function registerIdeaRoutes(router: Router) {
   // List ideas
   router.get("/api/v1/ideas", async (req, res) => {
+    const userId = getUserId(req);
     const deviceId = getDeviceId(req);
-    const ideas = await ideaRepo.findByDevice(deviceId);
+    const ideas = userId
+      ? await ideaRepo.findByUser(userId)
+      : await ideaRepo.findByDevice(deviceId);
     sendJson(res, ideas);
   });
 

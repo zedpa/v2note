@@ -74,6 +74,13 @@ export async function deleteById(id: string, deviceId: string): Promise<void> {
   );
 }
 
+export async function deleteByIdAndUser(id: string, userId: string): Promise<void> {
+  await execute(
+    `DELETE FROM memory WHERE id = $1 AND user_id = $2`,
+    [id, userId],
+  );
+}
+
 export async function update(
   id: string,
   deviceId: string,
@@ -94,6 +101,30 @@ export async function update(
   params.push(id, deviceId);
   await execute(
     `UPDATE memory SET ${sets.join(", ")} WHERE id = $${i++} AND device_id = $${i}`,
+    params,
+  );
+}
+
+export async function updateByUser(
+  id: string,
+  userId: string,
+  fields: { content?: string; importance?: number },
+): Promise<void> {
+  const sets: string[] = [];
+  const params: any[] = [];
+  let i = 1;
+  if (fields.content !== undefined) {
+    sets.push(`content = $${i++}`);
+    params.push(fields.content);
+  }
+  if (fields.importance !== undefined) {
+    sets.push(`importance = $${i++}`);
+    params.push(fields.importance);
+  }
+  if (sets.length === 0) return;
+  params.push(id, userId);
+  await execute(
+    `UPDATE memory SET ${sets.join(", ")} WHERE id = $${i++} AND user_id = $${i}`,
     params,
   );
 }

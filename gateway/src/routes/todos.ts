@@ -1,12 +1,15 @@
 import type { Router } from "../router.js";
-import { readBody, sendJson, getDeviceId } from "../lib/http-helpers.js";
+import { readBody, sendJson, getDeviceId, getUserId } from "../lib/http-helpers.js";
 import { todoRepo } from "../db/repositories/index.js";
 
 export function registerTodoRoutes(router: Router) {
   // List todos
   router.get("/api/v1/todos", async (req, res) => {
+    const userId = getUserId(req);
     const deviceId = getDeviceId(req);
-    const todos = await todoRepo.findByDevice(deviceId);
+    const todos = userId
+      ? await todoRepo.findByUser(userId)
+      : await todoRepo.findByDevice(deviceId);
     sendJson(res, todos);
   });
 

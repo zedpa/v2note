@@ -100,8 +100,10 @@ export async function processEntry(payload: ProcessPayload): Promise<ProcessResu
       }));
     } else {
       try {
-        skillConfigs = (await skillConfigRepo.findByDevice(payload.deviceId))
-          .map((c) => ({ skill_name: c.skill_name, enabled: c.enabled }));
+        const configs = payload.userId
+          ? await skillConfigRepo.findByUser(payload.userId)
+          : await skillConfigRepo.findByDevice(payload.deviceId);
+        skillConfigs = configs.map((c) => ({ skill_name: c.skill_name, enabled: c.enabled }));
       } catch (err: any) {
         console.warn(`[process] Failed to load skill config: ${err.message}`);
       }
@@ -242,7 +244,9 @@ export async function processEntry(payload: ProcessPayload): Promise<ProcessResu
       // Auto-link new todos to active goals by keyword matching
       if (result.todos.length > 0) {
         try {
-          const activeGoals = await goalRepo.findActiveByDevice(payload.deviceId);
+          const activeGoals = payload.userId
+            ? await goalRepo.findActiveByUser(payload.userId)
+            : await goalRepo.findActiveByDevice(payload.deviceId);
           if (activeGoals.length > 0) {
             const recentTodos = await todoRepo.findByRecordId(payload.recordId);
             for (const todo of recentTodos) {
@@ -316,13 +320,17 @@ export async function processEntry(payload: ProcessPayload): Promise<ProcessResu
 
     // 7. Background: enrich new todos
     if (result.todos.length > 0) {
-      const pendingTodos = await todoRepo.findPendingByDevice(payload.deviceId);
+      const pendingTodos = payload.userId
+        ? await todoRepo.findPendingByUser(payload.userId)
+        : await todoRepo.findPendingByDevice(payload.deviceId);
       const newTodos = pendingTodos.slice(-result.todos.length);
       if (newTodos.length > 0) {
         // Load memories only for enrichment (not injected into process prompt)
         let goalMemories: string[] = [];
         try {
-          const activeGoals = await goalRepo.findActiveByDevice(payload.deviceId);
+          const activeGoals = payload.userId
+            ? await goalRepo.findActiveByUser(payload.userId)
+            : await goalRepo.findActiveByDevice(payload.deviceId);
           const session = getSession(payload.deviceId);
           const memoryManager = session.memoryManager;
           const loaded = await memoryManager.loadRelevantContext(payload.deviceId, {

@@ -50,6 +50,24 @@ export function getDeviceId(req: IncomingMessage): string {
   return id;
 }
 
+/**
+ * Extract userId from JWT. Returns null if no valid JWT present.
+ * Use this for data queries — userId represents the account, not a single device.
+ */
+export function getUserId(req: IncomingMessage): string | null {
+  const authHeader = req.headers["authorization"];
+  if (authHeader && authHeader.startsWith("Bearer ")) {
+    try {
+      const secret = process.env.JWT_SECRET ?? "dev-jwt-secret-change-me";
+      const payload = jwt.verify(authHeader.slice(7), secret) as { userId?: string };
+      return payload.userId ?? null;
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
 export class HttpError extends Error {
   constructor(public status: number, message: string) {
     super(message);

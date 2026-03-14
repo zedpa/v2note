@@ -17,6 +17,16 @@ export async function findByDevice(deviceId: string): Promise<Idea[]> {
   );
 }
 
+export async function findByUser(userId: string): Promise<Idea[]> {
+  return query<Idea>(
+    `SELECT i.* FROM idea i
+     JOIN record r ON r.id = i.record_id
+     WHERE r.user_id = $1
+     ORDER BY i.created_at DESC`,
+    [userId],
+  );
+}
+
 export async function findByRecordId(recordId: string): Promise<Idea[]> {
   return query<Idea>(
     `SELECT * FROM idea WHERE record_id = $1 ORDER BY created_at`,

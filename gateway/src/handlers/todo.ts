@@ -12,9 +12,12 @@ export interface TodoAggregateResult {
  */
 export async function aggregateTodos(
   deviceId: string,
+  userId?: string,
 ): Promise<TodoAggregateResult> {
-  // Fetch pending todos for this device
-  const deviceTodos = await todoRepo.findPendingByDevice(deviceId);
+  // Fetch pending todos for this user/device
+  const deviceTodos = userId
+    ? await todoRepo.findPendingByUser(userId)
+    : await todoRepo.findPendingByDevice(deviceId);
 
   if (deviceTodos.length === 0) {
     return { diary_entry: "当前没有待办事项。" };

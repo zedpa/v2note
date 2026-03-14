@@ -1,5 +1,5 @@
 import type { Router } from "../router.js";
-import { readBody, sendJson, getDeviceId } from "../lib/http-helpers.js";
+import { readBody, sendJson, getDeviceId, getUserId } from "../lib/http-helpers.js";
 import {
   recordRepo,
   transcriptRepo,
@@ -14,15 +14,23 @@ export function registerRecordRoutes(router: Router) {
   // List records (with summary + tags)
   router.get("/api/v1/records", async (req, res, _params, query) => {
     const deviceId = getDeviceId(req);
+    const userId = getUserId(req);
     const limit = parseInt(query.limit ?? "100", 10);
     const offset = parseInt(query.offset ?? "0", 10);
     const notebook = query.notebook;
-    const records = await recordRepo.findByDevice(deviceId, {
-      archived: false,
-      limit,
-      offset,
-      notebook: notebook !== undefined ? notebook : undefined,
-    });
+    const records = userId
+      ? await recordRepo.findByUser(userId, {
+          archived: false,
+          limit,
+          offset,
+          notebook: notebook !== undefined ? notebook : undefined,
+        })
+      : await recordRepo.findByDevice(deviceId, {
+          archived: false,
+          limit,
+          offset,
+          notebook: notebook !== undefined ? notebook : undefined,
+        });
 
     // Batch load summaries and tags
     const ids = records.map((r) => r.id);
@@ -55,12 +63,15 @@ export function registerRecordRoutes(router: Router) {
   // Search records (must be before :id to avoid "search" being captured as an id)
   router.get("/api/v1/records/search", async (req, res, _params, query) => {
     const deviceId = getDeviceId(req);
+    const userId = getUserId(req);
     const q = query.q ?? "";
     if (!q) {
       sendJson(res, []);
       return;
     }
-    const records = await recordRepo.search(deviceId, q);
+    const records = userId
+      ? await recordRepo.searchByUser(userId, q)
+      : await recordRepo.search(deviceId, q);
 
     // Batch load summaries and tags (same as list route)
     const ids = records.map((r) => r.id);

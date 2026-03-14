@@ -44,7 +44,7 @@ export async function findByDevice(
 
 export async function findByUser(
   userId: string,
-  opts?: { archived?: boolean; limit?: number; offset?: number },
+  opts?: { archived?: boolean; limit?: number; offset?: number; notebook?: string | null },
 ): Promise<Record[]> {
   const conditions = [`user_id = $1`];
   const params: any[] = [userId];
@@ -52,6 +52,14 @@ export async function findByUser(
   if (opts?.archived !== undefined) {
     conditions.push(`archived = $${i++}`);
     params.push(opts.archived);
+  }
+  if (opts?.notebook !== undefined) {
+    if (opts.notebook === null) {
+      conditions.push(`notebook IS NULL`);
+    } else {
+      conditions.push(`notebook = $${i++}`);
+      params.push(opts.notebook);
+    }
   }
   const limit = opts?.limit ?? 100;
   const offset = opts?.offset ?? 0;
@@ -163,6 +171,22 @@ export async function search(
   );
 }
 
+export async function searchByUser(
+  userId: string,
+  q: string,
+): Promise<Record[]> {
+  return query<Record>(
+    `SELECT DISTINCT r.* FROM record r
+     LEFT JOIN transcript t ON t.record_id = r.id
+     LEFT JOIN summary s ON s.record_id = r.id
+     WHERE r.user_id = $1
+       AND (t.text ILIKE $2 OR s.title ILIKE $2 OR s.short_summary ILIKE $2)
+     ORDER BY r.created_at DESC
+     LIMIT 50`,
+    [userId, `%${q}%`],
+  );
+}
+
 export async function countByDateRange(
   deviceId: string,
   start: string,
@@ -172,6 +196,19 @@ export async function countByDateRange(
     `SELECT COUNT(*)::text AS count FROM record
      WHERE device_id = $1 AND created_at >= $2 AND created_at <= $3`,
     [deviceId, start, end],
+  );
+  return parseInt(row?.count ?? "0", 10);
+}
+
+export async function countByUserDateRange(
+  userId: string,
+  start: string,
+  end: string,
+): Promise<number> {
+  const row = await queryOne<{ count: string }>(
+    `SELECT COUNT(*)::text AS count FROM record
+     WHERE user_id = $1 AND created_at >= $2 AND created_at <= $3`,
+    [userId, start, end],
   );
   return parseInt(row?.count ?? "0", 10);
 }

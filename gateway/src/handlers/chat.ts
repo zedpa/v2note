@@ -59,11 +59,17 @@ export async function startChat(
   const memories = loaded.memories;
 
   // Load records from the date range for context
-  const records = await recordRepo.findByDeviceAndDateRange(
-    payload.deviceId,
-    `${payload.dateRange.start}T00:00:00`,
-    `${payload.dateRange.end}T23:59:59`,
-  );
+  const records = payload.userId
+    ? await recordRepo.findByUserAndDateRange(
+        payload.userId,
+        `${payload.dateRange.start}T00:00:00`,
+        `${payload.dateRange.end}T23:59:59`,
+      )
+    : await recordRepo.findByDeviceAndDateRange(
+        payload.deviceId,
+        `${payload.dateRange.start}T00:00:00`,
+        `${payload.dateRange.end}T23:59:59`,
+      );
 
   // Load transcripts for these records
   let transcriptSummary = "";
@@ -99,7 +105,9 @@ export async function startChat(
   // Load pending intents for natural follow-up in conversation
   let pendingIntentContext = "";
   try {
-    const pendingIntents = await pendingIntentRepo.findPendingByDevice(payload.deviceId);
+    const pendingIntents = payload.userId
+      ? await pendingIntentRepo.findPendingByUser(payload.userId)
+      : await pendingIntentRepo.findPendingByDevice(payload.deviceId);
     if (pendingIntents.length > 0) {
       const lines = pendingIntents.slice(0, 5).map((pi) => {
         const date = new Date(pi.created_at).toLocaleDateString("zh-CN");

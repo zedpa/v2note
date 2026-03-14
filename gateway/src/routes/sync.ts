@@ -1,5 +1,5 @@
 import type { Router } from "../router.js";
-import { readBody, sendJson, getDeviceId } from "../lib/http-helpers.js";
+import { readBody, sendJson, getDeviceId, getUserId } from "../lib/http-helpers.js";
 import { recordRepo } from "../db/repositories/index.js";
 import { query } from "../db/pool.js";
 
@@ -20,24 +20,28 @@ export function registerSyncRoutes(router: Router) {
     sendJson(res, { uploaded });
   });
 
-  // Pull sync (cursor-based)
+  // Pull sync (cursor-based) — uses userId for cross-device data
   router.get("/api/v1/sync/pull", async (req, res, _params, qp) => {
     const deviceId = getDeviceId(req);
+    const userId = getUserId(req);
     const cursor = qp.cursor;
     const limit = 50;
+
+    const idCol = userId ? "user_id" : "device_id";
+    const idVal = userId ?? deviceId;
 
     let rows;
     if (cursor) {
       rows = await query(
-        `SELECT * FROM record WHERE device_id = $1 AND created_at > $2
+        `SELECT * FROM record WHERE ${idCol} = $1 AND created_at > $2
          ORDER BY created_at ASC LIMIT $3`,
-        [deviceId, cursor, limit],
+        [idVal, cursor, limit],
       );
     } else {
       rows = await query(
-        `SELECT * FROM record WHERE device_id = $1
+        `SELECT * FROM record WHERE ${idCol} = $1
          ORDER BY created_at ASC LIMIT $2`,
-        [deviceId, limit],
+        [idVal, limit],
       );
     }
 

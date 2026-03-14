@@ -78,6 +78,23 @@ export async function findSummaries(
   );
 }
 
+export async function findSummariesByUser(
+  userId: string,
+  notebook: string,
+  startDate: string,
+  endDate: string,
+): Promise<Pick<AiDiary, "id" | "entry_date" | "summary" | "notebook">[]> {
+  return query(
+    `SELECT id, entry_date,
+            COALESCE(NULLIF(summary, ''), LEFT(full_content, 200)) AS summary,
+            notebook
+     FROM ai_diary
+     WHERE user_id = $1 AND notebook = $2 AND entry_date >= $3 AND entry_date <= $4
+     ORDER BY entry_date DESC`,
+    [userId, notebook, startDate, endDate],
+  );
+}
+
 /**
  * Get full content of a specific diary entry.
  */
@@ -89,6 +106,17 @@ export async function findFull(
   return queryOne<AiDiary>(
     `SELECT * FROM ai_diary WHERE device_id = $1 AND notebook = $2 AND entry_date = $3`,
     [deviceId, notebook, date],
+  );
+}
+
+export async function findFullByUser(
+  userId: string,
+  notebook: string,
+  date: string,
+): Promise<AiDiary | null> {
+  return queryOne<AiDiary>(
+    `SELECT * FROM ai_diary WHERE user_id = $1 AND notebook = $2 AND entry_date = $3`,
+    [userId, notebook, date],
   );
 }
 

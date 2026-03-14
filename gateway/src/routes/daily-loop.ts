@@ -1,5 +1,5 @@
 import type { Router } from "../router.js";
-import { sendJson, sendError, getDeviceId, HttpError } from "../lib/http-helpers.js";
+import { sendJson, sendError, getDeviceId, getUserId, HttpError } from "../lib/http-helpers.js";
 import { generateMorningBriefing, generateEveningSummary } from "../handlers/daily-loop.js";
 import { todoRepo } from "../db/repositories/index.js";
 
@@ -8,7 +8,8 @@ export function registerDailyLoopRoutes(router: Router) {
   router.get("/api/v1/daily/briefing", async (req, res) => {
     try {
       const deviceId = getDeviceId(req);
-      const briefing = await generateMorningBriefing(deviceId);
+      const userId = getUserId(req);
+      const briefing = await generateMorningBriefing(deviceId, userId ?? undefined);
       sendJson(res, briefing);
     } catch (err: any) {
       const status = err instanceof HttpError ? err.status : 500;
@@ -21,7 +22,8 @@ export function registerDailyLoopRoutes(router: Router) {
   router.get("/api/v1/daily/evening-summary", async (req, res) => {
     try {
       const deviceId = getDeviceId(req);
-      const summary = await generateEveningSummary(deviceId);
+      const userId = getUserId(req);
+      const summary = await generateEveningSummary(deviceId, userId ?? undefined);
       sendJson(res, summary);
     } catch (err: any) {
       const status = err instanceof HttpError ? err.status : 500;
@@ -34,7 +36,10 @@ export function registerDailyLoopRoutes(router: Router) {
   router.get("/api/v1/daily/relays", async (req, res) => {
     try {
       const deviceId = getDeviceId(req);
-      const relays = await todoRepo.findRelayByDevice(deviceId);
+      const userId = getUserId(req);
+      const relays = userId
+        ? await todoRepo.findRelayByUser(userId)
+        : await todoRepo.findRelayByDevice(deviceId);
       sendJson(res, relays);
     } catch (err: any) {
       const status = err instanceof HttpError ? err.status : 500;

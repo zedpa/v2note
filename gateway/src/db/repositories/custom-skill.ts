@@ -20,6 +20,13 @@ export async function findByDevice(deviceId: string): Promise<CustomSkill[]> {
   );
 }
 
+export async function findByUser(userId: string): Promise<CustomSkill[]> {
+  return query<CustomSkill>(
+    `SELECT * FROM custom_skill WHERE user_id = $1 ORDER BY created_at`,
+    [userId],
+  );
+}
+
 export async function findByDeviceAndName(
   deviceId: string,
   name: string,
@@ -27,6 +34,16 @@ export async function findByDeviceAndName(
   return queryOne<CustomSkill>(
     `SELECT * FROM custom_skill WHERE device_id = $1 AND name = $2`,
     [deviceId, name],
+  );
+}
+
+export async function findByUserAndName(
+  userId: string,
+  name: string,
+): Promise<CustomSkill | null> {
+  return queryOne<CustomSkill>(
+    `SELECT * FROM custom_skill WHERE user_id = $1 AND name = $2`,
+    [userId, name],
   );
 }
 
@@ -111,5 +128,15 @@ export async function deleteByName(
   return execute(
     `DELETE FROM custom_skill WHERE device_id = $1 AND name = $2`,
     [deviceId, name],
+  );
+}
+
+export async function deleteByUserAndName(
+  userId: string,
+  name: string,
+): Promise<number> {
+  return execute(
+    `DELETE FROM custom_skill WHERE user_id = $1 AND name = $2`,
+    [userId, name],
   );
 }
