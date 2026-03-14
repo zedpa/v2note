@@ -16,6 +16,8 @@ jobs:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_KEY }}
+          port: 22
+          debug: true
           script: |
             cd ${{ secrets.DEPLOY_PATH }}
             git pull origin main
