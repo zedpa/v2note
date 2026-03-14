@@ -1,6 +1,6 @@
 import React from "react"
 import type { Metadata, Viewport } from "next";
-import { Sora, JetBrains_Mono, Noto_Sans_SC } from "next/font/google";
+import { Sora, JetBrains_Mono, Noto_Sans_SC, DM_Serif_Display } from "next/font/google";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "sonner";
 
@@ -27,6 +27,13 @@ const notoSansSC = Noto_Sans_SC({
   weight: ["400", "500", "600", "700"],
 });
 
+const dmSerifDisplay = DM_Serif_Display({
+  subsets: ["latin"],
+  variable: "--font-serif-display",
+  display: "swap",
+  weight: ["400"],
+});
+
 export const metadata: Metadata = {
   title: "VoiceNote - AI Voice Notes",
   description: "Turn your voice into organized notes instantly",
@@ -47,7 +54,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="zh-CN" suppressHydrationWarning className={`${sora.variable} ${jetbrainsMono.variable} ${notoSansSC.variable}`}>
+    <html lang="zh-CN" suppressHydrationWarning className={`${sora.variable} ${jetbrainsMono.variable} ${notoSansSC.variable} ${dmSerifDisplay.variable}`}>
       <body className="font-body antialiased">
         <ThemeProvider
           attribute="class"

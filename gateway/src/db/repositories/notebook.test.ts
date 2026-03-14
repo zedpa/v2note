@@ -43,7 +43,7 @@ describe("notebook repository", () => {
       expect(result.name).toBe("project-alpha");
       expect(queryOne).toHaveBeenCalledWith(
         expect.stringContaining("ON CONFLICT"),
-        ["dev-1", "project-alpha", "Alpha notes", false],
+        ["dev-1", "project-alpha", "Alpha notes", false, "#6366f1"],
       );
     });
 

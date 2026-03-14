@@ -13,17 +13,21 @@
   "dependencies": {
     "@ai-sdk/openai": "^3.0.41",
     "ai": "^6.0.116",
+    "bcryptjs": "^2.4.3",
     "bullmq": "^5.70.4",
     "dotenv": "^16.4.7",
     "gray-matter": "^4.0.3",
     "ioredis": "^5.10.0",
+    "jsonwebtoken": "^9.0.3",
     "mem0ai": "^2.2.4",
     "pg": "^8.18.0",
     "ws": "^8.18.0"
   },
   "devDependencies": {
     "@types/ali-oss": "^6.23.3",
+    "@types/bcryptjs": "^2.4.6",
     "@types/ioredis": "^5.0.0",
+    "@types/jsonwebtoken": "^9.0.7",
     "@types/node": "^22",
     "@types/pg": "^8.16.0",
     "@types/ws": "^8.5.13",

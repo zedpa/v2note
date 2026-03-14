@@ -21,16 +21,28 @@ export async function upsertEntry(
   content: string,
 ): Promise<AiDiary> {
   const row = await queryOne<AiDiary>(
-    `INSERT INTO ai_diary (device_id, notebook, entry_date, full_content)
-     VALUES ($1, $2, $3, $4)
+    `INSERT INTO ai_diary (device_id, notebook, entry_date, full_content, summary)
+     VALUES ($1, $2, $3, $4, LEFT($4, 200))
      ON CONFLICT (device_id, notebook, entry_date)
      DO UPDATE SET
        full_content = ai_diary.full_content || E'\\n\\n' || $4,
+       summary = LEFT(ai_diary.full_content || E'\\n\\n' || $4, 200),
        updated_at = now()
      RETURNING *`,
     [deviceId, notebook, date, content],
   );
   return row!;
+}
+
+export async function findByUser(
+  userId: string,
+  notebook: string,
+  date: string,
+): Promise<AiDiary | null> {
+  return queryOne<AiDiary>(
+    `SELECT * FROM ai_diary WHERE user_id = $1 AND notebook = $2 AND entry_date = $3`,
+    [userId, notebook, date],
+  );
 }
 
 /**
@@ -56,7 +68,10 @@ export async function findSummaries(
   endDate: string,
 ): Promise<Pick<AiDiary, "id" | "entry_date" | "summary" | "notebook">[]> {
   return query(
-    `SELECT id, entry_date, summary, notebook FROM ai_diary
+    `SELECT id, entry_date,
+            COALESCE(NULLIF(summary, ''), LEFT(full_content, 200)) AS summary,
+            notebook
+     FROM ai_diary
      WHERE device_id = $1 AND notebook = $2 AND entry_date >= $3 AND entry_date <= $4
      ORDER BY entry_date DESC`,
     [deviceId, notebook, startDate, endDate],

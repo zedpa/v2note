@@ -9,9 +9,12 @@
     "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "cap:sync": "next build && cap sync",
+    "cap:sync": "node scripts/sync-version.cjs && next build && cap sync",
     "cap:android": "cap open android",
     "cap:ios": "cap open ios",
+    "build:android": "bash scripts/build-android.sh debug",
+    "build:android:release": "bash scripts/build-android.sh release",
+    "build:android:install": "bash scripts/build-android.sh debug --install",
     "gateway": "cd gateway && pnpm dev"
   },
   "dependencies": {
@@ -23,6 +26,7 @@
     "@capacitor/ios": "^8.0.2",
     "@capacitor/preferences": "^8.0.0",
     "@capacitor/status-bar": "^8.0.0",
+    "@capgo/capacitor-updater": "^8.43.10",
     "@hookform/resolvers": "^3.9.1",
     "@radix-ui/react-accordion": "1.2.2",
     "@radix-ui/react-alert-dialog": "1.1.4",

@@ -6,6 +6,7 @@ export interface ManualNoteInput {
   content: string;
   tags?: string[];
   useAi?: boolean;
+  notebook?: string;
 }
 
 /**
@@ -19,6 +20,7 @@ export async function createManualNote(input: ManualNoteInput): Promise<string> 
     content: input.content,
     tags: input.tags,
     useAi: input.useAi,
+    notebook: input.notebook,
   });
   emit("recording:processed");
 

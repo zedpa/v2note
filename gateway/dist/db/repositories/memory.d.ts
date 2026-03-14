@@ -16,6 +16,10 @@ export declare function create(fields: {
     source_date?: string;
     importance?: number;
 }): Promise<void>;
+export declare function findByUser(userId: string, dateRange?: {
+    start: string;
+    end: string;
+}, limit?: number): Promise<MemoryEntry[]>;
 export declare function deleteById(id: string, deviceId: string): Promise<void>;
 export declare function update(id: string, deviceId: string, fields: {
     content?: string;

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useCallback, useEffect, useMemo } from "react";
-import { Mic, X, Command, Lock, Send } from "lucide-react";
+import { Mic, X, Command, Lock, Send, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { usePCMRecorder } from "@/features/recording/hooks/use-pcm-recorder";
 import { useFabGestures } from "@/features/recording/hooks/use-fab-gestures";
@@ -23,11 +23,20 @@ function formatDuration(s: number) {
   return `${m.toString().padStart(2, "0")}:${sec.toString().padStart(2, "0")}`;
 }
 
+const WITTY_PROCESSING = [
+  "正在向宇宙发送电波…",
+  "正在翻译你的脑电波…",
+  "让我想想你说了啥…",
+  "收到！正在解码中…",
+  "正在和云端的小伙伴商量…",
+];
+
 interface FABProps {
   onStartReview?: (dateRange: { start: string; end: string }) => void;
   onCommandDetected?: (command: string, args?: string[]) => void;
   onOpenCommandChat?: (initialText: string) => void;
   commandContext?: Partial<CommandContext>;
+  activeNotebook?: string | null;
 }
 
 export function FAB({
@@ -35,6 +44,7 @@ export function FAB({
   onCommandDetected,
   onOpenCommandChat,
   commandContext,
+  activeNotebook,
 }: FABProps) {
   const [showTextSheet, setShowTextSheet] = useState(false);
   const [displayDuration, setDisplayDuration] = useState(0);
@@ -42,6 +52,8 @@ export function FAB({
   const [confirmedText, setConfirmedText] = useState("");
   const [partialText, setPartialText] = useState("");
   const [lockedPaused, setLockedPaused] = useState(false);
+  const [processing, setProcessing] = useState(false);
+  const [wittyText, setWittyText] = useState("");
 
   const recorder = usePCMRecorder();
   const timerRef = useRef<NodeJS.Timeout | null>(null);
@@ -54,6 +66,8 @@ export function FAB({
   const preBufferRef = useRef<ArrayBuffer[]>([]);
   const streamingRef = useRef(false);
   const preCaptureAbortRef = useRef(false);
+  const activeNotebookRef = useRef(activeNotebook);
+  activeNotebookRef.current = activeNotebook;
   const gwClientRef = useRef<ReturnType<typeof getGatewayClient> | null>(null);
 
   const startTimers = useCallback(() => {
@@ -114,6 +128,13 @@ export function FAB({
 
           if (msg.payload.recordId) {
             emit("recording:uploaded");
+            // Show processing capsule
+            setProcessing(true);
+            setWittyText(
+              WITTY_PROCESSING[
+                Math.floor(Math.random() * WITTY_PROCESSING.length)
+              ],
+            );
           }
           break;
         }
@@ -126,10 +147,19 @@ export function FAB({
           pausedRef.current = false;
           setLockedPaused(false);
           commandReleaseRef.current = false;
+          setProcessing(false);
+          setWittyText("");
           resetRef.current();
           break;
         case "process.result":
           emit("recording:processed");
+          setProcessing(false);
+          setWittyText("");
+          break;
+        case "error":
+          // Reset processing state on any gateway error
+          setProcessing(false);
+          setWittyText("");
           break;
         case "command.detected":
           onCommandDetected?.(msg.payload.command, msg.payload.args);
@@ -138,7 +168,17 @@ export function FAB({
     });
 
     return () => unsub();
-  }, [onCommandDetected, onOpenCommandChat]);
+  }, [onCommandDetected, onOpenCommandChat, stopTimers]);
+
+  // Safety timeout: auto-reset processing capsule after 30s
+  useEffect(() => {
+    if (!processing) return;
+    const timer = setTimeout(() => {
+      setProcessing(false);
+      setWittyText("");
+    }, 30000);
+    return () => clearTimeout(timer);
+  }, [processing]);
 
   const asrModeRef = useRef<"realtime" | "upload">("realtime");
 
@@ -214,7 +254,7 @@ export function FAB({
       }
       gwClientRef.current = client;
 
-      client.send({ type: "asr.start", payload: { deviceId, mode: asrMode } });
+      client.send({ type: "asr.start", payload: { deviceId, mode: asrMode, notebook: activeNotebookRef.current ?? undefined } });
 
       for (const chunk of preBufferRef.current) {
         client.sendBinary(chunk);
@@ -594,53 +634,67 @@ export function FAB({
           transition: phase === "recording" ? "none" : "transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)",
         }}
       >
-        {/* Pressing ripples */}
-        {phase === "pressing" && (
+        {/* Processing capsule */}
+        {processing && phase === "idle" ? (
+          <div className="flex items-center gap-2 h-12 px-4 rounded-full bg-primary text-primary-foreground shadow-lg shadow-primary/30 animate-bubble-enter">
+            <Sparkles className="w-5 h-5 animate-spin-slow shrink-0" />
+            <span className="text-sm font-medium whitespace-nowrap">{wittyText}</span>
+          </div>
+        ) : (
           <>
-            <div className="absolute inset-0 rounded-full bg-primary/20 animate-fab-ripple" />
-            <div
-              className="absolute inset-0 rounded-full bg-primary/15 animate-fab-ripple"
-              style={{ animationDelay: "0.4s" }}
-            />
+            {/* Pressing ripples */}
+            {phase === "pressing" && (
+              <>
+                <div className="absolute inset-0 rounded-full bg-primary/20 animate-fab-ripple" />
+                <div
+                  className="absolute inset-0 rounded-full bg-primary/15 animate-fab-ripple"
+                  style={{ animationDelay: "0.4s" }}
+                />
+              </>
+            )}
+
+            {/* Recording ring — larger, more dramatic */}
+            {phase === "recording" && (
+              <>
+                <div className="absolute -inset-3 rounded-full border-2 border-primary/40 animate-pulse pointer-events-none" />
+                <div className="absolute -inset-6 rounded-full border border-primary/15 animate-pulse pointer-events-none" style={{ animationDelay: "0.5s" }} />
+              </>
+            )}
+
+            <button
+              ref={fabRef}
+              type="button"
+              {...handlers}
+              onPointerDown={(e) => {
+                longPressTriggeredRef.current = false;
+                pointerIdRef.current = e.pointerId;
+                startPreCapture();
+                handlers.onPointerDown(e);
+              }}
+              onClick={() => {
+                if (!longPressTriggeredRef.current) {
+                  setShowTextSheet(true);
+                }
+              }}
+              className={cn(
+                "relative flex items-center justify-center rounded-full select-none touch-none transition-all duration-300",
+                "bg-primary text-primary-foreground shadow-lg shadow-primary/30",
+                phase === "idle" && "w-16 h-16 animate-fab-breathe",
+                phase === "pressing" && "w-[72px] h-[72px] scale-105",
+                phase === "recording" && "w-16 h-16",
+              )}
+            >
+              {phase === "idle" ? (
+                <Sparkles className="w-7 h-7" />
+              ) : (
+                <Mic className={cn(
+                  "transition-all duration-200",
+                  phase === "recording" ? "w-7 h-7" : "w-8 h-8",
+                )} />
+              )}
+            </button>
           </>
         )}
-
-        {/* Recording ring — larger, more dramatic */}
-        {phase === "recording" && (
-          <>
-            <div className="absolute -inset-3 rounded-full border-2 border-primary/40 animate-pulse pointer-events-none" />
-            <div className="absolute -inset-6 rounded-full border border-primary/15 animate-pulse pointer-events-none" style={{ animationDelay: "0.5s" }} />
-          </>
-        )}
-
-        <button
-          ref={fabRef}
-          type="button"
-          {...handlers}
-          onPointerDown={(e) => {
-            longPressTriggeredRef.current = false;
-            pointerIdRef.current = e.pointerId;
-            startPreCapture();
-            handlers.onPointerDown(e);
-          }}
-          onClick={() => {
-            if (!longPressTriggeredRef.current) {
-              setShowTextSheet(true);
-            }
-          }}
-          className={cn(
-            "relative flex items-center justify-center rounded-full select-none touch-none transition-all duration-200",
-            "bg-primary text-primary-foreground shadow-lg shadow-primary/30",
-            phase === "idle" && "w-16 h-16 animate-fab-breathe",
-            phase === "pressing" && "w-[72px] h-[72px] scale-105",
-            phase === "recording" && "w-16 h-16",
-          )}
-        >
-          <Mic className={cn(
-            "transition-all duration-200",
-            phase === "recording" ? "w-7 h-7" : "w-8 h-8",
-          )} />
-        </button>
       </div>
 
       <TextBottomSheet
@@ -652,6 +706,7 @@ export function FAB({
           onOpenCommandChat?.(text);
         }}
         commandContext={commandContext}
+        activeNotebook={activeNotebook}
       />
     </>
   );

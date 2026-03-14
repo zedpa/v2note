@@ -18,6 +18,20 @@ export async function findActiveByDevice(deviceId: string): Promise<Goal[]> {
   );
 }
 
+export async function findActiveByUser(userId: string): Promise<Goal[]> {
+  return query<Goal>(
+    `SELECT * FROM goal WHERE user_id = $1 AND status = 'active' ORDER BY created_at DESC`,
+    [userId],
+  );
+}
+
+export async function findByUser(userId: string): Promise<Goal[]> {
+  return query<Goal>(
+    `SELECT * FROM goal WHERE user_id = $1 ORDER BY created_at DESC`,
+    [userId],
+  );
+}
+
 export async function findByDevice(deviceId: string): Promise<Goal[]> {
   return query<Goal>(
     `SELECT * FROM goal WHERE device_id = $1 ORDER BY created_at DESC`,

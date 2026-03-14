@@ -7,23 +7,51 @@ export async function findByDevice(deviceId, opts) {
         conditions.push(`archived = $${i++}`);
         params.push(opts.archived);
     }
+    if (opts?.notebook !== undefined) {
+        if (opts.notebook === null) {
+            conditions.push(`notebook IS NULL`);
+        }
+        else {
+            conditions.push(`notebook = $${i++}`);
+            params.push(opts.notebook);
+        }
+    }
     const limit = opts?.limit ?? 100;
     const offset = opts?.offset ?? 0;
     return query(`SELECT * FROM record WHERE ${conditions.join(" AND ")}
      ORDER BY created_at DESC LIMIT $${i++} OFFSET $${i}`, [...params, limit, offset]);
 }
+export async function findByUser(userId, opts) {
+    const conditions = [`user_id = $1`];
+    const params = [userId];
+    let i = 2;
+    if (opts?.archived !== undefined) {
+        conditions.push(`archived = $${i++}`);
+        params.push(opts.archived);
+    }
+    const limit = opts?.limit ?? 100;
+    const offset = opts?.offset ?? 0;
+    return query(`SELECT * FROM record WHERE ${conditions.join(" AND ")}
+     ORDER BY created_at DESC LIMIT $${i++} OFFSET $${i}`, [...params, limit, offset]);
+}
+export async function findByUserAndDateRange(userId, start, end) {
+    return query(`SELECT * FROM record WHERE user_id = $1
+     AND created_at >= $2 AND created_at <= $3
+     ORDER BY created_at ASC`, [userId, start, end]);
+}
 export async function findById(id) {
     return queryOne(`SELECT * FROM record WHERE id = $1`, [id]);
 }
 export async function create(fields) {
-    const row = await queryOne(`INSERT INTO record (device_id, status, source, audio_path, duration_seconds, location_text)
-     VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`, [
+    const row = await queryOne(`INSERT INTO record (device_id, status, source, audio_path, duration_seconds, location_text, notebook)
+     VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`, [
         fields.device_id,
         fields.status ?? "uploading",
         fields.source ?? "voice",
         fields.audio_path ?? null,
         fields.duration_seconds ?? null,
         fields.location_text ?? null,
+        fields.notebook ?? null,
     ]);
     return row;
 }

@@ -26,6 +26,10 @@ async function getDeviceIdentifier(): Promise<{ identifier: string; platform: st
   return { identifier, platform: 'web' }
 }
 
+/**
+ * Get the device ID. Looks up existing device first, registers if not found.
+ * The device will be linked to a user during login/register.
+ */
 export async function getDeviceId(): Promise<string> {
   if (cachedDeviceId) return cachedDeviceId
 
@@ -39,7 +43,7 @@ export async function getDeviceId(): Promise<string> {
     return existing.id;
   }
 
-  // Register new device
+  // Register new device (will be linked to user during auth)
   const created = await registerDevice(identifier, platform);
   cachedDeviceId = created.id;
   setApiDeviceId(created.id);

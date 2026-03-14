@@ -2,15 +2,14 @@ import { ShortTermMemory } from "./short-term.js";
 import { loadMemory, saveMemory } from "./long-term.js";
 import { chatCompletion } from "../ai/provider.js";
 import { loadWarmContext } from "../context/loader.js";
-import { semanticSearch, findSimilarMemory } from "./embeddings.js";
+import { semanticSearch } from "./embeddings.js";
 import * as memoryRepo from "../db/repositories/memory.js";
 /**
  * MemoryManager combines short-term (session) and long-term (Supabase) memory.
  *
- * Enhanced with Mem0-inspired features:
- * - Semantic search via embeddings (optional, falls back to keyword-based)
- * - Automatic memory deduplication (prevents storing near-identical memories)
- * - Memory consolidation (merges related memories over time)
+ * Mem0-inspired two-stage approach:
+ * 1. Extract candidate facts from content
+ * 2. For each candidate, retrieve similar memories and decide: ADD/UPDATE/DELETE/NONE
  */
 export class MemoryManager {
     shortTerm = new ShortTermMemory();
@@ -22,11 +21,9 @@ export class MemoryManager {
         const longTerm = await loadMemory(deviceId, dateRange);
         const shortTermEntries = this.shortTerm.getAll();
         const memories = [];
-        // Add short-term context
         if (shortTermEntries.length > 0) {
             memories.push(`[近期对话] ${this.shortTerm.getSummary()}`);
         }
-        // Add long-term memories
         for (const entry of longTerm) {
             memories.push(`[${entry.source_date ?? "未知日期"}] ${entry.content}`);
         }
@@ -34,25 +31,24 @@ export class MemoryManager {
     }
     /**
      * Load relevance-filtered memories using the context loader.
-     * Returns both formatted strings and raw entries.
      */
     async loadRelevantContext(deviceId, opts) {
         const shortTermEntries = this.shortTerm.getAll();
         const loaded = await loadWarmContext({
             deviceId,
+            userId: opts?.userId,
             mode: opts?.mode ?? "chat",
             inputText: opts?.inputText,
             dateRange: opts?.dateRange,
             localSoul: opts?.localSoul,
         });
-        // Prepend short-term context if available
         if (shortTermEntries.length > 0) {
             loaded.memories.unshift(`[近期对话] ${this.shortTerm.getSummary()}`);
         }
         return loaded;
     }
     /**
-     * Semantic memory search (Mem0-style).
+     * Semantic memory search.
      * Falls back to keyword-based loading if embeddings unavailable.
      */
     async searchMemories(deviceId, query, limit = 10) {
@@ -64,7 +60,6 @@ export class MemoryManager {
         }
         catch (err) {
             console.warn(`[memory] Semantic search failed, using keyword fallback: ${err.message}`);
-            // Fallback: return by importance
             return allMemories.slice(0, limit).map((m) => ({
                 content: m.content,
                 score: m.importance / 10,
@@ -72,68 +67,107 @@ export class MemoryManager {
             }));
         }
     }
-    /**
-     * Add to short-term memory.
-     */
     addShortTerm(content) {
         this.shortTerm.add(content);
     }
     /**
-     * After processing a record, use AI to decide if a long-term memory should be created.
-     * Enhanced with Mem0-style deduplication: checks for similar existing memories
-     * and updates instead of creating duplicates.
+     * Mem0 two-stage memory management:
+     * 1. AI extracts candidate facts from content
+     * 2. For each candidate, embedding-retrieve top-5 similar memories
+     * 3. AI decides in one call: ADD / UPDATE(id) / DELETE(id) / NONE
+     * 4. Execute decisions
      */
     async maybeCreateMemory(deviceId, content, date) {
+        // Load all existing memories for comparison
+        const existingMemories = await loadMemory(deviceId);
+        // Find top-5 similar memories for context
+        let similarContext = "";
+        try {
+            const similar = await semanticSearch(content, existingMemories, 5);
+            if (similar.length > 0) {
+                similarContext = similar
+                    .map((s) => `- [id: ${s.id ?? "?"}] ${s.content} (importance: ${s.importance ?? 5}, date: ${s.source_date ?? "?"})`)
+                    .join("\n");
+            }
+        }
+        catch {
+            // Embedding unavailable — provide recent memories as fallback
+            if (existingMemories.length > 0) {
+                similarContext = existingMemories
+                    .slice(0, 5)
+                    .map((m) => `- [id: ${m.id}] ${m.content} (importance: ${m.importance}, date: ${m.source_date ?? "?"})`)
+                    .join("\n");
+            }
+        }
+        // Single AI call: extract + compare + decide
         const result = await chatCompletion([
             {
                 role: "system",
-                content: `判断以下内容是否值得作为长期记忆保存。只保存重要的事实、决定、承诺或关键事件。
+                content: `你是记忆管理系统。分析用户的新内容，提取值得长期保存的事实、决定、承诺或关键事件。
 
-特别注意：当用户表达目标、计划、愿望或野心时（如"我要完成融资"、"今年想跑马拉松"、"这个季度重点是..."），
-必须保存为高重要性记忆，summary 以 [目标] 开头，importance 设为 8-10。
+## 现有相关记忆
+${similarContext || "（暂无记忆）"}
 
-返回 JSON: {"save": true/false, "summary": "简洁摘要", "importance": 1-10}
-如果不值得保存，返回 {"save": false}`,
+## 决策规则
+对每条值得保存的信息，与现有记忆比较后决定：
+- **ADD**: 全新信息，不与任何现有记忆重复 → 创建新记忆
+- **UPDATE**: 是对某条现有记忆的更新/修正/补充 → 更新该记忆（提供 id）
+- **DELETE**: 新内容明确否定了某条现有记忆 → 删除该记忆（提供 id）
+- **NONE**: 内容不值得保存（日常流水账、无信息增量）
+
+## 重要性评分
+- 1-3: 一般事实
+- 4-6: 较重要的信息（习惯、偏好、日常决定）
+- 7-8: 重要事件（职业变动、重要决定、关键关系）
+- 9-10: 核心目标/重大人生事件
+
+返回 JSON 数组：
+[
+  {"action": "ADD", "content": "简洁摘要", "importance": 7},
+  {"action": "UPDATE", "id": "mem-xxx", "content": "更新后的摘要", "importance": 8},
+  {"action": "DELETE", "id": "mem-yyy", "reason": "已过时"},
+  {"action": "NONE"}
+]
+
+如果没有任何值得保存的信息，返回 [{"action": "NONE"}]。`,
             },
             { role: "user", content },
         ], { json: true, temperature: 0.3 });
         try {
-            const parsed = JSON.parse(result.content);
-            if (parsed.save && parsed.summary) {
-                // Mem0-style dedup: check for similar existing memories
-                await this.saveWithDedup(deviceId, parsed.summary, date, parsed.importance ?? 5);
+            const decisions = JSON.parse(result.content);
+            if (!Array.isArray(decisions))
+                return;
+            for (const decision of decisions) {
+                switch (decision.action) {
+                    case "ADD":
+                        if (decision.content) {
+                            await saveMemory(deviceId, decision.content, date, decision.importance ?? 5);
+                            console.log(`[memory] ADD: "${decision.content.slice(0, 50)}..." (importance: ${decision.importance ?? 5})`);
+                        }
+                        break;
+                    case "UPDATE":
+                        if (decision.id && decision.content) {
+                            await memoryRepo.update(decision.id, deviceId, {
+                                content: decision.content,
+                                importance: decision.importance,
+                            });
+                            console.log(`[memory] UPDATE ${decision.id}: "${decision.content.slice(0, 50)}..."`);
+                        }
+                        break;
+                    case "DELETE":
+                        if (decision.id) {
+                            await memoryRepo.deleteById(decision.id, deviceId);
+                            console.log(`[memory] DELETE ${decision.id}: ${decision.reason ?? "outdated"}`);
+                        }
+                        break;
+                    case "NONE":
+                        break;
+                }
             }
         }
         catch {
             // Skip if AI response can't be parsed
         }
-    }
-    /**
-     * Save memory with semantic deduplication (Mem0-inspired).
-     * If a very similar memory exists, update it instead of creating a duplicate.
-     */
-    async saveWithDedup(deviceId, content, date, importance) {
-        try {
-            const existing = await loadMemory(deviceId);
-            const similar = await findSimilarMemory(content, existing, 0.85);
-            if (similar) {
-                // Update existing memory: merge content, take higher importance
-                const mergedImportance = Math.max(similar.importance, importance);
-                const shouldUpdateContent = content.length > similar.content.length;
-                await memoryRepo.update(similar.id, deviceId, {
-                    content: shouldUpdateContent ? content : similar.content,
-                    importance: mergedImportance,
-                });
-                console.log(`[memory] Dedup: updated existing memory ${similar.id} (similarity: ${similar.score.toFixed(2)})`);
-                return;
-            }
-        }
-        catch (err) {
-            // Embedding unavailable — skip dedup, just save
-            console.warn(`[memory] Dedup check skipped: ${err.message}`);
-        }
-        // No similar memory found — create new
-        await saveMemory(deviceId, content, date, importance);
     }
     clearShortTerm() {
         this.shortTerm.clear();

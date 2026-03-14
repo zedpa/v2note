@@ -1,28 +1,27 @@
 import type { Skill } from "./types.js";
 import type { ContextTier, ContextBuildOptions } from "../context/tiers.js";
 /**
- * Build tiered context for structured prompt assembly.
+ * Build tiered context for chat/briefing prompt assembly.
  *
- * Hot tier (~1500 chars): core rules, anti-hallucination, output format skeleton
- * Warm tier (variable): soul, relevant memories, active skill prompts
- * Cold tier: remaining context available on-demand
+ * Hot tier (~1500 chars): core rules, anti-hallucination
+ * Warm tier (variable): soul, profile, memories, skill prompts, tools
  */
 export declare function buildTieredContext(opts: ContextBuildOptions): ContextTier;
 /**
- * Build the system prompt by combining active skills, memory, and soul.
- * Backward-compatible wrapper that concatenates hot + warm tiers.
+ * Build the system prompt by combining hot + warm tiers.
+ * Serves chat and briefing modes only (process uses hardcoded prompt).
  */
 export declare function buildSystemPrompt(opts: {
     skills: Skill[];
     soul?: string;
+    userProfile?: string;
     memory?: string[];
-    mode?: "process" | "chat";
-    existingTags?: string[];
+    mode?: "chat" | "briefing";
     mcpTools?: Array<{
         name: string;
         description: string;
         parameters?: Record<string, unknown>;
     }>;
-    /** Input text for relevance-based skill filtering */
-    inputText?: string;
+    /** Pre-built pending intent context to inject into warm tier */
+    pendingIntentContext?: string;
 }): string;

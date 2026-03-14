@@ -5,7 +5,7 @@ export declare function readBody<T = any>(req: IncomingMessage): Promise<T>;
 export declare function sendJson(res: ServerResponse, data: any, status?: number): void;
 /** Send an error response */
 export declare function sendError(res: ServerResponse, message: string, status?: number): void;
-/** Extract X-Device-Id header */
+/** Extract device ID — prefers JWT auth context, falls back to X-Device-Id header */
 export declare function getDeviceId(req: IncomingMessage): string;
 export declare class HttpError extends Error {
     status: number;

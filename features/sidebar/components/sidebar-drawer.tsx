@@ -1,6 +1,6 @@
 "use client";
 
-import { X, HelpCircle, Download, CreditCard, Info, Brain, UserCircle, Sun, Settings } from "lucide-react";
+import { X, HelpCircle, Download, CreditCard, Info, Brain, UserCircle, Sun, Settings, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { StatsPanel } from "./stats-panel";
 import { getCommandDefs } from "@/features/commands/lib/registry";
@@ -15,6 +15,9 @@ interface SidebarDrawerProps {
   onViewBriefing?: () => void;
   onViewSettings?: () => void;
   onExportData?: () => void;
+  onLogout?: () => void;
+  userName?: string | null;
+  userPhone?: string | null;
 }
 
 export function SidebarDrawer({
@@ -26,6 +29,9 @@ export function SidebarDrawer({
   onViewBriefing,
   onViewSettings,
   onExportData,
+  onLogout,
+  userName,
+  userPhone,
 }: SidebarDrawerProps) {
   if (!open) return null;
 
@@ -52,8 +58,12 @@ export function SidebarDrawer({
               <span className="text-lg">🎙</span>
             </div>
             <div>
-              <p className="text-sm font-display font-bold text-foreground">VoiceNote</p>
-              <p className="text-[10px] text-muted-foreground">AI 个人助手</p>
+              <p className="text-sm font-display font-bold text-foreground">
+                {userName || "VoiceNote"}
+              </p>
+              <p className="text-[10px] text-muted-foreground">
+                {userPhone || "AI 个人助手"}
+              </p>
             </div>
           </div>
           <button
@@ -162,6 +172,16 @@ export function SidebarDrawer({
                     toast("VoiceNote v2 — AI 个人助手", { duration: 3000 });
                   }}
                 />
+                {onLogout && (
+                  <MenuItem
+                    icon={<LogOut className="w-4 h-4" />}
+                    label="退出登录"
+                    onClick={() => {
+                      onClose();
+                      onLogout();
+                    }}
+                  />
+                )}
               </div>
             </div>
           </div>

@@ -1,3 +1,15 @@
+export interface AuthIdentity {
+  deviceId: string
+  userId: string
+}
+
+export interface AppUser {
+  id: string
+  phone: string
+  displayName: string | null
+  createdAt: string
+}
+
 export type UserType = 'manager' | 'creator' | null
 
 export interface Device {

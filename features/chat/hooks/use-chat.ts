@@ -14,7 +14,7 @@ export interface ChatMessage {
 }
 
 interface UseChatOptions {
-  mode?: "review" | "command";
+  mode?: "review" | "command" | "insight";
   initialMessage?: string;
 }
 
@@ -36,6 +36,8 @@ export function useChat(
   const responseTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   // Track whether chat.start has been sent to the gateway
   const sessionStartedRef = useRef(false);
+  // Store AI preamble (e.g. AiWindow message shown as assistant before user input)
+  const aiPreambleRef = useRef<string | null>(null);
   // Store dateRange in a ref so send() can access it without being in deps
   const dateRangeRef = useRef(dateRange);
   dateRangeRef.current = dateRange;
@@ -184,33 +186,33 @@ export function useChat(
     setStreaming(true);
     streamingTextRef.current = "";
 
-    // For command mode: show user's "/" message first, then assistant placeholder
+    // For command mode with initialMessage: show as AI greeting, wait for user input
     if (mode === "command" && options?.initialMessage) {
+      aiPreambleRef.current = options.initialMessage;
+      sessionStartedRef.current = false;
+      setStreaming(false);
+      streamingTextRef.current = "";
       setMessages([
         {
           id: crypto.randomUUID(),
-          role: "user",
+          role: "assistant",
           content: options.initialMessage,
           timestamp: new Date(),
         },
-        {
-          id: crypto.randomUUID(),
-          role: "assistant",
-          content: "",
-          timestamp: new Date(),
-        },
       ]);
-    } else {
-      // Review mode: just show assistant placeholder
-      setMessages([
-        {
-          id: crypto.randomUUID(),
-          role: "assistant",
-          content: "",
-          timestamp: new Date(),
-        },
-      ]);
+      // Don't send chat.start yet — wait for user's first message
+      return;
     }
+
+    // Review mode or command without initialMessage: start streaming immediately
+    setMessages([
+      {
+        id: crypto.randomUUID(),
+        role: "assistant",
+        content: "",
+        timestamp: new Date(),
+      },
+    ]);
 
     client.send({
       type: "chat.start",
@@ -292,9 +294,11 @@ export function useChat(
       },
     ]);
 
-    // If gateway session not started yet (e.g. "/" bootstrap), send chat.start instead of chat.message
+    // If gateway session not started yet (e.g. "/" bootstrap or AI preamble), send chat.start instead of chat.message
     if (!sessionStartedRef.current) {
       const localConfig = await loadLocalConfig();
+      const preamble = aiPreambleRef.current;
+      aiPreambleRef.current = null;
       client.send({
         type: "chat.start",
         payload: {
@@ -302,6 +306,7 @@ export function useChat(
           mode: "command",
           dateRange: dateRangeRef.current,
           initialMessage: text,
+          assistantPreamble: preamble ?? undefined,
           localConfig,
         },
       });

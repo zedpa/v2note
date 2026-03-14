@@ -19,7 +19,9 @@ export interface ProcessPayload {
     text: string;
     audioUrl?: string;
     deviceId: string;
+    userId?: string;
     recordId: string;
+    notebook?: string;
     localConfig?: LocalConfigPayload;
 }
 export interface RelayExtract {
@@ -29,8 +31,15 @@ export interface RelayExtract {
     context?: string;
     direction?: "outgoing" | "incoming";
 }
+export interface IntentSignal {
+    type: "task" | "wish" | "goal" | "complaint" | "reflection";
+    text: string;
+    context?: string;
+}
 export interface ProcessResult {
     todos: string[];
+    intents: IntentSignal[];
+    pending_followups: number;
     customer_requests: string[];
     setting_changes: string[];
     tags: string[];
@@ -39,6 +48,6 @@ export interface ProcessResult {
     error?: string;
 }
 /**
- * Process a single diary entry: run active skills to extract structured data.
+ * Process a single diary entry: hardcoded prompt + optional skills.
  */
 export declare function processEntry(payload: ProcessPayload): Promise<ProcessResult>;

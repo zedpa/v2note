@@ -19,6 +19,13 @@ export async function findPendingByDevice(deviceId: string): Promise<PendingInte
   );
 }
 
+export async function findPendingByUser(userId: string): Promise<PendingIntent[]> {
+  return query<PendingIntent>(
+    `SELECT * FROM pending_intent WHERE user_id = $1 AND status = 'pending' ORDER BY created_at DESC`,
+    [userId],
+  );
+}
+
 export async function findById(id: string): Promise<PendingIntent | null> {
   return queryOne<PendingIntent>(`SELECT * FROM pending_intent WHERE id = $1`, [id]);
 }

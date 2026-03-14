@@ -7,7 +7,6 @@ import { NewHeader } from "@/shared/components/new-header";
 import { NotesTimeline } from "@/features/notes/components/notes-timeline";
 import { FAB } from "@/features/recording/components/fab";
 import { SidebarDrawer } from "@/features/sidebar/components/sidebar-drawer";
-import { NoteDetail } from "@/features/notes/components/note-detail";
 import { SearchView } from "@/features/search/components/search-view";
 import { ChatView } from "@/features/chat/components/chat-view";
 import { OfflineBanner } from "@/shared/components/offline-banner";
@@ -20,13 +19,17 @@ import { ProfileEditor } from "@/features/profile/components/profile-editor";
 import { SettingsEditor } from "@/features/settings/components/settings-editor";
 import { SkillsPage } from "@/features/skills/components/skills-page";
 import { NotebookList } from "@/features/diary/components/notebook-list";
-import { DiaryView } from "@/features/diary/components/diary-view";
 import { MorningBriefing } from "@/features/daily/components/morning-briefing";
 import { EveningSummary } from "@/features/daily/components/evening-summary";
 import { toast } from "sonner";
 import { getCommandDefs } from "@/features/commands/lib/registry";
-import { NudgeToastListener } from "@/features/proactive/components/nudge-toast";
+// NudgeToastListener replaced by AiWindow (inside NotesTimeline)
 import { useBackHandler } from "@/shared/hooks/use-back-handler";
+import { useAuth } from "@/features/auth/hooks/use-auth";
+import { LoginPage } from "@/features/auth/components/login-page";
+import { RegisterPage } from "@/features/auth/components/register-page";
+import { useUpdateCheck } from "@/shared/hooks/use-update-check";
+import { UpdateDialog } from "@/shared/components/update-dialog";
 
 type OverlayName =
   | "search"
@@ -46,8 +49,10 @@ type OverlayName =
 
 export default function Page() {
   const { setTheme } = useTheme();
+  const { loggedIn, user, loading: authLoading, error: authError, login, register, logout } = useAuth();
+  const { update, dismiss, applying } = useUpdateCheck();
+  const [authMode, setAuthMode] = useState<"login" | "register">("login");
   const [showSidebar, setShowSidebar] = useState(false);
-  const [detailId, setDetailId] = useState<string | null>(null);
   const [activeOverlay, setActiveOverlay] = useState<OverlayName>(null);
   const [chatDateRange, setChatDateRange] = useState<{
     start: string;
@@ -70,6 +75,7 @@ export default function Page() {
 
   // Auto-show morning briefing (7-10am, once per day)
   useEffect(() => {
+    if (!loggedIn) return;
     const hour = new Date().getHours();
     if (hour >= 7 && hour < 10) {
       const today = new Date().toISOString().split("T")[0];
@@ -79,13 +85,12 @@ export default function Page() {
         setActiveOverlay("morning-briefing");
       }
     }
-  }, []);
+  }, [loggedIn]);
 
   const backHandler = useMemo(() => {
-    if (detailId) return () => setDetailId(null);
     if (activeOverlay) return () => setActiveOverlay(null);
     return null;
-  }, [detailId, activeOverlay]);
+  }, [activeOverlay]);
 
   useBackHandler(backHandler);
 
@@ -95,6 +100,8 @@ export default function Page() {
 
   const closeOverlay = useCallback(() => {
     setActiveOverlay(null);
+    // Notify AiWindow that chat/overlay was closed
+    window.dispatchEvent(new Event("ai-window:chat-return"));
   }, []);
 
   const handleStartReview = useCallback((range: { start: string; end: string }) => {
@@ -103,7 +110,7 @@ export default function Page() {
     setActiveOverlay("chat");
   }, []);
 
-  const handleOpenCommandChat = useCallback((initialText: string) => {
+  const handleOpenCommandChat = useCallback((initialText?: string) => {
     const today = new Date().toISOString().split("T")[0];
     setChatDateRange({ start: today, end: today });
     setChatInitialMessage(initialText);
@@ -111,7 +118,6 @@ export default function Page() {
   }, []);
 
   const handleCommandDetected = useCallback((command: string, args?: string[]) => {
-    // Voice command detected from gateway
     openOverlay(command, args);
   }, [openOverlay]);
 
@@ -122,9 +128,41 @@ export default function Page() {
   }, []);
 
   const handleExport = useCallback((_format: string) => {
-    // Export functionality — existing logic
     toast("导出功能开发中...");
   }, []);
+
+  // Auth gate: show login/register if not logged in
+  if (authLoading) {
+    return (
+      <div className="min-h-dvh flex items-center justify-center bg-background">
+        <div className="text-center space-y-3">
+          <div className="w-12 h-12 mx-auto rounded-xl bg-primary/10 flex items-center justify-center">
+            <span className="text-2xl">🎙</span>
+          </div>
+          <p className="text-sm text-muted-foreground">加载中...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!loggedIn) {
+    if (authMode === "register") {
+      return (
+        <RegisterPage
+          onRegister={register}
+          onSwitchToLogin={() => setAuthMode("login")}
+          error={authError}
+        />
+      );
+    }
+    return (
+      <LoginPage
+        onLogin={login}
+        onSwitchToRegister={() => setAuthMode("register")}
+        error={authError}
+      />
+    );
+  }
 
   return (
     <div className="min-h-dvh bg-background max-w-lg mx-auto relative">
@@ -136,14 +174,13 @@ export default function Page() {
         onViewProfile={() => setActiveOverlay("profile")}
         onViewBriefing={() => setActiveOverlay("morning-briefing")}
         onViewSettings={() => setActiveOverlay("settings")}
+        onLogout={logout}
+        userName={user?.displayName}
+        userPhone={user?.phone}
       />
       <OfflineBanner />
-      <NudgeToastListener
-        onOpenTodos={() => setActiveOverlay("todos")}
-        onOpenTodayTodo={() => setActiveOverlay("today-todo")}
-        onOpenBriefing={() => setActiveOverlay("morning-briefing")}
-        onOpenSummary={() => setActiveOverlay("evening-summary")}
-      />
+      <UpdateDialog update={update} onDismiss={dismiss} applying={applying} />
+      {/* Proactive messages now handled by AiWindow inside NotesTimeline */}
 
       <NewHeader
         onSearchClick={() => setActiveOverlay("search")}
@@ -153,17 +190,19 @@ export default function Page() {
         onNotebookClick={() => setActiveOverlay("notebooks")}
         activeNotebookName={activeNotebookName}
         activeNotebookColor={activeNotebookColor}
+        userName={user?.displayName}
       />
 
       <main className="pb-6">
-        {activeNotebook === null ? (
-          <NotesTimeline onNoteClick={(id) => setDetailId(id)} />
-        ) : (
-          <DiaryView notebook={activeNotebook} />
-        )}
+        <NotesTimeline
+          notebook={activeNotebook}
+          onOpenChat={handleOpenCommandChat}
+          onOpenOverlay={openOverlay}
+        />
       </main>
 
       <FAB
+        activeNotebook={activeNotebook}
         onStartReview={(range) => {
           setChatDateRange(range);
           setChatInitialMessage(undefined);
@@ -181,16 +220,9 @@ export default function Page() {
       />
 
       {/* Overlays — command-driven */}
-      {detailId && (
-        <NoteDetail recordId={detailId} onClose={() => setDetailId(null)} />
-      )}
       {activeOverlay === "search" && (
         <SearchView
           onClose={closeOverlay}
-          onNoteClick={(id) => {
-            closeOverlay();
-            setDetailId(id);
-          }}
         />
       )}
       {activeOverlay === "chat" && chatDateRange && (
@@ -222,10 +254,6 @@ export default function Page() {
       <TodoPanel
         open={activeOverlay === "todos"}
         onClose={closeOverlay}
-        onNoteClick={(id) => {
-          closeOverlay();
-          setDetailId(id);
-        }}
       />
       {activeOverlay === "today-todo" && (
         <TodayGantt onClose={closeOverlay} />

@@ -50,13 +50,19 @@ export interface LocalSkillConfig {
   name: string;
   enabled: boolean;
   description?: string;
+  /** @deprecated Directory structure determines type now */
   type?: "review" | "process";
   prompt?: string;
+  /** @deprecated No longer distinguishing builtin vs user */
   builtin?: boolean;
+  /** Which directory this skill belongs to: "skills" or "insights" */
+  source?: "skills" | "insights";
 }
 
 export interface LocalSkills {
   configs: LocalSkillConfig[];
+  selectedInsightSkill?: string;
+  /** @deprecated Use selectedInsightSkill */
   selectedReviewSkill?: string;
   updatedAt: string;
 }

@@ -14,15 +14,33 @@ export async function loadSoul(deviceId: string): Promise<Soul | null> {
   return soulRepo.findByDevice(deviceId);
 }
 
+// ── Per-user write queue for serialized updates ──
+const updateQueues = new Map<string, Promise<void>>();
+
 /**
  * Update the Soul (AI identity definition) based on new interactions.
- * The AI merges the existing soul with insights from the new interaction.
+ * Serialized per-user to prevent concurrent overwrites.
  */
 export async function updateSoul(
   deviceId: string,
   newInteraction: string,
+  userId?: string,
 ): Promise<void> {
-  const existing = await loadSoul(deviceId);
+  const key = userId ?? deviceId;
+  const prev = updateQueues.get(key) ?? Promise.resolve();
+  const next = prev.then(() => doUpdateSoul(deviceId, newInteraction, userId)).catch(() => {});
+  updateQueues.set(key, next);
+  return next;
+}
+
+async function doUpdateSoul(
+  deviceId: string,
+  newInteraction: string,
+  userId?: string,
+): Promise<void> {
+  const existing = userId
+    ? await soulRepo.findByUser(userId) ?? await loadSoul(deviceId)
+    : await loadSoul(deviceId);
   const currentSoul = existing?.content ?? "";
 
   const result = await chatCompletion(
@@ -54,5 +72,9 @@ export async function updateSoul(
     { temperature: 0.3 },
   );
 
-  await soulRepo.upsert(deviceId, result.content);
+  if (userId) {
+    await soulRepo.upsertByUser(userId, result.content);
+  } else {
+    await soulRepo.upsert(deviceId, result.content);
+  }
 }

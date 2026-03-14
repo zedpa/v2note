@@ -41,10 +41,8 @@ interface SkillDisplay {
   description: string;
   enabled: boolean;
   always: boolean;
-  type: "review" | "process";
-  builtin: boolean;
+  source: "skills" | "insights";
   prompt?: string;
-  created_by?: string;
 }
 
 interface SkillsPageProps {
@@ -55,6 +53,7 @@ interface SkillFormData {
   name: string;
   description: string;
   prompt: string;
+  source: "skills" | "insights";
 }
 
 export function SkillsPage({ onClose }: SkillsPageProps) {
@@ -69,28 +68,27 @@ export function SkillsPage({ onClose }: SkillsPageProps) {
     name: "",
     description: "",
     prompt: "",
+    source: "insights",
   });
   const [saving, setSaving] = useState(false);
 
   // Delete confirmation state
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
 
-  const reviewSkills = skills.filter((s) => s.type === "review");
-  const processSkills = skills.filter((s) => s.type === "process");
+  const insightSkills = skills.filter((s) => s.source === "insights");
+  const processSkills = skills.filter((s) => s.source === "skills");
 
   const loadData = useCallback(async () => {
     try {
-      // Try loading from local config first
       const localSkills = await getSkills();
-      if (localSkills && localSkills.configs.length > 0 && localSkills.configs.some((c) => c.type)) {
+      if (localSkills && localSkills.configs.length > 0) {
         setSkillsState(
           localSkills.configs.map((c) => ({
             name: c.name,
             description: c.description ?? c.name,
             enabled: c.enabled,
             always: false,
-            type: c.type ?? "process",
-            builtin: c.builtin ?? true,
+            source: c.source ?? (c.type === "review" ? "insights" : "skills"),
             prompt: c.prompt,
           })),
         );
@@ -107,14 +105,10 @@ export function SkillsPage({ onClose }: SkillsPageProps) {
           description: s.description,
           enabled: s.enabled,
           always: s.always ?? false,
-          type: s.type ?? "process",
-          builtin: s.builtin ?? true,
+          source: s.source ?? (s.type === "review" ? "insights" : "skills"),
           prompt: s.prompt,
-          created_by: s.created_by,
         }));
         setSkillsState(mapped);
-
-        // Persist to local config
         await persistToLocal(mapped);
       }
     } catch {
@@ -127,18 +121,17 @@ export function SkillsPage({ onClose }: SkillsPageProps) {
     loadData();
   }, [loadData]);
 
-  const persistToLocal = async (items: SkillDisplay[], selectedReview?: string) => {
+  const persistToLocal = async (items: SkillDisplay[]) => {
     const current = await getSkills();
     const localSkills: LocalSkills = {
       configs: items.map((s) => ({
         name: s.name,
         enabled: s.enabled,
         description: s.description,
-        type: s.type,
-        prompt: s.builtin ? undefined : s.prompt,
-        builtin: s.builtin,
+        source: s.source,
+        prompt: s.prompt,
       })),
-      selectedReviewSkill: selectedReview ?? current?.selectedReviewSkill,
+      selectedInsightSkill: current?.selectedInsightSkill ?? current?.selectedReviewSkill,
       updatedAt: new Date().toISOString(),
     };
     await setSkills(localSkills);
@@ -157,9 +150,9 @@ export function SkillsPage({ onClose }: SkillsPageProps) {
     toast(`${skill.description || skill.name} 已${newEnabled ? "启用" : "停用"}`);
   };
 
-  const openCreateForm = () => {
+  const openCreateForm = (source: "skills" | "insights") => {
     setEditingSkill(null);
-    setFormData({ name: "", description: "", prompt: "" });
+    setFormData({ name: "", description: "", prompt: "", source });
     setFormOpen(true);
   };
 
@@ -169,6 +162,7 @@ export function SkillsPage({ onClose }: SkillsPageProps) {
       name: skill.name,
       description: skill.description,
       prompt: skill.prompt ?? "",
+      source: skill.source,
     });
     setFormOpen(true);
   };
@@ -182,7 +176,6 @@ export function SkillsPage({ onClose }: SkillsPageProps) {
     setSaving(true);
     try {
       if (editingSkill) {
-        // Update — save locally first
         const updated = skills.map((s) =>
           s.name === editingSkill
             ? {
@@ -196,34 +189,29 @@ export function SkillsPage({ onClose }: SkillsPageProps) {
         setSkillsState(updated);
         await persistToLocal(updated);
         toast("技能已更新");
-        // Sync to server in background
         apiUpdateSkill(editingSkill, {
           name: formData.name.trim(),
           description: formData.description.trim(),
           prompt: formData.prompt.trim(),
         }).catch(() => {});
       } else {
-        // Create — save locally first
         const newSkill: SkillDisplay = {
           name: formData.name.trim(),
           description: formData.description.trim(),
           enabled: true,
           always: false,
-          type: "review",
-          builtin: false,
+          source: formData.source,
           prompt: formData.prompt.trim(),
-          created_by: "user",
         };
         const updated = [...skills, newSkill];
         setSkillsState(updated);
         await persistToLocal(updated);
         toast("技能已创建");
-        // Sync to server in background
         apiCreateSkill({
           name: formData.name.trim(),
           description: formData.description.trim(),
           prompt: formData.prompt.trim(),
-          type: "review",
+          type: formData.source === "insights" ? "review" : "process",
         }).catch(() => {});
       }
       setFormOpen(false);
@@ -235,12 +223,10 @@ export function SkillsPage({ onClose }: SkillsPageProps) {
 
   const handleDelete = async () => {
     if (!deleteTarget) return;
-    // Save locally first
     const updated = skills.filter((s) => s.name !== deleteTarget);
     setSkillsState(updated);
     await persistToLocal(updated);
     toast("技能已删除");
-    // Sync to server in background
     apiDeleteSkill(deleteTarget).catch(() => {});
     setDeleteTarget(null);
   };
@@ -262,18 +248,18 @@ export function SkillsPage({ onClose }: SkillsPageProps) {
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto px-4 py-4 space-y-6">
-          {/* Review Skills Section */}
+          {/* Process Skills Section */}
           <section>
             <div className="flex items-center justify-between mb-3">
               <div>
-                <h2 className="text-sm font-semibold text-foreground">复盘视角</h2>
+                <h2 className="text-sm font-semibold text-foreground">处理技能</h2>
                 <p className="text-[11px] text-muted-foreground mt-0.5">
-                  复盘对话时可选择一个视角引导 AI 分析
+                  录音处理时使用已启用的技能进行可选提取
                 </p>
               </div>
               <button
                 type="button"
-                onClick={openCreateForm}
+                onClick={() => openCreateForm("skills")}
                 className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-primary/10 text-primary text-xs font-medium hover:bg-primary/20 transition-colors"
               >
                 <Plus className="w-3.5 h-3.5" />
@@ -282,7 +268,7 @@ export function SkillsPage({ onClose }: SkillsPageProps) {
             </div>
 
             <div className="space-y-1">
-              {reviewSkills.map((skill) => (
+              {processSkills.map((skill) => (
                 <SkillRow
                   key={skill.name}
                   skill={skill}
@@ -298,25 +284,35 @@ export function SkillsPage({ onClose }: SkillsPageProps) {
                   loading={loading}
                 />
               ))}
-              {reviewSkills.length === 0 && !loading && (
+              {processSkills.length === 0 && !loading && (
                 <p className="text-xs text-muted-foreground py-4 text-center">
-                  暂无复盘视角，点击右上角"新建"创建
+                  暂无处理技能
                 </p>
               )}
             </div>
           </section>
 
-          {/* Process Skills Section */}
+          {/* Insight Skills Section */}
           <section>
-            <div className="mb-3">
-              <h2 className="text-sm font-semibold text-foreground">处理技能</h2>
-              <p className="text-[11px] text-muted-foreground mt-0.5">
-                录音处理时使用已启用的技能进行提取
-              </p>
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <h2 className="text-sm font-semibold text-foreground">洞察视角</h2>
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  复盘对话时可选择一个视角引导 AI 分析
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => openCreateForm("insights")}
+                className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-primary/10 text-primary text-xs font-medium hover:bg-primary/20 transition-colors"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                新建
+              </button>
             </div>
 
             <div className="space-y-1">
-              {processSkills.map((skill) => (
+              {insightSkills.map((skill) => (
                 <SkillRow
                   key={skill.name}
                   skill={skill}
@@ -327,9 +323,16 @@ export function SkillsPage({ onClose }: SkillsPageProps) {
                       expandedSkill === skill.name ? null : skill.name,
                     )
                   }
+                  onEdit={() => openEditForm(skill)}
+                  onDelete={() => setDeleteTarget(skill.name)}
                   loading={loading}
                 />
               ))}
+              {insightSkills.length === 0 && !loading && (
+                <p className="text-xs text-muted-foreground py-4 text-center">
+                  暂无洞察视角，点击右上角"新建"创建
+                </p>
+              )}
             </div>
           </section>
         </div>
@@ -340,12 +343,14 @@ export function SkillsPage({ onClose }: SkillsPageProps) {
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>
-              {editingSkill ? "编辑复盘视角" : "新建复盘视角"}
+              {editingSkill ? "编辑技能" : `新建${formData.source === "insights" ? "洞察视角" : "处理技能"}`}
             </DialogTitle>
             <DialogDescription>
               {editingSkill
-                ? "修改视角的名称、描述和提示词"
-                : "创建一个新的复盘视角，在复盘对话中使用"}
+                ? "修改名称、描述和提示词"
+                : formData.source === "insights"
+                  ? "创建一个新的洞察视角，在复盘对话中使用"
+                  : "创建一个新的处理技能，在录音处理时使用"}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
@@ -358,7 +363,7 @@ export function SkillsPage({ onClose }: SkillsPageProps) {
                 onChange={(e) =>
                   setFormData((f) => ({ ...f, name: e.target.value }))
                 }
-                placeholder="如：用户体验视角"
+                placeholder={formData.source === "insights" ? "如：用户体验视角" : "如：项目管理提取"}
                 disabled={saving}
               />
             </div>
@@ -371,7 +376,7 @@ export function SkillsPage({ onClose }: SkillsPageProps) {
                 onChange={(e) =>
                   setFormData((f) => ({ ...f, description: e.target.value }))
                 }
-                placeholder="简短描述这个视角的作用"
+                placeholder="简短描述这个技能的作用"
                 disabled={saving}
               />
             </div>
@@ -384,7 +389,7 @@ export function SkillsPage({ onClose }: SkillsPageProps) {
                 onChange={(e) =>
                   setFormData((f) => ({ ...f, prompt: e.target.value }))
                 }
-                placeholder="引导 AI 从这个视角进行分析的指令..."
+                placeholder={formData.source === "insights" ? "引导 AI 从这个视角进行分析的指令..." : "指导 AI 从录音中提取特定信息的规则..."}
                 rows={6}
                 disabled={saving}
               />
@@ -489,17 +494,6 @@ function SkillRow({
                 始终启用
               </Badge>
             )}
-            {skill.builtin && (
-              <Badge
-                variant="outline"
-                className="text-[10px] px-1.5 py-0"
-              >
-                内置
-              </Badge>
-            )}
-            {skill.created_by === "ai" && (
-              <Bot className="w-3 h-3 text-muted-foreground" />
-            )}
           </div>
           {skill.description && (
             <span className="block text-[11px] text-muted-foreground mt-0.5">
@@ -508,35 +502,33 @@ function SkillRow({
           )}
         </div>
 
-        {/* Action buttons for custom skills */}
-        {!skill.builtin && (
-          <div className="flex items-center gap-1">
-            {onEdit && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onEdit();
-                }}
-                className="p-1.5 rounded-lg hover:bg-secondary/60 transition-colors"
-              >
-                <Pencil className="w-3.5 h-3.5 text-muted-foreground" />
-              </button>
-            )}
-            {onDelete && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onDelete();
-                }}
-                className="p-1.5 rounded-lg hover:bg-destructive/10 transition-colors"
-              >
-                <Trash2 className="w-3.5 h-3.5 text-destructive" />
-              </button>
-            )}
-          </div>
-        )}
+        {/* Action buttons */}
+        <div className="flex items-center gap-1">
+          {onEdit && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onEdit();
+              }}
+              className="p-1.5 rounded-lg hover:bg-secondary/60 transition-colors"
+            >
+              <Pencil className="w-3.5 h-3.5 text-muted-foreground" />
+            </button>
+          )}
+          {onDelete && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete();
+              }}
+              className="p-1.5 rounded-lg hover:bg-destructive/10 transition-colors"
+            >
+              <Trash2 className="w-3.5 h-3.5 text-destructive" />
+            </button>
+          )}
+        </div>
 
         <CollapsibleTrigger asChild>
           <button

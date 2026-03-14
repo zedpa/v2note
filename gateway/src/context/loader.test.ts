@@ -22,6 +22,10 @@ vi.mock("../lib/text-utils.js", () => ({
   extractKeywords: vi.fn().mockReturnValue(new Set()),
 }));
 
+vi.mock("../memory/embeddings.js", () => ({
+  semanticSearch: vi.fn().mockRejectedValue(new Error("not available")),
+}));
+
 import { loadWarmContext } from "./loader.js";
 import { loadProfile } from "../profile/manager.js";
 import { loadSoul } from "../soul/manager.js";
@@ -42,16 +46,14 @@ describe("context loader", () => {
       expect(ctx.soul).toBe("Soul content");
     });
 
-    it("loads profile even in process mode", async () => {
+    it("loads profile in briefing mode", async () => {
       const ctx = await loadWarmContext({
         deviceId: "dev-1",
-        mode: "process",
+        mode: "briefing",
       });
 
       expect(loadProfile).toHaveBeenCalledWith("dev-1");
       expect(ctx.userProfile).toBe("Profile content");
-      // Soul is skipped in process mode
-      expect(ctx.soul).toBeUndefined();
     });
 
     it("skips soul when localSoul is provided", async () => {

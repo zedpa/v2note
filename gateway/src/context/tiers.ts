@@ -4,7 +4,6 @@
  * Inspired by OpenClaw's approach:
  * - Hot: always in system prompt (core rules, anti-hallucination, output format)
  * - Warm: task-specific (soul, relevant memories, active skill prompts)
- * - Cold: on-demand (full memory history, skill details, tool param schemas)
  */
 
 import type { Skill } from "../skills/types.js";
@@ -14,11 +13,9 @@ export interface ContextTier {
   hot: string;
   /** Task-specific additions. Varies by mode. */
   warm: string;
-  /** Available but not injected into system prompt. */
-  cold: string[];
 }
 
-export type ContextMode = "process" | "chat" | "briefing" | "estimate";
+export type ContextMode = "chat" | "briefing";
 
 export interface ContextBuildOptions {
   mode: ContextMode;
@@ -27,8 +24,5 @@ export interface ContextBuildOptions {
   /** User profile (factual info, separated from soul) */
   userProfile?: string;
   memories?: string[];
-  existingTags?: string[];
   mcpTools?: Array<{ name: string; description: string; parameters?: Record<string, unknown> }>;
-  /** Input text for relevance-based filtering */
-  inputText?: string;
 }

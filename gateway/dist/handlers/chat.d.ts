@@ -1,11 +1,13 @@
 export interface ChatStartPayload {
     deviceId: string;
-    mode: "review" | "command";
+    userId?: string;
+    mode: "review" | "command" | "insight";
     dateRange: {
         start: string;
         end: string;
     };
     initialMessage?: string;
+    assistantPreamble?: string;
     localConfig?: {
         soul?: {
             content: string;
@@ -15,24 +17,23 @@ export interface ChatStartPayload {
                 name: string;
                 enabled: boolean;
                 description?: string;
-                type?: string;
                 prompt?: string;
                 builtin?: boolean;
             }>;
+            selectedInsightSkill?: string;
+            /** @deprecated Use selectedInsightSkill */
             selectedReviewSkill?: string;
         };
     };
 }
 /**
- * Start a review chat session.
+ * Start a review/insight chat session.
  * Loads memory, soul, and skills into the session context.
  * Returns the initial AI greeting.
  */
 export declare function startChat(payload: ChatStartPayload): Promise<AsyncGenerator<string, void, undefined>>;
 /**
  * Send a message in an ongoing chat session.
- * Supports built-in tool calls: if AI responds with tool_calls JSON,
- * execute them and re-call AI for the final streaming response.
  */
 export declare function sendChatMessage(deviceId: string, text: string): Promise<AsyncGenerator<string, void, undefined>>;
 /**

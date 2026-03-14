@@ -17,6 +17,15 @@ export async function create(fields) {
         fields.importance ?? 5,
     ]);
 }
+export async function findByUser(userId, dateRange, limit) {
+    if (dateRange) {
+        return query(`SELECT * FROM memory WHERE user_id = $1
+       AND source_date >= $2 AND source_date <= $3
+       ORDER BY importance DESC LIMIT $4`, [userId, dateRange.start, dateRange.end, limit ?? 50]);
+    }
+    return query(`SELECT * FROM memory WHERE user_id = $1
+     ORDER BY importance DESC LIMIT $2`, [userId, limit ?? 50]);
+}
 export async function deleteById(id, deviceId) {
     await execute(`DELETE FROM memory WHERE id = $1 AND device_id = $2`, [id, deviceId]);
 }

@@ -19,3 +19,6 @@ export * as pendingIntentRepo from "./pending-intent.js";
 export * as userProfileRepo from "./user-profile.js";
 export * as aiDiaryRepo from "./ai-diary.js";
 export * as notebookRepo from "./notebook.js";
+export * as appUserRepo from "./app-user.js";
+export * as refreshTokenRepo from "./refresh-token.js";
+export * as appReleaseRepo from "./app-release.js";

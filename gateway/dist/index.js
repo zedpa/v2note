@@ -23,8 +23,15 @@ import { registerSyncRoutes } from "./routes/sync.js";
 import { registerMemoryRoutes } from "./routes/memory.js";
 import { registerSoulRoutes } from "./routes/soul.js";
 import { registerDailyLoopRoutes } from "./routes/daily-loop.js";
+import { registerGoalRoutes } from "./routes/goals.js";
+import { registerProfileRoutes } from "./routes/profile.js";
+import { registerNotebookRoutes } from "./routes/notebooks.js";
 import { registerMCPServerRoutes } from "./mcp/server.js";
+import { registerAuthRoutes } from "./routes/auth.js";
+import { registerReleaseRoutes } from "./routes/releases.js";
 import { getProactiveEngine } from "./proactive/engine.js";
+import { verifyAccessToken } from "./auth/jwt.js";
+import { generateAiStatus } from "./handlers/reflect.js";
 // Load environment
 config({ path: "../.env.local" });
 config({ path: ".env" });
@@ -46,7 +53,12 @@ registerSyncRoutes(router);
 registerMemoryRoutes(router);
 registerSoulRoutes(router);
 registerDailyLoopRoutes(router);
+registerGoalRoutes(router);
+registerProfileRoutes(router);
+registerNotebookRoutes(router);
 registerMCPServerRoutes(router);
+registerAuthRoutes(router);
+registerReleaseRoutes(router);
 // ── HTTP Server ──
 const server = createServer(async (req, res) => {
     // CORS for all requests (including /health and non-router paths)
@@ -82,8 +94,9 @@ const server = createServer(async (req, res) => {
 });
 // ── WebSocket Server ──
 const wss = new WebSocketServer({ server });
-// Map WebSocket connections to device IDs for binary audio routing
+// Map WebSocket connections to device IDs and user IDs
 const connectionDeviceMap = new Map();
+const connectionUserMap = new Map();
 function send(ws, msg) {
     if (ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify(msg));
@@ -114,12 +127,42 @@ wss.on("connection", (ws) => {
         }
         try {
             switch (msg.type) {
+                case "auth": {
+                    // WebSocket authentication
+                    try {
+                        const payload = verifyAccessToken(msg.payload.token);
+                        connectionUserMap.set(ws, payload.userId);
+                        connectionDeviceMap.set(ws, payload.deviceId);
+                        console.log(`[gateway] WebSocket authenticated: user=${payload.userId}, device=${payload.deviceId}`);
+                        send(ws, { type: "auth.ok", payload: { userId: payload.userId } });
+                        // Send personalized AI status in background
+                        generateAiStatus(payload.deviceId, payload.userId)
+                            .then((text) => {
+                            send(ws, { type: "ai.status", payload: { text } });
+                        })
+                            .catch((err) => {
+                            console.warn("[gateway] AI status generation failed:", err.message);
+                        });
+                    }
+                    catch {
+                        send(ws, { type: "error", payload: { message: "Authentication failed" } });
+                    }
+                    break;
+                }
                 case "process": {
+                    // Inject userId from WebSocket auth
+                    const userId = connectionUserMap.get(ws);
+                    if (userId)
+                        msg.payload.userId = userId;
                     const result = await processEntry(msg.payload);
                     send(ws, { type: "process.result", payload: result });
                     break;
                 }
                 case "chat.start": {
+                    // Inject userId from WebSocket auth
+                    const userId = connectionUserMap.get(ws);
+                    if (userId)
+                        msg.payload.userId = userId;
                     const stream = await startChat(msg.payload);
                     let fullText = "";
                     for await (const chunk of stream) {
@@ -156,9 +199,10 @@ wss.on("connection", (ws) => {
                     break;
                 }
                 case "asr.start": {
+                    console.log(`[asr.start] notebook=${msg.payload.notebook}, mode=${msg.payload.mode}`);
                     connectionDeviceMap.set(ws, msg.payload.deviceId);
                     proactiveEngine.registerDevice(msg.payload.deviceId, ws);
-                    await startASR(ws, msg.payload.deviceId, msg.payload.locationText, msg.payload.mode);
+                    await startASR(ws, msg.payload.deviceId, msg.payload.locationText, msg.payload.mode, msg.payload.notebook);
                     break;
                 }
                 case "asr.stop": {
@@ -196,6 +240,7 @@ wss.on("connection", (ws) => {
             cancelASR(deviceId, ws);
             connectionDeviceMap.delete(ws);
         }
+        connectionUserMap.delete(ws);
         proactiveEngine.unregisterByWs(ws);
         console.log("[gateway] Client disconnected");
     });

@@ -4,78 +4,90 @@
  * Key design (borrowed from OpenClaw):
  * - Parallel loading of soul + memories via Promise.all
  * - Keyword-based relevance scoring (no vector DB needed)
- * - Mode-aware loading: process mode skips soul, chat loads more memories
+ * - Mode-aware loading: chat loads more memories than briefing
  * - Returns pre-filtered, ranked context ready for prompt assembly
  */
 import { loadMemory } from "../memory/long-term.js";
 import { loadSoul } from "../soul/manager.js";
-/** Chinese stopwords to exclude from keyword matching */
-const STOPWORDS = new Set([
-    "的", "了", "在", "是", "我", "有", "和", "就", "不", "人", "都", "一",
-    "一个", "上", "也", "很", "到", "说", "要", "去", "你", "会", "着", "没有",
-    "看", "好", "自己", "这", "他", "她", "它", "们", "那", "被", "从", "把",
-    "还", "能", "对", "吗", "呢", "吧", "啊", "嗯", "哦", "额", "呃",
-]);
+import { loadProfile } from "../profile/manager.js";
+import { goalRepo } from "../db/repositories/index.js";
+import { extractKeywords } from "../lib/text-utils.js";
+import { semanticSearch } from "../memory/embeddings.js";
 /** Memory limits per mode */
 const MEMORY_LIMITS = {
-    process: 5,
     chat: 15,
     briefing: 10,
-    estimate: 5,
 };
 /**
  * Load warm-tier context in parallel, with relevance filtering.
  */
 export async function loadWarmContext(opts) {
-    const needsSoul = opts.mode !== "process"; // process mode doesn't need soul
     const memoryLimit = MEMORY_LIMITS[opts.mode] ?? 10;
-    // Parallel loading
-    const [soul, rawMemories] = await Promise.all([
-        needsSoul && !opts.localSoul
-            ? loadSoulSafe(opts.deviceId)
+    // Use userId for cross-device data when available, fall back to deviceId
+    const id = opts.userId ?? opts.deviceId;
+    const useUser = !!opts.userId;
+    // Parallel loading (soul + profile + memories + goals)
+    const [soul, profile, rawMemories, activeGoals] = await Promise.all([
+        !opts.localSoul
+            ? (useUser ? loadSoulByUserSafe(id) : loadSoulSafe(opts.deviceId))
             : Promise.resolve(undefined),
-        loadMemorySafe(opts.deviceId, opts.dateRange),
+        useUser ? loadProfileByUserSafe(id) : loadProfileSafe(opts.deviceId),
+        useUser ? loadMemoryByUserSafe(id, opts.dateRange) : loadMemorySafe(opts.deviceId, opts.dateRange),
+        useUser ? loadGoalsByUserSafe(id) : loadGoalsSafe(opts.deviceId),
     ]);
     const soulContent = opts.localSoul ?? soul?.content;
-    // Relevance-filter memories
-    const ranked = rankMemories(rawMemories, opts.inputText, memoryLimit);
+    const profileContent = profile?.content;
+    // Relevance-filter memories (embedding-first, keyword fallback)
+    const ranked = await rankMemories(rawMemories, opts.inputText, memoryLimit);
     // Format as context strings
     const memories = ranked.map((m) => `[${m.source_date ?? "未知日期"}] ${m.content}`);
+    const goals = activeGoals.map((g) => ({ id: g.id, title: g.title }));
     return {
         soul: soulContent,
+        userProfile: profileContent,
         memories,
         rawMemories: ranked,
+        goals,
     };
 }
 /**
  * Rank memories by relevance to input text.
- * Uses keyword overlap + importance + recency.
+ * Tries embedding-based search first, falls back to keyword scoring.
  */
-function rankMemories(memories, inputText, limit) {
+async function rankMemories(memories, inputText, limit) {
     if (memories.length === 0)
         return [];
-    // Goals ([目标] prefixed) always surface — they're high-value context
-    const goals = memories.filter((m) => m.content.startsWith("[目标]"));
-    const nonGoals = memories.filter((m) => !m.content.startsWith("[目标]"));
     if (!inputText) {
-        // No input text — fall back to importance-based selection
-        // Goals first, then by importance
-        return [...goals, ...nonGoals].slice(0, limit);
+        // No input — return by importance + recency
+        return memories.slice(0, limit);
     }
+    // 1. Try embedding search
+    try {
+        const results = await semanticSearch(inputText, memories, limit);
+        if (results.length > 0) {
+            return results.map(r => {
+                const entry = memories.find(m => m.content === r.content);
+                return entry;
+            }).filter(Boolean);
+        }
+    }
+    catch {
+        // fallback to keyword
+    }
+    // 2. Keyword fallback
+    return keywordRank(memories, inputText, limit);
+}
+/**
+ * Keyword-based memory ranking (fallback).
+ */
+function keywordRank(memories, inputText, limit) {
     const inputKeywords = extractKeywords(inputText);
-    // Score non-goal memories
-    const scored = nonGoals.map((m) => ({
+    const scored = memories.map((m) => ({
         memory: m,
         score: computeRelevanceScore(m, inputKeywords),
     }));
     scored.sort((a, b) => b.score - a.score);
-    // Goals always included + top-scored non-goals
-    const goalSlots = Math.min(goals.length, Math.ceil(limit * 0.4));
-    const nonGoalSlots = limit - goalSlots;
-    return [
-        ...goals.slice(0, goalSlots),
-        ...scored.slice(0, nonGoalSlots).map((s) => s.memory),
-    ];
+    return scored.slice(0, limit).map((s) => s.memory);
 }
 /**
  * Compute relevance score for a memory entry.
@@ -102,27 +114,15 @@ function computeRelevanceScore(memory, inputKeywords) {
     }
     return keywordScore * 0.4 + importanceScore * 0.3 + recencyScore * 0.3;
 }
-/**
- * Extract keywords from Chinese/mixed text.
- * Uses character bigrams + word-level split for broad matching.
- */
-function extractKeywords(text) {
-    const keywords = new Set();
-    // Split on whitespace and common punctuation
-    const words = text.split(/[\s,，。！？、；：""''（）()《》\[\]【】\-—…·]+/);
-    for (const word of words) {
-        const w = word.trim().toLowerCase();
-        if (w.length >= 2 && !STOPWORDS.has(w)) {
-            keywords.add(w);
-        }
+/** Safe profile loading (never throws) */
+async function loadProfileSafe(deviceId) {
+    try {
+        return await loadProfile(deviceId);
     }
-    // Add character bigrams for Chinese text
-    const cleaned = text.replace(/[a-zA-Z0-9\s\p{P}]/gu, "");
-    for (let i = 0; i < cleaned.length - 1; i++) {
-        const bigram = cleaned.slice(i, i + 2);
-        keywords.add(bigram);
+    catch (err) {
+        console.warn(`[context-loader] Failed to load profile: ${err.message}`);
+        return undefined;
     }
-    return keywords;
 }
 /** Safe soul loading (never throws) */
 async function loadSoulSafe(deviceId) {
@@ -141,6 +141,56 @@ async function loadMemorySafe(deviceId, dateRange) {
     }
     catch (err) {
         console.warn(`[context-loader] Failed to load memories: ${err.message}`);
+        return [];
+    }
+}
+/** Safe goals loading (never throws) */
+async function loadGoalsSafe(deviceId) {
+    try {
+        return await goalRepo.findActiveByDevice(deviceId);
+    }
+    catch (err) {
+        console.warn(`[context-loader] Failed to load goals: ${err.message}`);
+        return [];
+    }
+}
+// ── User-based loaders (for cross-device unified data) ──
+async function loadSoulByUserSafe(userId) {
+    try {
+        const { soulRepo } = await import("../db/repositories/index.js");
+        return await soulRepo.findByUser(userId);
+    }
+    catch (err) {
+        console.warn(`[context-loader] Failed to load soul by user: ${err.message}`);
+        return undefined;
+    }
+}
+async function loadProfileByUserSafe(userId) {
+    try {
+        const { userProfileRepo } = await import("../db/repositories/index.js");
+        return await userProfileRepo.findByUser(userId);
+    }
+    catch (err) {
+        console.warn(`[context-loader] Failed to load profile by user: ${err.message}`);
+        return undefined;
+    }
+}
+async function loadMemoryByUserSafe(userId, dateRange) {
+    try {
+        const memoryRepo = await import("../db/repositories/memory.js");
+        return await memoryRepo.findByUser(userId, dateRange);
+    }
+    catch (err) {
+        console.warn(`[context-loader] Failed to load memories by user: ${err.message}`);
+        return [];
+    }
+}
+async function loadGoalsByUserSafe(userId) {
+    try {
+        return await goalRepo.findActiveByUser(userId);
+    }
+    catch (err) {
+        console.warn(`[context-loader] Failed to load goals by user: ${err.message}`);
         return [];
     }
 }

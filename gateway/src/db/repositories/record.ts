@@ -8,6 +8,7 @@ export interface Record {
   audio_path: string | null;
   duration_seconds: number | null;
   location_text: string | null;
+  notebook: string | null;
   archived: boolean;
   created_at: string;
   updated_at: string;
@@ -15,10 +16,38 @@ export interface Record {
 
 export async function findByDevice(
   deviceId: string,
-  opts?: { archived?: boolean; limit?: number; offset?: number },
+  opts?: { archived?: boolean; limit?: number; offset?: number; notebook?: string | null },
 ): Promise<Record[]> {
   const conditions = [`device_id = $1`];
   const params: any[] = [deviceId];
+  let i = 2;
+  if (opts?.archived !== undefined) {
+    conditions.push(`archived = $${i++}`);
+    params.push(opts.archived);
+  }
+  if (opts?.notebook !== undefined) {
+    if (opts.notebook === null) {
+      conditions.push(`notebook IS NULL`);
+    } else {
+      conditions.push(`notebook = $${i++}`);
+      params.push(opts.notebook);
+    }
+  }
+  const limit = opts?.limit ?? 100;
+  const offset = opts?.offset ?? 0;
+  return query<Record>(
+    `SELECT * FROM record WHERE ${conditions.join(" AND ")}
+     ORDER BY created_at DESC LIMIT $${i++} OFFSET $${i}`,
+    [...params, limit, offset],
+  );
+}
+
+export async function findByUser(
+  userId: string,
+  opts?: { archived?: boolean; limit?: number; offset?: number },
+): Promise<Record[]> {
+  const conditions = [`user_id = $1`];
+  const params: any[] = [userId];
   let i = 2;
   if (opts?.archived !== undefined) {
     conditions.push(`archived = $${i++}`);
@@ -33,6 +62,19 @@ export async function findByDevice(
   );
 }
 
+export async function findByUserAndDateRange(
+  userId: string,
+  start: string,
+  end: string,
+): Promise<Record[]> {
+  return query<Record>(
+    `SELECT * FROM record WHERE user_id = $1
+     AND created_at >= $2 AND created_at <= $3
+     ORDER BY created_at ASC`,
+    [userId, start, end],
+  );
+}
+
 export async function findById(id: string): Promise<Record | null> {
   return queryOne<Record>(`SELECT * FROM record WHERE id = $1`, [id]);
 }
@@ -44,10 +86,11 @@ export async function create(fields: {
   audio_path?: string;
   duration_seconds?: number;
   location_text?: string;
+  notebook?: string;
 }): Promise<Record> {
   const row = await queryOne<Record>(
-    `INSERT INTO record (device_id, status, source, audio_path, duration_seconds, location_text)
-     VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+    `INSERT INTO record (device_id, status, source, audio_path, duration_seconds, location_text, notebook)
+     VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
     [
       fields.device_id,
       fields.status ?? "uploading",
@@ -55,6 +98,7 @@ export async function create(fields: {
       fields.audio_path ?? null,
       fields.duration_seconds ?? null,
       fields.location_text ?? null,
+      fields.notebook ?? null,
     ],
   );
   return row!;

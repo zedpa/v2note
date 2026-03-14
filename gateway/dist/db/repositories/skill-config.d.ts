@@ -6,6 +6,7 @@ export interface SkillConfig {
     config: any;
 }
 export declare function findByDevice(deviceId: string): Promise<SkillConfig[]>;
+export declare function findByUser(userId: string): Promise<SkillConfig[]>;
 export declare function upsert(fields: {
     device_id: string;
     skill_name: string;

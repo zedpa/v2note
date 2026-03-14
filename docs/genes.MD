@@ -10,6 +10,11 @@
 
 | 版本 | 日期 | 变更内容 |
 |------|------|----------|
+| v2026.03.14b | 2026-03-14 | 录音处理硬编码+Skills/Insights双目录架构+记忆系统Mem0重构：(1)process-prompt.ts 硬编码核心提取规则（意图分类+转达检测+转写清理+标签匹配+反幻觉纪律+JSON输出格式），不再动态加载skill构建prompt；(2)process.ts 简化——移除buildSystemPrompt/MCP工具注入/上下文注入AI prompt，改用硬编码+可选技能追加；(3)skills/ 目录清理——删除 intent-classify/relay-detect（已硬编码），迁移 reflect/meta-question/second-order-thinking 到 insights/；(4)新建 gateway/insights/ 目录——reflect、meta-question、second-order-thinking（迁移）+ munger-review（新建芒格决策复盘）；(5)SKILL.md frontmatter简化——去掉type/builtin字段，目录即类型；(6)skills/types.ts——删除SkillType/type/builtin，新增version/trigger/rag_required；(7)loader.ts——接收dir参数支持skills/和insights/，删除partitionSkillsByRelevance/getSkillManifest，filterActiveSkills去掉type参数；(8)prompt-builder.ts——只服务chat/briefing，删除process分支和cold tier；(9)tiers.ts——ContextTier删除cold字段，ContextMode只保留chat/briefing；(10)anti-hallucination.ts——删除PROCESS_GUARDRAILS（已内联到process-prompt）；(11)context/loader.ts——embedding优先召回+keyword fallback，删除[目标]memory分支（统一排序）；(12)chat.ts——从insights/加载选中洞察技能，支持insight mode；(13)memory/manager.ts Mem0两阶段重写——一次AI调用完成候选提取+相似记忆比较+决策（ADD/UPDATE/DELETE/NONE），替代原来两步分离（maybeCreateMemory+saveWithDedup）；(14)soul/profile manager per-user写入队列串行化（防止并发覆盖）；(15)session/manager.ts——MemoryManager挂在session上（per-device单例，非每次new）；(16)process.ts soul/profile按需更新——关键词预判（soulKeywords/profileKeywords），大多数录音跳过更新节省2次AI调用；(17)前端 local-config.ts——新增selectedInsightSkill+source字段；(18)use-chat.ts 支持insight mode；(19)review-overlay.tsx——洞察启动器，选技能→对话；(20)skills-page.tsx——双section（处理技能+洞察视角），均可编辑/启停/新建，去掉builtin/type区分 |
+| v2026.03.14 | 2026-03-14 | AI伴侣窗口：(1)AiWindow 统一交互入口——嵌入 timeline 顶部，优先级消息队列（reflect=1/nudge=2/briefing=3/summary=4/status=10），点击路由到对话或 overlay；(2)Reflect 技能——process 后生成苏格拉底追问（张力识别：矛盾>模糊>情绪>未说完>重复），gateway/insights/reflect/SKILL.md；(3)AI 状态消息——WebSocket 认证后基于 soul 生成个性化状态，时段问候语（早/中/下午/晚/深夜）；(4)FAB 变形——idle 显示 Sparkles 图标，processing 态胶囊形显示俏皮话（"正在翻译你的脑电波…"），30s 安全超时自动重置；(5)聊天继承——点击 AiWindow 进入对话时 AI 的话作为 assistant 消息显示（非用户消息），通过 assistantPreamble 传递上下文给 gateway；(6)gateway-client 新增 reflect.question + ai.status 消息类型；(7)proactive 消息由 AiWindow 内部监听替代 NudgeToastListener；(8)chat-return 事件——关闭对话时 dispatch 自定义事件清除 reflect 消息；(9)CSS 动画 bubble-enter/bubble-fade/spin-slow |
+| v2026.03.13c | 2026-03-13 | 日记卡片重新设计：(1)TimelineCard 元数据第一行合并——时间·录音时长·位置·标签用 `·` 分隔，突出内容区；(2)卡片折叠/展开——默认折叠 line-clamp-4，点击展开显示完整摘要+转录原文+待办事项；(3)展开按需加载——useNoteDetail(expanded ? id : null) 条件性 fetch，带 loading 动画，缓存已加载数据；(4)取消 NoteDetail 详情页——删除 NoteDetail overlay、detailId state、onNoteClick prop 传递；(5)NotesTimeline 接口简化——移除 onNoteClick prop，卡片自身处理展开；(6)选择模式不变——长按进入，点击切换选中（不触发展开） |
+| v2026.03.13b | 2026-03-13 | 检查更新+OTA热更新+APK版本升级：(1)app_release 表（migration 015），存储 apk/ota 两种发布类型；(2)app-release repository——findLatest 支持 version_code 比较+OTA min_native_version 检查；(3)releases 路由——GET /check 公开检查、GET /bundles/:filename 流式下载、POST 创建/上传/编辑（Admin鉴权 ADMIN_USER_ID）；(4)bundle 存储 gateway/uploads/bundles/ + sha256 校验；(5)前端 updater.ts——lazy import Capacitor 插件、checkForUpdate/applyOtaUpdate/openApkDownload；(6)useUpdateCheck hook——3s 延迟检查、OTA 静默自动应用、APK 弹窗提示；(7)UpdateDialog 组件——AlertDialog 版本+changelog+mandatory 支持；(8)@capgo/capacitor-updater 集成（autoUpdate:false 手动控制）；(9)发布脚本 publish-ota.sh/publish-apk.sh/sync-version.cjs；(10)cap:sync 集成版本同步 |
+| v2026.03.13 | 2026-03-13 | 用户登录认证+多设备数据统一：(1)app_user 表+refresh_token 表（migration 014），所有用户级表加 user_id 列+索引；(2)Auth 模块——bcryptjs 密码 hash(cost=12)、JWT 签发/验证(access 15min/refresh 30d)、getAuthContext 中间件解析 Bearer token；(3)linkDeviceToUser——关联设备+回填所有历史数据 user_id；(4)Auth REST 路由——POST register/login/refresh/logout + GET me；(5)10个 repository 新增 findByUser 方法(memory/record/soul/user-profile/goal/todo/notebook/ai-diary/pending-intent/skill-config)；(6)Handler+Manager 改造——process/chat payload 加 userId，context loader 支持 user-based 查询，soul/profile manager 支持 upsertByUser；(7)WebSocket 认证——新增 auth 消息类型+connectionUserMap，连接后发送 JWT 认证；(8)前端 Auth——shared/lib/auth.ts 客户端状态管理(token 持久化)、api.ts 自动 Authorization header+401 自动 refresh、gateway-client 连接后发送 auth；(9)登录/注册 UI——features/auth/ 手机号+密码表单(shadcn)，app/page.tsx auth gate 强制登录；(10)sidebar 退出登录+用户信息显示，header 用户昵称首字母头像 |
 | v2026.03.12b | 2026-03-12 | 核心重构四阶段+测试+UI重设计：**Phase 1 待办日期设置**——(1)TodoItem 补全 scheduled_start/scheduled_end/estimated_minutes/priority 字段；(2)PATCH /api/v1/todos/:id 扩展接受调度字段；(3)TodoDetailSheet 底部弹窗（日期/时间原生 picker + showPicker() overlay、时长快选pill、域名标签、AI执行计划展示、"让AI帮忙"入口）；(4)update_todo 内置工具。**Phase 2 记忆架构重构**——(5)migration 012：user_profile + notebook + ai_diary 三表；(6)Soul 限定为仅存 AI 人格（排除用户个人信息）；(7)UserProfile 管理器（AI 提取用户事实信息，独立于 soul）；(8)profile REST 路由 GET/PATCH /api/v1/profile；(9)context/loader + prompt-builder 并行加载 userProfile 到 warm 层。**Phase 3 AI日记本**——(10)ai-diary repo（upsert/findByDate/findSummaries/findFull/updateSummary）；(11)notebook repo（findOrCreate/ensureSystemNotebooks：ai-self + default）；(12)diary manager（appendToDiary 快速追加、regenerateSummary AI 摘要、extractToMemory 长期记忆提取）；(13)notebook REST 路由；(14)proactive engine 集成（晚间摘要+周日深度记忆提取）；(15)create_notebook 内置工具。**Phase 4 Impact UX**——(16)impact-dots 重写：1-3隐藏、4-6数字、7-8火焰、9-10脉冲火焰；(17)AI可执行任务紫色背景+紫色sparkle图标。**测试**——(18)vitest 框架配置（gateway node + frontend jsdom）；(19)57 个测试全部通过（41 gateway + 16 frontend），覆盖 builtin-tools/repos/diary-manager/profile-manager/context-loader/types/api/impact-dots/domain-config。**UI重设计**——(20)TodoDetailSheet redesign：drag handle、淡色域名图标、showPicker() 日期/时间覆盖层、formatDateDisplay 友好文本（今天/明天/X月X日 周X）、域名色时长高亮pill、自定义时长+min单位、深色保存按钮+pb-safe、Sheet overlay 减淡至 bg-black/50；(21)FAB 录音界面全屏沉浸重设计：暗色剧场背景、方向感知彩色光晕（红/琥珀/翡翠）、32根大波形随方向变色、边缘56x56方向图标（X取消/Command指令/Lock常驻）选中1.3x放大+发光、text-5xl计时器+红色呼吸灯、FAB弹性跟随手指、RecordingImmersive 升级（text-7xl计时器、大波形、三按钮横排控件） |
 | v2026.03.12 | 2026-03-12 | 意图理解系统：(1)intent-classify SKILL.md——替代 todo-extract 成为主力 process 技能，将语音分类为 task/wish/goal/complaint/reflection 五种意图类型；(2)目标树——新增 goal 表+pending_intent 表（migration 011），goal 替代 [目标] memory hack，todo.goal_id 关联目标；(3)意图路由——process handler 解析 intents 数组，task→todo，wish/goal→pending_intent 暂存待确认；(4)目标自动关联——创建 todo 时 extractKeywords 匹配活跃目标；(5)Chat 确认流程——chat handler 注入 pending intents 到 system prompt，新增 create_goal/confirm_intent 内置工具；(6)上下文更新——context/loader 并行加载 goals，goal 表有数据时 [目标] memory 降级；(7)前端 GoalsTab 重构——优先 goal 表数据，fallback [目标] memory；(8)REST 路由 GET/POST/PATCH /api/v1/goals + GET /api/v1/intents/pending；(9)extractKeywords 提取到 gateway/src/lib/text-utils.ts 共享模块 |
 | v2026.03.11 | 2026-03-11 | AI能力修复两项：(1)AI SDK v6 端点修复——`@ai-sdk/openai` v3 默认走 Responses API (`/v1/responses`)，DashScope 不支持返回404，改为 `provider.chat(model)` 强制走 Chat Completions API (`/v1/chat/completions`)；(2)BullMQ Redis 连接修复——无 Redis 时 BullMQ Queue 测试产生大量未捕获 ECONNREFUSED 错误可能导致 gateway 崩溃，改用 `node:net` TCP 端口探测（3s 超时快速失败）+ Worker 添加 error handler |
@@ -56,18 +61,18 @@
 |------|------|----------|
 | gene_voice_recording | 语音录制与ASR转写，三阶段录音（pressing/recording/locked），Python DashScope SDK实时+录后识别 | [voice-recording.md](./gene/voice-recording.md) |
 | gene_text_input | 文本输入与命令对话，TextBottomSheet，"/"触发流式AI指令 | [text-input.md](./gene/text-input.md) |
-| gene_ai_processing | AI处理管道，分层上下文(Hot/Warm/Cold)，转写清理+技能提取+工具调用循环 | [ai-processing.md](./gene/ai-processing.md) |
+| gene_ai_processing | AI处理管道，硬编码process-prompt(意图+转达+清理+标签)，可选skill追加，不注入上下文到AI | [ai-processing.md](./gene/ai-processing.md) |
 | gene_command_system | JSON驱动命令注册表，文本+语音触发，别名/中文名匹配 | [command-system.md](./gene/command-system.md) |
 | gene_todo_panel | 待办看板，右侧3/4屏滑出，三Tab(今日时间轴/全部按域分组/目标记忆) | [todo-panel.md](./gene/todo-panel.md) |
 | gene_today_gantt | 甘特图今日任务时间轴，按domain配色，AI可协助标识 | [today-gantt.md](./gene/today-gantt.md) |
 | gene_settings_editor | 设置编辑器，JSON schema驱动，Gateway地址+ASR模式配置 | [settings-editor.md](./gene/settings-editor.md) |
-| gene_skills_management | 技能管理，review(复盘视角)+process(处理技能)两类，CRUD+AI自动创建 | [skills-management.md](./gene/skills-management.md) |
+| gene_skills_management | 技能管理，skills/(处理技能)+insights/(洞察视角)双目录，CRUD+启停+新建，无type/builtin区分 | [skills-management.md](./gene/skills-management.md) |
 | gene_profile_editor | 用户画像/信息/工具配置编辑器，三tab页 | [profile-editor.md](./gene/profile-editor.md) |
 | gene_tag_system | 标签管理，AI仅匹配已有标签，不创建新标签 | [tag-system.md](./gene/tag-system.md) |
-| gene_note_detail | 笔记详情与编辑，支持删除，文字/语音智能显示 | [note-detail.md](./gene/note-detail.md) |
-| gene_multiselect_delete | 时间线长按多选+批量删除，语音/文字类型标识 | [multiselect-delete.md](./gene/multiselect-delete.md) |
+| gene_note_detail | **已废弃** — 详情页取消，功能内联到 TimelineCard 展开态 | [note-detail.md](./gene/note-detail.md) |
+| gene_timeline_card | 日记卡片折叠/展开，元数据单行，展开显示原文+待办，长按多选+批量删除 | [timeline-card.md](./gene/timeline-card.md) |
 | gene_search | 全文搜索，ILIKE匹配，batch load summary+tags | [search.md](./gene/search.md) |
-| gene_review_chat | 复盘对话，流式AI对话，技能视角选择，命令模式 | [review-chat.md](./gene/review-chat.md) |
+| gene_review_chat | 复盘对话，流式AI对话，从insights/加载选中洞察技能，支持review/command/insight三模式 | [review-chat.md](./gene/review-chat.md) |
 | gene_mcp_integration | MCP双向集成，Client(连接外部工具)+Server(暴露v2note能力) | [mcp-integration.md](./gene/mcp-integration.md) |
 | gene_builtin_tools | AI内置工具，create_diary/delete_diary/create_todo/create_skill | [builtin-tools.md](./gene/builtin-tools.md) |
 | gene_proactive_ai | AI主动提醒，BullMQ持久化+setInterval降级，impact智能过滤 | [proactive-ai.md](./gene/proactive-ai.md) |
@@ -75,45 +80,17 @@
 | gene_local_config | 本地配置存储层，跨平台(Capacitor/localStorage) | [local-config.md](./gene/local-config.md) |
 | gene_sync | 数据同步，设备注册+REST API同步 | [sync.md](./gene/sync.md) |
 | gene_offline | 离线支持，OfflineBanner+WebSocket自动重连 | [offline.md](./gene/offline.md) |
-| gene_second_order_thinking | 二阶思考技能，分析"问题背后的问题" | [second-order-thinking.md](./gene/second-order-thinking.md) |
-| gene_context_architecture | 分层上下文架构(Hot/Warm/Cold)，记忆相关性评分，反幻觉纪律 | [context-architecture.md](./gene/context-architecture.md) |
+| gene_second_order_thinking | 二阶思考洞察视角（已迁移到insights/），分析"问题背后的问题" | [second-order-thinking.md](./gene/second-order-thinking.md) |
+| gene_context_architecture | 分层上下文架构(Hot/Warm双层，无Cold)，embedding优先+keyword fallback记忆召回，仅服务chat/briefing | [context-architecture.md](./gene/context-architecture.md) |
 | gene_daily_loop | 忙人日常循环，晨间简报+转达追踪+日终总结+主动推送 | [daily-loop.md](./gene/daily-loop.md) |
-| gene_intent_understanding | 意图分类+目标树+待确认意图，五类意图路由，Chat确认流程 | [intent-understanding.md](./gene/intent-understanding.md) |
-| gene_memory_architecture | 记忆架构三层分离：Soul(AI人格) + UserProfile(用户事实) + Memory(长期记忆) | [memory-architecture.md](./gene/memory-architecture.md) |
+| gene_intent_understanding | 意图分类（硬编码于process-prompt）+目标树+待确认意图，五类意图路由，Chat确认流程 | [intent-understanding.md](./gene/intent-understanding.md) |
+| gene_memory_architecture | 记忆架构三层分离：Soul(AI人格) + UserProfile(用户事实) + Memory(Mem0两阶段ADD/UPDATE/DELETE)，per-user写入队列串行化，per-device MemoryManager单例 | [memory-architecture.md](./gene/memory-architecture.md) |
 | gene_ai_diary | AI日记本系统，每日每笔记本一条，摘要+全文，自动追加+AI摘要+记忆提取 | [ai-diary.md](./gene/ai-diary.md) |
 | gene_recording_immersive | 录音全屏沉浸界面，暗色剧场+方向感知光晕+大波形+边缘方向图标+弹性FAB | [recording-immersive.md](./gene/recording-immersive.md) |
+| gene_auth | 用户登录认证+多设备数据统一，手机号+密码，JWT双token，强制登录，设备关联+数据回填 | [auth.md](./gene/auth.md) |
+| gene_app_update | 检查更新+OTA热更新+APK版本升级，双层更新机制，Admin发布管理，静默OTA+弹窗APK | [app-update.md](./gene/app-update.md) |
+| gene_ai_companion | AI伴侣窗口，统一交互入口，优先级消息队列，reflect追问(insights/)+AI状态+主动推送，FAB变形，聊天继承 | [ai-companion.md](./gene/ai-companion.md) |
+| gene_munger_review | 芒格决策复盘洞察视角，反转思考+多学科心智模型+能力圈+二阶效应+检查清单 | — |
 
 ---
 
-## UX Issues Backlog (v2026.03.01 走查) — 已全部修复 (v2026.03.01c)
-
-<details>
-<summary>展开查看已修复的11项问题</summary>
-
-### P0 — 功能性问题
-
-| # | 问题 | 修复内容 |
-|---|------|----------|
-| 1 | 搜索完全失效 | 搜索路由移至 `:id` 之前注册 |
-
-### P1 — 体验严重缺陷
-
-| # | 问题 | 修复内容 |
-|---|------|----------|
-| 2 | 复盘结果markdown未渲染 | 新增 markdown-content.tsx |
-| 3 | 文字笔记详情页冗余 | 隐藏转录原文区块 |
-| 4 | 历史复盘卡片markdown未清理 | stripMarkdown() 清理预览 |
-| 5 | 详情页无删除入口 | header新增Trash2删除按钮 |
-
-### P2 — 体验粗糙
-
-| # | 问题 | 修复内容 |
-|---|------|----------|
-| 6 | AI画像显示原始markdown | MarkdownContent渲染 |
-| 7 | AI记忆与个人画像重复 | tab重新组织 |
-| 8 | 复盘ISO日期格式 | cleanDates()中文格式 |
-| 9 | 命令列表不可点击 | command chip按钮 |
-| 10 | 笔记卡片无类型标识 | Mic/Type图标 |
-| 11 | 工具配置手写JSON | 实时校验提示 |
-
-</details>

@@ -1,4 +1,5 @@
 import { SessionContext } from "./context.js";
+import { MemoryManager } from "../memory/manager.js";
 const sessions = new Map();
 const SESSION_TTL = 30 * 60 * 1000; // 30 minutes
 /**
@@ -12,6 +13,7 @@ export function getSession(deviceId) {
             deviceId,
             context: new SessionContext(),
             mode: "idle",
+            memoryManager: new MemoryManager(),
             createdAt: new Date(),
             lastActivity: new Date(),
         };

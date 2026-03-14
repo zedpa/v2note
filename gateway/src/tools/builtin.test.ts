@@ -146,6 +146,8 @@ describe("builtin tools", () => {
         "device-1",
         "project-alpha",
         "Alpha project notes",
+        false,
+        undefined,
       );
     });
 

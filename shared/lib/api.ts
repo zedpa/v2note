@@ -15,10 +15,16 @@ export function getApiDeviceId(): string | null {
   return _deviceId;
 }
 
+/** Get auth module lazily to avoid circular imports */
+async function getAuth() {
+  return import("./auth");
+}
+
 async function request<T>(
   method: string,
   path: string,
   body?: any,
+  _isRetry = false,
 ): Promise<T> {
   const base = getGatewayHttpUrl();
   const headers: Record<string, string> = {
@@ -28,11 +34,29 @@ async function request<T>(
     headers["X-Device-Id"] = _deviceId;
   }
 
+  // Add Authorization header if logged in
+  const auth = await getAuth();
+  const token = auth.getAccessToken();
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+
   const res = await fetch(`${base}${path}`, {
     method,
     headers,
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
+
+  // 401: try refresh once
+  if (res.status === 401 && !_isRetry && !path.includes("/auth/")) {
+    const refreshed = await tryRefreshToken();
+    if (refreshed) {
+      return request<T>(method, path, body, true);
+    }
+    // Refresh failed — clear auth and throw
+    await auth.logout();
+    throw new Error("登录已过期，请重新登录");
+  }
 
   // Check content-type to guard against HTML responses
   // (e.g. Capacitor WebView intercepting localhost requests)
@@ -62,6 +86,20 @@ async function request<T>(
   }
 
   return res.json();
+}
+
+async function tryRefreshToken(): Promise<boolean> {
+  try {
+    const auth = await getAuth();
+    const rt = auth.getRefreshTokenValue();
+    if (!rt) return false;
+    const { refreshToken } = await import("./api/auth");
+    const result = await refreshToken(rt);
+    await auth.updateTokens(result.accessToken, result.refreshToken);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export const api = {

@@ -34,6 +34,26 @@ export async function findByDevice(deviceId: string): Promise<Todo[]> {
   );
 }
 
+export async function findByUser(userId: string): Promise<Todo[]> {
+  return query<Todo>(
+    `SELECT t.* FROM todo t
+     JOIN record r ON r.id = t.record_id
+     WHERE r.user_id = $1
+     ORDER BY t.created_at DESC`,
+    [userId],
+  );
+}
+
+export async function findPendingByUser(userId: string): Promise<Todo[]> {
+  return query<Todo>(
+    `SELECT t.* FROM todo t
+     JOIN record r ON r.id = t.record_id
+     WHERE r.user_id = $1 AND t.done = false
+     ORDER BY t.created_at ASC`,
+    [userId],
+  );
+}
+
 export async function findByRecordId(recordId: string): Promise<Todo[]> {
   return query<Todo>(
     `SELECT * FROM todo WHERE record_id = $1 ORDER BY created_at`,

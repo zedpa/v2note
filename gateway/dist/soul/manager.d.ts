@@ -9,6 +9,6 @@ export interface Soul {
 export declare function loadSoul(deviceId: string): Promise<Soul | null>;
 /**
  * Update the Soul (AI identity definition) based on new interactions.
- * The AI merges the existing soul with insights from the new interaction.
+ * Serialized per-user to prevent concurrent overwrites.
  */
-export declare function updateSoul(deviceId: string, newInteraction: string): Promise<void>;
+export declare function updateSoul(deviceId: string, newInteraction: string, userId?: string): Promise<void>;

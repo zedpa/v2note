@@ -16,10 +16,12 @@ export function registerRecordRoutes(router: Router) {
     const deviceId = getDeviceId(req);
     const limit = parseInt(query.limit ?? "100", 10);
     const offset = parseInt(query.offset ?? "0", 10);
+    const notebook = query.notebook;
     const records = await recordRepo.findByDevice(deviceId, {
       archived: false,
       limit,
       offset,
+      notebook: notebook !== undefined ? notebook : undefined,
     });
 
     // Batch load summaries and tags
@@ -125,16 +127,18 @@ export function registerRecordRoutes(router: Router) {
   // Create manual note (content + optional AI processing)
   router.post("/api/v1/records/manual", async (req, res) => {
     const deviceId = getDeviceId(req);
-    const { content, tags, useAi } = await readBody<{
+    const { content, tags, useAi, notebook } = await readBody<{
       content: string;
       tags?: string[];
       useAi?: boolean;
+      notebook?: string;
     }>(req);
 
     const record = await recordRepo.create({
       device_id: deviceId,
       status: useAi ? "processing" : "completed",
       source: "manual",
+      notebook: notebook || undefined,
     });
 
     await transcriptRepo.create({ record_id: record.id, text: content, language: "zh" });
@@ -157,6 +161,7 @@ export function registerRecordRoutes(router: Router) {
         text: content,
         deviceId,
         recordId: record.id,
+        notebook: notebook || undefined,
       }).catch((err) => console.error("[records/manual] AI processing failed:", err));
     }
 
@@ -169,8 +174,16 @@ export function registerRecordRoutes(router: Router) {
       status?: string;
       archived?: boolean;
       duration_seconds?: number;
+      short_summary?: string;
     }>(req);
-    await recordRepo.updateFields(params.id, body);
+
+    const { short_summary, ...recordFields } = body;
+    if (Object.keys(recordFields).length > 0) {
+      await recordRepo.updateFields(params.id, recordFields);
+    }
+    if (short_summary !== undefined) {
+      await summaryRepo.update(params.id, { short_summary });
+    }
     sendJson(res, { ok: true });
   });
 

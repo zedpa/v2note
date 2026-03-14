@@ -6,6 +6,7 @@ export interface Record {
     audio_path: string | null;
     duration_seconds: number | null;
     location_text: string | null;
+    notebook: string | null;
     archived: boolean;
     created_at: string;
     updated_at: string;
@@ -14,7 +15,14 @@ export declare function findByDevice(deviceId: string, opts?: {
     archived?: boolean;
     limit?: number;
     offset?: number;
+    notebook?: string | null;
 }): Promise<Record[]>;
+export declare function findByUser(userId: string, opts?: {
+    archived?: boolean;
+    limit?: number;
+    offset?: number;
+}): Promise<Record[]>;
+export declare function findByUserAndDateRange(userId: string, start: string, end: string): Promise<Record[]>;
 export declare function findById(id: string): Promise<Record | null>;
 export declare function create(fields: {
     device_id: string;
@@ -23,6 +31,7 @@ export declare function create(fields: {
     audio_path?: string;
     duration_seconds?: number;
     location_text?: string;
+    notebook?: string;
 }): Promise<Record>;
 export declare function updateStatus(id: string, status: string): Promise<void>;
 export declare function updateFields(id: string, fields: {

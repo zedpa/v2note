@@ -18,11 +18,13 @@ import type { Review } from "@/shared/lib/types";
 
 interface ReviewOverlayProps {
   onClose: () => void;
+  /** Callback to open ChatView in insight mode */
+  onStartInsight?: (dateRange: { start: string; end: string }, skillName: string) => void;
 }
 
 type Stage = "selecting" | "generating" | "viewing";
 
-export function ReviewOverlay({ onClose }: ReviewOverlayProps) {
+export function ReviewOverlay({ onClose, onStartInsight }: ReviewOverlayProps) {
   const { reviews, generating, generateReview, loading } = useReviews();
   const [stage, setStage] = useState<Stage>("selecting");
   const [currentReview, setCurrentReview] = useState<Review | null>(null);
@@ -32,22 +34,29 @@ export function ReviewOverlay({ onClose }: ReviewOverlayProps) {
     end: string;
   } | null>(null);
 
-  // Review skill selection
-  const [reviewSkills, setReviewSkills] = useState<LocalSkillConfig[]>([]);
+  // Insight skill selection
+  const [insightSkills, setInsightSkills] = useState<LocalSkillConfig[]>([]);
   const [selectedSkill, setSelectedSkill] = useState<string>("");
 
+  // Date range for insight mode
+  const [insightDateRange, setInsightDateRange] = useState<{
+    start: string;
+    end: string;
+  } | null>(null);
+
   useEffect(() => {
-    async function loadReviewSkills() {
+    async function loadInsightSkills() {
       const local = await getSkills();
       if (local?.configs) {
-        const reviews = local.configs.filter(
-          (c) => c.type === "review" && c.enabled,
+        // Load insight skills (source === "insights" or legacy type === "review")
+        const insights = local.configs.filter(
+          (c) => (c.source === "insights" || c.type === "review") && c.enabled,
         );
-        setReviewSkills(reviews);
-        setSelectedSkill(local.selectedReviewSkill ?? "");
+        setInsightSkills(insights);
+        setSelectedSkill(local.selectedInsightSkill ?? local.selectedReviewSkill ?? "");
       }
     }
-    loadReviewSkills();
+    loadInsightSkills();
   }, []);
 
   const handleSkillChange = async (value: string) => {
@@ -56,7 +65,7 @@ export function ReviewOverlay({ onClose }: ReviewOverlayProps) {
     if (local) {
       await setSkills({
         ...local,
-        selectedReviewSkill: value || undefined,
+        selectedInsightSkill: value || undefined,
         updatedAt: new Date().toISOString(),
       });
     }
@@ -67,6 +76,12 @@ export function ReviewOverlay({ onClose }: ReviewOverlayProps) {
     start: string,
     end: string,
   ) => {
+    // If an insight skill is selected and callback provided, launch insight chat
+    if (selectedSkill && onStartInsight) {
+      onStartInsight({ start, end }, selectedSkill);
+      return;
+    }
+
     setLastParams({ period, start, end });
     setStage("generating");
     try {
@@ -139,34 +154,34 @@ export function ReviewOverlay({ onClose }: ReviewOverlayProps) {
                   generating={generating}
                 />
 
-                {/* Review skill selector */}
-                {reviewSkills.length > 0 && (
+                {/* Insight skill selector */}
+                {insightSkills.length > 0 && (
                   <div className="border border-border/60 rounded-xl p-4">
-                    <h3 className="text-sm font-medium mb-3">复盘视角</h3>
+                    <h3 className="text-sm font-medium mb-3">洞察视角</h3>
                     <RadioGroup
                       value={selectedSkill}
                       onValueChange={handleSkillChange}
                     >
                       <div className="flex items-center gap-2">
-                        <RadioGroupItem value="" id="review-none" />
+                        <RadioGroupItem value="" id="insight-none" />
                         <label
-                          htmlFor="review-none"
+                          htmlFor="insight-none"
                           className="text-sm text-muted-foreground cursor-pointer"
                         >
                           无视角（默认对话）
                         </label>
                       </div>
-                      {reviewSkills.map((skill) => (
+                      {insightSkills.map((skill) => (
                         <div
                           key={skill.name}
                           className="flex items-center gap-2"
                         >
                           <RadioGroupItem
                             value={skill.name}
-                            id={`review-${skill.name}`}
+                            id={`insight-${skill.name}`}
                           />
                           <label
-                            htmlFor={`review-${skill.name}`}
+                            htmlFor={`insight-${skill.name}`}
                             className="text-sm cursor-pointer"
                           >
                             {skill.name}

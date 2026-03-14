@@ -1,0 +1,10 @@
+export interface UserProfile {
+    id: string;
+    device_id: string;
+    content: string;
+    updated_at: string;
+}
+export declare function findByDevice(deviceId: string): Promise<UserProfile | null>;
+export declare function findByUser(userId: string): Promise<UserProfile | null>;
+export declare function upsertByUser(userId: string, content: string): Promise<void>;
+export declare function upsert(deviceId: string, content: string): Promise<void>;

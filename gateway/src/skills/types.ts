@@ -1,10 +1,12 @@
-export type SkillType = "review" | "process";
-
 export interface SkillMetadata {
   extract_fields?: string[];
   always?: boolean;
-  type: SkillType;
-  builtin?: boolean;
+  /** Optional version string */
+  version?: string;
+  /** Trigger description for insight skills */
+  trigger?: string;
+  /** Whether RAG context is required */
+  rag_required?: boolean;
 }
 
 export interface Skill {

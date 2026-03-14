@@ -1,7 +1,6 @@
 ---
 name: todo-extract
-description: 从语音/文字记录中提取行动事项和待办
-type: process
+description: 从语音/文字记录中提取行动事项和待办（兼容，默认禁用）
 metadata:
   openclaw:
     extract_fields: ["todos"]

@@ -1,4 +1,5 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
+import jwt from "jsonwebtoken";
 
 /** Read the request body as parsed JSON */
 export function readBody<T = any>(req: IncomingMessage): Promise<T> {
@@ -28,8 +29,20 @@ export function sendError(res: ServerResponse, message: string, status = 400): v
   res.end(JSON.stringify({ error: message }));
 }
 
-/** Extract X-Device-Id header */
+/** Extract device ID — prefers JWT auth context, falls back to X-Device-Id header */
 export function getDeviceId(req: IncomingMessage): string {
+  // Try JWT auth first
+  const authHeader = req.headers["authorization"];
+  if (authHeader && authHeader.startsWith("Bearer ")) {
+    try {
+      const secret = process.env.JWT_SECRET ?? "dev-jwt-secret-change-me";
+      const payload = jwt.verify(authHeader.slice(7), secret) as { deviceId?: string };
+      if (payload.deviceId) return payload.deviceId;
+    } catch {
+      // JWT invalid — fall through to header
+    }
+  }
+  // Fallback: X-Device-Id header
   const id = req.headers["x-device-id"];
   if (!id || typeof id !== "string") {
     throw new HttpError(401, "Missing X-Device-Id header");

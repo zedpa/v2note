@@ -18,7 +18,7 @@ export function registerSkillRoutes(router) {
             description: skill.description,
             enabled: configMap[skill.name]?.enabled ?? true,
             always: skill.metadata?.always ?? false,
-            type: skill.metadata.type,
+            type: undefined,
             builtin: true,
         }));
         // Custom skills from DB
@@ -57,7 +57,7 @@ export function registerSkillRoutes(router) {
                 prompt: skill.prompt,
                 always: skill.metadata?.always ?? false,
                 enabled: cfg?.enabled ?? true,
-                type: skill.metadata.type,
+                type: undefined,
                 builtin: true,
             });
             return;

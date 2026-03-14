@@ -1,5 +1,5 @@
 import { loadSkills, filterActiveSkills, mergeWithCustomSkills } from "../skills/loader.js";
-import { buildSystemPrompt } from "../skills/prompt-builder.js";
+import { buildProcessPrompt } from "./process-prompt.js";
 import { chatCompletion, type ChatMessage } from "../ai/provider.js";
 import { MemoryManager } from "../memory/manager.js";
 import { updateSoul } from "../soul/manager.js";
@@ -17,9 +17,8 @@ import { summaryRepo } from "../db/repositories/index.js";
 import { goalRepo } from "../db/repositories/index.js";
 import { pendingIntentRepo } from "../db/repositories/index.js";
 import { extractKeywords } from "../lib/text-utils.js";
-import { getMCPRegistry } from "../mcp/registry.js";
-import { isBuiltinTool, callBuiltinTool } from "../tools/builtin.js";
 import { estimateBatchTodos } from "../proactive/time-estimator.js";
+import { getSession } from "../session/manager.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SKILLS_DIR = join(__dirname, "../../skills");
@@ -35,7 +34,9 @@ export interface ProcessPayload {
   text: string;
   audioUrl?: string;
   deviceId: string;
+  userId?: string;
   recordId: string;
+  notebook?: string;
   localConfig?: LocalConfigPayload;
 }
 
@@ -65,8 +66,12 @@ export interface ProcessResult {
   error?: string;
 }
 
+// ── Soul/Profile relevance keywords ──
+const soulKeywords = ["你要", "你应该", "语气", "风格", "不要", "请用", "像一个", "你是"];
+const profileKeywords = ["我是", "我在", "我的工作", "我住", "我喜欢", "我每天", "家人", "同事"];
+
 /**
- * Process a single diary entry: run active skills to extract structured data.
+ * Process a single diary entry: hardcoded prompt + optional skills.
  */
 export async function processEntry(payload: ProcessPayload): Promise<ProcessResult> {
   const result: ProcessResult = {
@@ -80,11 +85,11 @@ export async function processEntry(payload: ProcessPayload): Promise<ProcessResu
   };
 
   try {
-    // 1. Load skills
     console.log(`[process] Starting for record ${payload.recordId}, text length: ${payload.text.length}`);
+
+    // 1. Load optional skills (lightweight — just read files for prompt text)
     const builtinSkills = loadSkills(SKILLS_DIR);
     const allSkills = mergeWithCustomSkills(builtinSkills, payload.localConfig?.skills?.configs as any);
-    console.log(`[process] Loaded ${allSkills.length} skills: ${allSkills.map(s => s.name).join(", ")}`);
 
     // Load skill config: prefer localConfig, fall back to server DB
     let skillConfigs: Array<{ skill_name: string; enabled: boolean }> = [];
@@ -93,60 +98,28 @@ export async function processEntry(payload: ProcessPayload): Promise<ProcessResu
         skill_name: c.name,
         enabled: c.enabled,
       }));
-      console.log(`[process] Using local skill config`);
     } else {
       try {
         skillConfigs = (await skillConfigRepo.findByDevice(payload.deviceId))
           .map((c) => ({ skill_name: c.skill_name, enabled: c.enabled }));
       } catch (err: any) {
-        console.warn(`[process] Failed to load skill config (table may not exist): ${err.message}`);
+        console.warn(`[process] Failed to load skill config: ${err.message}`);
       }
     }
 
-    // Process handler: only use process-type skills
-    const activeSkills = filterActiveSkills(allSkills, skillConfigs, "process");
-    console.log(`[process] Active process skills: ${activeSkills.map(s => s.name).join(", ")}`);
+    // Only load optional (non-hardcoded) skills — filter by enabled
+    const enabledSkills = filterActiveSkills(allSkills, skillConfigs);
+    const optionalPrompts = enabledSkills.map(s => `### ${s.name}\n${s.prompt}`);
+    console.log(`[process] Optional skills: ${enabledSkills.map(s => s.name).join(", ") || "(none)"}`);
 
-    if (activeSkills.length === 0) {
-      console.warn("[process] No active skills — nothing to extract");
-    }
-
-    // 2. Load context using tiered loader (parallel, relevance-filtered)
-    // Process mode: skips soul (not needed for extraction), limits memories
-    let soulContent: string | undefined;
-    let memories: string[] = [];
-    const memoryManager = new MemoryManager();
-
-    try {
-      const loaded = await memoryManager.loadRelevantContext(payload.deviceId, {
-        mode: "process",
-        inputText: payload.text,
-        localSoul: payload.localConfig?.soul?.content,
-      });
-      soulContent = loaded.soul; // undefined in process mode (by design)
-      memories = loaded.memories;
-      console.log(`[process] Context loaded: ${memories.length} relevant memories (soul: ${soulContent ? 'yes' : 'skipped'})`);
-    } catch (err: any) {
-      console.warn(`[process] Failed to load context: ${err.message}`);
-    }
-
-    // 3. Build prompt with MCP tools if available (tiered: hot + warm)
-    const mcpRegistry = getMCPRegistry();
-    const mcpTools = mcpRegistry.hasTools() ? mcpRegistry.getToolsForPrompt() : undefined;
-
-    const systemPrompt = buildSystemPrompt({
-      skills: activeSkills,
-      soul: soulContent,
-      memory: memories,
-      mode: "process",
+    // 2. Build hardcoded prompt + optional skill appendage
+    const systemPrompt = buildProcessPrompt({
       existingTags: payload.localConfig?.existingTags,
-      mcpTools,
-      inputText: payload.text,
+      optionalSkillPrompts: optionalPrompts,
     });
-    console.log(`[process] System prompt length: ${systemPrompt.length}, MCP tools: ${mcpTools?.length ?? 0}`);
+    console.log(`[process] System prompt length: ${systemPrompt.length}`);
 
-    // 4. Call AI (with tool call loop)
-    // Dynamic timeout: base 60s + 20s per 1000 chars of input, capped at 5min
+    // 3. Call AI
     const dynamicTimeout = Math.min(300_000, 60_000 + Math.floor(payload.text.length / 1000) * 20_000);
     console.log(`[process] Calling AI... (timeout: ${dynamicTimeout}ms, text: ${payload.text.length} chars)`);
     const messages: ChatMessage[] = [
@@ -154,59 +127,15 @@ export async function processEntry(payload: ProcessPayload): Promise<ProcessResu
       { role: "user", content: payload.text },
     ];
 
-    let response = await chatCompletion(messages, { json: true, temperature: 0.3, timeout: dynamicTimeout });
-    
+    const response = await chatCompletion(messages, { json: true, temperature: 0.3, timeout: dynamicTimeout });
+
     if (!response) {
-       throw new Error("AI provider returned null response");
+      throw new Error("AI provider returned null response");
     }
-    
+
     console.log(`[process] AI response length: ${response.content.length}, usage: ${JSON.stringify(response.usage)}`);
 
-    // Tool call loop: if AI requests tool calls, execute them and re-call AI
-    const MAX_TOOL_ROUNDS = 3;
-    for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
-      if (!response.content.trim()) break;
-
-      let parsed: any;
-      try {
-        parsed = JSON.parse(response.content);
-      } catch {
-        break;
-      }
-
-      if (!Array.isArray(parsed.tool_calls) || parsed.tool_calls.length === 0) break;
-
-      console.log(`[process] Tool call round ${round + 1}: ${parsed.tool_calls.length} calls`);
-
-      // Execute tool calls (built-in tools first, then MCP)
-      const toolResults: string[] = [];
-      for (const call of parsed.tool_calls) {
-        try {
-          if (isBuiltinTool(call.name)) {
-            const res = await callBuiltinTool(call.name, call.arguments ?? {}, payload.deviceId);
-            toolResults.push(`Tool "${call.name}" result: ${res.message}`);
-            console.log(`[process] Built-in tool ${call.name}: ${res.success ? "success" : "failed"}`);
-          } else {
-            const toolResult = await mcpRegistry.callTool(call.name, call.arguments ?? {});
-            const text = toolResult.content.map((c: any) => c.text ?? "").join("\n");
-            toolResults.push(`Tool "${call.name}" result: ${text}`);
-            console.log(`[process] Tool ${call.name}: success`);
-          }
-        } catch (err: any) {
-          toolResults.push(`Tool "${call.name}" error: ${err.message}`);
-          console.warn(`[process] Tool ${call.name}: ${err.message}`);
-        }
-      }
-
-      // Add tool results and re-call AI
-      messages.push({ role: "assistant", content: response.content });
-      messages.push({ role: "user", content: `工具调用结果：\n${toolResults.join("\n\n")}\n\n请基于工具结果，返回最终的 JSON 结果。` });
-
-      response = await chatCompletion(messages, { json: true, temperature: 0.3, timeout: dynamicTimeout });
-      console.log(`[process] AI re-response length: ${response.content.length}`);
-    }
-
-    // 5. Parse result
+    // 4. Parse result
     if (!response.content.trim()) {
       console.error("[process] AI returned empty content");
       result.error = "AI returned empty response";
@@ -214,15 +143,14 @@ export async function processEntry(payload: ProcessPayload): Promise<ProcessResu
       try {
         const parsed = JSON.parse(response.content);
 
-        // New format: intents array (from intent-classify skill)
+        // Intent array (from hardcoded intent-classify rules)
         if (Array.isArray(parsed.intents)) {
           result.intents = parsed.intents;
-          // task type → backward-compatible todos
           result.todos = parsed.intents
             .filter((i: any) => i.type === "task")
             .map((i: any) => i.text);
         } else {
-          // Old format fallback (from todo-extract)
+          // Old format fallback
           result.todos = Array.isArray(parsed.todos) ? parsed.todos : [];
           result.intents = result.todos.map((t) => ({ type: "task" as const, text: t }));
         }
@@ -250,7 +178,7 @@ export async function processEntry(payload: ProcessPayload): Promise<ProcessResu
       }
     }
 
-    // 6. Write extracted data to DB
+    // 5. Write extracted data to DB
     try {
       if (result.todos.length > 0) {
         await todoRepo.createMany(
@@ -303,8 +231,6 @@ export async function processEntry(payload: ProcessPayload): Promise<ProcessResu
             context: intent.context,
           });
         }
-        // complaint → handled by updateSoul (soul system naturally absorbs)
-        // reflection → handled by maybeCreateMemory
       }
       result.pending_followups = nonTaskIntents.filter(
         (i) => i.type === "wish" || i.type === "goal",
@@ -354,7 +280,7 @@ export async function processEntry(payload: ProcessPayload): Promise<ProcessResu
         );
       }
 
-      // 7. Save tags — only associate existing tags, never create new ones
+      // Save tags — only associate existing tags, never create new ones
       if (result.tags.length > 0) {
         for (const tagName of result.tags) {
           const tag = await tagRepo.findByName(tagName);
@@ -366,7 +292,7 @@ export async function processEntry(payload: ProcessPayload): Promise<ProcessResu
         }
       }
 
-      // 8. Save de-colloquialized summary to database
+      // Save de-colloquialized summary to database
       if (result.summary) {
         const existing = await summaryRepo.findByRecordId(payload.recordId);
         if (existing) {
@@ -382,37 +308,41 @@ export async function processEntry(payload: ProcessPayload): Promise<ProcessResu
       }
     } catch (err: any) {
       console.error(`[process] DB write error: ${err.message}`);
-      // Don't block — still update status and return result
     }
 
-    // 9. Update record status
+    // 6. Update record status
     await recordRepo.updateStatus(payload.recordId, "completed");
     console.log(`[process] Record ${payload.recordId} marked as completed`);
 
-    // 10. Background: enrich new todos (time, priority, domain, impact, actionability)
+    // 7. Background: enrich new todos
     if (result.todos.length > 0) {
       const pendingTodos = await todoRepo.findPendingByDevice(payload.deviceId);
-      const newTodos = pendingTodos.slice(-result.todos.length); // latest N todos
+      const newTodos = pendingTodos.slice(-result.todos.length);
       if (newTodos.length > 0) {
-        // Prefer goal table data over [目标] memory hack
+        // Load memories only for enrichment (not injected into process prompt)
         let goalMemories: string[] = [];
         try {
           const activeGoals = await goalRepo.findActiveByDevice(payload.deviceId);
+          const session = getSession(payload.deviceId);
+          const memoryManager = session.memoryManager;
+          const loaded = await memoryManager.loadRelevantContext(payload.deviceId, {
+            mode: "chat",
+            inputText: payload.text,
+            userId: payload.userId,
+          });
+          const memories = loaded.memories;
+
           if (activeGoals.length > 0) {
             goalMemories = activeGoals.map((g) => `[目标] ${g.title}`);
-          } else {
-            goalMemories = memories.filter((m) => m.includes("[目标]"));
           }
-          goalMemories = goalMemories.concat(
-            memories.filter((m) => !m.includes("[目标]")).slice(0, 5),
-          );
+          goalMemories = goalMemories.concat(memories.slice(0, 5));
         } catch {
-          goalMemories = memories.slice(0, 10);
+          // fallback: no memories for enrichment
         }
 
         estimateBatchTodos(
           newTodos.map((t) => ({ id: t.id, text: t.text })),
-          { soul: soulContent, memories: goalMemories },
+          { memories: goalMemories },
         )
           .then(async (estimates) => {
             for (const [todoId, estimate] of estimates) {
@@ -433,28 +363,43 @@ export async function processEntry(payload: ProcessPayload): Promise<ProcessResu
       }
     }
 
-    // 11. Background: maybe create long-term memory, update soul & profile
+    // 8. Background: maybe create long-term memory, conditionally update soul & profile
     const today = new Date().toISOString().split("T")[0];
+    const session = getSession(payload.deviceId);
+    const memoryManager = session.memoryManager;
+
     memoryManager.maybeCreateMemory(payload.deviceId, payload.text, today).catch((e) => {
       console.warn("[process] Memory creation failed:", e.message);
     });
-    updateSoul(payload.deviceId, payload.text).catch((e) => {
-      console.warn("[process] Soul update failed:", e.message);
-    });
-    updateProfile(payload.deviceId, payload.text).catch((e) => {
-      console.warn("[process] Profile update failed:", e.message);
-    });
+
+    // Soul/Profile: only update when text likely contains relevant content
+    const text = payload.text;
+    const maySoulUpdate = soulKeywords.some(kw => text.includes(kw));
+    const mayProfileUpdate = profileKeywords.some(kw => text.includes(kw));
+
+    if (maySoulUpdate) {
+      updateSoul(payload.deviceId, text, payload.userId).catch((e) => {
+        console.warn("[process] Soul update failed:", e.message);
+      });
+    }
+    if (mayProfileUpdate) {
+      updateProfile(payload.deviceId, text, payload.userId).catch((e) => {
+        console.warn("[process] Profile update failed:", e.message);
+      });
+    }
+
     // Append to daily diary
     const diaryLine = result.summary
       ? `[${new Date().toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })}] ${result.summary}`
       : `[${new Date().toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })}] ${payload.text.slice(0, 200)}`;
-    appendToDiary(payload.deviceId, "default", diaryLine).catch((e) => {
+    const diaryNotebook = payload.notebook && payload.notebook !== "ai-self" ? payload.notebook : "default";
+    console.log(`[process] Diary append: payload.notebook=${payload.notebook}, target=${diaryNotebook}`);
+    appendToDiary(payload.deviceId, diaryNotebook, diaryLine).catch((e) => {
       console.warn("[process] Diary append failed:", e.message);
     });
   } catch (err: any) {
     console.error(`[process] Fatal error processing record ${payload.recordId}:`, err);
 
-    // Ensure record status is updated even on failure
     try {
       await recordRepo.updateStatus(payload.recordId, "error");
     } catch {

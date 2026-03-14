@@ -7,10 +7,12 @@ export function registerRecordRoutes(router) {
         const deviceId = getDeviceId(req);
         const limit = parseInt(query.limit ?? "100", 10);
         const offset = parseInt(query.offset ?? "0", 10);
+        const notebook = query.notebook;
         const records = await recordRepo.findByDevice(deviceId, {
             archived: false,
             limit,
             offset,
+            notebook: notebook !== undefined ? notebook : undefined,
         });
         // Batch load summaries and tags
         const ids = records.map((r) => r.id);
@@ -86,11 +88,12 @@ export function registerRecordRoutes(router) {
     // Create manual note (content + optional AI processing)
     router.post("/api/v1/records/manual", async (req, res) => {
         const deviceId = getDeviceId(req);
-        const { content, tags, useAi } = await readBody(req);
+        const { content, tags, useAi, notebook } = await readBody(req);
         const record = await recordRepo.create({
             device_id: deviceId,
             status: useAi ? "processing" : "completed",
             source: "manual",
+            notebook: notebook || undefined,
         });
         await transcriptRepo.create({ record_id: record.id, text: content, language: "zh" });
         await summaryRepo.create({
@@ -110,6 +113,7 @@ export function registerRecordRoutes(router) {
                 text: content,
                 deviceId,
                 recordId: record.id,
+                notebook: notebook || undefined,
             }).catch((err) => console.error("[records/manual] AI processing failed:", err));
         }
         sendJson(res, { id: record.id }, 201);
@@ -117,7 +121,13 @@ export function registerRecordRoutes(router) {
     // Update record
     router.patch("/api/v1/records/:id", async (req, res, params) => {
         const body = await readBody(req);
-        await recordRepo.updateFields(params.id, body);
+        const { short_summary, ...recordFields } = body;
+        if (Object.keys(recordFields).length > 0) {
+            await recordRepo.updateFields(params.id, recordFields);
+        }
+        if (short_summary !== undefined) {
+            await summaryRepo.update(params.id, { short_summary });
+        }
         sendJson(res, { ok: true });
     });
     // Delete records

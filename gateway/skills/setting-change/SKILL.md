@@ -1,10 +1,10 @@
 ---
 name: setting-change
 description: 提取用户表达的偏好/设置修改意图
-type: process
 metadata:
   openclaw:
     extract_fields: ["setting_changes"]
+    always: false
 ---
 
 # 设置变更提取

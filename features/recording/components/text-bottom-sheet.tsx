@@ -15,6 +15,7 @@ interface TextBottomSheetProps {
   onStartReview?: (dateRange: { start: string; end: string }) => void;
   onCommandMode?: (text: string) => void;
   commandContext?: Partial<CommandContext>;
+  activeNotebook?: string | null;
 }
 
 export function TextBottomSheet({
@@ -23,6 +24,7 @@ export function TextBottomSheet({
   onStartReview,
   onCommandMode,
   commandContext,
+  activeNotebook,
 }: TextBottomSheetProps) {
   const [text, setText] = useState("");
   const [suggestions, setSuggestions] = useState<string[]>([]);
@@ -131,7 +133,7 @@ export function TextBottomSheet({
     onClose();
     try {
       toast("正在保存...");
-      await createManualNote({ content: trimmed, useAi: true });
+      await createManualNote({ content: trimmed, useAi: true, notebook: activeNotebook ?? undefined });
       toast("已保存");
       emit("recording:processed");
     } catch (err: any) {

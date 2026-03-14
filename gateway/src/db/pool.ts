@@ -1,6 +1,9 @@
 import pg from "pg";
 
-const { Pool } = pg;
+const { Pool, types } = pg;
+
+// Return DATE (OID 1082) as plain string "YYYY-MM-DD" instead of JS Date object
+types.setTypeParser(1082, (val: string) => val);
 
 let pool: pg.Pool | null = null;
 

@@ -21,6 +21,9 @@ const config: CapacitorConfig = {
       overlaysWebView: false,
       style: 'DEFAULT',
     },
+    CapacitorUpdater: {
+      autoUpdate: false,
+    },
   },
 };
 

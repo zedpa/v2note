@@ -14,15 +14,33 @@ export async function loadProfile(deviceId: string): Promise<UserProfile | null>
   return userProfileRepo.findByDevice(deviceId);
 }
 
+// ── Per-user write queue for serialized updates ──
+const updateQueues = new Map<string, Promise<void>>();
+
 /**
  * Update the user profile based on new interactions.
- * Extracts factual information about the user (not AI personality).
+ * Serialized per-user to prevent concurrent overwrites.
  */
 export async function updateProfile(
   deviceId: string,
   newInteraction: string,
+  userId?: string,
 ): Promise<void> {
-  const existing = await loadProfile(deviceId);
+  const key = userId ?? deviceId;
+  const prev = updateQueues.get(key) ?? Promise.resolve();
+  const next = prev.then(() => doUpdateProfile(deviceId, newInteraction, userId)).catch(() => {});
+  updateQueues.set(key, next);
+  return next;
+}
+
+async function doUpdateProfile(
+  deviceId: string,
+  newInteraction: string,
+  userId?: string,
+): Promise<void> {
+  const existing = userId
+    ? await userProfileRepo.findByUser(userId) ?? await loadProfile(deviceId)
+    : await loadProfile(deviceId);
   const currentProfile = existing?.content ?? "";
 
   const result = await chatCompletion(
@@ -55,5 +73,9 @@ export async function updateProfile(
     { temperature: 0.3 },
   );
 
-  await userProfileRepo.upsert(deviceId, result.content);
+  if (userId) {
+    await userProfileRepo.upsertByUser(userId, result.content);
+  } else {
+    await userProfileRepo.upsert(deviceId, result.content);
+  }
 }

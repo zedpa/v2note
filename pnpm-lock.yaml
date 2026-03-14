@@ -32,6 +32,9 @@ importers:
       '@capacitor/status-bar':
         specifier: ^8.0.0
         version: 8.0.0(@capacitor/core@8.0.2)
+      '@capgo/capacitor-updater':
+        specifier: ^8.43.10
+        version: 8.43.10(@capacitor/core@8.0.2)
       '@hookform/resolvers':
         specifier: ^3.9.1
         version: 3.10.0(react-hook-form@7.68.0(react@19.2.3))
@@ -309,6 +312,11 @@ packages:
 
   '@capacitor/synapse@1.0.4':
     resolution: {integrity: sha512-/C1FUo8/OkKuAT4nCIu/34ny9siNHr9qtFezu4kxm6GY1wNFxrCFWjfYx5C1tUhVGz3fxBABegupkpjXvjCHrw==}
+
+  '@capgo/capacitor-updater@8.43.10':
+    resolution: {integrity: sha512-M4ZwzMLB0FeJyF4P+qPVROfFng0YwPiIT3WZMdqU5QQsCHpvrBRpn0OmYCtRUU45210QH3+vDjNXTEmqngIZXw==}
+    peerDependencies:
+      '@capacitor/core': ^8.0.0
 
   '@csstools/color-helpers@6.0.2':
     resolution: {integrity: sha512-LMGQLS9EuADloEFkcTBR3BwV/CGHV7zyDxVRtVDTwdI2Ca4it0CCVTT9wCkxSgokjE5Ho41hEPgb8OEUwoXr6Q==}
@@ -3493,6 +3501,10 @@ snapshots:
       '@capacitor/core': 8.0.2
 
   '@capacitor/synapse@1.0.4': {}
+
+  '@capgo/capacitor-updater@8.43.10(@capacitor/core@8.0.2)':
+    dependencies:
+      '@capacitor/core': 8.0.2
 
   '@csstools/color-helpers@6.0.2': {}
 

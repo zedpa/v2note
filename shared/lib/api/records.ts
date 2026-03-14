@@ -3,10 +3,12 @@ import { api } from "../api";
 export async function listRecords(opts?: {
   limit?: number;
   offset?: number;
+  notebook?: string;
 }): Promise<any[]> {
   const params = new URLSearchParams();
   if (opts?.limit) params.set("limit", String(opts.limit));
   if (opts?.offset) params.set("offset", String(opts.offset));
+  if (opts?.notebook !== undefined) params.set("notebook", opts.notebook);
   const qs = params.toString();
   return api.get(`/api/v1/records${qs ? `?${qs}` : ""}`);
 }
@@ -27,13 +29,14 @@ export async function createManualNote(fields: {
   content: string;
   tags?: string[];
   useAi?: boolean;
+  notebook?: string;
 }): Promise<{ id: string }> {
   return api.post("/api/v1/records/manual", fields);
 }
 
 export async function updateRecord(
   id: string,
-  fields: { status?: string; archived?: boolean; duration_seconds?: number },
+  fields: { status?: string; archived?: boolean; duration_seconds?: number; short_summary?: string },
 ): Promise<void> {
   await api.patch(`/api/v1/records/${id}`, fields);
 }

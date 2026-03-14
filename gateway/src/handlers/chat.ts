@@ -1,4 +1,4 @@
-import { loadSkills, filterActiveSkills, mergeWithCustomSkills } from "../skills/loader.js";
+import { loadSkills, mergeWithCustomSkills } from "../skills/loader.js";
 import type { Skill } from "../skills/types.js";
 import { buildSystemPrompt } from "../skills/prompt-builder.js";
 import { chatCompletion, chatCompletionStream } from "../ai/provider.js";
@@ -15,24 +15,28 @@ import { pendingIntentRepo } from "../db/repositories/index.js";
 import { isBuiltinTool, callBuiltinTool } from "../tools/builtin.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const SKILLS_DIR = join(__dirname, "../../skills");
+const INSIGHTS_DIR = join(__dirname, "../../insights");
 
 export interface ChatStartPayload {
   deviceId: string;
-  mode: "review" | "command";
+  userId?: string;
+  mode: "review" | "command" | "insight";
   dateRange: { start: string; end: string };
   initialMessage?: string;
+  assistantPreamble?: string;
   localConfig?: {
     soul?: { content: string };
     skills?: {
-      configs: Array<{ name: string; enabled: boolean; description?: string; type?: string; prompt?: string; builtin?: boolean }>;
+      configs: Array<{ name: string; enabled: boolean; description?: string; prompt?: string; builtin?: boolean }>;
+      selectedInsightSkill?: string;
+      /** @deprecated Use selectedInsightSkill */
       selectedReviewSkill?: string;
     };
   };
 }
 
 /**
- * Start a review chat session.
+ * Start a review/insight chat session.
  * Loads memory, soul, and skills into the session context.
  * Returns the initial AI greeting.
  */
@@ -41,13 +45,15 @@ export async function startChat(
 ): Promise<AsyncGenerator<string, void, undefined>> {
   const session = getSession(payload.deviceId);
   session.mode = "chat";
+  session.userId = payload.userId;
 
   // Load context in parallel using tiered loader (soul + memories)
-  const memoryManager = new MemoryManager();
+  const memoryManager = session.memoryManager;
   const loaded = await memoryManager.loadRelevantContext(payload.deviceId, {
     mode: "chat",
     dateRange: payload.dateRange,
     localSoul: payload.localConfig?.soul?.content,
+    userId: payload.userId,
   });
   const soul = loaded.soul ? { content: loaded.soul } : undefined;
   const memories = loaded.memories;
@@ -78,27 +84,16 @@ export async function startChat(
     }
   }
 
-  // Build skills — merge built-in + custom, then filter
-  const builtinSkills = loadSkills(SKILLS_DIR);
-  const allSkills = mergeWithCustomSkills(builtinSkills, payload.localConfig?.skills?.configs as any);
-  const skillConfigs = payload.localConfig?.skills?.configs?.map((c) => ({
-    skill_name: c.name,
-    enabled: c.enabled,
-  }));
+  // Build skills — load from insights/ for selected insight skill
+  let activeSkills: Skill[] = [];
+  const selectedName = payload.localConfig?.skills?.selectedInsightSkill
+    ?? payload.localConfig?.skills?.selectedReviewSkill;
 
-  let activeSkills: Skill[];
-  if (payload.mode === "review") {
-    // Review mode: only apply the single selected review skill (if any)
-    const selectedName = payload.localConfig?.skills?.selectedReviewSkill;
-    if (selectedName) {
-      const reviewSkills = filterActiveSkills(allSkills, skillConfigs, "review");
-      activeSkills = reviewSkills.filter((s) => s.name === selectedName);
-    } else {
-      activeSkills = []; // No review skill selected → default conversation
-    }
-  } else {
-    // Command mode: no review skills, just tools available
-    activeSkills = [];
+  if (selectedName && (payload.mode === "review" || payload.mode === "insight")) {
+    const insights = loadSkills(INSIGHTS_DIR);
+    const merged = mergeWithCustomSkills(insights, payload.localConfig?.skills?.configs as any);
+    const found = merged.find(s => s.name === selectedName);
+    if (found) activeSkills = [found];
   }
 
   // Load pending intents for natural follow-up in conversation
@@ -130,10 +125,13 @@ export async function startChat(
 
   if (payload.mode === "command") {
     // Command mode: skip review, respond directly to the initial message
+    if (payload.assistantPreamble) {
+      session.context.addMessage({ role: "assistant", content: payload.assistantPreamble });
+    }
     const msg = payload.initialMessage?.trim() || "/";
     session.context.addMessage({ role: "user", content: msg });
   } else {
-    // Review mode: load transcript context then stream initial review
+    // Review/insight mode: load transcript context then stream initial review
     if (transcriptSummary) {
       session.context.addMessage({
         role: "user",
@@ -153,8 +151,6 @@ export async function startChat(
 
 /**
  * Send a message in an ongoing chat session.
- * Supports built-in tool calls: if AI responds with tool_calls JSON,
- * execute them and re-call AI for the final streaming response.
  */
 export async function sendChatMessage(
   deviceId: string,
@@ -172,7 +168,6 @@ export async function sendChatMessage(
 /**
  * Extract tool_calls from AI response text.
  * Handles both pure JSON and mixed text+JSON responses.
- * Returns [toolCalls, textPart] or null if no tool calls found.
  */
 function extractToolCalls(content: string): { toolCalls: any[]; textPart: string } | null {
   // 1. Try pure JSON parse
@@ -182,11 +177,10 @@ function extractToolCalls(content: string): { toolCalls: any[]; textPart: string
       return { toolCalls: parsed.tool_calls, textPart: "" };
     }
   } catch {
-    // Not pure JSON, try regex extraction
+    // Not pure JSON
   }
 
   // 2. Try to find JSON object containing tool_calls in mixed text
-  // Match: {"tool_calls": [...]} or {  "tool_calls" : [...] }
   const jsonMatch = content.match(/\{[\s\S]*?"tool_calls"\s*:\s*\[[\s\S]*?\]\s*\}/);
   if (jsonMatch) {
     try {
@@ -200,8 +194,7 @@ function extractToolCalls(content: string): { toolCalls: any[]; textPart: string
     }
   }
 
-  // 3. Try to find tool_calls array directly (AI sometimes outputs without wrapping {})
-  // Match: tool_calls: [{"name": ...}]
+  // 3. Try to find tool_calls array directly
   const arrayMatch = content.match(/tool_calls\s*[:：]\s*(\[[\s\S]*?\])/);
   if (arrayMatch) {
     try {
@@ -230,7 +223,6 @@ async function* streamWithToolCalls(
   const MAX_TOOL_ROUNDS = 3;
 
   for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
-    // Non-streaming call to check for tool_calls
     const response = await chatCompletion(session.context.getMessages(), {
       temperature: 0.7,
     });
@@ -238,7 +230,6 @@ async function* streamWithToolCalls(
     const content = response.content.trim();
     if (!content) break;
 
-    // Try to extract tool_calls (handles pure JSON and mixed text)
     const extracted = extractToolCalls(content);
 
     if (!extracted) {
@@ -261,7 +252,6 @@ async function* streamWithToolCalls(
       }
     }
 
-    // Feed results back and continue loop
     session.context.addMessage({ role: "assistant", content });
     session.context.addMessage({
       role: "user",
@@ -289,10 +279,9 @@ export async function endChat(deviceId: string): Promise<void> {
       .map((m) => `${m.role}: ${m.content.slice(0, 200)}`)
       .join("\n");
 
-    // Update soul and profile with conversation insights
-    updateSoul(deviceId, `[复盘对话] ${summary}`).catch(() => {});
-    updateProfile(deviceId, `[复盘对话] ${summary}`).catch(() => {});
-    // Append conversation summary to AI self-diary
+    const userId = session.userId;
+    updateSoul(deviceId, `[复盘对话] ${summary}`, userId).catch(() => {});
+    updateProfile(deviceId, `[复盘对话] ${summary}`, userId).catch(() => {});
     appendToDiary(deviceId, "ai-self", `[对话摘要] ${summary.slice(0, 500)}`).catch(() => {});
   }
 

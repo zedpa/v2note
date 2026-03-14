@@ -3,10 +3,9 @@ import type { ContextMode } from "../context/tiers.js";
 /**
  * MemoryManager combines short-term (session) and long-term (Supabase) memory.
  *
- * Enhanced with Mem0-inspired features:
- * - Semantic search via embeddings (optional, falls back to keyword-based)
- * - Automatic memory deduplication (prevents storing near-identical memories)
- * - Memory consolidation (merges related memories over time)
+ * Mem0-inspired two-stage approach:
+ * 1. Extract candidate facts from content
+ * 2. For each candidate, retrieve similar memories and decide: ADD/UPDATE/DELETE/NONE
  */
 export declare class MemoryManager {
     private shortTerm;
@@ -20,7 +19,6 @@ export declare class MemoryManager {
     }): Promise<string[]>;
     /**
      * Load relevance-filtered memories using the context loader.
-     * Returns both formatted strings and raw entries.
      */
     loadRelevantContext(deviceId: string, opts?: {
         mode?: ContextMode;
@@ -30,13 +28,15 @@ export declare class MemoryManager {
             end: string;
         };
         localSoul?: string;
+        userId?: string;
     }): Promise<{
         soul?: string;
+        userProfile?: string;
         memories: string[];
         rawMemories: MemoryEntry[];
     }>;
     /**
-     * Semantic memory search (Mem0-style).
+     * Semantic memory search.
      * Falls back to keyword-based loading if embeddings unavailable.
      */
     searchMemories(deviceId: string, query: string, limit?: number): Promise<Array<{
@@ -44,20 +44,14 @@ export declare class MemoryManager {
         score: number;
         source_date: string | null;
     }>>;
-    /**
-     * Add to short-term memory.
-     */
     addShortTerm(content: string): void;
     /**
-     * After processing a record, use AI to decide if a long-term memory should be created.
-     * Enhanced with Mem0-style deduplication: checks for similar existing memories
-     * and updates instead of creating duplicates.
+     * Mem0 two-stage memory management:
+     * 1. AI extracts candidate facts from content
+     * 2. For each candidate, embedding-retrieve top-5 similar memories
+     * 3. AI decides in one call: ADD / UPDATE(id) / DELETE(id) / NONE
+     * 4. Execute decisions
      */
     maybeCreateMemory(deviceId: string, content: string, date: string): Promise<void>;
-    /**
-     * Save memory with semantic deduplication (Mem0-inspired).
-     * If a very similar memory exists, update it instead of creating a duplicate.
-     */
-    private saveWithDedup;
     clearShortTerm(): void;
 }

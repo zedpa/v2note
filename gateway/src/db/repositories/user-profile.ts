@@ -14,6 +14,28 @@ export async function findByDevice(deviceId: string): Promise<UserProfile | null
   );
 }
 
+export async function findByUser(userId: string): Promise<UserProfile | null> {
+  return queryOne<UserProfile>(
+    `SELECT * FROM user_profile WHERE user_id = $1`,
+    [userId],
+  );
+}
+
+export async function upsertByUser(userId: string, content: string): Promise<void> {
+  const existing = await findByUser(userId);
+  if (existing) {
+    await execute(
+      `UPDATE user_profile SET content = $1, updated_at = now() WHERE id = $2`,
+      [content, existing.id],
+    );
+  } else {
+    await execute(
+      `INSERT INTO user_profile (user_id, content) VALUES ($1, $2)`,
+      [userId, content],
+    );
+  }
+}
+
 export async function upsert(deviceId: string, content: string): Promise<void> {
   await execute(
     `INSERT INTO user_profile (device_id, content) VALUES ($1, $2)

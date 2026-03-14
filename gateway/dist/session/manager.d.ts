@@ -1,9 +1,12 @@
 import { SessionContext } from "./context.js";
+import { MemoryManager } from "../memory/manager.js";
 export interface Session {
     id: string;
     deviceId: string;
+    userId?: string;
     context: SessionContext;
     mode: "idle" | "process" | "chat";
+    memoryManager: MemoryManager;
     createdAt: Date;
     lastActivity: Date;
 }

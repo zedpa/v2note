@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { BookOpen, Calendar, Bot, FileText } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -9,13 +9,16 @@ import {
   type DiarySummary,
   type DiaryEntry,
 } from "@/shared/lib/api/notebooks";
+import { on } from "@/features/recording/lib/events";
 
 interface DiaryViewProps {
   notebook: string;
 }
 
 function formatDate(dateStr: string): string {
-  const d = new Date(dateStr + "T00:00:00");
+  // Handle both "2026-03-13" and "2026-03-13T00:00:00.000Z" formats
+  const dateOnly = dateStr.split("T")[0];
+  const d = new Date(dateOnly + "T00:00:00");
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const diff = Math.floor((today.getTime() - d.getTime()) / 86400000);
@@ -45,21 +48,27 @@ export function DiaryView({ notebook }: DiaryViewProps) {
   const [entry, setEntry] = useState<DiaryEntry | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingEntry, setLoadingEntry] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  // Refresh when recording is processed
+  useEffect(() => {
+    return on("recording:processed", () => {
+      // Delay slightly to let backend finish diary append
+      setTimeout(() => setRefreshKey((k) => k + 1), 2000);
+    });
+  }, []);
 
   // Load summaries
   useEffect(() => {
-    setLoading(true);
-    setSummaries([]);
-    setSelectedDate(null);
-    setEntry(null);
+    setLoading(summaries.length === 0);
     listDiarySummaries(notebook, getDateStr(-30), getDateStr(0))
       .then((items) => {
         setSummaries(items);
-        if (items.length > 0) setSelectedDate(items[0].entry_date);
+        if (items.length > 0 && !selectedDate) setSelectedDate(items[0].entry_date);
       })
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, [notebook]);
+  }, [notebook, refreshKey]);
 
   // Load entry detail
   useEffect(() => {
@@ -69,7 +78,7 @@ export function DiaryView({ notebook }: DiaryViewProps) {
       .then(setEntry)
       .catch(() => setEntry(null))
       .finally(() => setLoadingEntry(false));
-  }, [notebook, selectedDate]);
+  }, [notebook, selectedDate, refreshKey]);
 
   const accentColor = NOTEBOOK_COLORS[notebook] ?? "text-blue-500";
 

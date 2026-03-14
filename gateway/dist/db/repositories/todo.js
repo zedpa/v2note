@@ -5,6 +5,18 @@ export async function findByDevice(deviceId) {
      WHERE r.device_id = $1
      ORDER BY t.created_at DESC`, [deviceId]);
 }
+export async function findByUser(userId) {
+    return query(`SELECT t.* FROM todo t
+     JOIN record r ON r.id = t.record_id
+     WHERE r.user_id = $1
+     ORDER BY t.created_at DESC`, [userId]);
+}
+export async function findPendingByUser(userId) {
+    return query(`SELECT t.* FROM todo t
+     JOIN record r ON r.id = t.record_id
+     WHERE r.user_id = $1 AND t.done = false
+     ORDER BY t.created_at ASC`, [userId]);
+}
 export async function findByRecordId(recordId) {
     return query(`SELECT * FROM todo WHERE record_id = $1 ORDER BY created_at`, [recordId]);
 }
@@ -67,6 +79,10 @@ export async function update(id, fields) {
     if (fields.ai_action_plan !== undefined) {
         sets.push(`ai_action_plan = $${i++}`);
         params.push(JSON.stringify(fields.ai_action_plan));
+    }
+    if (fields.goal_id !== undefined) {
+        sets.push(`goal_id = $${i++}`);
+        params.push(fields.goal_id);
     }
     if (sets.length === 0)
         return;

@@ -5,4 +5,6 @@ export interface Soul {
     updated_at: string;
 }
 export declare function findByDevice(deviceId: string): Promise<Soul | null>;
+export declare function findByUser(userId: string): Promise<Soul | null>;
+export declare function upsertByUser(userId: string, content: string): Promise<void>;
 export declare function upsert(deviceId: string, content: string): Promise<void>;

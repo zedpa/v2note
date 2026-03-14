@@ -15,6 +15,13 @@ export async function findByDevice(deviceId: string): Promise<SkillConfig[]> {
   );
 }
 
+export async function findByUser(userId: string): Promise<SkillConfig[]> {
+  return query<SkillConfig>(
+    `SELECT * FROM skill_config WHERE user_id = $1`,
+    [userId],
+  );
+}
+
 export async function upsert(fields: {
   device_id: string;
   skill_name: string;

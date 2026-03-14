@@ -17,6 +17,31 @@ export async function findByDevice(deviceId: string): Promise<Notebook[]> {
   );
 }
 
+export async function findByUser(userId: string): Promise<Notebook[]> {
+  return query<Notebook>(
+    `SELECT * FROM notebook WHERE user_id = $1 ORDER BY is_system DESC, created_at`,
+    [userId],
+  );
+}
+
+export async function findOrCreateByUser(
+  userId: string,
+  deviceId: string,
+  name: string,
+  description?: string,
+  isSystem = false,
+  color?: string,
+): Promise<Notebook> {
+  const row = await queryOne<Notebook>(
+    `INSERT INTO notebook (user_id, device_id, name, description, is_system, color)
+     VALUES ($1, $2, $3, $4, $5, $6)
+     ON CONFLICT (device_id, name) DO UPDATE SET user_id = $1
+     RETURNING *`,
+    [userId, deviceId, name, description ?? null, isSystem, color ?? "#6366f1"],
+  );
+  return row!;
+}
+
 export async function findById(id: string): Promise<Notebook | null> {
   return queryOne<Notebook>(`SELECT * FROM notebook WHERE id = $1`, [id]);
 }

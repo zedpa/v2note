@@ -4,7 +4,7 @@
  * Key design (borrowed from OpenClaw):
  * - Parallel loading of soul + memories via Promise.all
  * - Keyword-based relevance scoring (no vector DB needed)
- * - Mode-aware loading: process mode skips soul, chat loads more memories
+ * - Mode-aware loading: chat loads more memories than briefing
  * - Returns pre-filtered, ranked context ready for prompt assembly
  */
 
@@ -13,14 +13,13 @@ import { loadSoul } from "../soul/manager.js";
 import { loadProfile } from "../profile/manager.js";
 import { goalRepo } from "../db/repositories/index.js";
 import { extractKeywords } from "../lib/text-utils.js";
+import { semanticSearch } from "../memory/embeddings.js";
 import type { ContextMode } from "./tiers.js";
 
 /** Memory limits per mode */
 const MEMORY_LIMITS: Record<ContextMode, number> = {
-  process: 5,
   chat: 15,
   briefing: 10,
-  estimate: 5,
 };
 
 export interface LoadedContext {
@@ -39,32 +38,34 @@ export interface LoadedContext {
  */
 export async function loadWarmContext(opts: {
   deviceId: string;
+  userId?: string;
   mode: ContextMode;
   inputText?: string;
   dateRange?: { start: string; end: string };
   /** Pre-loaded soul content (from localConfig) */
   localSoul?: string;
 }): Promise<LoadedContext> {
-  const needsSoul = opts.mode !== "process"; // process mode doesn't need soul
   const memoryLimit = MEMORY_LIMITS[opts.mode] ?? 10;
+
+  // Use userId for cross-device data when available, fall back to deviceId
+  const id = opts.userId ?? opts.deviceId;
+  const useUser = !!opts.userId;
 
   // Parallel loading (soul + profile + memories + goals)
   const [soul, profile, rawMemories, activeGoals] = await Promise.all([
-    needsSoul && !opts.localSoul
-      ? loadSoulSafe(opts.deviceId)
+    !opts.localSoul
+      ? (useUser ? loadSoulByUserSafe(id) : loadSoulSafe(opts.deviceId))
       : Promise.resolve(undefined),
-    loadProfileSafe(opts.deviceId),
-    loadMemorySafe(opts.deviceId, opts.dateRange),
-    loadGoalsSafe(opts.deviceId),
+    useUser ? loadProfileByUserSafe(id) : loadProfileSafe(opts.deviceId),
+    useUser ? loadMemoryByUserSafe(id, opts.dateRange) : loadMemorySafe(opts.deviceId, opts.dateRange),
+    useUser ? loadGoalsByUserSafe(id) : loadGoalsSafe(opts.deviceId),
   ]);
 
   const soulContent = opts.localSoul ?? soul?.content;
   const profileContent = profile?.content;
 
-  // Relevance-filter memories
-  // When goal table has data, [目标] memories are demoted to normal processing
-  const hasGoalTableData = activeGoals.length > 0;
-  const ranked = rankMemories(rawMemories, opts.inputText, memoryLimit, hasGoalTableData);
+  // Relevance-filter memories (embedding-first, keyword fallback)
+  const ranked = await rankMemories(rawMemories, opts.inputText, memoryLimit);
 
   // Format as context strings
   const memories = ranked.map(
@@ -84,46 +85,54 @@ export async function loadWarmContext(opts: {
 
 /**
  * Rank memories by relevance to input text.
- * Uses keyword overlap + importance + recency.
+ * Tries embedding-based search first, falls back to keyword scoring.
  */
-function rankMemories(
+async function rankMemories(
   memories: MemoryEntry[],
   inputText: string | undefined,
   limit: number,
-  hasGoalTableData = false,
-): MemoryEntry[] {
+): Promise<MemoryEntry[]> {
   if (memories.length === 0) return [];
 
-  // When goal table has data, [目标] memories are treated as normal memories
-  const goalMemories = hasGoalTableData
-    ? []
-    : memories.filter((m) => m.content.startsWith("[目标]"));
-  const nonGoals = hasGoalTableData
-    ? memories
-    : memories.filter((m) => !m.content.startsWith("[目标]"));
-
   if (!inputText) {
-    return [...goalMemories, ...nonGoals].slice(0, limit);
+    // No input — return by importance + recency
+    return memories.slice(0, limit);
   }
 
+  // 1. Try embedding search
+  try {
+    const results = await semanticSearch(inputText, memories, limit);
+    if (results.length > 0) {
+      return results.map(r => {
+        const entry = memories.find(m => m.content === r.content);
+        return entry!;
+      }).filter(Boolean);
+    }
+  } catch {
+    // fallback to keyword
+  }
+
+  // 2. Keyword fallback
+  return keywordRank(memories, inputText, limit);
+}
+
+/**
+ * Keyword-based memory ranking (fallback).
+ */
+function keywordRank(
+  memories: MemoryEntry[],
+  inputText: string,
+  limit: number,
+): MemoryEntry[] {
   const inputKeywords = extractKeywords(inputText);
 
-  // Score non-goal memories
-  const scored = nonGoals.map((m) => ({
+  const scored = memories.map((m) => ({
     memory: m,
     score: computeRelevanceScore(m, inputKeywords),
   }));
 
   scored.sort((a, b) => b.score - a.score);
-
-  // Goals always included + top-scored non-goals
-  const goalSlots = Math.min(goalMemories.length, Math.ceil(limit * 0.4));
-  const nonGoalSlots = limit - goalSlots;
-
-  return [
-    ...goalMemories.slice(0, goalSlots),
-    ...scored.slice(0, nonGoalSlots).map((s) => s.memory),
-  ];
+  return scored.slice(0, limit).map((s) => s.memory);
 }
 
 /**
@@ -202,6 +211,52 @@ async function loadGoalsSafe(
     return await goalRepo.findActiveByDevice(deviceId);
   } catch (err: any) {
     console.warn(`[context-loader] Failed to load goals: ${err.message}`);
+    return [];
+  }
+}
+
+// ── User-based loaders (for cross-device unified data) ──
+
+async function loadSoulByUserSafe(userId: string) {
+  try {
+    const { soulRepo } = await import("../db/repositories/index.js");
+    return await soulRepo.findByUser(userId);
+  } catch (err: any) {
+    console.warn(`[context-loader] Failed to load soul by user: ${err.message}`);
+    return undefined;
+  }
+}
+
+async function loadProfileByUserSafe(userId: string) {
+  try {
+    const { userProfileRepo } = await import("../db/repositories/index.js");
+    return await userProfileRepo.findByUser(userId);
+  } catch (err: any) {
+    console.warn(`[context-loader] Failed to load profile by user: ${err.message}`);
+    return undefined;
+  }
+}
+
+async function loadMemoryByUserSafe(
+  userId: string,
+  dateRange?: { start: string; end: string },
+): Promise<MemoryEntry[]> {
+  try {
+    const memoryRepo = await import("../db/repositories/memory.js");
+    return await memoryRepo.findByUser(userId, dateRange);
+  } catch (err: any) {
+    console.warn(`[context-loader] Failed to load memories by user: ${err.message}`);
+    return [];
+  }
+}
+
+async function loadGoalsByUserSafe(
+  userId: string,
+): Promise<Array<{ id: string; title: string }>> {
+  try {
+    return await goalRepo.findActiveByUser(userId);
+  } catch (err: any) {
+    console.warn(`[context-loader] Failed to load goals by user: ${err.message}`);
     return [];
   }
 }

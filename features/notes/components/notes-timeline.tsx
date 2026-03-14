@@ -1,15 +1,21 @@
 "use client";
 
 import { useMemo, useState, useRef, useCallback } from "react";
-import { MapPin, Clock, Trash2, X, CheckCircle2, Mic, Type } from "lucide-react";
+import { createPortal } from "react-dom";
+import { MapPin, Clock, Trash2, X, CheckCircle2, Mic, Type, MoreVertical, Pencil, Copy } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useNotes } from "@/features/notes/hooks/use-notes";
+import { useNoteDetail } from "@/features/notes/hooks/use-note-detail";
 import { MiniAudioPlayer } from "./mini-audio-player";
+import { toast } from "sonner";
 import type { NoteItem } from "@/shared/lib/types";
+import { AiWindow } from "@/features/ai-bubble/components/ai-window";
 
 interface NotesTimelineProps {
   filter?: string;
-  onNoteClick?: (noteId: string) => void;
+  notebook?: string | null;
+  onOpenChat?: (initial?: string) => void;
+  onOpenOverlay?: (name: string) => void;
 }
 
 interface DayGroup {
@@ -29,8 +35,8 @@ function parseDayGroup(dateStr: string): { day: number; monthWeekday: string } {
   return { day, monthWeekday: `${month}月 周${weekday}` };
 }
 
-export function NotesTimeline({ filter, onNoteClick }: NotesTimelineProps) {
-  const { notes, loading, deleteNotes } = useNotes();
+export function NotesTimeline({ filter, notebook, onOpenChat, onOpenOverlay }: NotesTimelineProps) {
+  const { notes, loading, deleteNotes, updateNote } = useNotes(notebook);
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [deleting, setDeleting] = useState(false);
@@ -145,14 +151,15 @@ export function NotesTimeline({ filter, onNoteClick }: NotesTimelineProps) {
   return (
     <>
       <div className="px-4 pt-2 pb-28">
+        <AiWindow onOpenChat={onOpenChat} onOpenOverlay={onOpenOverlay} />
         {groups.map((group) => (
           <div key={group.date} className="mb-6">
-            {/* Day header — editorial style */}
-            <div className="flex items-baseline gap-2.5 py-3">
-              <span className="text-3xl font-display font-light text-foreground/80 leading-none tabular-nums">
+            {/* Day header — editorial style with serif date */}
+            <div className="flex items-baseline gap-2 py-3">
+              <span className="text-4xl font-serif-display text-foreground/80 leading-none tabular-nums">
                 {group.day}
               </span>
-              <span className="text-xs text-muted-foreground tracking-wide">
+              <span className="text-xs text-muted-foreground/60 tracking-wide">
                 {group.monthWeekday}
               </span>
             </div>
@@ -168,14 +175,10 @@ export function NotesTimeline({ filter, onNoteClick }: NotesTimelineProps) {
                     index={idx}
                     selectionMode={selectionMode}
                     selected={selectedIds.has(note.id)}
-                    onClick={() => {
-                      if (selectionMode) {
-                        toggleSelect(note.id);
-                      } else {
-                        onNoteClick?.(note.id);
-                      }
-                    }}
+                    onToggleSelect={() => toggleSelect(note.id)}
                     onLongPress={() => enterSelectionMode(note.id)}
+                    onDelete={() => deleteNotes([note.id])}
+                    onUpdate={(fields) => updateNote(note.id, fields)}
                   />
                 );
               })}
@@ -217,23 +220,40 @@ export function NotesTimeline({ filter, onNoteClick }: NotesTimelineProps) {
 
 const LONG_PRESS_MS = 500;
 
+function formatDuration(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const s = (seconds % 60).toString().padStart(2, "0");
+  return `${m}:${s}`;
+}
+
 function TimelineCard({
   note,
   index,
   selectionMode,
   selected,
-  onClick,
+  onToggleSelect,
   onLongPress,
+  onDelete,
+  onUpdate,
 }: {
   note: NoteItem;
   index: number;
   selectionMode: boolean;
   selected: boolean;
-  onClick?: () => void;
+  onToggleSelect: () => void;
   onLongPress?: () => void;
+  onDelete: () => void;
+  onUpdate: (fields: { short_summary: string }) => void;
 }) {
+  const [expanded, setExpanded] = useState(false);
+  const { detail, loading: detailLoading } = useNoteDetail(expanded ? note.id : null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const longPressTriggered = useRef(false);
+
+  // Menu & edit state
+  const [menuPos, setMenuPos] = useState<{ x: number; y: number } | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [editText, setEditText] = useState("");
 
   const handlePointerDown = useCallback(() => {
     longPressTriggered.current = false;
@@ -249,9 +269,13 @@ function TimelineCard({
       timerRef.current = null;
     }
     if (!longPressTriggered.current) {
-      onClick?.();
+      if (selectionMode) {
+        onToggleSelect();
+      } else {
+        setExpanded((prev) => !prev);
+      }
     }
-  }, [onClick]);
+  }, [selectionMode, onToggleSelect]);
 
   const handlePointerLeave = useCallback(() => {
     if (timerRef.current) {
@@ -259,6 +283,32 @@ function TimelineCard({
       timerRef.current = null;
     }
   }, []);
+
+  const handleStartEdit = useCallback(() => {
+    setEditText(note.short_summary || note.title);
+    setEditing(true);
+    setMenuPos(null);
+  }, [note.short_summary, note.title]);
+
+  const handleSaveEdit = useCallback(() => {
+    if (editText.trim()) {
+      onUpdate({ short_summary: editText.trim() });
+    }
+    setEditing(false);
+  }, [editText, onUpdate]);
+
+  const handleCopy = useCallback(() => {
+    const text = note.short_summary || note.title;
+    navigator.clipboard.writeText(text).then(() => toast("已复制"));
+    setMenuPos(null);
+  }, [note.short_summary, note.title]);
+
+  const handleDeleteSingle = useCallback(() => {
+    setMenuPos(null);
+    if (confirm("确定删除这条记录？")) {
+      onDelete();
+    }
+  }, [onDelete]);
 
   // Only show skeleton if still processing AND no content available yet
   const hasContent = !!(note.short_summary || note.title !== "处理中...");
@@ -317,41 +367,97 @@ function TimelineCard({
         )}
 
         <div className="flex-1 min-w-0">
-          {/* Time + location row */}
-          <div className="flex items-center gap-1.5 mb-3">
-            <span className="text-[11px] font-mono tabular-nums text-muted-foreground/70">
-              {note.time}
-            </span>
+          {/* Meta row: time · duration/type · location · tags + menu button */}
+          <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground/70 mb-2 flex-wrap">
+            <span className="font-mono tabular-nums">{note.time}</span>
+            {note.duration_seconds != null && note.duration_seconds > 0 ? (
+              <>
+                <span>·</span>
+                <Mic className="w-3 h-3" />
+                <span>{formatDuration(note.duration_seconds)}</span>
+              </>
+            ) : (
+              <>
+                <span>·</span>
+                <Type className="w-3 h-3" />
+                <span>文字</span>
+              </>
+            )}
             {note.location && (
               <>
-                <span className="text-muted-foreground/30">|</span>
-                <div className="flex items-center gap-0.5 text-muted-foreground/60">
-                  <MapPin className="w-3 h-3" />
-                  <span className="text-[11px]">{note.location}</span>
-                </div>
+                <span>·</span>
+                <MapPin className="w-3 h-3" />
+                <span className="truncate max-w-[80px]">{note.location}</span>
+              </>
+            )}
+            {note.tags.length > 0 && (
+              <>
+                <span>·</span>
+                {note.tags.map((tag) => (
+                  <span
+                    key={tag}
+                    className="px-1.5 py-0.5 rounded-full bg-primary/8 text-primary/80 text-[10px]"
+                  >
+                    {tag}
+                  </span>
+                ))}
+              </>
+            )}
+            {/* Spacer + three-dot menu button */}
+            {expanded && !selectionMode && (
+              <>
+                <span className="flex-1" />
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    setMenuPos({ x: rect.right - 160, y: rect.bottom + 4 });
+                  }}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onPointerUp={(e) => e.stopPropagation()}
+                  className="shrink-0 p-1 -mr-1 rounded-md hover:bg-secondary/60 transition-colors"
+                >
+                  <MoreVertical className="w-4 h-4 text-muted-foreground/60" />
+                </button>
               </>
             )}
           </div>
 
-          {/* Voice/text type indicator */}
-          {note.duration_seconds != null && note.duration_seconds > 0 ? (
-            <div className="flex items-center gap-1 text-muted-foreground/60 mb-1.5">
-              <Mic className="w-3 h-3" />
-              <span className="text-[11px]">
-                {Math.floor(note.duration_seconds / 60)}:{(note.duration_seconds % 60).toString().padStart(2, "0")}
-              </span>
+          {/* Content — editing or display */}
+          {editing ? (
+            <div className="space-y-2" onClick={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()} onPointerUp={(e) => e.stopPropagation()}>
+              <textarea
+                autoFocus
+                value={editText}
+                onChange={(e) => setEditText(e.target.value)}
+                className="w-full text-[15px] leading-[1.7] bg-secondary/30 rounded-lg p-2 border outline-none focus:ring-1 focus:ring-primary/40 resize-none min-h-[80px]"
+              />
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={handleSaveEdit}
+                  className="bg-primary text-primary-foreground text-xs px-3 py-1.5 rounded-lg"
+                >
+                  保存
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEditing(false)}
+                  className="text-xs px-3 py-1.5 rounded-lg text-muted-foreground hover:bg-secondary/60"
+                >
+                  取消
+                </button>
+              </div>
             </div>
           ) : (
-            <div className="flex items-center gap-1 text-muted-foreground/60 mb-1.5">
-              <Type className="w-3 h-3" />
-              <span className="text-[11px]">文字</span>
-            </div>
+            <p className={cn(
+              "text-[15px] leading-[1.7] text-foreground",
+              !expanded && "line-clamp-4",
+            )}>
+              {note.short_summary || note.title}
+            </p>
           )}
-
-          {/* Content */}
-          <p className="text-[15px] leading-[1.7] text-foreground line-clamp-5">
-            {note.short_summary || note.title}
-          </p>
 
           {/* Audio player */}
           {note.audio_path && !selectionMode && (
@@ -360,21 +466,93 @@ function TimelineCard({
             </div>
           )}
 
-          {/* Tags */}
-          {note.tags.length > 0 && (
-            <div className="flex flex-wrap gap-1.5 mt-3">
-              {note.tags.map((tag) => (
-                <span
-                  key={tag}
-                  className="text-[10px] font-medium px-2.5 py-0.5 rounded-full bg-primary/8 text-primary/80"
-                >
-                  {tag}
-                </span>
-              ))}
+          {/* Expanded detail section */}
+          {expanded && (
+            <div className="mt-3 pt-3 border-t border-border/50 space-y-3 animate-in fade-in slide-in-from-top-2">
+              {detailLoading ? (
+                <div className="flex items-center gap-2 text-muted-foreground/60">
+                  <div className="w-4 h-4 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+                  <span className="text-xs">加载中...</span>
+                </div>
+              ) : detail && (
+                <>
+                  {/* Transcript */}
+                  {detail.transcript?.text && (
+                    <div>
+                      <h4 className="text-xs font-medium text-muted-foreground mb-1">原文</h4>
+                      <p className="text-sm text-foreground/70 leading-relaxed whitespace-pre-wrap">
+                        {detail.transcript.text}
+                      </p>
+                    </div>
+                  )}
+                  {/* Todos */}
+                  {detail.todos.length > 0 && (
+                    <div>
+                      <h4 className="text-xs font-medium text-muted-foreground mb-1">待办</h4>
+                      {detail.todos.map((todo) => (
+                        <div key={todo.id} className="flex items-center gap-2 py-0.5">
+                          <div className={cn(
+                            "w-3.5 h-3.5 rounded border shrink-0",
+                            todo.done ? "bg-primary border-primary" : "border-muted-foreground/30",
+                          )} />
+                          <span className={cn(
+                            "text-sm",
+                            todo.done && "line-through text-muted-foreground",
+                          )}>
+                            {todo.text}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
             </div>
           )}
         </div>
       </div>
+
+      {/* Popover menu — portal to body to escape transform containing block */}
+      {menuPos && createPortal(
+        <>
+          <div className="fixed inset-0 z-50" onClick={() => setMenuPos(null)} />
+          <div
+            style={{
+              position: "fixed",
+              zIndex: 60,
+              left: Math.min(menuPos.x, window.innerWidth - 160),
+              top: Math.min(menuPos.y, window.innerHeight - 140),
+            }}
+            className="w-36 bg-background border rounded-xl shadow-xl py-1 animate-in fade-in zoom-in-95 duration-150"
+          >
+            <button
+              type="button"
+              onClick={handleStartEdit}
+              className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-secondary/60 transition-colors"
+            >
+              <Pencil className="w-4 h-4" />
+              编辑
+            </button>
+            <button
+              type="button"
+              onClick={handleCopy}
+              className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-secondary/60 transition-colors"
+            >
+              <Copy className="w-4 h-4" />
+              复制
+            </button>
+            <button
+              type="button"
+              onClick={handleDeleteSingle}
+              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-destructive hover:bg-destructive/10 transition-colors"
+            >
+              <Trash2 className="w-4 h-4" />
+              删除
+            </button>
+          </div>
+        </>,
+        document.body,
+      )}
     </div>
   );
 }

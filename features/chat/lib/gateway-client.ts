@@ -21,21 +21,23 @@ export interface LocalConfigPayload {
 }
 
 export type GatewayMessage =
+  | { type: "auth"; payload: { token: string; deviceId: string } }
   | { type: "process"; payload: { text: string; deviceId: string; recordId: string; localConfig?: LocalConfigPayload } }
   | {
       type: "chat.start";
       payload: {
         deviceId: string;
-        mode: "review" | "command";
+        mode: "review" | "command" | "insight";
         dateRange: { start: string; end: string };
         initialMessage?: string;
+        assistantPreamble?: string;
         localConfig?: Pick<LocalConfigPayload, "soul" | "skills">;
       };
     }
   | { type: "chat.message"; payload: { text: string; deviceId: string } }
   | { type: "chat.end"; payload: { deviceId: string } }
   | { type: "todo.aggregate"; payload: { deviceId: string } }
-  | { type: "asr.start"; payload: { deviceId: string; locationText?: string; mode?: "realtime" | "upload" } }
+  | { type: "asr.start"; payload: { deviceId: string; locationText?: string; mode?: "realtime" | "upload"; notebook?: string } }
   | { type: "asr.stop"; payload: { deviceId: string; saveAudio?: boolean } }
   | { type: "asr.cancel"; payload: { deviceId: string } };
 
@@ -54,11 +56,15 @@ export type GatewayResponse =
   | { type: "proactive.morning_briefing"; payload: { text: string } }
   | { type: "proactive.relay_reminder"; payload: { text: string; count: number } }
   | { type: "proactive.evening_summary"; payload: { text: string } }
+  | { type: "reflect.question"; payload: { question: string } }
+  | { type: "ai.status"; payload: { text: string } }
   | { type: "error"; payload: { message: string } };
 
 type MessageHandler = (msg: GatewayResponse) => void;
 
 import { getGatewayWsUrl } from "@/shared/lib/gateway-url";
+import { getAccessToken } from "@/shared/lib/auth";
+import { getApiDeviceId } from "@/shared/lib/api";
 
 const MAX_RECONNECT_ATTEMPTS = 10;
 const BASE_RECONNECT_DELAY = 3000;
@@ -92,6 +98,15 @@ export class GatewayClient {
           this._connected = true;
           this.reconnectAttempts = 0;
           console.log("[gateway-client] Connected");
+          // Send auth message if logged in
+          const token = getAccessToken();
+          const deviceId = getApiDeviceId();
+          if (token && deviceId) {
+            this.ws?.send(JSON.stringify({
+              type: "auth",
+              payload: { token, deviceId },
+            }));
+          }
           if (this.pendingMessages.length > 0) {
             for (const pending of this.pendingMessages) {
               this.ws?.send(JSON.stringify(pending));
@@ -195,3 +210,4 @@ export function getGatewayClient(): GatewayClient {
   }
   return instance;
 }
+

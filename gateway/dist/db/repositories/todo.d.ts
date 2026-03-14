@@ -22,6 +22,8 @@ export interface Todo {
     ai_action_plan?: string[];
 }
 export declare function findByDevice(deviceId: string): Promise<Todo[]>;
+export declare function findByUser(userId: string): Promise<Todo[]>;
+export declare function findPendingByUser(userId: string): Promise<Todo[]>;
 export declare function findByRecordId(recordId: string): Promise<Todo[]>;
 export declare function create(fields: {
     record_id: string;
@@ -44,6 +46,7 @@ export declare function update(id: string, fields: {
     impact?: number;
     ai_actionable?: boolean;
     ai_action_plan?: string[] | null;
+    goal_id?: string | null;
 }): Promise<void>;
 export declare function del(id: string): Promise<void>;
 export declare function toggle(id: string): Promise<Todo | null>;

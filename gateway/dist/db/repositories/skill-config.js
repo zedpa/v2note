@@ -2,6 +2,9 @@ import { query, execute } from "../pool.js";
 export async function findByDevice(deviceId) {
     return query(`SELECT * FROM skill_config WHERE device_id = $1`, [deviceId]);
 }
+export async function findByUser(userId) {
+    return query(`SELECT * FROM skill_config WHERE user_id = $1`, [userId]);
+}
 export async function upsert(fields) {
     await execute(`INSERT INTO skill_config (device_id, skill_name, enabled, config)
      VALUES ($1, $2, $3, $4)

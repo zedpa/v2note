@@ -1,10 +1,10 @@
 ---
 name: customer-request
 description: 提取客户提出的需求、要求、变更
-type: process
 metadata:
   openclaw:
     extract_fields: ["customer_requests"]
+    always: false
 ---
 
 # 客户需求提取

@@ -1,30 +1,34 @@
-import { loadSkills, filterActiveSkills, mergeWithCustomSkills } from "../skills/loader.js";
+import { loadSkills, mergeWithCustomSkills } from "../skills/loader.js";
 import { buildSystemPrompt } from "../skills/prompt-builder.js";
 import { chatCompletion, chatCompletionStream } from "../ai/provider.js";
-import { MemoryManager } from "../memory/manager.js";
 import { updateSoul } from "../soul/manager.js";
+import { updateProfile } from "../profile/manager.js";
+import { appendToDiary } from "../diary/manager.js";
 import { getSession } from "../session/manager.js";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { recordRepo } from "../db/repositories/index.js";
 import { transcriptRepo } from "../db/repositories/index.js";
+import { pendingIntentRepo } from "../db/repositories/index.js";
 import { isBuiltinTool, callBuiltinTool } from "../tools/builtin.js";
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const SKILLS_DIR = join(__dirname, "../../skills");
+const INSIGHTS_DIR = join(__dirname, "../../insights");
 /**
- * Start a review chat session.
+ * Start a review/insight chat session.
  * Loads memory, soul, and skills into the session context.
  * Returns the initial AI greeting.
  */
 export async function startChat(payload) {
     const session = getSession(payload.deviceId);
     session.mode = "chat";
+    session.userId = payload.userId;
     // Load context in parallel using tiered loader (soul + memories)
-    const memoryManager = new MemoryManager();
+    const memoryManager = session.memoryManager;
     const loaded = await memoryManager.loadRelevantContext(payload.deviceId, {
         mode: "chat",
         dateRange: payload.dateRange,
         localSoul: payload.localConfig?.soul?.content,
+        userId: payload.userId,
     });
     const soul = loaded.soul ? { content: loaded.soul } : undefined;
     const memories = loaded.memories;
@@ -47,44 +51,52 @@ export async function startChat(payload) {
                 .join("\n\n");
         }
     }
-    // Build skills — merge built-in + custom, then filter
-    const builtinSkills = loadSkills(SKILLS_DIR);
-    const allSkills = mergeWithCustomSkills(builtinSkills, payload.localConfig?.skills?.configs);
-    const skillConfigs = payload.localConfig?.skills?.configs?.map((c) => ({
-        skill_name: c.name,
-        enabled: c.enabled,
-    }));
-    let activeSkills;
-    if (payload.mode === "review") {
-        // Review mode: only apply the single selected review skill (if any)
-        const selectedName = payload.localConfig?.skills?.selectedReviewSkill;
-        if (selectedName) {
-            const reviewSkills = filterActiveSkills(allSkills, skillConfigs, "review");
-            activeSkills = reviewSkills.filter((s) => s.name === selectedName);
-        }
-        else {
-            activeSkills = []; // No review skill selected → default conversation
+    // Build skills — load from insights/ for selected insight skill
+    let activeSkills = [];
+    const selectedName = payload.localConfig?.skills?.selectedInsightSkill
+        ?? payload.localConfig?.skills?.selectedReviewSkill;
+    if (selectedName && (payload.mode === "review" || payload.mode === "insight")) {
+        const insights = loadSkills(INSIGHTS_DIR);
+        const merged = mergeWithCustomSkills(insights, payload.localConfig?.skills?.configs);
+        const found = merged.find(s => s.name === selectedName);
+        if (found)
+            activeSkills = [found];
+    }
+    // Load pending intents for natural follow-up in conversation
+    let pendingIntentContext = "";
+    try {
+        const pendingIntents = await pendingIntentRepo.findPendingByDevice(payload.deviceId);
+        if (pendingIntents.length > 0) {
+            const lines = pendingIntents.slice(0, 5).map((pi) => {
+                const date = new Date(pi.created_at).toLocaleDateString("zh-CN");
+                return `- [${pi.intent_type}] "${pi.text}"${pi.context ? ` (${pi.context})` : ""} (${date}, id: ${pi.id})`;
+            });
+            pendingIntentContext = `\n## 待确认意图\n以下是用户近期提到但未确认的愿望/目标，在对话中自然地跟进（不要一开口就问，找合适时机）：\n${lines.join("\n")}\n不要逐条审问用户，自然聊天中确认即可。确认后使用 confirm_intent 工具处理。`;
         }
     }
-    else {
-        // Command mode: no review skills, just tools available
-        activeSkills = [];
+    catch (err) {
+        console.warn(`[chat] Failed to load pending intents: ${err.message}`);
     }
     const systemPrompt = buildSystemPrompt({
         skills: activeSkills,
         soul: soul?.content,
+        userProfile: loaded.userProfile,
         memory: memories,
         mode: "chat",
+        pendingIntentContext,
     });
     // Set up session context
     session.context.setSystemPrompt(systemPrompt);
     if (payload.mode === "command") {
         // Command mode: skip review, respond directly to the initial message
+        if (payload.assistantPreamble) {
+            session.context.addMessage({ role: "assistant", content: payload.assistantPreamble });
+        }
         const msg = payload.initialMessage?.trim() || "/";
         session.context.addMessage({ role: "user", content: msg });
     }
     else {
-        // Review mode: load transcript context then stream initial review
+        // Review/insight mode: load transcript context then stream initial review
         if (transcriptSummary) {
             session.context.addMessage({
                 role: "user",
@@ -103,8 +115,6 @@ export async function startChat(payload) {
 }
 /**
  * Send a message in an ongoing chat session.
- * Supports built-in tool calls: if AI responds with tool_calls JSON,
- * execute them and re-call AI for the final streaming response.
  */
 export async function sendChatMessage(deviceId, text) {
     const session = getSession(deviceId);
@@ -117,7 +127,6 @@ export async function sendChatMessage(deviceId, text) {
 /**
  * Extract tool_calls from AI response text.
  * Handles both pure JSON and mixed text+JSON responses.
- * Returns [toolCalls, textPart] or null if no tool calls found.
  */
 function extractToolCalls(content) {
     // 1. Try pure JSON parse
@@ -128,10 +137,9 @@ function extractToolCalls(content) {
         }
     }
     catch {
-        // Not pure JSON, try regex extraction
+        // Not pure JSON
     }
     // 2. Try to find JSON object containing tool_calls in mixed text
-    // Match: {"tool_calls": [...]} or {  "tool_calls" : [...] }
     const jsonMatch = content.match(/\{[\s\S]*?"tool_calls"\s*:\s*\[[\s\S]*?\]\s*\}/);
     if (jsonMatch) {
         try {
@@ -145,8 +153,7 @@ function extractToolCalls(content) {
             // JSON parse failed
         }
     }
-    // 3. Try to find tool_calls array directly (AI sometimes outputs without wrapping {})
-    // Match: tool_calls: [{"name": ...}]
+    // 3. Try to find tool_calls array directly
     const arrayMatch = content.match(/tool_calls\s*[:：]\s*(\[[\s\S]*?\])/);
     if (arrayMatch) {
         try {
@@ -170,14 +177,12 @@ function extractToolCalls(content) {
 async function* streamWithToolCalls(session, deviceId) {
     const MAX_TOOL_ROUNDS = 3;
     for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
-        // Non-streaming call to check for tool_calls
         const response = await chatCompletion(session.context.getMessages(), {
             temperature: 0.7,
         });
         const content = response.content.trim();
         if (!content)
             break;
-        // Try to extract tool_calls (handles pure JSON and mixed text)
         const extracted = extractToolCalls(content);
         if (!extracted) {
             // No tool calls — normal text response
@@ -198,7 +203,6 @@ async function* streamWithToolCalls(session, deviceId) {
                 toolResults.push(`工具 "${call.name}" 错误: 未知工具`);
             }
         }
-        // Feed results back and continue loop
         session.context.addMessage({ role: "assistant", content });
         session.context.addMessage({
             role: "user",
@@ -223,8 +227,10 @@ export async function endChat(deviceId) {
         const summary = history
             .map((m) => `${m.role}: ${m.content.slice(0, 200)}`)
             .join("\n");
-        // Update soul with conversation insights
-        updateSoul(deviceId, `[复盘对话] ${summary}`).catch(() => { });
+        const userId = session.userId;
+        updateSoul(deviceId, `[复盘对话] ${summary}`, userId).catch(() => { });
+        updateProfile(deviceId, `[复盘对话] ${summary}`, userId).catch(() => { });
+        appendToDiary(deviceId, "ai-self", `[对话摘要] ${summary.slice(0, 500)}`).catch(() => { });
     }
     session.mode = "idle";
     session.context.clear();

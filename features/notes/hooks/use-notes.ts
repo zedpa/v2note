@@ -15,17 +15,17 @@ interface DateGroup {
 
 const POLL_INTERVAL = 5000;
 
-export function useNotes() {
+export function useNotes(notebook?: string | null) {
   const [notes, setNotes] = useState<NoteItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const pollRef = useRef<NodeJS.Timeout | null>(null);
   const initialLoadDone = useRef(false);
 
-  // Load from cache on first render
+  // Load from cache on first render (only for main timeline)
   const cacheLoadedRef = useRef(false);
   useEffect(() => {
-    if (cacheLoadedRef.current) return;
+    if (cacheLoadedRef.current || notebook) return;
     cacheLoadedRef.current = true;
     getCachedNotes().then((cached) => {
       if (cached && cached.length > 0 && notes.length === 0) {
@@ -40,7 +40,9 @@ export function useNotes() {
       if (!silent) setLoading(true);
       await getDeviceId(); // ensure deviceId is set in api client
 
-      const records = await listRecords();
+      const records = await listRecords(
+        notebook !== undefined && notebook !== null ? { notebook } : undefined,
+      );
 
       const items: NoteItem[] = records.map((r: any) => {
         const summary = r.summary;
@@ -77,15 +79,15 @@ export function useNotes() {
       setError(null);
       initialLoadDone.current = true;
 
-      // Update local cache
-      setCachedNotes(items);
+      // Update local cache (only for main timeline)
+      if (!notebook) setCachedNotes(items);
     } catch (e: any) {
       setError(e.message ?? "Failed to load notes");
     } finally {
       if (!initialLoadDone.current) setLoading(false);
       else setLoading(false);
     }
-  }, []);
+  }, [notebook]);
 
   // Start/stop polling based on whether any notes are still processing
   useEffect(() => {
@@ -110,6 +112,12 @@ export function useNotes() {
       }
     };
   }, [notes, fetchNotes]);
+
+  // Reset on notebook change
+  useEffect(() => {
+    setNotes([]);
+    initialLoadDone.current = false;
+  }, [notebook]);
 
   // Initial fetch + event listeners
   useEffect(() => {
@@ -165,5 +173,22 @@ export function useNotes() {
     [],
   );
 
-  return { notes, loading, error, refetch: fetchNotes, groupByDate, deleteNotes, archiveNotes };
+  const updateNote = useCallback(
+    async (id: string, fields: { short_summary: string }) => {
+      try {
+        await updateRecord(id, fields);
+        setNotes((prev) =>
+          prev.map((n) =>
+            n.id === id ? { ...n, short_summary: fields.short_summary } : n,
+          ),
+        );
+        toast("已保存");
+      } catch (e: any) {
+        toast.error(`保存失败: ${e.message}`);
+      }
+    },
+    [],
+  );
+
+  return { notes, loading, error, refetch: fetchNotes, groupByDate, deleteNotes, archiveNotes, updateNote };
 }

@@ -8,6 +8,7 @@ import { recordRepo } from "../db/repositories/index.js";
 import { transcriptRepo } from "../db/repositories/index.js";
 import { processEntry } from "./process.js";
 import { matchVoiceCommand } from "./voice-commands.js";
+import { generateReflection } from "./reflect.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -26,6 +27,7 @@ interface ASRSession {
   sentences: Array<{ text: string; sentenceId: number; begin_time?: number; end_time?: number }>;
   partialText: string;
   locationText?: string;
+  notebook?: string;
   audioChunks: Buffer[];
   saveAudio: boolean;
   startTime: number;
@@ -43,6 +45,7 @@ export async function startASR(
   deviceId: string,
   locationText?: string,
   mode: ASRMode = "realtime",
+  notebook?: string,
 ): Promise<void> {
   const apiKey = process.env.DASHSCOPE_API_KEY;
   if (!apiKey) throw new Error("Missing DASHSCOPE_API_KEY");
@@ -69,6 +72,7 @@ export async function startASR(
     sentences: [],
     partialText: "",
     locationText,
+    notebook,
     audioChunks: [],
     saveAudio: false,
     startTime: Date.now(),
@@ -412,6 +416,7 @@ async function createRecordAndProcess(
     source: "voice",
     duration_seconds: durationSeconds,
     location_text: session.locationText,
+    notebook: session.notebook,
   });
 
   await transcriptRepo.create({
@@ -444,13 +449,30 @@ async function createRecordAndProcess(
     text: transcript,
     deviceId: session.deviceId,
     recordId: record.id,
+    notebook: session.notebook,
   })
-    .then((result) => {
+    .then(async (result) => {
       console.log(`[asr] Process result for ${record.id}: ${JSON.stringify(result)}`);
       sendToClient(clientWs, {
         type: "process.result",
         payload: result,
       });
+
+      // Generate reflection question in background
+      try {
+        const question = await generateReflection(
+          transcript,
+          session.deviceId,
+        );
+        if (question) {
+          sendToClient(clientWs, {
+            type: "reflect.question",
+            payload: { question },
+          });
+        }
+      } catch (err: any) {
+        console.warn("[asr] Reflect failed:", err.message);
+      }
     })
     .catch((err) => {
       console.error("[asr] Process error:", err);
