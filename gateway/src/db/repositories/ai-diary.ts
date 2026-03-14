@@ -19,17 +19,19 @@ export async function upsertEntry(
   notebook: string,
   date: string,
   content: string,
+  userId?: string,
 ): Promise<AiDiary> {
   const row = await queryOne<AiDiary>(
-    `INSERT INTO ai_diary (device_id, notebook, entry_date, full_content, summary)
-     VALUES ($1, $2, $3, $4, LEFT($4, 200))
+    `INSERT INTO ai_diary (device_id, user_id, notebook, entry_date, full_content, summary)
+     VALUES ($1, $2, $3, $4, $5, LEFT($5, 200))
      ON CONFLICT (device_id, notebook, entry_date)
      DO UPDATE SET
-       full_content = ai_diary.full_content || E'\\n\\n' || $4,
-       summary = LEFT(ai_diary.full_content || E'\\n\\n' || $4, 200),
+       full_content = ai_diary.full_content || E'\\n\\n' || $5,
+       summary = LEFT(ai_diary.full_content || E'\\n\\n' || $5, 200),
+       user_id = COALESCE($2, ai_diary.user_id),
        updated_at = now()
      RETURNING *`,
-    [deviceId, notebook, date, content],
+    [deviceId, userId ?? null, notebook, date, content],
   );
   return row!;
 }

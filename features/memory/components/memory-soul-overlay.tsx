@@ -28,12 +28,12 @@ export function MemorySoulOverlay({ onClose }: MemorySoulOverlayProps) {
 
         <Tabs defaultValue="soul" className="flex-1 flex flex-col overflow-hidden">
           <TabsList className="mx-4 mt-3 grid grid-cols-2">
-            <TabsTrigger value="soul">AI画像</TabsTrigger>
+            <TabsTrigger value="soul">AI 身份</TabsTrigger>
             <TabsTrigger value="memory">记忆列表</TabsTrigger>
           </TabsList>
 
           <TabsContent value="soul" className="flex-1 overflow-y-auto mt-0">
-            <SoulTab title="AI画像" />
+            <SoulTab title="AI 身份" />
           </TabsContent>
 
           <TabsContent value="memory" className="flex-1 overflow-hidden mt-0">

@@ -142,24 +142,25 @@ export async function callBuiltinTool(
   name: string,
   args: Record<string, unknown>,
   deviceId: string,
+  userId?: string,
 ): Promise<ToolCallResult> {
   switch (name) {
     case "create_diary":
-      return handleCreateDiary(args, deviceId);
+      return handleCreateDiary(args, deviceId, userId);
     case "create_todo":
-      return handleCreateTodo(args, deviceId);
+      return handleCreateTodo(args, deviceId, userId);
     case "delete_diary":
       return handleDeleteDiary(args, deviceId);
     case "create_skill":
-      return handleCreateSkill(args, deviceId);
+      return handleCreateSkill(args, deviceId, userId);
     case "update_todo":
       return handleUpdateTodo(args, deviceId);
     case "create_goal":
-      return handleCreateGoal(args, deviceId);
+      return handleCreateGoal(args, deviceId, userId);
     case "create_notebook":
-      return handleCreateNotebook(args, deviceId);
+      return handleCreateNotebook(args, deviceId, userId);
     case "confirm_intent":
-      return handleConfirmIntent(args, deviceId);
+      return handleConfirmIntent(args, deviceId, userId);
     default:
       return { success: false, message: `Unknown built-in tool: ${name}` };
   }
@@ -168,6 +169,7 @@ export async function callBuiltinTool(
 async function handleCreateTodo(
   args: Record<string, unknown>,
   deviceId: string,
+  userId?: string,
 ): Promise<ToolCallResult> {
   const text = String(args.text ?? "").trim();
   if (!text) {
@@ -186,6 +188,7 @@ async function handleCreateTodo(
   } else {
     const rec = await recordRepo.create({
       device_id: deviceId,
+      user_id: userId,
       status: "completed",
       source: "chat_tool",
     });
@@ -217,6 +220,7 @@ async function handleCreateTodo(
 async function handleCreateDiary(
   args: Record<string, unknown>,
   deviceId: string,
+  userId?: string,
 ): Promise<ToolCallResult> {
   const content = String(args.content ?? "").trim();
   if (!content) {
@@ -228,6 +232,7 @@ async function handleCreateDiary(
   // Create record
   const record = await recordRepo.create({
     device_id: deviceId,
+    user_id: userId,
     status: "completed",
     source: "manual",
   });
@@ -286,6 +291,7 @@ async function handleDeleteDiary(
 async function handleCreateSkill(
   args: Record<string, unknown>,
   deviceId: string,
+  userId?: string,
 ): Promise<ToolCallResult> {
   const name = String(args.name ?? "").trim();
   const prompt = String(args.prompt ?? "").trim();
@@ -306,6 +312,7 @@ async function handleCreateSkill(
 
   const skill = await customSkillRepo.create({
     device_id: deviceId,
+    user_id: userId,
     name,
     description,
     prompt,
@@ -355,6 +362,7 @@ async function handleUpdateTodo(
 async function handleCreateGoal(
   args: Record<string, unknown>,
   deviceId: string,
+  userId?: string,
 ): Promise<ToolCallResult> {
   const title = String(args.title ?? "").trim();
   if (!title) {
@@ -364,6 +372,7 @@ async function handleCreateGoal(
   const parentId = args.parent_id ? String(args.parent_id) : undefined;
   const goal = await goalRepo.create({
     device_id: deviceId,
+    user_id: userId,
     title,
     parent_id: parentId,
     source: "chat",
@@ -381,6 +390,7 @@ async function handleCreateGoal(
 async function handleCreateNotebook(
   args: Record<string, unknown>,
   deviceId: string,
+  userId?: string,
 ): Promise<ToolCallResult> {
   const name = String(args.name ?? "").trim();
   if (!name) {
@@ -389,7 +399,9 @@ async function handleCreateNotebook(
 
   const description = String(args.description ?? "").trim();
   const color = args.color ? String(args.color).trim() : undefined;
-  const notebook = await notebookRepo.findOrCreate(deviceId, name, description, false, color);
+  const notebook = userId
+    ? await notebookRepo.findOrCreateByUser(userId, deviceId, name, description, false, color)
+    : await notebookRepo.findOrCreate(deviceId, name, description, false, color);
   console.log(`[builtin-tool] create_notebook: "${name}" created for device ${deviceId}`);
 
   return {
@@ -402,6 +414,7 @@ async function handleCreateNotebook(
 async function handleConfirmIntent(
   args: Record<string, unknown>,
   deviceId: string,
+  userId?: string,
 ): Promise<ToolCallResult> {
   const intentId = String(args.intent_id ?? "").trim();
   const action = String(args.action ?? "").trim();
@@ -424,6 +437,7 @@ async function handleConfirmIntent(
   if (action === "promote_goal") {
     const goal = await goalRepo.create({
       device_id: deviceId,
+      user_id: userId,
       title: intent.text,
       source: "speech",
     });
@@ -439,6 +453,7 @@ async function handleConfirmIntent(
     // Create a record + todo for the promoted intent
     const record = await recordRepo.create({
       device_id: deviceId,
+      user_id: userId,
       status: "completed",
       source: "chat_tool",
     });

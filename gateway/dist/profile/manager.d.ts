@@ -6,7 +6,7 @@ export interface UserProfile {
 /**
  * Load the user profile for a device.
  */
-export declare function loadProfile(deviceId: string): Promise<UserProfile | null>;
+export declare function loadProfile(deviceId: string, userId?: string): Promise<UserProfile | null>;
 /**
  * Update the user profile based on new interactions.
  * Serialized per-user to prevent concurrent overwrites.

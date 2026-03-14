@@ -1,13 +1,15 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { getDeviceId } from "@/shared/lib/device";
-import type { Soul } from "@/shared/lib/types";
-import { getSoul, updateSoul as apiUpdateSoul } from "@/shared/lib/api/soul";
+import {
+  getProfile,
+  updateProfile as apiUpdateProfile,
+  type UserProfile,
+} from "@/shared/lib/api/profile";
 import { toast } from "sonner";
 
-export function useSoul() {
-  const [soul, setSoul] = useState<Soul | null>(null);
+export function useProfile() {
+  const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -16,9 +18,8 @@ export function useSoul() {
 
     async function load() {
       try {
-        await getDeviceId();
-        const data = await getSoul();
-        if (!cancelled) setSoul(data);
+        const data = await getProfile();
+        if (!cancelled) setProfile(data);
       } catch {
         // silently fail
       } finally {
@@ -30,16 +31,16 @@ export function useSoul() {
     return () => { cancelled = true; };
   }, []);
 
-  const updateSoul = useCallback(async (content: string) => {
+  const updateProfile = useCallback(async (content: string) => {
     setSaving(true);
     try {
-      await apiUpdateSoul(content);
-      setSoul((prev) =>
+      await apiUpdateProfile(content);
+      setProfile((prev) =>
         prev
           ? { ...prev, content, updated_at: new Date().toISOString() }
-          : { id: "", device_id: "", content, updated_at: new Date().toISOString() },
+          : { device_id: "", content, updated_at: new Date().toISOString() },
       );
-      toast("AI 人格已更新");
+      toast("用户画像已更新");
     } catch {
       toast.error("保存失败");
     } finally {
@@ -47,5 +48,5 @@ export function useSoul() {
     }
   }, []);
 
-  return { soul, loading, saving, updateSoul };
+  return { profile, loading, saving, updateProfile };
 }

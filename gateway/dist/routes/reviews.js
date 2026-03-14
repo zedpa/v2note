@@ -1,19 +1,25 @@
-import { readBody, sendJson, getDeviceId } from "../lib/http-helpers.js";
+import { readBody, sendJson, getDeviceId, getUserId } from "../lib/http-helpers.js";
 import { reviewRepo, recordRepo, transcriptRepo } from "../db/repositories/index.js";
 import { chatCompletion } from "../ai/provider.js";
 export function registerReviewRoutes(router) {
     // List reviews
     router.get("/api/v1/reviews", async (req, res) => {
+        const userId = getUserId(req);
         const deviceId = getDeviceId(req);
-        const reviews = await reviewRepo.findByDevice(deviceId);
+        const reviews = userId
+            ? await reviewRepo.findByUser(userId)
+            : await reviewRepo.findByDevice(deviceId);
         sendJson(res, reviews);
     });
     // Generate review
     router.post("/api/v1/reviews/generate", async (req, res) => {
         const deviceId = getDeviceId(req);
+        const userId = getUserId(req);
         const { period, start, end } = await readBody(req);
         // Load records and transcripts in the date range
-        const records = await recordRepo.findByDeviceAndDateRange(deviceId, `${start}T00:00:00`, `${end}T23:59:59`);
+        const records = userId
+            ? await recordRepo.findByUserAndDateRange(userId, `${start}T00:00:00`, `${end}T23:59:59`)
+            : await recordRepo.findByDeviceAndDateRange(deviceId, `${start}T00:00:00`, `${end}T23:59:59`);
         const recordIds = records.map((r) => r.id);
         const transcripts = recordIds.length > 0
             ? await transcriptRepo.findByRecordIds(recordIds)
@@ -31,6 +37,7 @@ export function registerReviewRoutes(router) {
         ], { temperature: 0.5 });
         const review = await reviewRepo.create({
             device_id: deviceId,
+            user_id: userId ?? undefined,
             period,
             period_start: start,
             period_end: end,

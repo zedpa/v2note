@@ -17,8 +17,8 @@ export class MemoryManager {
      * Load relevant memories for a session.
      * @deprecated Use loadRelevantContext() for new code — it supports relevance filtering.
      */
-    async loadContext(deviceId, dateRange) {
-        const longTerm = await loadMemory(deviceId, dateRange);
+    async loadContext(deviceId, dateRange, userId) {
+        const longTerm = await loadMemory(deviceId, dateRange, userId);
         const shortTermEntries = this.shortTerm.getAll();
         const memories = [];
         if (shortTermEntries.length > 0) {
@@ -51,8 +51,8 @@ export class MemoryManager {
      * Semantic memory search.
      * Falls back to keyword-based loading if embeddings unavailable.
      */
-    async searchMemories(deviceId, query, limit = 10) {
-        const allMemories = await loadMemory(deviceId);
+    async searchMemories(deviceId, query, limit = 10, userId) {
+        const allMemories = await loadMemory(deviceId, undefined, userId);
         try {
             const results = await semanticSearch(query, allMemories, limit);
             console.log(`[memory] Semantic search returned ${results.length} results`);
@@ -77,9 +77,9 @@ export class MemoryManager {
      * 3. AI decides in one call: ADD / UPDATE(id) / DELETE(id) / NONE
      * 4. Execute decisions
      */
-    async maybeCreateMemory(deviceId, content, date) {
+    async maybeCreateMemory(deviceId, content, date, userId) {
         // Load all existing memories for comparison
-        const existingMemories = await loadMemory(deviceId);
+        const existingMemories = await loadMemory(deviceId, undefined, userId);
         // Find top-5 similar memories for context
         let similarContext = "";
         try {
@@ -141,22 +141,35 @@ ${similarContext || "（暂无记忆）"}
                 switch (decision.action) {
                     case "ADD":
                         if (decision.content) {
-                            await saveMemory(deviceId, decision.content, date, decision.importance ?? 5);
+                            await saveMemory(deviceId, decision.content, date, decision.importance ?? 5, userId);
                             console.log(`[memory] ADD: "${decision.content.slice(0, 50)}..." (importance: ${decision.importance ?? 5})`);
                         }
                         break;
                     case "UPDATE":
                         if (decision.id && decision.content) {
-                            await memoryRepo.update(decision.id, deviceId, {
-                                content: decision.content,
-                                importance: decision.importance,
-                            });
+                            if (userId) {
+                                await memoryRepo.updateByUser(decision.id, userId, {
+                                    content: decision.content,
+                                    importance: decision.importance,
+                                });
+                            }
+                            else {
+                                await memoryRepo.update(decision.id, deviceId, {
+                                    content: decision.content,
+                                    importance: decision.importance,
+                                });
+                            }
                             console.log(`[memory] UPDATE ${decision.id}: "${decision.content.slice(0, 50)}..."`);
                         }
                         break;
                     case "DELETE":
                         if (decision.id) {
-                            await memoryRepo.deleteById(decision.id, deviceId);
+                            if (userId) {
+                                await memoryRepo.deleteByIdAndUser(decision.id, userId);
+                            }
+                            else {
+                                await memoryRepo.deleteById(decision.id, deviceId);
+                            }
                             console.log(`[memory] DELETE ${decision.id}: ${decision.reason ?? "outdated"}`);
                         }
                         break;

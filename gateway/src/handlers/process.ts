@@ -16,7 +16,7 @@ import { recordRepo } from "../db/repositories/index.js";
 import { summaryRepo } from "../db/repositories/index.js";
 import { goalRepo } from "../db/repositories/index.js";
 import { pendingIntentRepo } from "../db/repositories/index.js";
-import { extractKeywords } from "../lib/text-utils.js";
+import { extractKeywords, maySoulUpdate, mayProfileUpdate } from "../lib/text-utils.js";
 import { estimateBatchTodos } from "../proactive/time-estimator.js";
 import { getSession } from "../session/manager.js";
 
@@ -66,9 +66,6 @@ export interface ProcessResult {
   error?: string;
 }
 
-// ── Soul/Profile relevance keywords ──
-const soulKeywords = ["你要", "你应该", "语气", "风格", "不要", "请用", "像一个", "你是"];
-const profileKeywords = ["我是", "我在", "我的工作", "我住", "我喜欢", "我每天", "家人", "同事"];
 
 /**
  * Process a single diary entry: hardcoded prompt + optional skills.
@@ -227,6 +224,7 @@ export async function processEntry(payload: ProcessPayload): Promise<ProcessResu
         if (intent.type === "wish" || intent.type === "goal") {
           await pendingIntentRepo.create({
             device_id: payload.deviceId,
+            user_id: payload.userId,
             record_id: payload.recordId,
             intent_type: intent.type,
             text: intent.text,
@@ -376,21 +374,19 @@ export async function processEntry(payload: ProcessPayload): Promise<ProcessResu
     const session = getSession(payload.deviceId);
     const memoryManager = session.memoryManager;
 
-    memoryManager.maybeCreateMemory(payload.deviceId, payload.text, today).catch((e) => {
+    memoryManager.maybeCreateMemory(payload.deviceId, payload.text, today, payload.userId).catch((e) => {
       console.warn("[process] Memory creation failed:", e.message);
     });
 
     // Soul/Profile: only update when text likely contains relevant content
     const text = payload.text;
-    const maySoulUpdate = soulKeywords.some(kw => text.includes(kw));
-    const mayProfileUpdate = profileKeywords.some(kw => text.includes(kw));
 
-    if (maySoulUpdate) {
+    if (maySoulUpdate(text)) {
       updateSoul(payload.deviceId, text, payload.userId).catch((e) => {
         console.warn("[process] Soul update failed:", e.message);
       });
     }
-    if (mayProfileUpdate) {
+    if (mayProfileUpdate(text)) {
       updateProfile(payload.deviceId, text, payload.userId).catch((e) => {
         console.warn("[process] Profile update failed:", e.message);
       });
@@ -402,7 +398,7 @@ export async function processEntry(payload: ProcessPayload): Promise<ProcessResu
       : `[${new Date().toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })}] ${payload.text.slice(0, 200)}`;
     const diaryNotebook = payload.notebook && payload.notebook !== "ai-self" ? payload.notebook : "default";
     console.log(`[process] Diary append: payload.notebook=${payload.notebook}, target=${diaryNotebook}`);
-    appendToDiary(payload.deviceId, diaryNotebook, diaryLine).catch((e) => {
+    appendToDiary(payload.deviceId, diaryNotebook, diaryLine, payload.userId).catch((e) => {
       console.warn("[process] Diary append failed:", e.message);
     });
   } catch (err: any) {

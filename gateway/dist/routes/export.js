@@ -1,15 +1,18 @@
-import { sendJson, getDeviceId } from "../lib/http-helpers.js";
+import { sendJson, getDeviceId, getUserId } from "../lib/http-helpers.js";
 import { recordRepo, transcriptRepo, summaryRepo, todoRepo, ideaRepo, } from "../db/repositories/index.js";
 export function registerExportRoutes(router) {
     router.get("/api/v1/export", async (req, res, _params, query) => {
         const deviceId = getDeviceId(req);
+        const userId = getUserId(req);
         const format = query.format ?? "json";
-        const records = await recordRepo.findByDevice(deviceId, { limit: 10000 });
+        const records = userId
+            ? await recordRepo.findByUser(userId, { limit: 10000 })
+            : await recordRepo.findByDevice(deviceId, { limit: 10000 });
         const ids = records.map((r) => r.id);
         const [transcripts, todos, ideas] = await Promise.all([
             ids.length > 0 ? transcriptRepo.findByRecordIds(ids) : [],
-            todoRepo.findByDevice(deviceId),
-            ideaRepo.findByDevice(deviceId),
+            userId ? todoRepo.findByUser(userId) : todoRepo.findByDevice(deviceId),
+            userId ? ideaRepo.findByUser(userId) : ideaRepo.findByDevice(deviceId),
         ]);
         const summaries = ids.length > 0
             ? await Promise.all(ids.map((id) => summaryRepo.findByRecordId(id)))

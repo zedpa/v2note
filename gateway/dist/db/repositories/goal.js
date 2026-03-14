@@ -15,7 +15,7 @@ export async function findById(id) {
     return queryOne(`SELECT * FROM goal WHERE id = $1`, [id]);
 }
 export async function create(fields) {
-    const row = await queryOne(`INSERT INTO goal (device_id, title, parent_id, source) VALUES ($1, $2, $3, $4) RETURNING *`, [fields.device_id, fields.title, fields.parent_id ?? null, fields.source ?? "speech"]);
+    const row = await queryOne(`INSERT INTO goal (device_id, user_id, title, parent_id, source) VALUES ($1, $2, $3, $4, $5) RETURNING *`, [fields.device_id, fields.user_id ?? null, fields.title, fields.parent_id ?? null, fields.source ?? "speech"]);
     return row;
 }
 export async function update(id, fields) {

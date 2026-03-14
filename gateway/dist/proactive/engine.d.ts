@@ -21,7 +21,8 @@ export declare class ProactiveEngine {
     private worker;
     private redisAvailable;
     setInterval(minutes: number): void;
-    registerDevice(deviceId: string, ws: WebSocket): void;
+    registerDevice(deviceId: string, ws: WebSocket, userId?: string): void;
+    setDeviceUserId(deviceId: string, userId: string): void;
     unregisterDevice(deviceId: string): void;
     unregisterByWs(ws: WebSocket): void;
     /**

@@ -135,6 +135,8 @@ wss.on("connection", (ws) => {
                         connectionDeviceMap.set(ws, payload.deviceId);
                         console.log(`[gateway] WebSocket authenticated: user=${payload.userId}, device=${payload.deviceId}`);
                         send(ws, { type: "auth.ok", payload: { userId: payload.userId } });
+                        // Register device with userId for proactive engine
+                        proactiveEngine.registerDevice(payload.deviceId, ws, payload.userId);
                         // Send personalized AI status in background
                         generateAiStatus(payload.deviceId, payload.userId)
                             .then((text) => {
@@ -194,15 +196,17 @@ wss.on("connection", (ws) => {
                     break;
                 }
                 case "todo.aggregate": {
-                    const result = await aggregateTodos(msg.payload.deviceId);
+                    const userId = connectionUserMap.get(ws);
+                    const result = await aggregateTodos(msg.payload.deviceId, userId);
                     send(ws, { type: "todo.result", payload: result });
                     break;
                 }
                 case "asr.start": {
                     console.log(`[asr.start] notebook=${msg.payload.notebook}, mode=${msg.payload.mode}`);
                     connectionDeviceMap.set(ws, msg.payload.deviceId);
-                    proactiveEngine.registerDevice(msg.payload.deviceId, ws);
-                    await startASR(ws, msg.payload.deviceId, msg.payload.locationText, msg.payload.mode, msg.payload.notebook);
+                    const userId = connectionUserMap.get(ws);
+                    proactiveEngine.registerDevice(msg.payload.deviceId, ws, userId);
+                    await startASR(ws, msg.payload.deviceId, msg.payload.locationText, msg.payload.mode, msg.payload.notebook, userId);
                     break;
                 }
                 case "asr.stop": {

@@ -106,6 +106,17 @@ export async function countByDateRange(deviceId, start, end) {
         done: parseInt(row?.done ?? "0", 10),
     };
 }
+export async function countByUserDateRange(userId, start, end) {
+    const row = await queryOne(`SELECT COUNT(*)::text AS total,
+            COUNT(*) FILTER (WHERE t.done)::text AS done
+     FROM todo t
+     JOIN record r ON r.id = t.record_id
+     WHERE r.user_id = $1 AND t.created_at >= $2 AND t.created_at <= $3`, [userId, start, end]);
+    return {
+        total: parseInt(row?.total ?? "0", 10),
+        done: parseInt(row?.done ?? "0", 10),
+    };
+}
 export async function findPendingByDevice(deviceId) {
     return query(`SELECT t.* FROM todo t
      JOIN record r ON r.id = t.record_id
@@ -117,6 +128,12 @@ export async function findRelayByDevice(deviceId) {
      JOIN record r ON r.id = t.record_id
      WHERE r.device_id = $1 AND t.category = 'relay' AND t.done = false
      ORDER BY t.created_at ASC`, [deviceId]);
+}
+export async function findRelayByUser(userId) {
+    return query(`SELECT t.* FROM todo t
+     JOIN record r ON r.id = t.record_id
+     WHERE r.user_id = $1 AND t.category = 'relay' AND t.done = false
+     ORDER BY t.created_at ASC`, [userId]);
 }
 export async function createWithCategory(fields) {
     const row = await queryOne(`INSERT INTO todo (record_id, text, done, category, relay_meta)

@@ -49,6 +49,7 @@ export async function findByUserAndName(
 
 export async function create(fields: {
   device_id: string;
+  user_id?: string;
   name: string;
   description?: string;
   prompt: string;
@@ -56,11 +57,12 @@ export async function create(fields: {
   created_by?: "user" | "ai";
 }): Promise<CustomSkill> {
   const rows = await query<CustomSkill>(
-    `INSERT INTO custom_skill (device_id, name, description, prompt, type, created_by)
-     VALUES ($1, $2, $3, $4, $5, $6)
+    `INSERT INTO custom_skill (device_id, user_id, name, description, prompt, type, created_by)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)
      RETURNING *`,
     [
       fields.device_id,
+      fields.user_id ?? null,
       fields.name,
       fields.description ?? "",
       fields.prompt,

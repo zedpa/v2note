@@ -31,15 +31,17 @@ export async function findByDevice(
 
 export async function create(fields: {
   device_id: string;
+  user_id?: string;
   content: string;
   source_date?: string;
   importance?: number;
 }): Promise<void> {
   await execute(
-    `INSERT INTO memory (device_id, content, source_date, importance)
-     VALUES ($1, $2, $3, $4)`,
+    `INSERT INTO memory (device_id, user_id, content, source_date, importance)
+     VALUES ($1, $2, $3, $4, $5)`,
     [
       fields.device_id,
+      fields.user_id ?? null,
       fields.content,
       fields.source_date ?? null,
       fields.importance ?? 5,

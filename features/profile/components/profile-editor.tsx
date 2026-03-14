@@ -11,7 +11,7 @@ import {
   type LocalUser,
   type LocalToolServer,
 } from "@/shared/lib/local-config";
-import { SoulTab } from "@/features/memory/components/soul-tab";
+import { ProfileTab } from "@/features/memory/components/profile-tab";
 
 type Tab = "soul" | "user" | "tools";
 
@@ -143,7 +143,7 @@ export function ProfileEditor({ onClose }: ProfileEditorProps) {
             <span className="text-sm text-muted-foreground">加载中...</span>
           </div>
         ) : tab === "soul" ? (
-          <SoulTab />
+          <ProfileTab />
         ) : tab === "user" ? (
           <div className="space-y-4">
             <div>

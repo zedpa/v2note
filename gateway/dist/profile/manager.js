@@ -3,7 +3,12 @@ import { userProfileRepo } from "../db/repositories/index.js";
 /**
  * Load the user profile for a device.
  */
-export async function loadProfile(deviceId) {
+export async function loadProfile(deviceId, userId) {
+    if (userId) {
+        const byUser = await userProfileRepo.findByUser(userId);
+        if (byUser)
+            return byUser;
+    }
     return userProfileRepo.findByDevice(deviceId);
 }
 // ── Per-user write queue for serialized updates ──

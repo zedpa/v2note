@@ -24,17 +24,19 @@ export async function findByUser(userId: string): Promise<SkillConfig[]> {
 
 export async function upsert(fields: {
   device_id: string;
+  user_id?: string;
   skill_name: string;
   enabled: boolean;
   config?: any;
 }): Promise<void> {
   await execute(
-    `INSERT INTO skill_config (device_id, skill_name, enabled, config)
-     VALUES ($1, $2, $3, $4)
+    `INSERT INTO skill_config (device_id, user_id, skill_name, enabled, config)
+     VALUES ($1, $2, $3, $4, $5)
      ON CONFLICT (device_id, skill_name)
-     DO UPDATE SET enabled = $3, config = $4`,
+     DO UPDATE SET enabled = $4, config = $5, user_id = COALESCE($2, skill_config.user_id)`,
     [
       fields.device_id,
+      fields.user_id ?? null,
       fields.skill_name,
       fields.enabled,
       fields.config ? JSON.stringify(fields.config) : "{}",

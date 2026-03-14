@@ -23,4 +23,4 @@ export declare function isBuiltinTool(name: string): boolean;
 /**
  * Execute a built-in tool call.
  */
-export declare function callBuiltinTool(name: string, args: Record<string, unknown>, deviceId: string): Promise<ToolCallResult>;
+export declare function callBuiltinTool(name: string, args: Record<string, unknown>, deviceId: string, userId?: string): Promise<ToolCallResult>;

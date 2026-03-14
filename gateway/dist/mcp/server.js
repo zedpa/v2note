@@ -6,7 +6,7 @@
  *
  * Endpoint: POST /mcp (JSON-RPC 2.0)
  */
-import { readBody, sendJson, getDeviceId } from "../lib/http-helpers.js";
+import { readBody, sendJson, getDeviceId, getUserId } from "../lib/http-helpers.js";
 import { BUILTIN_TOOLS, callBuiltinTool } from "../tools/builtin.js";
 import { loadSkills } from "../skills/loader.js";
 import { join, dirname } from "node:path";
@@ -29,7 +29,7 @@ function toolDefsToMCP(tools) {
 /**
  * Handle a single JSON-RPC request.
  */
-async function handleRpcRequest(req, deviceId) {
+async function handleRpcRequest(req, deviceId, userId) {
     switch (req.method) {
         case "initialize":
             return rpcResult(req.id, {
@@ -80,7 +80,7 @@ async function handleRpcRequest(req, deviceId) {
             }
             // Handle built-in tools
             try {
-                const result = await callBuiltinTool(toolName, args, deviceId);
+                const result = await callBuiltinTool(toolName, args, deviceId, userId);
                 return rpcResult(req.id, {
                     content: [{ type: "text", text: result.message }],
                     isError: !result.success,
@@ -104,12 +104,13 @@ export function registerMCPServerRoutes(router) {
     router.post("/mcp", async (req, res) => {
         try {
             const deviceId = getDeviceId(req);
+            const userId = getUserId(req);
             const body = await readBody(req);
             if (body.jsonrpc !== "2.0") {
                 sendJson(res, rpcError(body.id ?? null, -32600, "Invalid JSON-RPC version"));
                 return;
             }
-            const response = await handleRpcRequest(body, deviceId);
+            const response = await handleRpcRequest(body, deviceId, userId ?? undefined);
             sendJson(res, response);
         }
         catch (err) {

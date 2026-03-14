@@ -6,7 +6,7 @@ export interface Soul {
 /**
  * Load the Soul (AI identity definition) for a device.
  */
-export declare function loadSoul(deviceId: string): Promise<Soul | null>;
+export declare function loadSoul(deviceId: string, userId?: string): Promise<Soul | null>;
 /**
  * Update the Soul (AI identity definition) based on new interactions.
  * Serialized per-user to prevent concurrent overwrites.

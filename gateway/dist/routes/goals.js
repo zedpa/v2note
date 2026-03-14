@@ -1,17 +1,21 @@
-import { readBody, sendJson, getDeviceId } from "../lib/http-helpers.js";
+import { readBody, sendJson, getDeviceId, getUserId } from "../lib/http-helpers.js";
 import { goalRepo, pendingIntentRepo } from "../db/repositories/index.js";
 export function registerGoalRoutes(router) {
     // List active goals
     router.get("/api/v1/goals", async (req, res) => {
+        const userId = getUserId(req);
         const deviceId = getDeviceId(req);
-        const goals = await goalRepo.findActiveByDevice(deviceId);
+        const goals = userId
+            ? await goalRepo.findActiveByUser(userId)
+            : await goalRepo.findActiveByDevice(deviceId);
         sendJson(res, goals);
     });
     // Create goal
     router.post("/api/v1/goals", async (req, res) => {
         const deviceId = getDeviceId(req);
+        const userId = getUserId(req);
         const { title, parent_id, source } = await readBody(req);
-        const goal = await goalRepo.create({ device_id: deviceId, title, parent_id, source });
+        const goal = await goalRepo.create({ device_id: deviceId, user_id: userId ?? undefined, title, parent_id, source });
         sendJson(res, goal, 201);
     });
     // Update goal
@@ -27,8 +31,11 @@ export function registerGoalRoutes(router) {
     });
     // List pending intents
     router.get("/api/v1/intents/pending", async (req, res) => {
+        const userId = getUserId(req);
         const deviceId = getDeviceId(req);
-        const intents = await pendingIntentRepo.findPendingByDevice(deviceId);
+        const intents = userId
+            ? await pendingIntentRepo.findPendingByUser(userId)
+            : await pendingIntentRepo.findPendingByDevice(deviceId);
         sendJson(res, intents);
     });
 }

@@ -32,7 +32,7 @@ export async function generateReflection(text, deviceId, userId) {
     // Load recent memories for pattern detection
     let memoryContext = "";
     try {
-        const memories = await loadMemory(deviceId);
+        const memories = await loadMemory(deviceId, undefined, userId);
         if (memories.length > 0) {
             memoryContext = memories
                 .slice(0, 5)
@@ -74,7 +74,7 @@ export async function generateReflection(text, deviceId, userId) {
  */
 export async function generateAiStatus(deviceId, userId) {
     try {
-        const soul = await loadSoul(deviceId);
+        const soul = await loadSoul(deviceId, userId);
         if (soul?.content) {
             const response = await chatCompletion([
                 {

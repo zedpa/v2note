@@ -126,18 +126,20 @@ export function registerRecordRoutes(router: Router) {
   // Create record
   router.post("/api/v1/records", async (req, res) => {
     const deviceId = getDeviceId(req);
+    const userId = getUserId(req);
     const body = await readBody<{
       status?: string;
       source?: string;
       location_text?: string;
     }>(req);
-    const record = await recordRepo.create({ device_id: deviceId, ...body });
+    const record = await recordRepo.create({ device_id: deviceId, user_id: userId ?? undefined, ...body });
     sendJson(res, { id: record.id }, 201);
   });
 
   // Create manual note (content + optional AI processing)
   router.post("/api/v1/records/manual", async (req, res) => {
     const deviceId = getDeviceId(req);
+    const userId = getUserId(req) ?? undefined;
     const { content, tags, useAi, notebook } = await readBody<{
       content: string;
       tags?: string[];
@@ -147,6 +149,7 @@ export function registerRecordRoutes(router: Router) {
 
     const record = await recordRepo.create({
       device_id: deviceId,
+      user_id: userId,
       status: useAi ? "processing" : "completed",
       source: "manual",
       notebook: notebook || undefined,
@@ -171,6 +174,7 @@ export function registerRecordRoutes(router: Router) {
       processEntry({
         text: content,
         deviceId,
+        userId,
         recordId: record.id,
         notebook: notebook || undefined,
       }).catch((err) => console.error("[records/manual] AI processing failed:", err));

@@ -21,11 +21,13 @@ export declare function findByUser(userId: string, opts?: {
     archived?: boolean;
     limit?: number;
     offset?: number;
+    notebook?: string | null;
 }): Promise<Record[]>;
 export declare function findByUserAndDateRange(userId: string, start: string, end: string): Promise<Record[]>;
 export declare function findById(id: string): Promise<Record | null>;
 export declare function create(fields: {
     device_id: string;
+    user_id?: string;
     status?: string;
     source?: string;
     audio_path?: string;
@@ -42,5 +44,7 @@ export declare function updateFields(id: string, fields: {
 export declare function deleteByIds(ids: string[]): Promise<number>;
 export declare function archive(id: string): Promise<void>;
 export declare function search(deviceId: string, q: string): Promise<Record[]>;
+export declare function searchByUser(userId: string, q: string): Promise<Record[]>;
 export declare function countByDateRange(deviceId: string, start: string, end: string): Promise<number>;
+export declare function countByUserDateRange(userId: string, start: string, end: string): Promise<number>;
 export declare function findByDeviceAndDateRange(deviceId: string, start: string, end: string): Promise<Record[]>;

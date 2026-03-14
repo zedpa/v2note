@@ -20,6 +20,7 @@ export type ASRMode = "realtime" | "upload";
 
 interface ASRSession {
   deviceId: string;
+  userId?: string;
   ownerWs: WsWebSocket;
   mode: ASRMode;
   pythonProcess: ChildProcess | null;
@@ -46,6 +47,7 @@ export async function startASR(
   locationText?: string,
   mode: ASRMode = "realtime",
   notebook?: string,
+  userId?: string,
 ): Promise<void> {
   const apiKey = process.env.DASHSCOPE_API_KEY;
   if (!apiKey) throw new Error("Missing DASHSCOPE_API_KEY");
@@ -65,6 +67,7 @@ export async function startASR(
 
   const session: ASRSession = {
     deviceId,
+    userId,
     ownerWs: clientWs,
     mode,
     pythonProcess: null,
@@ -412,6 +415,7 @@ async function createRecordAndProcess(
 ): Promise<void> {
   const record = await recordRepo.create({
     device_id: session.deviceId,
+    user_id: session.userId,
     status: "processing",
     source: "voice",
     duration_seconds: durationSeconds,
@@ -448,6 +452,7 @@ async function createRecordAndProcess(
   processEntry({
     text: transcript,
     deviceId: session.deviceId,
+    userId: session.userId,
     recordId: record.id,
     notebook: session.notebook,
   })
@@ -463,6 +468,7 @@ async function createRecordAndProcess(
         const question = await generateReflection(
           transcript,
           session.deviceId,
+          session.userId,
         );
         if (question) {
           sendToClient(clientWs, {

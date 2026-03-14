@@ -122,29 +122,29 @@ export function isBuiltinTool(name) {
 /**
  * Execute a built-in tool call.
  */
-export async function callBuiltinTool(name, args, deviceId) {
+export async function callBuiltinTool(name, args, deviceId, userId) {
     switch (name) {
         case "create_diary":
-            return handleCreateDiary(args, deviceId);
+            return handleCreateDiary(args, deviceId, userId);
         case "create_todo":
-            return handleCreateTodo(args, deviceId);
+            return handleCreateTodo(args, deviceId, userId);
         case "delete_diary":
             return handleDeleteDiary(args, deviceId);
         case "create_skill":
-            return handleCreateSkill(args, deviceId);
+            return handleCreateSkill(args, deviceId, userId);
         case "update_todo":
             return handleUpdateTodo(args, deviceId);
         case "create_goal":
-            return handleCreateGoal(args, deviceId);
+            return handleCreateGoal(args, deviceId, userId);
         case "create_notebook":
-            return handleCreateNotebook(args, deviceId);
+            return handleCreateNotebook(args, deviceId, userId);
         case "confirm_intent":
-            return handleConfirmIntent(args, deviceId);
+            return handleConfirmIntent(args, deviceId, userId);
         default:
             return { success: false, message: `Unknown built-in tool: ${name}` };
     }
 }
-async function handleCreateTodo(args, deviceId) {
+async function handleCreateTodo(args, deviceId, userId) {
     const text = String(args.text ?? "").trim();
     if (!text) {
         return { success: false, message: "text 不能为空" };
@@ -162,6 +162,7 @@ async function handleCreateTodo(args, deviceId) {
     else {
         const rec = await recordRepo.create({
             device_id: deviceId,
+            user_id: userId,
             status: "completed",
             source: "chat_tool",
         });
@@ -192,7 +193,7 @@ async function handleCreateTodo(args, deviceId) {
         data: { todo_id: todo.id, record_id: recordId },
     };
 }
-async function handleCreateDiary(args, deviceId) {
+async function handleCreateDiary(args, deviceId, userId) {
     const content = String(args.content ?? "").trim();
     if (!content) {
         return { success: false, message: "content 不能为空" };
@@ -201,6 +202,7 @@ async function handleCreateDiary(args, deviceId) {
     // Create record
     const record = await recordRepo.create({
         device_id: deviceId,
+        user_id: userId,
         status: "completed",
         source: "manual",
     });
@@ -244,7 +246,7 @@ async function handleDeleteDiary(args, deviceId) {
         data: { record_id: recordId, deleted: count },
     };
 }
-async function handleCreateSkill(args, deviceId) {
+async function handleCreateSkill(args, deviceId, userId) {
     const name = String(args.name ?? "").trim();
     const prompt = String(args.prompt ?? "").trim();
     const description = String(args.description ?? "").trim();
@@ -261,6 +263,7 @@ async function handleCreateSkill(args, deviceId) {
     }
     const skill = await customSkillRepo.create({
         device_id: deviceId,
+        user_id: userId,
         name,
         description,
         prompt,
@@ -301,7 +304,7 @@ async function handleUpdateTodo(args, deviceId) {
         data: { todo_id: todoId, ...updates },
     };
 }
-async function handleCreateGoal(args, deviceId) {
+async function handleCreateGoal(args, deviceId, userId) {
     const title = String(args.title ?? "").trim();
     if (!title) {
         return { success: false, message: "title 不能为空" };
@@ -309,6 +312,7 @@ async function handleCreateGoal(args, deviceId) {
     const parentId = args.parent_id ? String(args.parent_id) : undefined;
     const goal = await goalRepo.create({
         device_id: deviceId,
+        user_id: userId,
         title,
         parent_id: parentId,
         source: "chat",
@@ -320,14 +324,16 @@ async function handleCreateGoal(args, deviceId) {
         data: { goal_id: goal.id },
     };
 }
-async function handleCreateNotebook(args, deviceId) {
+async function handleCreateNotebook(args, deviceId, userId) {
     const name = String(args.name ?? "").trim();
     if (!name) {
         return { success: false, message: "name 不能为空" };
     }
     const description = String(args.description ?? "").trim();
     const color = args.color ? String(args.color).trim() : undefined;
-    const notebook = await notebookRepo.findOrCreate(deviceId, name, description, false, color);
+    const notebook = userId
+        ? await notebookRepo.findOrCreateByUser(userId, deviceId, name, description, false, color)
+        : await notebookRepo.findOrCreate(deviceId, name, description, false, color);
     console.log(`[builtin-tool] create_notebook: "${name}" created for device ${deviceId}`);
     return {
         success: true,
@@ -335,7 +341,7 @@ async function handleCreateNotebook(args, deviceId) {
         data: { notebook_id: notebook.id, name: notebook.name },
     };
 }
-async function handleConfirmIntent(args, deviceId) {
+async function handleConfirmIntent(args, deviceId, userId) {
     const intentId = String(args.intent_id ?? "").trim();
     const action = String(args.action ?? "").trim();
     if (!intentId) {
@@ -354,6 +360,7 @@ async function handleConfirmIntent(args, deviceId) {
     if (action === "promote_goal") {
         const goal = await goalRepo.create({
             device_id: deviceId,
+            user_id: userId,
             title: intent.text,
             source: "speech",
         });
@@ -368,6 +375,7 @@ async function handleConfirmIntent(args, deviceId) {
         // Create a record + todo for the promoted intent
         const record = await recordRepo.create({
             device_id: deviceId,
+            user_id: userId,
             status: "completed",
             source: "chat_tool",
         });

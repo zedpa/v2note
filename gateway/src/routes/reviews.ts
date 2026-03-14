@@ -51,6 +51,7 @@ export function registerReviewRoutes(router: Router) {
 
     const review = await reviewRepo.create({
       device_id: deviceId,
+      user_id: userId ?? undefined,
       period,
       period_start: start,
       period_end: end,

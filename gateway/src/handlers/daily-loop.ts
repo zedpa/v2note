@@ -7,6 +7,7 @@ import { todoRepo, recordRepo, memoryRepo } from "../db/repositories/index.js";
 import * as briefingRepo from "../db/repositories/daily-briefing.js";
 import { MemoryManager } from "../memory/manager.js";
 import { loadSoul } from "../soul/manager.js";
+import { loadProfile } from "../profile/manager.js";
 
 // ── Types ──
 
@@ -86,16 +87,21 @@ export async function generateMorningBriefing(
     memories = await memoryManager.loadContext(deviceId, {
       start: sevenDaysAgo,
       end: yesterday,
-    });
+    }, userId);
   } catch (err: any) {
     console.warn(`[daily-loop] Memory load failed: ${err.message}`);
   }
 
-  // 3. Load soul for personalization
+  // 3. Load soul + profile for personalization
   let soulContent = "";
+  let profileContent = "";
   try {
-    const soul = await loadSoul(deviceId);
+    const [soul, profile] = await Promise.all([
+      loadSoul(deviceId, userId).catch(() => null),
+      loadProfile(deviceId, userId).catch(() => null),
+    ]);
     soulContent = soul?.content ?? "";
+    profileContent = profile?.content ?? "";
   } catch {
     // non-critical
   }
@@ -175,7 +181,7 @@ export async function generateMorningBriefing(
     {
       role: "system",
       content: `你是一个高效的个人助手，正在为用户生成晨间简报。
-${soulContent ? `用户画像：\n${soulContent}\n` : ""}
+${soulContent ? `你的人设：\n${soulContent}\n` : ""}${profileContent ? `用户画像：\n${profileContent}\n` : ""}
 请基于以下信息生成简洁、实用的晨间简报。
 待办事项带有领域标记[work/life/social/learning/health]和影响力评分。
 标记 *AI可协助* 的事项，在 priority_items 中可建议"让AI帮你处理"。
@@ -328,11 +334,16 @@ export async function generateEveningSummary(
   ).length;
   const relaysPending = relayTodos.filter((t) => !t.done);
 
-  // 5. Load soul
+  // 5. Load soul + profile
   let soulContent = "";
+  let profileContent = "";
   try {
-    const soul = await loadSoul(deviceId);
+    const [soul, profile] = await Promise.all([
+      loadSoul(deviceId, userId).catch(() => null),
+      loadProfile(deviceId, userId).catch(() => null),
+    ]);
     soulContent = soul?.content ?? "";
+    profileContent = profile?.content ?? "";
   } catch {
     // non-critical
   }
@@ -342,7 +353,7 @@ export async function generateEveningSummary(
     {
       role: "system",
       content: `你是用户的个人助手，正在生成日终总结。
-${soulContent ? `用户画像：\n${soulContent}\n` : ""}
+${soulContent ? `你的人设：\n${soulContent}\n` : ""}${profileContent ? `用户画像：\n${profileContent}\n` : ""}
 基于今日数据生成简洁总结。
 返回 JSON：
 {
@@ -393,7 +404,7 @@ ${relaysPending.map((t) => `- ${t.text}`).join("\n") || "无待转达"}
       try {
         const memoryManager = new MemoryManager();
         const seedContent = `明日关注: ${parsed.tomorrow_seeds.join("; ")}`;
-        await memoryManager.maybeCreateMemory(deviceId, seedContent, today);
+        await memoryManager.maybeCreateMemory(deviceId, seedContent, today, userId);
       } catch {
         // non-critical
       }

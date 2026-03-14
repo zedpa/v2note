@@ -16,7 +16,7 @@ export declare class MemoryManager {
     loadContext(deviceId: string, dateRange?: {
         start: string;
         end: string;
-    }): Promise<string[]>;
+    }, userId?: string): Promise<string[]>;
     /**
      * Load relevance-filtered memories using the context loader.
      */
@@ -39,7 +39,7 @@ export declare class MemoryManager {
      * Semantic memory search.
      * Falls back to keyword-based loading if embeddings unavailable.
      */
-    searchMemories(deviceId: string, query: string, limit?: number): Promise<Array<{
+    searchMemories(deviceId: string, query: string, limit?: number, userId?: string): Promise<Array<{
         content: string;
         score: number;
         source_date: string | null;
@@ -52,6 +52,6 @@ export declare class MemoryManager {
      * 3. AI decides in one call: ADD / UPDATE(id) / DELETE(id) / NONE
      * 4. Execute decisions
      */
-    maybeCreateMemory(deviceId: string, content: string, date: string): Promise<void>;
+    maybeCreateMemory(deviceId: string, content: string, date: string, userId?: string): Promise<void>;
     clearShortTerm(): void;
 }

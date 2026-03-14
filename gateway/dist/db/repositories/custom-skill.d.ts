@@ -11,9 +11,12 @@ export interface CustomSkill {
     updated_at: string;
 }
 export declare function findByDevice(deviceId: string): Promise<CustomSkill[]>;
+export declare function findByUser(userId: string): Promise<CustomSkill[]>;
 export declare function findByDeviceAndName(deviceId: string, name: string): Promise<CustomSkill | null>;
+export declare function findByUserAndName(userId: string, name: string): Promise<CustomSkill | null>;
 export declare function create(fields: {
     device_id: string;
+    user_id?: string;
     name: string;
     description?: string;
     prompt: string;
@@ -29,3 +32,4 @@ export declare function update(id: string, fields: {
 }): Promise<void>;
 export declare function deleteById(id: string): Promise<number>;
 export declare function deleteByName(deviceId: string, name: string): Promise<number>;
+export declare function deleteByUserAndName(userId: string, name: string): Promise<number>;

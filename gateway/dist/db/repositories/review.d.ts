@@ -10,8 +10,10 @@ export interface Review {
     created_at: string;
 }
 export declare function findByDevice(deviceId: string, period?: string): Promise<Review[]>;
+export declare function findByUser(userId: string, period?: string): Promise<Review[]>;
 export declare function create(fields: {
     device_id: string;
+    user_id?: string;
     period: string;
     period_start: string;
     period_end: string;

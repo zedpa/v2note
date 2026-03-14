@@ -14,6 +14,7 @@ export declare function findPendingByUser(userId: string): Promise<PendingIntent
 export declare function findById(id: string): Promise<PendingIntent | null>;
 export declare function create(fields: {
     device_id: string;
+    user_id?: string;
     record_id?: string;
     intent_type: string;
     text: string;

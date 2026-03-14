@@ -11,6 +11,7 @@ import { recordRepo } from "../db/repositories/index.js";
 import { transcriptRepo } from "../db/repositories/index.js";
 import { pendingIntentRepo } from "../db/repositories/index.js";
 import { isBuiltinTool, callBuiltinTool } from "../tools/builtin.js";
+import { maySoulUpdate, mayProfileUpdate } from "../lib/text-utils.js";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const INSIGHTS_DIR = join(__dirname, "../../insights");
 /**
@@ -33,7 +34,9 @@ export async function startChat(payload) {
     const soul = loaded.soul ? { content: loaded.soul } : undefined;
     const memories = loaded.memories;
     // Load records from the date range for context
-    const records = await recordRepo.findByDeviceAndDateRange(payload.deviceId, `${payload.dateRange.start}T00:00:00`, `${payload.dateRange.end}T23:59:59`);
+    const records = payload.userId
+        ? await recordRepo.findByUserAndDateRange(payload.userId, `${payload.dateRange.start}T00:00:00`, `${payload.dateRange.end}T23:59:59`)
+        : await recordRepo.findByDeviceAndDateRange(payload.deviceId, `${payload.dateRange.start}T00:00:00`, `${payload.dateRange.end}T23:59:59`);
     // Load transcripts for these records
     let transcriptSummary = "";
     if (records.length > 0) {
@@ -65,7 +68,9 @@ export async function startChat(payload) {
     // Load pending intents for natural follow-up in conversation
     let pendingIntentContext = "";
     try {
-        const pendingIntents = await pendingIntentRepo.findPendingByDevice(payload.deviceId);
+        const pendingIntents = payload.userId
+            ? await pendingIntentRepo.findPendingByUser(payload.userId)
+            : await pendingIntentRepo.findPendingByDevice(payload.deviceId);
         if (pendingIntents.length > 0) {
             const lines = pendingIntents.slice(0, 5).map((pi) => {
                 const date = new Date(pi.created_at).toLocaleDateString("zh-CN");
@@ -195,7 +200,7 @@ async function* streamWithToolCalls(session, deviceId) {
         const toolResults = [];
         for (const call of extracted.toolCalls) {
             if (isBuiltinTool(call.name)) {
-                const res = await callBuiltinTool(call.name, call.arguments ?? {}, deviceId);
+                const res = await callBuiltinTool(call.name, call.arguments ?? {}, deviceId, session.userId);
                 toolResults.push(`工具 "${call.name}" 结果: ${res.message}`);
                 console.log(`[chat] Built-in tool ${call.name}: ${res.success ? "success" : "failed"}`);
             }
@@ -227,10 +232,19 @@ export async function endChat(deviceId) {
         const summary = history
             .map((m) => `${m.role}: ${m.content.slice(0, 200)}`)
             .join("\n");
+        // Only check user messages for keyword pre-filtering
+        const userText = history
+            .filter(m => m.role === "user")
+            .map(m => m.content)
+            .join(" ");
         const userId = session.userId;
-        updateSoul(deviceId, `[复盘对话] ${summary}`, userId).catch(() => { });
-        updateProfile(deviceId, `[复盘对话] ${summary}`, userId).catch(() => { });
-        appendToDiary(deviceId, "ai-self", `[对话摘要] ${summary.slice(0, 500)}`).catch(() => { });
+        if (maySoulUpdate(userText)) {
+            updateSoul(deviceId, `[复盘对话] ${summary}`, userId).catch(() => { });
+        }
+        if (mayProfileUpdate(userText)) {
+            updateProfile(deviceId, `[复盘对话] ${summary}`, userId).catch(() => { });
+        }
+        appendToDiary(deviceId, "ai-self", `[对话摘要] ${summary.slice(0, 500)}`, userId).catch(() => { });
     }
     session.mode = "idle";
     session.context.clear();

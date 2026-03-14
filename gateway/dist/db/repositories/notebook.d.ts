@@ -22,3 +22,4 @@ export declare function deleteById(id: string): Promise<boolean>;
  * Ensure system notebooks exist for a device.
  */
 export declare function ensureSystemNotebooks(deviceId: string): Promise<void>;
+export declare function ensureSystemNotebooksByUser(userId: string, deviceId: string): Promise<void>;

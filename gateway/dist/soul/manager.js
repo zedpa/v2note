@@ -3,7 +3,12 @@ import { soulRepo } from "../db/repositories/index.js";
 /**
  * Load the Soul (AI identity definition) for a device.
  */
-export async function loadSoul(deviceId) {
+export async function loadSoul(deviceId, userId) {
+    if (userId) {
+        const byUser = await soulRepo.findByUser(userId);
+        if (byUser)
+            return byUser;
+    }
     return soulRepo.findByDevice(deviceId);
 }
 // ── Per-user write queue for serialized updates ──
@@ -27,26 +32,26 @@ async function doUpdateSoul(deviceId, newInteraction, userId) {
     const result = await chatCompletion([
         {
             role: "system",
-            content: `你负责维护 AI 助手的人格定义（Soul）。基于现有定义和用户的新互动，更新 AI 的人格。
+            content: `你负责维护用户定义的 AI 身份（Identity）。基于现有身份定义和用户的新互动，更新 AI 身份。
 
-## Soul 应该包含的内容（仅限 AI 人格相关）：
-- 用户对 AI 的期望和设定（如"你要像一个严格的教练"）
-- AI 行为偏好（语气、风格、禁忌话题）
-- 交互模式偏好（简洁/详细、主动/被动）
-- AI 专注领域
+## Identity 应该包含的内容：
+- AI 的名字（如用户给 AI 取了名字）
+- 性格特征（如"直接""温暖""幽默"）
+- 互动方式偏好（追问式/直接告知/根据情况判断）
+- 专注领域（用户希望 AI 重点关注的方面）
+- 禁忌（用户不希望 AI 做的事）
+- 沟通风格偏好（语气、简洁度、是否用 emoji 等）
 
-## Soul 不应该包含的内容（这些属于用户画像，不在此处记录）：
-- 用户的职业、身份、习惯
-- 用户的日程安排、作息时间
-- 用户提到的具体事件、人名、地点
-- 用户的个人目标、偏好
+## Identity 不应该包含：
+- 用户的个人信息（职业、习惯、人际关系 → 这些属于用户画像）
+- 具体事件、日程
 
-用 markdown 格式，简洁但全面。只输出更新后的完整 AI 人格定义。
-如果新互动没有对 AI 行为的要求，返回原定义不变。`,
+用 markdown 格式，按上述分类组织。只输出更新后的完整 AI 身份定义。
+如果新互动没有对 AI 身份的要求，返回原定义不变。`,
         },
         {
             role: "user",
-            content: `## 现有 AI 人格定义\n${currentSoul || "（空白，第一次互动）"}\n\n## 新互动内容\n${newInteraction}`,
+            content: `## 现有 AI 身份定义\n${currentSoul || "（空白，第一次互动）"}\n\n## 新互动内容\n${newInteraction}`,
         },
     ], { temperature: 0.3 });
     if (userId) {

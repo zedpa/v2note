@@ -46,6 +46,7 @@ describe("diary manager", () => {
         "default",
         expect.any(String), // today's date
         "Today I coded",
+        undefined,
       );
     });
 

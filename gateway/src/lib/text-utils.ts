@@ -15,6 +15,24 @@ export const STOPWORDS = new Set([
  * Extract keywords from Chinese/mixed text.
  * Uses character bigrams + word-level split for broad matching.
  */
+// ── Soul/Profile relevance keywords (shared by process.ts + chat.ts) ──
+
+/** Keywords indicating user is defining AI personality/behavior */
+export const SOUL_KEYWORDS = ["你要", "你应该", "语气", "风格", "不要", "请用", "像一个", "你是"];
+
+/** Keywords indicating user is sharing personal/factual info */
+export const PROFILE_KEYWORDS = ["我是", "我在", "我的工作", "我住", "我喜欢", "我每天", "家人", "同事"];
+
+/** Check if text likely contains soul-relevant content */
+export function maySoulUpdate(text: string): boolean {
+  return SOUL_KEYWORDS.some(kw => text.includes(kw));
+}
+
+/** Check if text likely contains profile-relevant content */
+export function mayProfileUpdate(text: string): boolean {
+  return PROFILE_KEYWORDS.some(kw => text.includes(kw));
+}
+
 export function extractKeywords(text: string): Set<string> {
   const keywords = new Set<string>();
 

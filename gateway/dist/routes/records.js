@@ -1,19 +1,27 @@
-import { readBody, sendJson, getDeviceId } from "../lib/http-helpers.js";
+import { readBody, sendJson, getDeviceId, getUserId } from "../lib/http-helpers.js";
 import { recordRepo, transcriptRepo, summaryRepo, tagRepo, todoRepo, ideaRepo, } from "../db/repositories/index.js";
 import { processEntry } from "../handlers/process.js";
 export function registerRecordRoutes(router) {
     // List records (with summary + tags)
     router.get("/api/v1/records", async (req, res, _params, query) => {
         const deviceId = getDeviceId(req);
+        const userId = getUserId(req);
         const limit = parseInt(query.limit ?? "100", 10);
         const offset = parseInt(query.offset ?? "0", 10);
         const notebook = query.notebook;
-        const records = await recordRepo.findByDevice(deviceId, {
-            archived: false,
-            limit,
-            offset,
-            notebook: notebook !== undefined ? notebook : undefined,
-        });
+        const records = userId
+            ? await recordRepo.findByUser(userId, {
+                archived: false,
+                limit,
+                offset,
+                notebook: notebook !== undefined ? notebook : undefined,
+            })
+            : await recordRepo.findByDevice(deviceId, {
+                archived: false,
+                limit,
+                offset,
+                notebook: notebook !== undefined ? notebook : undefined,
+            });
         // Batch load summaries and tags
         const ids = records.map((r) => r.id);
         const [summaries, transcripts] = await Promise.all([
@@ -37,12 +45,15 @@ export function registerRecordRoutes(router) {
     // Search records (must be before :id to avoid "search" being captured as an id)
     router.get("/api/v1/records/search", async (req, res, _params, query) => {
         const deviceId = getDeviceId(req);
+        const userId = getUserId(req);
         const q = query.q ?? "";
         if (!q) {
             sendJson(res, []);
             return;
         }
-        const records = await recordRepo.search(deviceId, q);
+        const records = userId
+            ? await recordRepo.searchByUser(userId, q)
+            : await recordRepo.search(deviceId, q);
         // Batch load summaries and tags (same as list route)
         const ids = records.map((r) => r.id);
         const [summaries, tagsByRecord] = await Promise.all([
@@ -81,16 +92,19 @@ export function registerRecordRoutes(router) {
     // Create record
     router.post("/api/v1/records", async (req, res) => {
         const deviceId = getDeviceId(req);
+        const userId = getUserId(req);
         const body = await readBody(req);
-        const record = await recordRepo.create({ device_id: deviceId, ...body });
+        const record = await recordRepo.create({ device_id: deviceId, user_id: userId ?? undefined, ...body });
         sendJson(res, { id: record.id }, 201);
     });
     // Create manual note (content + optional AI processing)
     router.post("/api/v1/records/manual", async (req, res) => {
         const deviceId = getDeviceId(req);
+        const userId = getUserId(req) ?? undefined;
         const { content, tags, useAi, notebook } = await readBody(req);
         const record = await recordRepo.create({
             device_id: deviceId,
+            user_id: userId,
             status: useAi ? "processing" : "completed",
             source: "manual",
             notebook: notebook || undefined,
@@ -112,6 +126,7 @@ export function registerRecordRoutes(router) {
             processEntry({
                 text: content,
                 deviceId,
+                userId,
                 recordId: record.id,
                 notebook: notebook || undefined,
             }).catch((err) => console.error("[records/manual] AI processing failed:", err));

@@ -13,6 +13,7 @@ import { recordRepo } from "../db/repositories/index.js";
 import { transcriptRepo } from "../db/repositories/index.js";
 import { pendingIntentRepo } from "../db/repositories/index.js";
 import { isBuiltinTool, callBuiltinTool } from "../tools/builtin.js";
+import { maySoulUpdate, mayProfileUpdate } from "../lib/text-utils.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const INSIGHTS_DIR = join(__dirname, "../../insights");
@@ -252,7 +253,7 @@ async function* streamWithToolCalls(
     const toolResults: string[] = [];
     for (const call of extracted.toolCalls) {
       if (isBuiltinTool(call.name)) {
-        const res = await callBuiltinTool(call.name, call.arguments ?? {}, deviceId);
+        const res = await callBuiltinTool(call.name, call.arguments ?? {}, deviceId, session.userId);
         toolResults.push(`工具 "${call.name}" 结果: ${res.message}`);
         console.log(`[chat] Built-in tool ${call.name}: ${res.success ? "success" : "failed"}`);
       } else {
@@ -287,10 +288,20 @@ export async function endChat(deviceId: string): Promise<void> {
       .map((m) => `${m.role}: ${m.content.slice(0, 200)}`)
       .join("\n");
 
+    // Only check user messages for keyword pre-filtering
+    const userText = history
+      .filter(m => m.role === "user")
+      .map(m => m.content)
+      .join(" ");
+
     const userId = session.userId;
-    updateSoul(deviceId, `[复盘对话] ${summary}`, userId).catch(() => {});
-    updateProfile(deviceId, `[复盘对话] ${summary}`, userId).catch(() => {});
-    appendToDiary(deviceId, "ai-self", `[对话摘要] ${summary.slice(0, 500)}`).catch(() => {});
+    if (maySoulUpdate(userText)) {
+      updateSoul(deviceId, `[复盘对话] ${summary}`, userId).catch(() => {});
+    }
+    if (mayProfileUpdate(userText)) {
+      updateProfile(deviceId, `[复盘对话] ${summary}`, userId).catch(() => {});
+    }
+    appendToDiary(deviceId, "ai-self", `[对话摘要] ${summary.slice(0, 500)}`, userId).catch(() => {});
   }
 
   session.mode = "idle";

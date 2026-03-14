@@ -28,5 +28,5 @@ export interface SummaryResult {
     };
     tomorrow_seeds: string[];
 }
-export declare function generateMorningBriefing(deviceId: string): Promise<BriefingResult>;
-export declare function generateEveningSummary(deviceId: string): Promise<SummaryResult>;
+export declare function generateMorningBriefing(deviceId: string, userId?: string): Promise<BriefingResult>;
+export declare function generateEveningSummary(deviceId: string, userId?: string): Promise<SummaryResult>;

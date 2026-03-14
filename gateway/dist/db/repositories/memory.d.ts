@@ -12,6 +12,7 @@ export declare function findByDevice(deviceId: string, dateRange?: {
 }, limit?: number): Promise<MemoryEntry[]>;
 export declare function create(fields: {
     device_id: string;
+    user_id?: string;
     content: string;
     source_date?: string;
     importance?: number;
@@ -21,7 +22,12 @@ export declare function findByUser(userId: string, dateRange?: {
     end: string;
 }, limit?: number): Promise<MemoryEntry[]>;
 export declare function deleteById(id: string, deviceId: string): Promise<void>;
+export declare function deleteByIdAndUser(id: string, userId: string): Promise<void>;
 export declare function update(id: string, deviceId: string, fields: {
+    content?: string;
+    importance?: number;
+}): Promise<void>;
+export declare function updateByUser(id: string, userId: string, fields: {
     content?: string;
     importance?: number;
 }): Promise<void>;

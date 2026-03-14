@@ -20,7 +20,7 @@ const sessions = new Map();
  * - realtime: spawn Python realtime ASR subprocess for streaming recognition.
  * - upload: just accumulate PCM chunks; transcribe when recording stops.
  */
-export async function startASR(clientWs, deviceId, locationText, mode = "realtime", notebook) {
+export async function startASR(clientWs, deviceId, locationText, mode = "realtime", notebook, userId) {
     const apiKey = process.env.DASHSCOPE_API_KEY;
     if (!apiKey)
         throw new Error("Missing DASHSCOPE_API_KEY");
@@ -37,6 +37,7 @@ export async function startASR(clientWs, deviceId, locationText, mode = "realtim
     const taskId = randomUUID();
     const session = {
         deviceId,
+        userId,
         ownerWs: clientWs,
         mode,
         pythonProcess: null,
@@ -331,6 +332,7 @@ async function finishUploadASR(clientWs, deviceId, expectedTaskId) {
 async function createRecordAndProcess(clientWs, session, transcript, durationSeconds) {
     const record = await recordRepo.create({
         device_id: session.deviceId,
+        user_id: session.userId,
         status: "processing",
         source: "voice",
         duration_seconds: durationSeconds,
@@ -364,6 +366,7 @@ async function createRecordAndProcess(clientWs, session, transcript, durationSec
     processEntry({
         text: transcript,
         deviceId: session.deviceId,
+        userId: session.userId,
         recordId: record.id,
         notebook: session.notebook,
     })
@@ -375,7 +378,7 @@ async function createRecordAndProcess(clientWs, session, transcript, durationSec
         });
         // Generate reflection question in background
         try {
-            const question = await generateReflection(transcript, session.deviceId);
+            const question = await generateReflection(transcript, session.deviceId, session.userId);
             if (question) {
                 sendToClient(clientWs, {
                     type: "reflect.question",

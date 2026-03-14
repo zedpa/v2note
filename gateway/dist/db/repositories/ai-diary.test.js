@@ -25,7 +25,7 @@ describe("ai-diary repository", () => {
             vi.mocked(queryOne).mockResolvedValue(mockEntry);
             const result = await upsertEntry("dev-1", "default", "2026-03-12", "今天写了代码");
             expect(result).toEqual(mockEntry);
-            expect(queryOne).toHaveBeenCalledWith(expect.stringContaining("ON CONFLICT"), ["dev-1", "default", "2026-03-12", "今天写了代码"]);
+            expect(queryOne).toHaveBeenCalledWith(expect.stringContaining("ON CONFLICT"), ["dev-1", null, "default", "2026-03-12", "今天写了代码"]);
         });
         it("appends to existing entry on conflict", async () => {
             vi.mocked(queryOne).mockResolvedValue({ id: "d-1", full_content: "Earlier\n\nLater" });

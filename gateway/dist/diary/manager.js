@@ -5,17 +5,24 @@ import { MemoryManager } from "../memory/manager.js";
  * Append content to today's diary for a specific notebook.
  * Fast operation — no AI call, just DB append.
  */
-export async function appendToDiary(deviceId, notebook, content) {
+export async function appendToDiary(deviceId, notebook, content, userId) {
     const today = new Date().toISOString().split("T")[0];
-    await notebookRepo.ensureSystemNotebooks(deviceId);
-    await aiDiaryRepo.upsertEntry(deviceId, notebook, today, content);
+    if (userId) {
+        await notebookRepo.ensureSystemNotebooksByUser(userId, deviceId);
+    }
+    else {
+        await notebookRepo.ensureSystemNotebooks(deviceId);
+    }
+    await aiDiaryRepo.upsertEntry(deviceId, notebook, today, content, userId);
 }
 /**
  * Regenerate the summary (first ~20 lines) for a diary entry.
  * Uses AI to create a concise summary.
  */
-export async function regenerateSummary(deviceId, notebook, date) {
-    const entry = await aiDiaryRepo.findFull(deviceId, notebook, date);
+export async function regenerateSummary(deviceId, notebook, date, userId) {
+    const entry = userId
+        ? await aiDiaryRepo.findFullByUser(userId, notebook, date)
+        : await aiDiaryRepo.findFull(deviceId, notebook, date);
     if (!entry || !entry.full_content.trim())
         return;
     const result = await chatCompletion([
@@ -37,8 +44,10 @@ export async function regenerateSummary(deviceId, notebook, date) {
  * Extract long-term memories from diary entries within a date range.
  * Identifies recurring patterns, important changes, and key insights.
  */
-export async function extractToMemory(deviceId, dateRange) {
-    const entries = await aiDiaryRepo.findSummaries(deviceId, "default", dateRange.start, dateRange.end);
+export async function extractToMemory(deviceId, dateRange, userId) {
+    const entries = userId
+        ? await aiDiaryRepo.findSummariesByUser(userId, "default", dateRange.start, dateRange.end)
+        : await aiDiaryRepo.findSummaries(deviceId, "default", dateRange.start, dateRange.end);
     if (entries.length === 0)
         return;
     const diaryContent = entries
@@ -67,7 +76,7 @@ export async function extractToMemory(deviceId, dateRange) {
         return;
     const memoryManager = new MemoryManager();
     for (const line of lines) {
-        await memoryManager.maybeCreateMemory(deviceId, line, dateRange.end);
+        await memoryManager.maybeCreateMemory(deviceId, line, dateRange.end, userId);
     }
     console.log(`[diary] Extracted ${lines.length} memories from ${dateRange.start} to ${dateRange.end}`);
 }

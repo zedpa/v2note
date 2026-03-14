@@ -50,6 +50,7 @@ export async function aggregateTodos(
   // Save as a new record
   const record = await recordRepo.create({
     device_id: deviceId,
+    user_id: userId,
     status: "completed",
     source: "todo_aggregate",
   });

@@ -89,6 +89,7 @@ export async function findById(id: string): Promise<Record | null> {
 
 export async function create(fields: {
   device_id: string;
+  user_id?: string;
   status?: string;
   source?: string;
   audio_path?: string;
@@ -97,10 +98,11 @@ export async function create(fields: {
   notebook?: string;
 }): Promise<Record> {
   const row = await queryOne<Record>(
-    `INSERT INTO record (device_id, status, source, audio_path, duration_seconds, location_text, notebook)
-     VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+    `INSERT INTO record (device_id, user_id, status, source, audio_path, duration_seconds, location_text, notebook)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
     [
       fields.device_id,
+      fields.user_id ?? null,
       fields.status ?? "uploading",
       fields.source ?? "voice",
       fields.audio_path ?? null,

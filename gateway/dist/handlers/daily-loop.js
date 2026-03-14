@@ -6,8 +6,9 @@ import { todoRepo, recordRepo } from "../db/repositories/index.js";
 import * as briefingRepo from "../db/repositories/daily-briefing.js";
 import { MemoryManager } from "../memory/manager.js";
 import { loadSoul } from "../soul/manager.js";
+import { loadProfile } from "../profile/manager.js";
 // ── Morning Briefing ──
-export async function generateMorningBriefing(deviceId) {
+export async function generateMorningBriefing(deviceId, userId) {
     const today = new Date().toISOString().split("T")[0];
     // Check cache first (2-hour TTL) — gracefully handle missing table
     try {
@@ -21,7 +22,9 @@ export async function generateMorningBriefing(deviceId) {
         console.warn(`[daily-loop] Briefing cache check failed (table may not exist): ${err.message}`);
     }
     // 1. Load all pending todos
-    const pendingTodos = await todoRepo.findPendingByDevice(deviceId);
+    const pendingTodos = userId
+        ? await todoRepo.findPendingByUser(userId)
+        : await todoRepo.findPendingByDevice(deviceId);
     // Categorize todos
     const now = new Date();
     const todayScheduled = pendingTodos.filter((t) => {
@@ -50,16 +53,21 @@ export async function generateMorningBriefing(deviceId) {
         memories = await memoryManager.loadContext(deviceId, {
             start: sevenDaysAgo,
             end: yesterday,
-        });
+        }, userId);
     }
     catch (err) {
         console.warn(`[daily-loop] Memory load failed: ${err.message}`);
     }
-    // 3. Load soul for personalization
+    // 3. Load soul + profile for personalization
     let soulContent = "";
+    let profileContent = "";
     try {
-        const soul = await loadSoul(deviceId);
+        const [soul, profile] = await Promise.all([
+            loadSoul(deviceId, userId).catch(() => null),
+            loadProfile(deviceId, userId).catch(() => null),
+        ]);
         soulContent = soul?.content ?? "";
+        profileContent = profile?.content ?? "";
     }
     catch {
         // non-critical
@@ -67,14 +75,18 @@ export async function generateMorningBriefing(deviceId) {
     // 4. Yesterday's stats
     const yesterdayStart = `${yesterday}T00:00:00Z`;
     const yesterdayEnd = `${yesterday}T23:59:59Z`;
-    const yesterdayStats = await todoRepo.countByDateRange(deviceId, yesterdayStart, yesterdayEnd);
+    const yesterdayStats = userId
+        ? await todoRepo.countByUserDateRange(userId, yesterdayStart, yesterdayEnd)
+        : await todoRepo.countByDateRange(deviceId, yesterdayStart, yesterdayEnd);
     // 5. Calculate streak (simplified: count consecutive days with records)
     let streak = 0;
     try {
         for (let i = 1; i <= 30; i++) {
             const d = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
             const ds = d.toISOString().split("T")[0];
-            const count = await todoRepo.countByDateRange(deviceId, `${ds}T00:00:00Z`, `${ds}T23:59:59Z`);
+            const count = userId
+                ? await todoRepo.countByUserDateRange(userId, `${ds}T00:00:00Z`, `${ds}T23:59:59Z`)
+                : await todoRepo.countByDateRange(deviceId, `${ds}T00:00:00Z`, `${ds}T23:59:59Z`);
             if (count.total > 0) {
                 streak++;
             }
@@ -127,7 +139,7 @@ export async function generateMorningBriefing(deviceId) {
         {
             role: "system",
             content: `你是一个高效的个人助手，正在为用户生成晨间简报。
-${soulContent ? `用户画像：\n${soulContent}\n` : ""}
+${soulContent ? `你的人设：\n${soulContent}\n` : ""}${profileContent ? `用户画像：\n${profileContent}\n` : ""}
 请基于以下信息生成简洁、实用的晨间简报。
 待办事项带有领域标记[work/life/social/learning/health]和影响力评分。
 标记 *AI可协助* 的事项，在 priority_items 中可建议"让AI帮你处理"。
@@ -222,7 +234,7 @@ ${memoryContext}
     }
 }
 // ── Evening Summary ──
-export async function generateEveningSummary(deviceId) {
+export async function generateEveningSummary(deviceId, userId) {
     const today = new Date().toISOString().split("T")[0];
     // Check cache — gracefully handle missing table
     try {
@@ -236,28 +248,39 @@ export async function generateEveningSummary(deviceId) {
         console.warn(`[daily-loop] Evening cache check failed: ${err.message}`);
     }
     // 1. Today's completed todos
-    const allTodos = await todoRepo.findByDevice(deviceId);
+    const allTodos = userId
+        ? await todoRepo.findByUser(userId)
+        : await todoRepo.findByDevice(deviceId);
     const todayDone = allTodos.filter((t) => t.done && t.completed_at && t.completed_at.startsWith(today));
     // 2. Today's new records count
     let newRecordCount = 0;
     try {
-        const records = await recordRepo.findByDevice(deviceId, { limit: 100 });
+        const records = userId
+            ? await recordRepo.findByUser(userId, { limit: 100 })
+            : await recordRepo.findByDevice(deviceId, { limit: 100 });
         newRecordCount = records.filter((r) => r.created_at && r.created_at.startsWith(today)).length;
     }
     catch {
         // non-critical
     }
     // 3. Still pending items
-    const pending = await todoRepo.findPendingByDevice(deviceId);
+    const pending = userId
+        ? await todoRepo.findPendingByUser(userId)
+        : await todoRepo.findPendingByDevice(deviceId);
     // 4. Relay status
     const relayTodos = allTodos.filter((t) => t.category === "relay");
     const relaysCompleted = relayTodos.filter((t) => t.done && t.completed_at && t.completed_at.startsWith(today)).length;
     const relaysPending = relayTodos.filter((t) => !t.done);
-    // 5. Load soul
+    // 5. Load soul + profile
     let soulContent = "";
+    let profileContent = "";
     try {
-        const soul = await loadSoul(deviceId);
+        const [soul, profile] = await Promise.all([
+            loadSoul(deviceId, userId).catch(() => null),
+            loadProfile(deviceId, userId).catch(() => null),
+        ]);
         soulContent = soul?.content ?? "";
+        profileContent = profile?.content ?? "";
     }
     catch {
         // non-critical
@@ -267,7 +290,7 @@ export async function generateEveningSummary(deviceId) {
         {
             role: "system",
             content: `你是用户的个人助手，正在生成日终总结。
-${soulContent ? `用户画像：\n${soulContent}\n` : ""}
+${soulContent ? `你的人设：\n${soulContent}\n` : ""}${profileContent ? `用户画像：\n${profileContent}\n` : ""}
 基于今日数据生成简洁总结。
 返回 JSON：
 {
@@ -317,7 +340,7 @@ ${relaysPending.map((t) => `- ${t.text}`).join("\n") || "无待转达"}
             try {
                 const memoryManager = new MemoryManager();
                 const seedContent = `明日关注: ${parsed.tomorrow_seeds.join("; ")}`;
-                await memoryManager.maybeCreateMemory(deviceId, seedContent, today);
+                await memoryManager.maybeCreateMemory(deviceId, seedContent, today, userId);
             }
             catch {
                 // non-critical

@@ -34,7 +34,7 @@ describe("diary manager", () => {
             await appendToDiary("dev-1", "default", "Today I coded");
             expect(notebookRepo.ensureSystemNotebooks).toHaveBeenCalledWith("dev-1");
             expect(aiDiaryRepo.upsertEntry).toHaveBeenCalledWith("dev-1", "default", expect.any(String), // today's date
-            "Today I coded");
+            "Today I coded", undefined);
         });
         it("uses today's date", async () => {
             const today = new Date().toISOString().split("T")[0];

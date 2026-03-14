@@ -16,12 +16,13 @@ export function registerGoalRoutes(router: Router) {
   // Create goal
   router.post("/api/v1/goals", async (req, res) => {
     const deviceId = getDeviceId(req);
+    const userId = getUserId(req);
     const { title, parent_id, source } = await readBody<{
       title: string;
       parent_id?: string;
       source?: string;
     }>(req);
-    const goal = await goalRepo.create({ device_id: deviceId, title, parent_id, source });
+    const goal = await goalRepo.create({ device_id: deviceId, user_id: userId ?? undefined, title, parent_id, source });
     sendJson(res, goal, 201);
   });
 

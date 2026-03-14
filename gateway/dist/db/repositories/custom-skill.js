@@ -2,14 +2,21 @@ import { query, queryOne, execute } from "../pool.js";
 export async function findByDevice(deviceId) {
     return query(`SELECT * FROM custom_skill WHERE device_id = $1 ORDER BY created_at`, [deviceId]);
 }
+export async function findByUser(userId) {
+    return query(`SELECT * FROM custom_skill WHERE user_id = $1 ORDER BY created_at`, [userId]);
+}
 export async function findByDeviceAndName(deviceId, name) {
     return queryOne(`SELECT * FROM custom_skill WHERE device_id = $1 AND name = $2`, [deviceId, name]);
 }
+export async function findByUserAndName(userId, name) {
+    return queryOne(`SELECT * FROM custom_skill WHERE user_id = $1 AND name = $2`, [userId, name]);
+}
 export async function create(fields) {
-    const rows = await query(`INSERT INTO custom_skill (device_id, name, description, prompt, type, created_by)
-     VALUES ($1, $2, $3, $4, $5, $6)
+    const rows = await query(`INSERT INTO custom_skill (device_id, user_id, name, description, prompt, type, created_by)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)
      RETURNING *`, [
         fields.device_id,
+        fields.user_id ?? null,
         fields.name,
         fields.description ?? "",
         fields.prompt,
@@ -53,5 +60,8 @@ export async function deleteById(id) {
 }
 export async function deleteByName(deviceId, name) {
     return execute(`DELETE FROM custom_skill WHERE device_id = $1 AND name = $2`, [deviceId, name]);
+}
+export async function deleteByUserAndName(userId, name) {
+    return execute(`DELETE FROM custom_skill WHERE user_id = $1 AND name = $2`, [userId, name]);
 }
 //# sourceMappingURL=custom-skill.js.map

@@ -54,8 +54,13 @@ export declare function countByDateRange(deviceId: string, start: string, end: s
     total: number;
     done: number;
 }>;
+export declare function countByUserDateRange(userId: string, start: string, end: string): Promise<{
+    total: number;
+    done: number;
+}>;
 export declare function findPendingByDevice(deviceId: string): Promise<Todo[]>;
 export declare function findRelayByDevice(deviceId: string): Promise<Todo[]>;
+export declare function findRelayByUser(userId: string): Promise<Todo[]>;
 export declare function createWithCategory(fields: {
     record_id: string;
     text: string;

@@ -263,7 +263,7 @@ wss.on("connection", (ws) => {
           connectionDeviceMap.set(ws, msg.payload.deviceId);
           const userId = connectionUserMap.get(ws);
           proactiveEngine.registerDevice(msg.payload.deviceId, ws, userId);
-          await startASR(ws, msg.payload.deviceId, msg.payload.locationText, msg.payload.mode, msg.payload.notebook);
+          await startASR(ws, msg.payload.deviceId, msg.payload.locationText, msg.payload.mode, msg.payload.notebook, userId);
           break;
         }
 

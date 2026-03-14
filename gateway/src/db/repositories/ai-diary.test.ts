@@ -32,7 +32,7 @@ describe("ai-diary repository", () => {
       expect(result).toEqual(mockEntry);
       expect(queryOne).toHaveBeenCalledWith(
         expect.stringContaining("ON CONFLICT"),
-        ["dev-1", "default", "2026-03-12", "今天写了代码"],
+        ["dev-1", null, "default", "2026-03-12", "今天写了代码"],
       );
     });
 

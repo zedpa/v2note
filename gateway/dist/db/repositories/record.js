@@ -29,6 +29,15 @@ export async function findByUser(userId, opts) {
         conditions.push(`archived = $${i++}`);
         params.push(opts.archived);
     }
+    if (opts?.notebook !== undefined) {
+        if (opts.notebook === null) {
+            conditions.push(`notebook IS NULL`);
+        }
+        else {
+            conditions.push(`notebook = $${i++}`);
+            params.push(opts.notebook);
+        }
+    }
     const limit = opts?.limit ?? 100;
     const offset = opts?.offset ?? 0;
     return query(`SELECT * FROM record WHERE ${conditions.join(" AND ")}
@@ -43,9 +52,10 @@ export async function findById(id) {
     return queryOne(`SELECT * FROM record WHERE id = $1`, [id]);
 }
 export async function create(fields) {
-    const row = await queryOne(`INSERT INTO record (device_id, status, source, audio_path, duration_seconds, location_text, notebook)
-     VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`, [
+    const row = await queryOne(`INSERT INTO record (device_id, user_id, status, source, audio_path, duration_seconds, location_text, notebook)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`, [
         fields.device_id,
+        fields.user_id ?? null,
         fields.status ?? "uploading",
         fields.source ?? "voice",
         fields.audio_path ?? null,
@@ -95,9 +105,23 @@ export async function search(deviceId, q) {
      ORDER BY r.created_at DESC
      LIMIT 50`, [deviceId, `%${q}%`]);
 }
+export async function searchByUser(userId, q) {
+    return query(`SELECT DISTINCT r.* FROM record r
+     LEFT JOIN transcript t ON t.record_id = r.id
+     LEFT JOIN summary s ON s.record_id = r.id
+     WHERE r.user_id = $1
+       AND (t.text ILIKE $2 OR s.title ILIKE $2 OR s.short_summary ILIKE $2)
+     ORDER BY r.created_at DESC
+     LIMIT 50`, [userId, `%${q}%`]);
+}
 export async function countByDateRange(deviceId, start, end) {
     const row = await queryOne(`SELECT COUNT(*)::text AS count FROM record
      WHERE device_id = $1 AND created_at >= $2 AND created_at <= $3`, [deviceId, start, end]);
+    return parseInt(row?.count ?? "0", 10);
+}
+export async function countByUserDateRange(userId, start, end) {
+    const row = await queryOne(`SELECT COUNT(*)::text AS count FROM record
+     WHERE user_id = $1 AND created_at >= $2 AND created_at <= $3`, [userId, start, end]);
     return parseInt(row?.count ?? "0", 10);
 }
 export async function findByDeviceAndDateRange(deviceId, start, end) {

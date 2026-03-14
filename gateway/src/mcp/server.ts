@@ -8,7 +8,7 @@
  */
 
 import type { Router } from "../router.js";
-import { readBody, sendJson, sendError, getDeviceId } from "../lib/http-helpers.js";
+import { readBody, sendJson, sendError, getDeviceId, getUserId } from "../lib/http-helpers.js";
 import { BUILTIN_TOOLS, callBuiltinTool, type BuiltinToolDef } from "../tools/builtin.js";
 import { loadSkills } from "../skills/loader.js";
 import { join, dirname } from "node:path";
@@ -50,7 +50,7 @@ function toolDefsToMCP(tools: BuiltinToolDef[]) {
 /**
  * Handle a single JSON-RPC request.
  */
-async function handleRpcRequest(req: JsonRpcRequest, deviceId: string): Promise<JsonRpcResponse> {
+async function handleRpcRequest(req: JsonRpcRequest, deviceId: string, userId?: string): Promise<JsonRpcResponse> {
   switch (req.method) {
     case "initialize":
       return rpcResult(req.id, {
@@ -105,7 +105,7 @@ async function handleRpcRequest(req: JsonRpcRequest, deviceId: string): Promise<
 
       // Handle built-in tools
       try {
-        const result = await callBuiltinTool(toolName, args, deviceId);
+        const result = await callBuiltinTool(toolName, args, deviceId, userId);
         return rpcResult(req.id, {
           content: [{ type: "text", text: result.message }],
           isError: !result.success,
@@ -130,6 +130,7 @@ export function registerMCPServerRoutes(router: Router) {
   router.post("/mcp", async (req, res) => {
     try {
       const deviceId = getDeviceId(req);
+      const userId = getUserId(req);
       const body = await readBody<JsonRpcRequest>(req);
 
       if (body.jsonrpc !== "2.0") {
@@ -137,7 +138,7 @@ export function registerMCPServerRoutes(router: Router) {
         return;
       }
 
-      const response = await handleRpcRequest(body, deviceId);
+      const response = await handleRpcRequest(body, deviceId, userId ?? undefined);
       sendJson(res, response);
     } catch (err: any) {
       sendJson(res, rpcError(null, -32603, err.message));

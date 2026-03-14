@@ -2,15 +2,16 @@ import { query, queryOne, execute } from "../pool.js";
 /**
  * Upsert a diary entry — append content to today's entry.
  */
-export async function upsertEntry(deviceId, notebook, date, content) {
-    const row = await queryOne(`INSERT INTO ai_diary (device_id, notebook, entry_date, full_content, summary)
-     VALUES ($1, $2, $3, $4, LEFT($4, 200))
+export async function upsertEntry(deviceId, notebook, date, content, userId) {
+    const row = await queryOne(`INSERT INTO ai_diary (device_id, user_id, notebook, entry_date, full_content, summary)
+     VALUES ($1, $2, $3, $4, $5, LEFT($5, 200))
      ON CONFLICT (device_id, notebook, entry_date)
      DO UPDATE SET
-       full_content = ai_diary.full_content || E'\\n\\n' || $4,
-       summary = LEFT(ai_diary.full_content || E'\\n\\n' || $4, 200),
+       full_content = ai_diary.full_content || E'\\n\\n' || $5,
+       summary = LEFT(ai_diary.full_content || E'\\n\\n' || $5, 200),
+       user_id = COALESCE($2, ai_diary.user_id),
        updated_at = now()
-     RETURNING *`, [deviceId, notebook, date, content]);
+     RETURNING *`, [deviceId, userId ?? null, notebook, date, content]);
     return row;
 }
 export async function findByUser(userId, notebook, date) {
@@ -33,11 +34,22 @@ export async function findSummaries(deviceId, notebook, startDate, endDate) {
      WHERE device_id = $1 AND notebook = $2 AND entry_date >= $3 AND entry_date <= $4
      ORDER BY entry_date DESC`, [deviceId, notebook, startDate, endDate]);
 }
+export async function findSummariesByUser(userId, notebook, startDate, endDate) {
+    return query(`SELECT id, entry_date,
+            COALESCE(NULLIF(summary, ''), LEFT(full_content, 200)) AS summary,
+            notebook
+     FROM ai_diary
+     WHERE user_id = $1 AND notebook = $2 AND entry_date >= $3 AND entry_date <= $4
+     ORDER BY entry_date DESC`, [userId, notebook, startDate, endDate]);
+}
 /**
  * Get full content of a specific diary entry.
  */
 export async function findFull(deviceId, notebook, date) {
     return queryOne(`SELECT * FROM ai_diary WHERE device_id = $1 AND notebook = $2 AND entry_date = $3`, [deviceId, notebook, date]);
+}
+export async function findFullByUser(userId, notebook, date) {
+    return queryOne(`SELECT * FROM ai_diary WHERE user_id = $1 AND notebook = $2 AND entry_date = $3`, [userId, notebook, date]);
 }
 /**
  * Update the summary field of a diary entry.

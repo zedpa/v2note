@@ -10,7 +10,11 @@ export interface UserProfile {
 /**
  * Load the user profile for a device.
  */
-export async function loadProfile(deviceId: string): Promise<UserProfile | null> {
+export async function loadProfile(deviceId: string, userId?: string): Promise<UserProfile | null> {
+  if (userId) {
+    const byUser = await userProfileRepo.findByUser(userId);
+    if (byUser) return byUser;
+  }
   return userProfileRepo.findByDevice(deviceId);
 }
 

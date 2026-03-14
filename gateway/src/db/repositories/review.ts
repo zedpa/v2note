@@ -48,6 +48,7 @@ export async function findByUser(
 
 export async function create(fields: {
   device_id: string;
+  user_id?: string;
   period: string;
   period_start: string;
   period_end: string;
@@ -56,14 +57,16 @@ export async function create(fields: {
   structured_data?: any;
 }): Promise<Review> {
   const row = await queryOne<Review>(
-    `INSERT INTO review (device_id, period, period_start, period_end, summary, stats, structured_data)
-     VALUES ($1, $2, $3, $4, $5, $6, $7)
+    `INSERT INTO review (device_id, user_id, period, period_start, period_end, summary, stats, structured_data)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
      ON CONFLICT (device_id, period, period_start)
      DO UPDATE SET summary = EXCLUDED.summary, stats = EXCLUDED.stats,
-                   structured_data = EXCLUDED.structured_data
+                   structured_data = EXCLUDED.structured_data,
+                   user_id = COALESCE(EXCLUDED.user_id, review.user_id)
      RETURNING *`,
     [
       fields.device_id,
+      fields.user_id ?? null,
       fields.period,
       fields.period_start,
       fields.period_end,

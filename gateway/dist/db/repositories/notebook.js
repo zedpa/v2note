@@ -54,4 +54,8 @@ export async function ensureSystemNotebooks(deviceId) {
     await findOrCreate(deviceId, "ai-self", "AI 自用工作日记", true, "#8b5cf6");
     await findOrCreate(deviceId, "default", "用户日常日记", true, "#f59e0b");
 }
+export async function ensureSystemNotebooksByUser(userId, deviceId) {
+    await findOrCreateByUser(userId, deviceId, "ai-self", "AI 自用工作日记", true, "#8b5cf6");
+    await findOrCreateByUser(userId, deviceId, "default", "用户日常日记", true, "#f59e0b");
+}
 //# sourceMappingURL=notebook.js.map

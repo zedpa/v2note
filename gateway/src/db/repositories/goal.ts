@@ -45,13 +45,14 @@ export async function findById(id: string): Promise<Goal | null> {
 
 export async function create(fields: {
   device_id: string;
+  user_id?: string;
   title: string;
   parent_id?: string;
   source?: string;
 }): Promise<Goal> {
   const row = await queryOne<Goal>(
-    `INSERT INTO goal (device_id, title, parent_id, source) VALUES ($1, $2, $3, $4) RETURNING *`,
-    [fields.device_id, fields.title, fields.parent_id ?? null, fields.source ?? "speech"],
+    `INSERT INTO goal (device_id, user_id, title, parent_id, source) VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+    [fields.device_id, fields.user_id ?? null, fields.title, fields.parent_id ?? null, fields.source ?? "speech"],
   );
   return row!;
 }

@@ -2,27 +2,23 @@
 
 import { useState } from "react";
 import { Edit3, Save, X } from "lucide-react";
-import { useSoul } from "../hooks/use-soul";
+import { useProfile } from "../hooks/use-profile";
 import { MarkdownContent } from "@/shared/components/markdown-content";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 
-interface SoulTabProps {
-  title?: string;
-}
-
-export function SoulTab({ title = "AI 身份" }: SoulTabProps) {
-  const { soul, loading, saving, updateSoul } = useSoul();
+export function ProfileTab() {
+  const { profile, loading, saving, updateProfile } = useProfile();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState("");
 
   const startEditing = () => {
-    setDraft(soul?.content ?? "");
+    setDraft(profile?.content ?? "");
     setEditing(true);
   };
 
   const handleSave = async () => {
-    await updateSoul(draft);
+    await updateProfile(draft);
     setEditing(false);
   };
 
@@ -45,7 +41,7 @@ export function SoulTab({ title = "AI 身份" }: SoulTabProps) {
               onChange={(e) => setDraft(e.target.value)}
               rows={12}
               className="text-sm"
-              placeholder="定义 AI 的名字、性格、互动方式、专注领域..."
+              placeholder="AI 从对话中提取的用户信息..."
             />
             <div className="flex gap-2 justify-end">
               <Button
@@ -66,7 +62,7 @@ export function SoulTab({ title = "AI 身份" }: SoulTabProps) {
         ) : (
           <div>
             <div className="flex items-start justify-between mb-3">
-              <h3 className="text-sm font-medium text-foreground">{title}</h3>
+              <h3 className="text-sm font-medium text-foreground">用户画像</h3>
               <button
                 type="button"
                 onClick={startEditing}
@@ -75,31 +71,22 @@ export function SoulTab({ title = "AI 身份" }: SoulTabProps) {
                 <Edit3 className="w-3.5 h-3.5 text-muted-foreground" />
               </button>
             </div>
-            {soul?.content ? (
+            {profile?.content ? (
               <MarkdownContent className="text-muted-foreground">
-                {soul.content}
+                {profile.content}
               </MarkdownContent>
             ) : (
-              <div className="space-y-2 text-sm text-muted-foreground">
-                <p className="italic">AI 身份尚未设定。你可以点击编辑来定义：</p>
-                <ul className="list-disc list-inside space-y-1 text-xs">
-                  <li>AI 的名字</li>
-                  <li>性格特征（直接/温暖/幽默…）</li>
-                  <li>互动方式（追问式/直接告知…）</li>
-                  <li>专注领域（你希望 AI 重点关注什么）</li>
-                  <li>禁忌（不希望 AI 做的事）</li>
-                  <li>沟通风格（语气、简洁度、emoji…）</li>
-                </ul>
-                <p className="text-xs">也可以在对话中自然表达，AI 会自动学习。</p>
-              </div>
+              <p className="text-sm text-muted-foreground italic">
+                AI 尚未建立您的用户画像。随着使用，AI 会自动了解您的基本信息和习惯。
+              </p>
             )}
           </div>
         )}
       </div>
 
-      {soul?.updated_at && (
+      {profile?.updated_at && (
         <p className="text-[10px] text-muted-foreground text-center">
-          最后更新: {new Date(soul.updated_at).toLocaleString("zh-CN")}
+          最后更新: {new Date(profile.updated_at).toLocaleString("zh-CN")}
         </p>
       )}
     </div>

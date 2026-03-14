@@ -5,6 +5,7 @@ export interface Idea {
     created_at: string;
 }
 export declare function findByDevice(deviceId: string): Promise<Idea[]>;
+export declare function findByUser(userId: string): Promise<Idea[]>;
 export declare function findByRecordId(recordId: string): Promise<Idea[]>;
 export declare function create(fields: {
     record_id: string;

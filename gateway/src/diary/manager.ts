@@ -11,10 +11,15 @@ export async function appendToDiary(
   deviceId: string,
   notebook: string,
   content: string,
+  userId?: string,
 ): Promise<void> {
   const today = new Date().toISOString().split("T")[0];
-  await notebookRepo.ensureSystemNotebooks(deviceId);
-  await aiDiaryRepo.upsertEntry(deviceId, notebook, today, content);
+  if (userId) {
+    await notebookRepo.ensureSystemNotebooksByUser(userId, deviceId);
+  } else {
+    await notebookRepo.ensureSystemNotebooks(deviceId);
+  }
+  await aiDiaryRepo.upsertEntry(deviceId, notebook, today, content, userId);
 }
 
 /**
@@ -25,8 +30,11 @@ export async function regenerateSummary(
   deviceId: string,
   notebook: string,
   date: string,
+  userId?: string,
 ): Promise<void> {
-  const entry = await aiDiaryRepo.findFull(deviceId, notebook, date);
+  const entry = userId
+    ? await aiDiaryRepo.findFullByUser(userId, notebook, date)
+    : await aiDiaryRepo.findFull(deviceId, notebook, date);
   if (!entry || !entry.full_content.trim()) return;
 
   const result = await chatCompletion(
@@ -56,13 +64,11 @@ export async function regenerateSummary(
 export async function extractToMemory(
   deviceId: string,
   dateRange: { start: string; end: string },
+  userId?: string,
 ): Promise<void> {
-  const entries = await aiDiaryRepo.findSummaries(
-    deviceId,
-    "default",
-    dateRange.start,
-    dateRange.end,
-  );
+  const entries = userId
+    ? await aiDiaryRepo.findSummariesByUser(userId, "default", dateRange.start, dateRange.end)
+    : await aiDiaryRepo.findSummaries(deviceId, "default", dateRange.start, dateRange.end);
 
   if (entries.length === 0) return;
 
@@ -102,6 +108,7 @@ export async function extractToMemory(
       deviceId,
       line,
       dateRange.end,
+      userId,
     );
   }
 

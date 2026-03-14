@@ -5,9 +5,11 @@ import { transcriptRepo } from "../db/repositories/index.js";
 /**
  * Aggregate all pending todos for a device into a formatted diary entry.
  */
-export async function aggregateTodos(deviceId) {
-    // Fetch pending todos for this device
-    const deviceTodos = await todoRepo.findPendingByDevice(deviceId);
+export async function aggregateTodos(deviceId, userId) {
+    // Fetch pending todos for this user/device
+    const deviceTodos = userId
+        ? await todoRepo.findPendingByUser(userId)
+        : await todoRepo.findPendingByDevice(deviceId);
     if (deviceTodos.length === 0) {
         return { diary_entry: "当前没有待办事项。" };
     }
@@ -33,6 +35,7 @@ export async function aggregateTodos(deviceId) {
     // Save as a new record
     const record = await recordRepo.create({
         device_id: deviceId,
+        user_id: userId,
         status: "completed",
         source: "todo_aggregate",
     });

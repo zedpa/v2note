@@ -15,6 +15,7 @@ export declare function findByDevice(deviceId: string): Promise<Goal[]>;
 export declare function findById(id: string): Promise<Goal | null>;
 export declare function create(fields: {
     device_id: string;
+    user_id?: string;
     title: string;
     parent_id?: string;
     source?: string;

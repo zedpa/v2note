@@ -32,14 +32,15 @@ export async function findById(id: string): Promise<PendingIntent | null> {
 
 export async function create(fields: {
   device_id: string;
+  user_id?: string;
   record_id?: string;
   intent_type: string;
   text: string;
   context?: string;
 }): Promise<PendingIntent> {
   const row = await queryOne<PendingIntent>(
-    `INSERT INTO pending_intent (device_id, record_id, intent_type, text, context) VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-    [fields.device_id, fields.record_id ?? null, fields.intent_type, fields.text, fields.context ?? null],
+    `INSERT INTO pending_intent (device_id, user_id, record_id, intent_type, text, context) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+    [fields.device_id, fields.user_id ?? null, fields.record_id ?? null, fields.intent_type, fields.text, fields.context ?? null],
   );
   return row!;
 }
