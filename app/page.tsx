@@ -59,6 +59,7 @@ export default function Page() {
     end: string;
   } | null>(null);
   const [chatInitialMessage, setChatInitialMessage] = useState<string | undefined>();
+  const [chatMode, setChatMode] = useState<"review" | "command" | "insight">("review");
   /** null = voice notes timeline, string = diary notebook name */
   const [activeNotebook, setActiveNotebook] = useState<string | null>(null);
   const [activeNotebookColor, setActiveNotebookColor] = useState<string | null>(null);
@@ -107,6 +108,15 @@ export default function Page() {
   const handleStartReview = useCallback((range: { start: string; end: string }) => {
     setChatDateRange(range);
     setChatInitialMessage(undefined);
+    setChatMode("review");
+    setActiveOverlay("chat");
+  }, []);
+
+  const handleStartInsight = useCallback((range: { start: string; end: string }, _skillName: string) => {
+    // skillName is already saved to local config by ReviewOverlay
+    setChatDateRange(range);
+    setChatInitialMessage(undefined);
+    setChatMode("insight");
     setActiveOverlay("chat");
   }, []);
 
@@ -114,6 +124,7 @@ export default function Page() {
     const today = new Date().toISOString().split("T")[0];
     setChatDateRange({ start: today, end: today });
     setChatInitialMessage(initialText);
+    setChatMode("command");
     setActiveOverlay("chat");
   }, []);
 
@@ -174,6 +185,7 @@ export default function Page() {
         onViewProfile={() => setActiveOverlay("profile")}
         onViewBriefing={() => setActiveOverlay("morning-briefing")}
         onViewSettings={() => setActiveOverlay("settings")}
+        onViewSkills={() => setActiveOverlay("skills")}
         onLogout={logout}
         userName={user?.displayName}
         userPhone={user?.phone}
@@ -231,8 +243,10 @@ export default function Page() {
           onClose={() => {
             closeOverlay();
             setChatInitialMessage(undefined);
+            setChatMode("review");
           }}
           initialMessage={chatInitialMessage}
+          mode={chatMode}
           commandContext={{
             setTheme,
             exportData: handleExport,
@@ -249,7 +263,7 @@ export default function Page() {
         <MemorySoulOverlay onClose={closeOverlay} />
       )}
       {activeOverlay === "review" && (
-        <ReviewOverlay onClose={closeOverlay} />
+        <ReviewOverlay onClose={closeOverlay} onStartInsight={handleStartInsight} />
       )}
       <TodoPanel
         open={activeOverlay === "todos"}

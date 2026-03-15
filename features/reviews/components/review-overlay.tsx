@@ -1,30 +1,75 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { useState } from "react";
+import {
+  ArrowLeft,
+  Loader2,
+  Sparkles,
+  HelpCircle,
+  Layers,
+  TrendingUp,
+  Check,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
 import { useReviews } from "../hooks/use-reviews";
 import { DateSelector } from "./date-selector";
 import { ReviewResult } from "./review-result";
 import { ReviewList } from "./review-list";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { SwipeBack } from "@/shared/components/swipe-back";
-import {
-  getSkills,
-  setSkills,
-  type LocalSkillConfig,
-} from "@/shared/lib/local-config";
+import { getSkills, setSkills } from "@/shared/lib/local-config";
 import type { Review } from "@/shared/lib/types";
 
 interface ReviewOverlayProps {
   onClose: () => void;
-  /** Callback to open ChatView in insight mode */
-  onStartInsight?: (dateRange: { start: string; end: string }, skillName: string) => void;
+  onStartInsight?: (
+    dateRange: { start: string; end: string },
+    skillName: string,
+  ) => void;
 }
 
 type Stage = "selecting" | "generating" | "viewing";
 
-export function ReviewOverlay({ onClose, onStartInsight }: ReviewOverlayProps) {
+/** Built-in insight perspectives — matches gateway/insights/ directory */
+const INSIGHT_SKILLS = [
+  {
+    name: "reflect",
+    displayName: "苏格拉底追问",
+    description: "对日记进行反思性提问，引导深度思考",
+    icon: Sparkles,
+    color: "text-amber-600 dark:text-amber-400",
+    bgColor: "bg-amber-50 dark:bg-amber-950/40",
+  },
+  {
+    name: "元问题视角",
+    displayName: "元问题分析",
+    description: "分析问题本质，找到真正需求",
+    icon: HelpCircle,
+    color: "text-blue-600 dark:text-blue-400",
+    bgColor: "bg-blue-50 dark:bg-blue-950/40",
+  },
+  {
+    name: "二阶思考视角",
+    displayName: "二阶思考",
+    description: "分析问题背后的深层问题，发现盲点",
+    icon: Layers,
+    color: "text-violet-600 dark:text-violet-400",
+    bgColor: "bg-violet-50 dark:bg-violet-950/40",
+  },
+  {
+    name: "munger-review",
+    displayName: "芒格决策框架",
+    description: "以查理·芒格的多元思维模型做跨期复盘",
+    icon: TrendingUp,
+    color: "text-emerald-600 dark:text-emerald-400",
+    bgColor: "bg-emerald-50 dark:bg-emerald-950/40",
+  },
+] as const;
+
+export function ReviewOverlay({
+  onClose,
+  onStartInsight,
+}: ReviewOverlayProps) {
   const { reviews, generating, generateReview, loading } = useReviews();
   const [stage, setStage] = useState<Stage>("selecting");
   const [currentReview, setCurrentReview] = useState<Review | null>(null);
@@ -33,42 +78,19 @@ export function ReviewOverlay({ onClose, onStartInsight }: ReviewOverlayProps) {
     start: string;
     end: string;
   } | null>(null);
-
-  // Insight skill selection
-  const [insightSkills, setInsightSkills] = useState<LocalSkillConfig[]>([]);
   const [selectedSkill, setSelectedSkill] = useState<string>("");
 
-  // Date range for insight mode
-  const [insightDateRange, setInsightDateRange] = useState<{
-    start: string;
-    end: string;
-  } | null>(null);
-
-  useEffect(() => {
-    async function loadInsightSkills() {
-      const local = await getSkills();
-      if (local?.configs) {
-        // Load insight skills (source === "insights" or legacy type === "review")
-        const insights = local.configs.filter(
-          (c) => (c.source === "insights" || c.type === "review") && c.enabled,
-        );
-        setInsightSkills(insights);
-        setSelectedSkill(local.selectedInsightSkill ?? local.selectedReviewSkill ?? "");
-      }
-    }
-    loadInsightSkills();
-  }, []);
-
-  const handleSkillChange = async (value: string) => {
-    setSelectedSkill(value);
+  const handleSkillSelect = async (name: string) => {
+    const next = name === selectedSkill ? "" : name;
+    setSelectedSkill(next);
+    // Persist selected insight skill to local config for gateway
     const local = await getSkills();
-    if (local) {
-      await setSkills({
-        ...local,
-        selectedInsightSkill: value || undefined,
-        updatedAt: new Date().toISOString(),
-      });
-    }
+    const updated = local ?? { configs: [], updatedAt: new Date().toISOString() };
+    await setSkills({
+      ...updated,
+      selectedInsightSkill: next || undefined,
+      updatedAt: new Date().toISOString(),
+    });
   };
 
   const handleGenerate = async (
@@ -76,7 +98,6 @@ export function ReviewOverlay({ onClose, onStartInsight }: ReviewOverlayProps) {
     start: string,
     end: string,
   ) => {
-    // If an insight skill is selected and callback provided, launch insight chat
     if (selectedSkill && onStartInsight) {
       onStartInsight({ start, end }, selectedSkill);
       return;
@@ -141,7 +162,7 @@ export function ReviewOverlay({ onClose, onStartInsight }: ReviewOverlayProps) {
             <ArrowLeft className="w-5 h-5" />
           </button>
           <h1 className="text-lg font-semibold">
-            {stage === "viewing" ? "复盘结果" : "复盘记录"}
+            {stage === "viewing" ? "复盘结果" : "洞察复盘"}
           </h1>
         </div>
 
@@ -149,54 +170,67 @@ export function ReviewOverlay({ onClose, onStartInsight }: ReviewOverlayProps) {
           <div className="max-w-lg mx-auto p-4">
             {stage === "selecting" && (
               <div className="space-y-6">
+                {/* Insight skill list */}
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground mb-3">
+                    选择洞察视角
+                  </p>
+                  <div className="space-y-2">
+                    {INSIGHT_SKILLS.map((skill) => {
+                      const Icon = skill.icon;
+                      const isSelected = selectedSkill === skill.name;
+                      return (
+                        <button
+                          key={skill.name}
+                          type="button"
+                          onClick={() => handleSkillSelect(skill.name)}
+                          className={cn(
+                            "w-full flex items-center gap-3 p-3.5 rounded-xl border transition-all text-left",
+                            isSelected
+                              ? "border-primary/40 bg-primary/5 shadow-sm"
+                              : "border-border/60 hover:border-border hover:bg-secondary/30",
+                          )}
+                        >
+                          <div
+                            className={cn(
+                              "w-9 h-9 rounded-lg flex items-center justify-center shrink-0",
+                              skill.bgColor,
+                            )}
+                          >
+                            <Icon className={cn("w-4.5 h-4.5", skill.color)} />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium">
+                              {skill.displayName}
+                            </p>
+                            <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
+                              {skill.description}
+                            </p>
+                          </div>
+                          {isSelected && (
+                            <div className="w-5 h-5 rounded-full bg-primary flex items-center justify-center shrink-0">
+                              <Check className="w-3 h-3 text-primary-foreground" />
+                            </div>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {!selectedSkill && (
+                    <p className="text-[11px] text-muted-foreground/60 mt-2 px-1">
+                      不选择视角将生成默认复盘报告
+                    </p>
+                  )}
+                </div>
+
+                {/* Date range selector */}
                 <DateSelector
                   onGenerate={handleGenerate}
                   generating={generating}
+                  insightSelected={!!selectedSkill}
                 />
 
-                {/* Insight skill selector */}
-                {insightSkills.length > 0 && (
-                  <div className="border border-border/60 rounded-xl p-4">
-                    <h3 className="text-sm font-medium mb-3">洞察视角</h3>
-                    <RadioGroup
-                      value={selectedSkill}
-                      onValueChange={handleSkillChange}
-                    >
-                      <div className="flex items-center gap-2">
-                        <RadioGroupItem value="" id="insight-none" />
-                        <label
-                          htmlFor="insight-none"
-                          className="text-sm text-muted-foreground cursor-pointer"
-                        >
-                          无视角（默认对话）
-                        </label>
-                      </div>
-                      {insightSkills.map((skill) => (
-                        <div
-                          key={skill.name}
-                          className="flex items-center gap-2"
-                        >
-                          <RadioGroupItem
-                            value={skill.name}
-                            id={`insight-${skill.name}`}
-                          />
-                          <label
-                            htmlFor={`insight-${skill.name}`}
-                            className="text-sm cursor-pointer"
-                          >
-                            {skill.name}
-                            {skill.description && (
-                              <span className="text-muted-foreground ml-1.5 text-xs">
-                                {skill.description}
-                              </span>
-                            )}
-                          </label>
-                        </div>
-                      ))}
-                    </RadioGroup>
-                  </div>
-                )}
-
+                {/* History */}
                 {!loading && (
                   <ReviewList
                     reviews={reviews}
@@ -209,7 +243,9 @@ export function ReviewOverlay({ onClose, onStartInsight }: ReviewOverlayProps) {
             {stage === "generating" && (
               <div className="flex flex-col items-center justify-center py-20 gap-4">
                 <Loader2 className="w-8 h-8 animate-spin text-primary" />
-                <p className="text-sm text-muted-foreground">AI 正在生成复盘...</p>
+                <p className="text-sm text-muted-foreground">
+                  AI 正在生成复盘...
+                </p>
               </div>
             )}
 

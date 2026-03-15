@@ -1,6 +1,6 @@
 "use client";
 
-import { X, HelpCircle, Download, CreditCard, Info, Brain, UserCircle, Sun, Settings, LogOut } from "lucide-react";
+import { X, HelpCircle, Download, CreditCard, Info, Brain, UserCircle, Sun, Settings, LogOut, Wand2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { StatsPanel } from "./stats-panel";
 import { getCommandDefs } from "@/features/commands/lib/registry";
@@ -14,6 +14,7 @@ interface SidebarDrawerProps {
   onViewProfile?: () => void;
   onViewBriefing?: () => void;
   onViewSettings?: () => void;
+  onViewSkills?: () => void;
   onExportData?: () => void;
   onLogout?: () => void;
   userName?: string | null;
@@ -28,6 +29,7 @@ export function SidebarDrawer({
   onViewProfile,
   onViewBriefing,
   onViewSettings,
+  onViewSkills,
   onExportData,
   onLogout,
   userName,
@@ -107,6 +109,13 @@ export function SidebarDrawer({
                     icon={<Brain className="w-4 h-4" />}
                     label="AI 记忆"
                     onClick={() => { onClose(); onViewMemory(); }}
+                  />
+                )}
+                {onViewSkills && (
+                  <MenuItem
+                    icon={<Wand2 className="w-4 h-4" />}
+                    label="技能管理"
+                    onClick={() => { onClose(); onViewSkills(); }}
                   />
                 )}
               </div>

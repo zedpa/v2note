@@ -13,13 +13,15 @@ interface ChatViewProps {
   onClose: () => void;
   initialMessage?: string;
   title?: string;
+  mode?: "review" | "command" | "insight";
   commandContext?: Partial<CommandContext>;
 }
 
-export function ChatView({ dateRange, onClose, initialMessage, title, commandContext }: ChatViewProps) {
+export function ChatView({ dateRange, onClose, initialMessage, title, mode: modeProp, commandContext }: ChatViewProps) {
+  const resolvedMode = modeProp ?? (initialMessage ? "command" : "review");
   const { messages, send, streaming, connected, connect, disconnect } =
     useChat(dateRange, {
-      mode: initialMessage ? "command" : "review",
+      mode: resolvedMode,
       initialMessage,
     });
   const [input, setInput] = useState("");
@@ -114,14 +116,17 @@ export function ChatView({ dateRange, onClose, initialMessage, title, commandCon
           </button>
           <div className="flex-1">
             <p className="text-sm font-semibold text-foreground">
-              {title ?? (initialMessage ? "指令模式" : "复盘")}
+              {title ?? (resolvedMode === "insight" ? "洞察分析" : initialMessage ? "指令模式" : "复盘")}
             </p>
-            {!initialMessage && (
+            {resolvedMode === "insight" ? (
+              <p className="text-[10px] text-muted-foreground">
+                {dateRange.start} — {dateRange.end}
+              </p>
+            ) : !initialMessage ? (
               <p className="text-[10px] text-muted-foreground">
                 {dateRange.start} - {dateRange.end}
               </p>
-            )}
-            {initialMessage && (
+            ) : (
               <p className="text-[10px] text-muted-foreground">
                 通过对话修改设置、提示词、记忆等
               </p>

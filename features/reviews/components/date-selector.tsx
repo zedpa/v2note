@@ -9,6 +9,8 @@ type PeriodType = Review["period"];
 interface DateSelectorProps {
   onGenerate: (period: PeriodType, start: string, end: string) => void;
   generating: boolean;
+  /** Whether an insight skill is selected */
+  insightSelected?: boolean;
 }
 
 function daysAgo(days: number): Date {
@@ -51,7 +53,7 @@ const SHORTCUTS = [
   },
 ];
 
-export function DateSelector({ onGenerate, generating }: DateSelectorProps) {
+export function DateSelector({ onGenerate, generating, insightSelected }: DateSelectorProps) {
   const handleClick = (shortcut: (typeof SHORTCUTS)[number]) => {
     if (generating) return;
     const { from, to } = shortcut.getRange();
@@ -60,7 +62,9 @@ export function DateSelector({ onGenerate, generating }: DateSelectorProps) {
 
   return (
     <div className="space-y-3">
-      <p className="text-sm text-muted-foreground">选择复盘范围</p>
+      <p className="text-sm text-muted-foreground">
+        {insightSelected ? "选择分析范围，开始洞察" : "选择复盘范围"}
+      </p>
       <div className="grid grid-cols-2 gap-3">
         {SHORTCUTS.map((s) => {
           const Icon = s.icon;
