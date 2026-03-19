@@ -17,6 +17,7 @@ import { todoRepo, recordRepo } from "../db/repositories/index.js";
 import * as dailyBriefingRepo from "../db/repositories/daily-briefing.js";
 import { regenerateSummary, extractToMemory } from "../diary/manager.js";
 import { digestRecords } from "../handlers/digest.js";
+import { runDailyCognitiveCycle } from "../cognitive/daily-cycle.js";
 
 interface ConnectedDevice {
   deviceId: string;
@@ -37,6 +38,7 @@ export class ProactiveEngine {
   // Fallback timer (used when Redis unavailable)
   private fallbackTimer: NodeJS.Timeout | null = null;
   private digestTimer: NodeJS.Timeout | null = null;
+  private cognitiveDailyTimer: NodeJS.Timeout | null = null;
 
   // BullMQ instances (populated if Redis is available)
   private queue: BullQueue | null = null;
@@ -104,6 +106,10 @@ export class ProactiveEngine {
       clearInterval(this.digestTimer);
       this.digestTimer = null;
     }
+    if (this.cognitiveDailyTimer) {
+      clearInterval(this.cognitiveDailyTimer);
+      this.cognitiveDailyTimer = null;
+    }
     if (this.worker) {
       this.worker.close().catch(() => {});
       this.worker = null;
@@ -170,6 +176,9 @@ export class ProactiveEngine {
           case "cognitive-digest":
             await this.runBatchDigest();
             break;
+          case "cognitive-daily":
+            await this.runCognitiveDaily();
+            break;
         }
       },
       { connection: connectionConfig, concurrency: 5 },
@@ -195,6 +204,13 @@ export class ProactiveEngine {
       "cognitive-digest-scheduler",
       { pattern: "0 */3 * * *" },
       { name: "cognitive-digest", data: {} },
+    );
+
+    // Cognitive daily cycle: every day at 3 AM
+    await this.queue.upsertJobScheduler(
+      "cognitive-daily-scheduler",
+      { pattern: "0 3 * * *" },
+      { name: "cognitive-daily", data: {} },
     );
 
     this.redisAvailable = true;
@@ -288,6 +304,14 @@ export class ProactiveEngine {
       });
     }, 3 * 60 * 60 * 1000);
     console.log("[proactive] Cognitive digest fallback timer started (interval: 3h)");
+
+    // Cognitive daily cycle fallback: every 24 hours
+    this.cognitiveDailyTimer = setInterval(() => {
+      this.runCognitiveDaily().catch((err) => {
+        console.error("[proactive] Cognitive daily cycle error:", err.message);
+      });
+    }, 24 * 60 * 60 * 1000);
+    console.log("[proactive] Cognitive daily cycle fallback timer started (interval: 24h)");
   }
 
   // ── Core check logic (shared by BullMQ and fallback) ──
@@ -363,6 +387,39 @@ export class ProactiveEngine {
       }
     } catch (err: any) {
       console.error("[proactive:digest] Batch digest failed:", err.message);
+    }
+  }
+
+  /**
+   * Run daily cognitive cycle for all users with active Strikes.
+   */
+  private async runCognitiveDaily(): Promise<void> {
+    try {
+      const { query } = await import("../db/pool.js");
+      const rows = await query<{ user_id: string }>(
+        `SELECT DISTINCT user_id FROM strike WHERE status = 'active'`,
+        [],
+      );
+
+      if (rows.length === 0) {
+        console.log("[proactive:cognitive-daily] No users with active strikes");
+        return;
+      }
+
+      console.log(`[proactive:cognitive-daily] Processing ${rows.length} user(s)`);
+
+      for (const row of rows) {
+        try {
+          await runDailyCognitiveCycle(row.user_id);
+        } catch (err: any) {
+          console.error(
+            `[proactive:cognitive-daily] Failed for user ${row.user_id}:`,
+            err.message,
+          );
+        }
+      }
+    } catch (err: any) {
+      console.error("[proactive:cognitive-daily] Failed:", err.message);
     }
   }
 

@@ -153,6 +153,65 @@ async function polarityChannel(
 }
 
 // ---------------------------------------------------------------------------
+// Channel C: Cluster retrieval
+// ---------------------------------------------------------------------------
+
+async function clusterChannel(
+  nucleus: string,
+  userId: string,
+  topClusters: number,
+  membersPerCluster: number,
+): Promise<ScoredStrike[]> {
+  // 1. Load cluster Strikes for this user
+  const clusters = await query<StrikeEntry>(
+    `SELECT * FROM strike WHERE is_cluster = true AND user_id = $1 AND status = 'active'`,
+    [userId],
+  );
+  if (clusters.length === 0) return [];
+
+  // 2. Compute similarity of input nucleus to each cluster nucleus
+  const queryEmbedding = await getEmbedding(nucleus);
+  const clusterScored: { cluster: StrikeEntry; similarity: number }[] = [];
+  for (const c of clusters) {
+    try {
+      const emb = await getEmbedding(c.nucleus);
+      clusterScored.push({ cluster: c, similarity: cosineSimilarity(queryEmbedding, emb) });
+    } catch {
+      // skip clusters that fail to embed
+    }
+  }
+  clusterScored.sort((a, b) => b.similarity - a.similarity);
+  const topHits = clusterScored.slice(0, topClusters);
+
+  // 3. For each top cluster, load members and find best matches
+  const results: ScoredStrike[] = [];
+  for (const { cluster } of topHits) {
+    const members = await query<StrikeEntry>(
+      `SELECT s.* FROM bond b
+       JOIN strike s ON s.id = b.target_strike_id
+       WHERE b.source_strike_id = $1 AND b.type = 'cluster_member'
+         AND s.status = 'active'`,
+      [cluster.id],
+    );
+    if (members.length === 0) continue;
+
+    const memberScored: ScoredStrike[] = [];
+    for (const m of members) {
+      try {
+        const emb = await getEmbedding(m.nucleus);
+        memberScored.push({ strike: m, similarity: cosineSimilarity(queryEmbedding, emb) });
+      } catch {
+        // skip
+      }
+    }
+    memberScored.sort((a, b) => b.similarity - a.similarity);
+    results.push(...memberScored.slice(0, membersPerCluster));
+  }
+
+  return results;
+}
+
+// ---------------------------------------------------------------------------
 // Main: hybrid retrieval
 // ---------------------------------------------------------------------------
 
@@ -172,7 +231,7 @@ export async function hybridRetrieve(
     console.warn("[retrieval] Failed to load active strikes:", err);
   }
 
-  // Run all channels concurrently; each channel catches its own errors
+  // Run channels A+B concurrently; each channel catches its own errors
   const [semanticResults, tagResults, personResults, temporalResults, polarityResults] =
     await Promise.all([
       semanticChannel(nucleus, activeStrikes, 5).catch((err) => {
@@ -196,6 +255,14 @@ export async function hybridRetrieve(
         return [] as StrikeEntry[];
       }),
     ]);
+
+  // Channel C: cluster retrieval (isolated try/catch, failure doesn't affect A+B)
+  let clusterResults: ScoredStrike[] = [];
+  try {
+    clusterResults = await clusterChannel(nucleus, userId, 3, 3);
+  } catch (err) {
+    console.warn("[retrieval] cluster channel failed:", err);
+  }
 
   // Build a map: strikeId -> { strike, similarity, channels }
   const map = new Map<
@@ -237,6 +304,13 @@ export async function hybridRetrieve(
     const entry = ensure(s);
     entry.structuredHits++;
     entry.channels.add("polarity");
+  }
+
+  // Cluster channel
+  for (const r of clusterResults) {
+    const entry = ensure(r.strike);
+    entry.similarity = Math.max(entry.similarity, r.similarity);
+    entry.channels.add("cluster");
   }
 
   // Compute combined score and sort
