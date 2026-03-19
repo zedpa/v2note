@@ -11,7 +11,7 @@
 | CE-03 | 混合检索模块 | M | CE-01 | ✅ DONE |
 | CE-04 | Process → Digest 触发 | S | CE-02 | ✅ DONE |
 | CE-05 | 3h Cron 批量 Digest | S | CE-02 | ✅ DONE |
-| CE-06 | 前端 Strike 展示+纠错 | M | CE-02 | TODO |
+| CE-06 | 前端 Strike 展示+纠错 | M | CE-02 | ✅ DONE |
 
 ## 关键设计决策
 - Strike = 一次认知触动（不是 atom/note/memory）
