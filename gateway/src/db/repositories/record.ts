@@ -10,6 +10,8 @@ export interface Record {
   location_text: string | null;
   notebook: string | null;
   archived: boolean;
+  digested: boolean;
+  digested_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -213,6 +215,21 @@ export async function countByUserDateRange(
     [userId, start, end],
   );
   return parseInt(row?.count ?? "0", 10);
+}
+
+export async function findUndigested(userId: string): Promise<Record[]> {
+  return query<Record>(
+    `SELECT * FROM record WHERE user_id = $1 AND digested = FALSE AND status = 'completed'
+     ORDER BY created_at ASC`,
+    [userId],
+  );
+}
+
+export async function markDigested(id: string): Promise<void> {
+  await execute(
+    `UPDATE record SET digested = true, digested_at = now(), updated_at = now() WHERE id = $1`,
+    [id],
+  );
 }
 
 export async function findByDeviceAndDateRange(

@@ -10,3 +10,4 @@ export * from "./export";
 export * from "./sync";
 export * from "./memory";
 export * from "./soul";
+export * from "./strikes";

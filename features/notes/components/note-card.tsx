@@ -1,8 +1,10 @@
 "use client";
 
-import { useRef, useCallback } from "react";
-import { MapPin, Clock, Sparkles, Check, AlertCircle } from "lucide-react";
+import { useRef, useCallback, useState } from "react";
+import { MapPin, Clock, Sparkles, Check, AlertCircle, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useStrikes } from "@/features/notes/hooks/use-strikes";
+import { StrikePreview, strikeSummaryText } from "./strike-preview";
 
 export interface Note {
   id: string;
@@ -248,7 +250,55 @@ export function NoteCard({
         >
           {note.summary}
         </p>
+
+        {/* Strikes — only for completed notes */}
+        {note.status === "completed" && (
+          <StrikesSection noteId={note.id} />
+        )}
       </button>
+    </div>
+  );
+}
+
+function StrikesSection({ noteId }: { noteId: string }) {
+  const { strikes, loading, loaded, fetch, updateStrike } = useStrikes(noteId);
+  const [expanded, setExpanded] = useState(false);
+
+  const handleToggle = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!loaded) fetch();
+    setExpanded((prev) => !prev);
+  };
+
+  if (loaded && strikes.length === 0) return null;
+
+  return (
+    <div className="mt-2 border-t border-border/40 pt-2">
+      <button
+        type="button"
+        onClick={handleToggle}
+        className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors w-full"
+      >
+        <ChevronDown
+          className={cn(
+            "w-3 h-3 transition-transform",
+            expanded && "rotate-180",
+          )}
+        />
+        <span>
+          {loaded
+            ? strikeSummaryText(strikes)
+            : "查看认知记录"}
+        </span>
+      </button>
+      {expanded && loaded && !loading && (
+        <div className="mt-1.5" onClick={(e) => e.stopPropagation()}>
+          <StrikePreview strikes={strikes} onUpdate={updateStrike} />
+        </div>
+      )}
+      {expanded && loading && (
+        <div className="text-[11px] text-muted-foreground py-2">加载中...</div>
+      )}
     </div>
   );
 }

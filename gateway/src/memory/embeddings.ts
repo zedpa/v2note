@@ -15,7 +15,7 @@ const MAX_CACHE_SIZE = 500;
 /**
  * Get embedding vector for text using DashScope API.
  */
-async function getEmbedding(text: string): Promise<number[]> {
+export async function getEmbedding(text: string): Promise<number[]> {
   // Check cache
   const cacheKey = text.slice(0, 200); // truncate key
   const cached = embeddingCache.get(cacheKey);
@@ -61,7 +61,7 @@ async function getEmbedding(text: string): Promise<number[]> {
 /**
  * Compute cosine similarity between two vectors.
  */
-function cosineSimilarity(a: number[], b: number[]): number {
+export function cosineSimilarity(a: number[], b: number[]): number {
   if (a.length !== b.length) return 0;
   let dotProduct = 0;
   let normA = 0;
