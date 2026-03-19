@@ -65,12 +65,32 @@ record.digested / record.digested_at — 消化追踪
 5. AI 判断跨记录 bond + supersede
 6. 标记 record.digested = true
 
-### Level 2: 关联聚类 + 矛盾检测 + 融合（每日，Phase 2）
+### Level 2: 关联聚类 + 矛盾检测 + 融合（每日，Phase 2 已实现）
 
-- 聚类：三角闭合度检测 → cluster 创建
-- 矛盾扫描：同主题反向极性 Strike 主动检测
-- 融合（Promote）：重复 Strike 提升为高阶 Strike + abstracted_from bond
-- 维护：bond type 归一化，strength/salience 衰减
+**每日凌晨 3 点自动执行（daily-cycle.ts 编排）：**
+
+**2a. 聚类** (clustering.ts)
+- 加载活跃 Strike + Bond 邻接表
+- 三角闭合度计算（密度 > 0.3 为种子，BFS 扩展 > 0.2）
+- 合并重叠 > 50% 的候选，最小 3 个 Strike
+- AI 审核命名 → 创建 is_cluster=true Strike + cluster_member
+- 已有 cluster 增量更新
+
+**2b. 矛盾扫描** (contradiction.ts)
+- 取最近 N 天 Judge/Perceive 类 Strike
+- hybridRetrieve 反向极性通道找候选
+- AI 批量判定：contradiction (bond 0.8) / perspective_of (bond 0.6) / none
+- 双重去重（内存 Set + DB 已有 bond）
+
+**2c. 融合 Promote** (promote.ts)
+- 在 cluster 成员中 AI 检测"本质说同一件事"的子组
+- 创建高阶 Strike + abstracted_from bond (strength 0.9)
+- 底层 Strike 保持 active 作为证据链
+
+**2d. 维护** (maintenance.ts)
+- Bond type 归一化（7 组同义词 → 标准名，单条 SQL）
+- Strength 衰减（30d × 0.9，90d × 0.7）
+- Salience 衰减（30 天未引用 × 0.95，最低 0.01）+ 回升（引用时 + 0.1）
 
 ### Level 3: 涌现（每周，Phase 3）
 
@@ -114,6 +134,12 @@ record.digested / record.digested_at — 消化追踪
 | `gateway/src/handlers/process.ts` | shouldDigestImmediately + 触发 |
 | `gateway/src/proactive/engine.ts` | 3h cron 批量 digest |
 | `gateway/src/routes/strikes.ts` | REST API |
+| `gateway/src/cognitive/clustering.ts` | Level 2 聚类引擎 |
+| `gateway/src/cognitive/clustering-prompt.ts` | 聚类 AI prompt |
+| `gateway/src/cognitive/contradiction.ts` | 矛盾扫描 |
+| `gateway/src/cognitive/promote.ts` | 融合 Promote |
+| `gateway/src/cognitive/maintenance.ts` | 维护（归一化+衰减） |
+| `gateway/src/cognitive/daily-cycle.ts` | 每日认知周期编排 |
 | `features/notes/components/strike-preview.tsx` | 前端 Strike 展示 + 编辑 |
 | `features/notes/hooks/use-strikes.ts` | 懒加载 hook |
 | `shared/lib/api/strikes.ts` | 前端 API 客户端 |
