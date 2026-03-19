@@ -30,6 +30,7 @@ import { registerMCPServerRoutes } from "./mcp/server.js";
 import { registerAuthRoutes } from "./routes/auth.js";
 import { registerReleaseRoutes } from "./routes/releases.js";
 import { registerStrikeRoutes } from "./routes/strikes.js";
+import { registerCognitiveStatsRoutes } from "./routes/cognitive-stats.js";
 import { getProactiveEngine } from "./proactive/engine.js";
 import { verifyAccessToken } from "./auth/jwt.js";
 import { generateAiStatus } from "./handlers/reflect.js";
@@ -99,6 +100,7 @@ registerMCPServerRoutes(router);
 registerAuthRoutes(router);
 registerReleaseRoutes(router);
 registerStrikeRoutes(router);
+registerCognitiveStatsRoutes(router);
 
 // ── HTTP Server ──
 

@@ -18,6 +18,7 @@ import * as dailyBriefingRepo from "../db/repositories/daily-briefing.js";
 import { regenerateSummary, extractToMemory } from "../diary/manager.js";
 import { digestRecords } from "../handlers/digest.js";
 import { runDailyCognitiveCycle } from "../cognitive/daily-cycle.js";
+import { runEmergence } from "../cognitive/emergence.js";
 
 interface ConnectedDevice {
   deviceId: string;
@@ -39,6 +40,7 @@ export class ProactiveEngine {
   private fallbackTimer: NodeJS.Timeout | null = null;
   private digestTimer: NodeJS.Timeout | null = null;
   private cognitiveDailyTimer: NodeJS.Timeout | null = null;
+  private emergenceWeeklyTimer: NodeJS.Timeout | null = null;
 
   // BullMQ instances (populated if Redis is available)
   private queue: BullQueue | null = null;
@@ -110,6 +112,10 @@ export class ProactiveEngine {
       clearInterval(this.cognitiveDailyTimer);
       this.cognitiveDailyTimer = null;
     }
+    if (this.emergenceWeeklyTimer) {
+      clearInterval(this.emergenceWeeklyTimer);
+      this.emergenceWeeklyTimer = null;
+    }
     if (this.worker) {
       this.worker.close().catch(() => {});
       this.worker = null;
@@ -179,6 +185,9 @@ export class ProactiveEngine {
           case "cognitive-daily":
             await this.runCognitiveDaily();
             break;
+          case "cognitive-weekly-emergence":
+            await this.runWeeklyEmergence();
+            break;
         }
       },
       { connection: connectionConfig, concurrency: 5 },
@@ -211,6 +220,13 @@ export class ProactiveEngine {
       "cognitive-daily-scheduler",
       { pattern: "0 3 * * *" },
       { name: "cognitive-daily", data: {} },
+    );
+
+    // Weekly emergence engine: every Sunday at 4 AM
+    await this.queue.upsertJobScheduler(
+      "cognitive-weekly-emergence-scheduler",
+      { pattern: "0 4 * * 0" },
+      { name: "cognitive-weekly-emergence", data: {} },
     );
 
     this.redisAvailable = true;
@@ -312,6 +328,14 @@ export class ProactiveEngine {
       });
     }, 24 * 60 * 60 * 1000);
     console.log("[proactive] Cognitive daily cycle fallback timer started (interval: 24h)");
+
+    // Weekly emergence fallback: every 7 days
+    this.emergenceWeeklyTimer = setInterval(() => {
+      this.runWeeklyEmergence().catch((err) => {
+        console.error("[proactive] Weekly emergence error:", err.message);
+      });
+    }, 7 * 24 * 60 * 60 * 1000);
+    console.log("[proactive] Weekly emergence fallback timer started (interval: 7d)");
   }
 
   // ── Core check logic (shared by BullMQ and fallback) ──
@@ -420,6 +444,40 @@ export class ProactiveEngine {
       }
     } catch (err: any) {
       console.error("[proactive:cognitive-daily] Failed:", err.message);
+    }
+  }
+
+  /**
+   * Run weekly emergence engine for all users with active clusters.
+   */
+  private async runWeeklyEmergence(): Promise<void> {
+    try {
+      const { query } = await import("../db/pool.js");
+      const rows = await query<{ user_id: string }>(
+        `SELECT DISTINCT user_id FROM strike WHERE is_cluster = true AND status = 'active'`,
+        [],
+      );
+
+      if (rows.length === 0) {
+        console.log("[proactive:emergence] No users with active clusters");
+        return;
+      }
+
+      console.log(`[proactive:emergence] Processing ${rows.length} user(s)`);
+
+      for (const row of rows) {
+        try {
+          const result = await runEmergence(row.user_id);
+          console.log(`[proactive:emergence] User ${row.user_id}:`, result);
+        } catch (err: any) {
+          console.error(
+            `[proactive:emergence] Failed for user ${row.user_id}:`,
+            err.message,
+          );
+        }
+      }
+    } catch (err: any) {
+      console.error("[proactive:emergence] Failed:", err.message);
     }
   }
 

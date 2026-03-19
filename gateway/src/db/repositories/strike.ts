@@ -51,6 +51,10 @@ export async function create(fields: {
   return row!;
 }
 
+export async function findById(id: string): Promise<StrikeEntry | null> {
+  return queryOne<StrikeEntry>(`SELECT * FROM strike WHERE id = $1`, [id]);
+}
+
 export async function findByUser(
   userId: string,
   opts?: { status?: string; polarity?: string; limit?: number },

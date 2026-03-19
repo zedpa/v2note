@@ -14,6 +14,7 @@ import { transcriptRepo } from "../db/repositories/index.js";
 import { pendingIntentRepo } from "../db/repositories/index.js";
 import { isBuiltinTool, callBuiltinTool } from "../tools/builtin.js";
 import { maySoulUpdate, mayProfileUpdate } from "../lib/text-utils.js";
+import { gatherDecisionContext, buildDecisionPrompt } from "../cognitive/decision.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const INSIGHTS_DIR = join(__dirname, "../../insights");
@@ -24,7 +25,7 @@ const MAX_TRANSCRIPT_CHARS = 8000;
 export interface ChatStartPayload {
   deviceId: string;
   userId?: string;
-  mode: "review" | "command" | "insight";
+  mode: "review" | "command" | "insight" | "decision";
   dateRange: { start: string; end: string };
   initialMessage?: string;
   assistantPreamble?: string;
@@ -142,7 +143,17 @@ export async function startChat(
   // Set up session context
   session.context.setSystemPrompt(systemPrompt);
 
-  if (payload.mode === "command") {
+  if (payload.mode === "decision") {
+    // Decision mode: deep cognitive graph traversal for decision support
+    const userId = payload.userId ?? payload.deviceId;
+    const question = payload.initialMessage?.trim() || "帮我分析这个问题";
+    const decisionCtx = await gatherDecisionContext(question, userId);
+    const decisionPrompt = buildDecisionPrompt(decisionCtx);
+
+    // Override system prompt with decision-specific prompt
+    session.context.setSystemPrompt(decisionPrompt);
+    session.context.addMessage({ role: "user", content: question });
+  } else if (payload.mode === "command") {
     // Command mode: skip review, respond directly to the initial message
     if (payload.assistantPreamble) {
       session.context.addMessage({ role: "assistant", content: payload.assistantPreamble });

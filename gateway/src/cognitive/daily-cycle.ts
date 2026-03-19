@@ -7,6 +7,7 @@ import { runClustering } from "./clustering.js";
 import { scanContradictions } from "./contradiction.js";
 import { runPromote } from "./promote.js";
 import { normalizeBondTypes, decayBondStrength, decaySalience } from "./maintenance.js";
+import { generateAlerts } from "./alerts.js";
 
 export async function runDailyCognitiveCycle(userId: string): Promise<void> {
   console.log("[cognitive] Starting daily cycle for user", userId);
@@ -33,6 +34,21 @@ export async function runDailyCognitiveCycle(userId: string): Promise<void> {
     console.log("[cognitive] Promote:", promoteResult);
   } catch (err) {
     console.error("[cognitive] Promote failed:", err);
+  }
+
+  // 2e. Cognitive alerts (contradiction push)
+  try {
+    const alerts = await generateAlerts(userId);
+    if (alerts.length > 0) {
+      console.log("[cognitive] Alerts generated:", alerts.length);
+      for (const alert of alerts) {
+        console.log("[cognitive] Alert:", alert.description);
+      }
+      // TODO: Push alerts via WebSocket using proactive engine
+      // e.g. proactiveEngine.pushToUser(userId, { type: 'cognitive.alert', payload: alerts });
+    }
+  } catch (err) {
+    console.error("[cognitive] Alert generation failed:", err);
   }
 
   // 2d. Maintenance
