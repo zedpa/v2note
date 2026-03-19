@@ -18,6 +18,9 @@ import { maySoulUpdate, mayProfileUpdate } from "../lib/text-utils.js";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const INSIGHTS_DIR = join(__dirname, "../../insights");
 
+/** Max characters for transcript context injected into prompt */
+const MAX_TRANSCRIPT_CHARS = 8000;
+
 export interface ChatStartPayload {
   deviceId: string;
   userId?: string;
@@ -79,15 +82,20 @@ export async function startChat(
     const transcripts = await transcriptRepo.findByRecordIds(recordIds);
 
     if (transcripts.length > 0) {
-      transcriptSummary = transcripts
-        .map((t) => {
-          const record = records.find((r) => r.id === t.record_id);
-          const date = record
-            ? new Date(record.created_at).toLocaleDateString("zh-CN")
-            : "";
-          return `[${date}] ${t.text}`;
-        })
-        .join("\n\n");
+      let joined = "";
+      for (const t of transcripts) {
+        const record = records.find((r) => r.id === t.record_id);
+        const date = record
+          ? new Date(record.created_at).toLocaleDateString("zh-CN")
+          : "";
+        const entry = `[${date}] ${t.text}`;
+        if (joined.length + entry.length > MAX_TRANSCRIPT_CHARS) {
+          joined += `\n\n...（已截断，共${transcripts.length}条记录）`;
+          break;
+        }
+        joined += (joined ? "\n\n" : "") + entry;
+      }
+      transcriptSummary = joined;
     }
   }
 
@@ -103,21 +111,23 @@ export async function startChat(
     if (found) activeSkills = [found];
   }
 
-  // Load pending intents for natural follow-up in conversation
+  // Load pending intents only for review/insight mode (not command mode)
   let pendingIntentContext = "";
-  try {
-    const pendingIntents = payload.userId
-      ? await pendingIntentRepo.findPendingByUser(payload.userId)
-      : await pendingIntentRepo.findPendingByDevice(payload.deviceId);
-    if (pendingIntents.length > 0) {
-      const lines = pendingIntents.slice(0, 5).map((pi) => {
-        const date = new Date(pi.created_at).toLocaleDateString("zh-CN");
-        return `- [${pi.intent_type}] "${pi.text}"${pi.context ? ` (${pi.context})` : ""} (${date}, id: ${pi.id})`;
-      });
-      pendingIntentContext = `\n## 待确认意图\n以下是用户近期提到但未确认的愿望/目标，在对话中自然地跟进（不要一开口就问，找合适时机）：\n${lines.join("\n")}\n不要逐条审问用户，自然聊天中确认即可。确认后使用 confirm_intent 工具处理。`;
+  if (payload.mode !== "command") {
+    try {
+      const pendingIntents = payload.userId
+        ? await pendingIntentRepo.findPendingByUser(payload.userId)
+        : await pendingIntentRepo.findPendingByDevice(payload.deviceId);
+      if (pendingIntents.length > 0) {
+        const lines = pendingIntents.slice(0, 5).map((pi) => {
+          const date = new Date(pi.created_at).toLocaleDateString("zh-CN");
+          return `- [${pi.intent_type}] "${pi.text}"${pi.context ? ` (${pi.context})` : ""} (${date}, id: ${pi.id})`;
+        });
+        pendingIntentContext = `\n## 待确认意图\n以下是用户近期提到但未确认的愿望/目标，在对话中自然地跟进（不要一开口就问，找合适时机）：\n${lines.join("\n")}\n不要逐条审问用户，自然聊天中确认即可。确认后使用 confirm_intent 工具处理。`;
+      }
+    } catch (err: any) {
+      console.warn(`[chat] Failed to load pending intents: ${err.message}`);
     }
-  } catch (err: any) {
-    console.warn(`[chat] Failed to load pending intents: ${err.message}`);
   }
 
   const systemPrompt = buildSystemPrompt({
@@ -295,13 +305,22 @@ export async function endChat(deviceId: string): Promise<void> {
       .join(" ");
 
     const userId = session.userId;
+    if (!userId) {
+      console.warn(`[chat] endChat: session.userId is undefined for device ${deviceId}, soul/profile updates will use deviceId only`);
+    }
     if (maySoulUpdate(userText)) {
-      updateSoul(deviceId, `[复盘对话] ${summary}`, userId).catch(() => {});
+      updateSoul(deviceId, `[复盘对话] ${summary}`, userId).catch((e) => {
+        console.warn(`[chat] Soul update failed: ${e.message}`);
+      });
     }
     if (mayProfileUpdate(userText)) {
-      updateProfile(deviceId, `[复盘对话] ${summary}`, userId).catch(() => {});
+      updateProfile(deviceId, `[复盘对话] ${summary}`, userId).catch((e) => {
+        console.warn(`[chat] Profile update failed: ${e.message}`);
+      });
     }
-    appendToDiary(deviceId, "ai-self", `[对话摘要] ${summary.slice(0, 500)}`, userId).catch(() => {});
+    appendToDiary(deviceId, "ai-self", `[对话摘要] ${summary.slice(0, 500)}`, userId).catch((e) => {
+      console.warn(`[chat] Diary append failed: ${e.message}`);
+    });
   }
 
   session.mode = "idle";

@@ -75,7 +75,7 @@
 | gene_note_detail | **已废弃** — 详情页取消，功能内联到 TimelineCard 展开态 | [note-detail.md](./gene/note-detail.md) |
 | gene_timeline_card | 日记卡片折叠/展开，元数据单行，展开显示原文+待办，长按多选+批量删除 | [timeline-card.md](./gene/timeline-card.md) |
 | gene_search | 全文搜索，ILIKE匹配，batch load summary+tags | [search.md](./gene/search.md) |
-| gene_review_chat | 洞察复盘，4种内置视角卡片列表(reflect/元问题/二阶思考/芒格)+日期范围选择→ChatView insight模式流式报告，支持review/command/insight三模式 | [review-chat.md](./gene/review-chat.md) |
+| gene_review_chat | 洞察复盘，gateway/insights/目录下每个SKILL.md为一个视角实例(reflect/meta-question/second-order-thinking/munger-review)，卡片列表选择+日期范围→ChatView insight模式流式报告，支持review/command/insight三模式，新增视角只需添加SKILL.md文件 | [review-chat.md](./gene/review-chat.md) |
 | gene_mcp_integration | MCP双向集成，Client(连接外部工具)+Server(暴露v2note能力) | [mcp-integration.md](./gene/mcp-integration.md) |
 | gene_builtin_tools | AI内置工具，create_diary/delete_diary/create_todo/create_skill | [builtin-tools.md](./gene/builtin-tools.md) |
 | gene_proactive_ai | AI主动提醒，BullMQ持久化+setInterval降级，impact智能过滤 | [proactive-ai.md](./gene/proactive-ai.md) |
@@ -83,8 +83,7 @@
 | gene_local_config | 本地配置存储层，跨平台(Capacitor/localStorage) | [local-config.md](./gene/local-config.md) |
 | gene_sync | 数据同步，设备注册+REST API同步 | [sync.md](./gene/sync.md) |
 | gene_offline | 离线支持，OfflineBanner+WebSocket自动重连 | [offline.md](./gene/offline.md) |
-| gene_second_order_thinking | 二阶思考洞察视角（已迁移到insights/），分析"问题背后的问题" | [second-order-thinking.md](./gene/second-order-thinking.md) |
-| gene_context_architecture | 分层上下文架构(Hot/Warm双层，无Cold)，embedding优先+keyword fallback记忆召回，仅服务chat/briefing | [context-architecture.md](./gene/context-architecture.md) |
+| gene_context_architecture | 分层上下文架构(Hot/Warm双层)，embedding优先+keyword fallback记忆召回，仅服务chat/briefing，转录截断+pending intent模式过滤+背景更新错误日志 | [context-architecture.md](./gene/context-architecture.md) |
 | gene_daily_loop | 忙人日常循环，晨间简报+转达追踪+日终总结+主动推送 | [daily-loop.md](./gene/daily-loop.md) |
 | gene_intent_understanding | 意图分类（硬编码于process-prompt）+目标树+待确认意图，五类意图路由，Chat确认流程 | [intent-understanding.md](./gene/intent-understanding.md) |
 | gene_memory_architecture | 记忆架构三层分离：Identity(AI身份，用户可自定义名字/性格/互动方式/专注领域/禁忌/沟通风格) + UserProfile(用户事实) + Memory(Mem0两阶段ADD/UPDATE/DELETE)，per-user写入队列串行化，per-device MemoryManager单例 | [memory-architecture.md](./gene/memory-architecture.md) |
@@ -94,7 +93,6 @@
 | gene_app_update | 检查更新+OTA热更新+APK版本升级，双层更新机制，Admin发布管理，静默OTA+弹窗APK | [app-update.md](./gene/app-update.md) |
 | gene_ai_companion | AI伴侣窗口，统一交互入口，优先级消息队列，reflect追问(insights/)+AI状态+主动推送，FAB变形，聊天继承 | [ai-companion.md](./gene/ai-companion.md) |
 | gene_behavior_constitution | AI行为宪法(AGENTS.md)，系统层规则(安全/纪律/沟通风格/场景指南/技能路由/静默规则)，可被用户Identity覆盖沟通风格和场景指南 | — |
-| gene_munger_review | 芒格决策复盘洞察视角，反转思考+多学科心智模型+能力圈+二阶效应+检查清单 | — |
 
 ---
 
