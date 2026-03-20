@@ -22,6 +22,11 @@ import { NotebookList } from "@/features/diary/components/notebook-list";
 import { MorningBriefing } from "@/features/daily/components/morning-briefing";
 import { EveningSummary } from "@/features/daily/components/evening-summary";
 import { ActionPanel } from "@/features/action-panel/components/action-panel";
+import { LifeMap } from "@/features/cognitive/components/life-map";
+import { ClusterDetailView } from "@/features/cognitive/components/cluster-detail";
+import { DecisionWorkspace } from "@/features/cognitive/components/decision-workspace";
+import { LinkHint } from "@/features/cognitive/components/link-hint";
+import { LayoutGrid, Minus, Brain } from "lucide-react";
 import { toast } from "sonner";
 import { getCommandDefs } from "@/features/commands/lib/registry";
 // NudgeToastListener replaced by AiWindow (inside NotesTimeline)
@@ -55,6 +60,9 @@ export default function Page() {
   const [authMode, setAuthMode] = useState<"login" | "register">("login");
   const [showSidebar, setShowSidebar] = useState(false);
   const [actionPanelOpen, setActionPanelOpen] = useState(false);
+  const [cognitiveMapOpen, setCognitiveMapOpen] = useState(false);
+  const [selectedClusterId, setSelectedClusterId] = useState<string | null>(null);
+  const [decisionQuestion, setDecisionQuestion] = useState<string | null>(null);
   const [activeOverlay, setActiveOverlay] = useState<OverlayName>(null);
   const [chatDateRange, setChatDateRange] = useState<{
     start: string;
@@ -62,9 +70,24 @@ export default function Page() {
   } | null>(null);
   const [chatInitialMessage, setChatInitialMessage] = useState<string | undefined>();
   const [chatMode, setChatMode] = useState<"review" | "command" | "insight">("review");
+  const [viewMode, setViewMode] = useState<"pure" | "timeline">("pure");
   /** null = voice notes timeline, string = diary notebook name */
   const [activeNotebook, setActiveNotebook] = useState<string | null>(null);
   const [activeNotebookColor, setActiveNotebookColor] = useState<string | null>(null);
+
+  // Real-time clock for pure view
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    if (viewMode !== "pure") return;
+    const id = setInterval(() => setNow(new Date()), 60_000);
+    return () => clearInterval(id);
+  }, [viewMode]);
+
+  // LinkHint text from localStorage
+  const [linkHint, setLinkHint] = useState<string | null>(null);
+  useEffect(() => {
+    setLinkHint(localStorage.getItem("v2note:lastLinkHint"));
+  }, []);
 
   const NOTEBOOK_LABEL_MAP: Record<string, string> = {
     "ai-self": "AI 工作日志",
@@ -196,24 +219,59 @@ export default function Page() {
       <UpdateDialog update={update} onDismiss={dismiss} applying={applying} />
       {/* Proactive messages now handled by AiWindow inside NotesTimeline */}
 
-      <NewHeader
-        onSearchClick={() => setActiveOverlay("search")}
-        onAvatarClick={() => setShowSidebar(true)}
-        onInsightClick={() => setActiveOverlay("review")}
-        onTodosClick={() => setActiveOverlay("todos")}
-        onNotebookClick={() => setActiveOverlay("notebooks")}
-        activeNotebookName={activeNotebookName}
-        activeNotebookColor={activeNotebookColor}
-        userName={user?.displayName}
-      />
+      {/* View mode toggle + cognitive map entry */}
+      <div className="fixed top-4 right-4 z-40 flex gap-2">
+        <button
+          onClick={() => setCognitiveMapOpen(true)}
+          className="w-9 h-9 rounded-full bg-muted/60 backdrop-blur flex items-center justify-center text-muted-foreground/70 hover:text-foreground transition-colors"
+          aria-label="认知地图"
+        >
+          <Brain size={16} />
+        </button>
+        <button
+          onClick={() => setViewMode(viewMode === "pure" ? "timeline" : "pure")}
+          className="w-9 h-9 rounded-full bg-muted/60 backdrop-blur flex items-center justify-center text-muted-foreground/70 hover:text-foreground transition-colors"
+          aria-label={viewMode === "pure" ? "切换到时间线" : "切换到纯净模式"}
+        >
+          {viewMode === "pure" ? <LayoutGrid size={16} /> : <Minus size={16} />}
+        </button>
+      </div>
 
-      <main className="pb-6">
-        <NotesTimeline
-          notebook={activeNotebook}
-          onOpenChat={handleOpenCommandChat}
-          onOpenOverlay={openOverlay}
-        />
-      </main>
+      {viewMode === "pure" ? (
+        <main className="flex flex-col items-center justify-center min-h-[80dvh] select-none">
+          <p className="text-5xl font-extralight tracking-wider text-foreground">
+            {String(now.getHours()).padStart(2, "0")}:{String(now.getMinutes()).padStart(2, "0")}
+          </p>
+          <p className="mt-3 text-sm text-muted-foreground/60">
+            {now.getMonth() + 1}月{now.getDate()}日{" "}
+            周{["日", "一", "二", "三", "四", "五", "六"][now.getDay()]}
+          </p>
+          <div className="mt-6">
+            <LinkHint text={linkHint} />
+          </div>
+        </main>
+      ) : (
+        <>
+          <NewHeader
+            onSearchClick={() => setActiveOverlay("search")}
+            onAvatarClick={() => setShowSidebar(true)}
+            onInsightClick={() => setActiveOverlay("review")}
+            onTodosClick={() => setActiveOverlay("todos")}
+            onNotebookClick={() => setActiveOverlay("notebooks")}
+            activeNotebookName={activeNotebookName}
+            activeNotebookColor={activeNotebookColor}
+            userName={user?.displayName}
+          />
+
+          <main className="pb-6">
+            <NotesTimeline
+              notebook={activeNotebook}
+              onOpenChat={handleOpenCommandChat}
+              onOpenOverlay={openOverlay}
+            />
+          </main>
+        </>
+      )}
 
       {/* Swipe-up trigger zone for ActionPanel */}
       {!actionPanelOpen && (
@@ -253,6 +311,38 @@ export default function Page() {
       )}
 
       <ActionPanel isOpen={actionPanelOpen} onClose={() => setActionPanelOpen(false)} />
+
+      {/* Cognitive Map (Level 0) */}
+      <LifeMap
+        isOpen={cognitiveMapOpen}
+        onClose={() => setCognitiveMapOpen(false)}
+        onSelectCluster={(id) => {
+          setSelectedClusterId(id);
+          setCognitiveMapOpen(false);
+        }}
+      />
+
+      {/* Cluster Detail (Level 2) */}
+      {selectedClusterId && (
+        <ClusterDetailView
+          clusterId={selectedClusterId}
+          isOpen={!!selectedClusterId}
+          onClose={() => setSelectedClusterId(null)}
+          onDecision={(q) => {
+            setDecisionQuestion(q);
+            setSelectedClusterId(null);
+          }}
+        />
+      )}
+
+      {/* Decision Workspace (Think) */}
+      {decisionQuestion && (
+        <DecisionWorkspace
+          question={decisionQuestion}
+          isOpen={!!decisionQuestion}
+          onClose={() => setDecisionQuestion(null)}
+        />
+      )}
 
       {/* Overlays — command-driven */}
       {activeOverlay === "search" && (

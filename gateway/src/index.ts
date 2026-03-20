@@ -32,6 +32,7 @@ import { registerReleaseRoutes } from "./routes/releases.js";
 import { registerStrikeRoutes } from "./routes/strikes.js";
 import { registerCognitiveStatsRoutes } from "./routes/cognitive-stats.js";
 import { registerActionPanelRoutes } from "./routes/action-panel.js";
+import { registerCognitiveClusterRoutes } from "./routes/cognitive-clusters.js";
 import { getProactiveEngine } from "./proactive/engine.js";
 import { verifyAccessToken } from "./auth/jwt.js";
 import { generateAiStatus } from "./handlers/reflect.js";
@@ -103,6 +104,7 @@ registerReleaseRoutes(router);
 registerStrikeRoutes(router);
 registerCognitiveStatsRoutes(router);
 registerActionPanelRoutes(router);
+registerCognitiveClusterRoutes(router);
 
 // ── HTTP Server ──
 
