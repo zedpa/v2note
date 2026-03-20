@@ -1,5 +1,6 @@
 import type { Router } from "../router.js";
-import { sendJson, getUserId } from "../lib/http-helpers.js";
+import { sendJson, sendError, getUserId } from "../lib/http-helpers.js";
+import { readBody } from "../lib/http-helpers.js";
 import { query } from "../db/pool.js";
 import { strikeRepo, strikeTagRepo, bondRepo } from "../db/repositories/index.js";
 
@@ -140,5 +141,29 @@ export function registerCognitiveClusterRoutes(router: Router) {
       })),
       intents,
     });
+  });
+
+  // Create a manual bond between two strikes/clusters
+  router.post("/api/v1/cognitive/bonds", async (req, res) => {
+    const body = await readBody<{
+      sourceStrikeId?: string;
+      targetStrikeId?: string;
+      type?: string;
+    }>(req);
+
+    if (!body.sourceStrikeId || !body.targetStrikeId) {
+      sendError(res, "sourceStrikeId and targetStrikeId are required");
+      return;
+    }
+
+    const bond = await bondRepo.create({
+      source_strike_id: body.sourceStrikeId,
+      target_strike_id: body.targetStrikeId,
+      type: body.type ?? "manual",
+      strength: 0.7,
+      created_by: "user",
+    });
+
+    sendJson(res, { ok: true, bondId: bond.id }, 201);
   });
 }

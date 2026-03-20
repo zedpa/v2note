@@ -26,6 +26,7 @@ import { LifeMap } from "@/features/cognitive/components/life-map";
 import { ClusterDetailView } from "@/features/cognitive/components/cluster-detail";
 import { DecisionWorkspace } from "@/features/cognitive/components/decision-workspace";
 import { LinkHint } from "@/features/cognitive/components/link-hint";
+import { OnboardingSeed } from "@/features/cognitive/components/onboarding-seed";
 import { LayoutGrid, Minus, Brain } from "lucide-react";
 import { toast } from "sonner";
 import { getCommandDefs } from "@/features/commands/lib/registry";
@@ -74,6 +75,12 @@ export default function Page() {
   /** null = voice notes timeline, string = diary notebook name */
   const [activeNotebook, setActiveNotebook] = useState<string | null>(null);
   const [activeNotebookColor, setActiveNotebookColor] = useState<string | null>(null);
+
+  // Onboarding state
+  const [isFirstTime, setIsFirstTime] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem("v2note:onboarded") !== "true";
+  });
 
   // Real-time clock for pure view
   const [now, setNow] = useState(() => new Date());
@@ -201,6 +208,21 @@ export default function Page() {
         onLogin={login}
         onSwitchToRegister={() => setAuthMode("register")}
         error={authError}
+      />
+    );
+  }
+
+  if (isFirstTime) {
+    return (
+      <OnboardingSeed
+        onComplete={() => {
+          localStorage.setItem("v2note:onboarded", "true");
+          setIsFirstTime(false);
+        }}
+        onSkip={() => {
+          localStorage.setItem("v2note:onboarded", "true");
+          setIsFirstTime(false);
+        }}
       />
     );
   }

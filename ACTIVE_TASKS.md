@@ -1,36 +1,33 @@
-# ACTIVE_TASKS.md — 前端 P4: 穿越交互 + 决策工作台
+# ACTIVE_TASKS.md — 前端 P5: 冷启动 + 手动连接
 
 ---
 
-## TASK-P4-01: 决策工作台端到端验证
-
-**复杂度**: S
-**已有代码**: decision-workspace.tsx + POST /chat/decision
-
-验证"帮我想想"→ 决策工作台的完整链路。
-需要 AI API 可用（DashScope）才能返回分析结果。
-
----
-
-## TASK-P4-02: 穿越交互——行动面板卡片长按→地图定位
+## TASK-P5-01: 冷启动播种对话
 
 **复杂度**: M
-**涉及文件**: now-card.tsx（添加长按）, app/page.tsx（接收穿越事件）
+**涉及文件**: 新建 features/cognitive/components/onboarding-seed.tsx, app/page.tsx
 
-1. NowCard 添加长按手势（500ms）
-2. 长按触发回调 onTraverse(strikeId)
-3. app/page.tsx 接收 → 关闭行动面板 → 打开认知地图 → 定位到该 Strike 所属 cluster
+首次使用（无 Strike 数据时）显示引导式对话而非空白。
+三个引导问题→录音/打字→转化为初始 Strike。
 
 ---
 
-## TASK-P4-03: Playwright 截图验证
+## TASK-P5-02: 手动连接交互（Cluster 级别）
 
-验证：
-1. ClusterDetail 的"帮我想想"按钮 → DecisionWorkspace 打开
-2. 行动面板可见时截图
+**复杂度**: M
+**涉及文件**: features/cognitive/components/life-map.tsx
+
+Level 0 地图中，长按 Cluster 卡片→拖线到另一个 Cluster→创建 bond。
+后端已有 bondRepo.create，前端需要手势+视觉反馈+API 调用。
+
+---
+
+## TASK-P5-03: Playwright 验证
+
+截图验证冷启动和手动连接。
 
 ---
 
 ## 执行顺序
 
-P4-01 + P4-02 并行 → P4-03
+P5-01 + P5-02 并行（不同文件）→ P5-03

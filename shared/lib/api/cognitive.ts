@@ -39,3 +39,11 @@ export async function fetchClusterDetail(
 ): Promise<ClusterDetail> {
   return api.get(`/api/v1/cognitive/clusters/${id}`);
 }
+
+export async function createBond(params: {
+  sourceStrikeId: string;
+  targetStrikeId: string;
+  type: string;
+}): Promise<{ id: string }> {
+  return api.post("/api/v1/cognitive/bonds", params);
+}
