@@ -10,9 +10,10 @@ import { GoalIndicator } from "./goal-indicator";
 interface ActionPanelProps {
   isOpen: boolean;
   onClose: () => void;
+  onTraverse?: (strikeId: string) => void;
 }
 
-export function ActionPanel({ isOpen, onClose }: ActionPanelProps) {
+export function ActionPanel({ isOpen, onClose, onTraverse }: ActionPanelProps) {
   const { now, today, goals, currentGoalIndex, switchGoal } = useActionPanel();
 
   const [dragY, setDragY] = useState(0);
@@ -84,6 +85,7 @@ export function ActionPanel({ isOpen, onClose }: ActionPanelProps) {
               card={now}
               onComplete={(id) => console.log("complete", id)}
               onSkip={(id) => console.log("skip", id)}
+              onTraverse={onTraverse}
             />
           )}
 

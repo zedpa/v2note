@@ -19,11 +19,12 @@ interface NowCardProps {
   card: ActionCard;
   onComplete: (strikeId: string) => void;
   onSkip: (strikeId: string, reason?: SkipReason) => void;
+  onTraverse?: (strikeId: string) => void;
 }
 
 type SwipePhase = "idle" | "swiping" | "forking" | "dropping";
 
-export function NowCard({ card, onComplete, onSkip }: NowCardProps) {
+export function NowCard({ card, onComplete, onSkip, onTraverse }: NowCardProps) {
   const [offsetX, setOffsetX] = useState(0);
   const [offsetY, setOffsetY] = useState(0);
   const [phase, setPhase] = useState<SwipePhase>("idle");
@@ -36,6 +37,10 @@ export function NowCard({ card, onComplete, onSkip }: NowCardProps) {
   const forkTimerRef = useRef<NodeJS.Timeout | null>(null);
   const forkedRef = useRef(false);
   const phaseRef = useRef<SwipePhase>("idle");
+
+  // Long-press traverse
+  const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const longPressFiredRef = useRef(false);
 
   const setPhaseSync = useCallback((p: SwipePhase) => {
     phaseRef.current = p;
@@ -71,6 +76,13 @@ export function NowCard({ card, onComplete, onSkip }: NowCardProps) {
     [setPhaseSync],
   );
 
+  const clearLongPress = useCallback(() => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  }, []);
+
   const onPointerDown = useCallback(
     (e: React.PointerEvent) => {
       if (phaseRef.current !== "idle") return;
@@ -81,9 +93,20 @@ export function NowCard({ card, onComplete, onSkip }: NowCardProps) {
       startYRef.current = e.clientY;
       widthRef.current = el.offsetWidth;
       forkedRef.current = false;
+      longPressFiredRef.current = false;
+
+      // Start long-press timer for traverse
+      clearLongPress();
+      if (onTraverse) {
+        longPressTimerRef.current = setTimeout(() => {
+          longPressFiredRef.current = true;
+          onTraverse(card.strikeId);
+        }, 500);
+      }
+
       setPhaseSync("swiping");
     },
-    [setPhaseSync],
+    [setPhaseSync, clearLongPress, onTraverse, card.strikeId],
   );
 
   const onPointerMove = useCallback(
@@ -93,6 +116,11 @@ export function NowCard({ card, onComplete, onSkip }: NowCardProps) {
 
       const dx = e.clientX - startXRef.current;
       const dy = e.clientY - startYRef.current;
+
+      // Cancel long-press if pointer moved > 10px
+      if (Math.abs(dx) > 10 || Math.abs(dy) > 10) {
+        clearLongPress();
+      }
       const ratio = Math.abs(dx) / widthRef.current;
 
       // Left swipe fork zone: 30-40%
@@ -130,8 +158,15 @@ export function NowCard({ card, onComplete, onSkip }: NowCardProps) {
 
   const onPointerUp = useCallback(
     (_e: React.PointerEvent) => {
+      clearLongPress();
       const p = phaseRef.current;
       if (p === "idle") return;
+
+      // If long-press already fired, just reset card
+      if (longPressFiredRef.current) {
+        resetCard();
+        return;
+      }
 
       const ratio = Math.abs(offsetX) / (widthRef.current || 1);
 
@@ -169,12 +204,13 @@ export function NowCard({ card, onComplete, onSkip }: NowCardProps) {
       // Forking without committing = cancel
       resetCard();
     },
-    [offsetX, card.strikeId, onComplete, onSkip, flyOut, resetCard],
+    [offsetX, card.strikeId, onComplete, onSkip, flyOut, resetCard, clearLongPress],
   );
 
   const onPointerCancel = useCallback(() => {
+    clearLongPress();
     resetCard();
-  }, [resetCard]);
+  }, [resetCard, clearLongPress]);
 
   const ratio = widthRef.current ? Math.abs(offsetX) / widthRef.current : 0;
   const isRight = offsetX > 0;

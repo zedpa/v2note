@@ -315,7 +315,14 @@ export default function Page() {
       />
       )}
 
-      <ActionPanel isOpen={actionPanelOpen} onClose={() => setActionPanelOpen(false)} />
+      <ActionPanel
+        isOpen={actionPanelOpen}
+        onClose={() => setActionPanelOpen(false)}
+        onTraverse={() => {
+          setActionPanelOpen(false);
+          setCognitiveMapOpen(true);
+        }}
+      />
 
       {/* Cognitive Map (Level 0) */}
       <LifeMap
