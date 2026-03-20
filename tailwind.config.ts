@@ -102,6 +102,10 @@ const config: Config = {
           from: { transform: 'scaleX(0)' },
           to: { transform: 'scaleX(1)' },
         },
+        'fade-out': {
+          '0%': { opacity: '1' },
+          '100%': { opacity: '0' },
+        },
       },
       animation: {
         'card-enter': 'card-enter 0.4s cubic-bezier(0.22,1,0.36,1) both',
@@ -110,6 +114,7 @@ const config: Config = {
         'todo-check-circle': 'todo-check-circle 0.4s cubic-bezier(0.34,1.56,0.64,1)',
         'todo-check-mark': 'todo-check-mark 0.3s cubic-bezier(0.34,1.56,0.64,1) 0.15s both',
         'impact-fill': 'impact-fill 0.6s cubic-bezier(0.22,1,0.36,1) both',
+        'fade-out': 'fade-out 0.3s ease-out forwards',
       },
     },
   },

@@ -11,3 +11,4 @@ export * from "./sync";
 export * from "./memory";
 export * from "./soul";
 export * from "./strikes";
+export * from "./action-panel";

@@ -21,6 +21,7 @@ import { SkillsPage } from "@/features/skills/components/skills-page";
 import { NotebookList } from "@/features/diary/components/notebook-list";
 import { MorningBriefing } from "@/features/daily/components/morning-briefing";
 import { EveningSummary } from "@/features/daily/components/evening-summary";
+import { ActionPanel } from "@/features/action-panel/components/action-panel";
 import { toast } from "sonner";
 import { getCommandDefs } from "@/features/commands/lib/registry";
 // NudgeToastListener replaced by AiWindow (inside NotesTimeline)
@@ -53,6 +54,7 @@ export default function Page() {
   const { update, dismiss, applying } = useUpdateCheck();
   const [authMode, setAuthMode] = useState<"login" | "register">("login");
   const [showSidebar, setShowSidebar] = useState(false);
+  const [actionPanelOpen, setActionPanelOpen] = useState(false);
   const [activeOverlay, setActiveOverlay] = useState<OverlayName>(null);
   const [chatDateRange, setChatDateRange] = useState<{
     start: string;
@@ -213,9 +215,27 @@ export default function Page() {
         />
       </main>
 
-      <FAB
-        activeNotebook={activeNotebook}
-        onStartReview={(range) => {
+      {/* Swipe-up trigger zone for ActionPanel */}
+      {!actionPanelOpen && (
+        <div
+          className="fixed bottom-0 left-0 right-0 h-6 z-30"
+          onPointerDown={(e) => {
+            (e.currentTarget as HTMLElement).dataset.startY = String(e.clientY);
+          }}
+          onPointerMove={(e) => {
+            const startY = Number((e.currentTarget as HTMLElement).dataset.startY);
+            if (startY && startY - e.clientY > 30) {
+              setActionPanelOpen(true);
+              (e.currentTarget as HTMLElement).dataset.startY = "";
+            }
+          }}
+        />
+      )}
+
+      {!actionPanelOpen && (
+        <FAB
+          activeNotebook={activeNotebook}
+          onStartReview={(range) => {
           setChatDateRange(range);
           setChatInitialMessage(undefined);
           setActiveOverlay("chat");
@@ -230,6 +250,9 @@ export default function Page() {
           openOverlay,
         }}
       />
+      )}
+
+      <ActionPanel isOpen={actionPanelOpen} onClose={() => setActionPanelOpen(false)} />
 
       {/* Overlays — command-driven */}
       {activeOverlay === "search" && (
