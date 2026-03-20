@@ -389,6 +389,16 @@
 }
 .animate-spin-slow { animation: spin-slow 3s linear infinite; }
 
+/* Pure view — breathe opacity for time display */
+@keyframes breathe {
+  0%, 100% { opacity: 0.75; }
+  50% { opacity: 1; }
+}
+
+.animate-breathe {
+  animation: breathe 4s ease-in-out infinite;
+}
+
 /* ============================================
    SAFE AREA UTILITIES
    ============================================ */

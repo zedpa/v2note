@@ -250,14 +250,22 @@ export default function Page() {
       <div className="fixed top-4 right-4 z-40 flex gap-2">
         <button
           onClick={() => setCognitiveMapOpen(true)}
-          className="w-9 h-9 rounded-full bg-muted/60 backdrop-blur flex items-center justify-center text-muted-foreground/70 hover:text-foreground transition-colors"
+          className={`w-9 h-9 rounded-full backdrop-blur flex items-center justify-center transition-colors ${
+            viewMode === "pure"
+              ? "bg-transparent border border-[#c4783a]/20 text-[#cfc9bc]/50 hover:text-[#cfc9bc] hover:border-[#c4783a]/40"
+              : "bg-muted/60 text-muted-foreground/70 hover:text-foreground"
+          }`}
           aria-label="认知地图"
         >
           <Brain size={16} />
         </button>
         <button
           onClick={() => setViewMode(viewMode === "pure" ? "timeline" : "pure")}
-          className="w-9 h-9 rounded-full bg-muted/60 backdrop-blur flex items-center justify-center text-muted-foreground/70 hover:text-foreground transition-colors"
+          className={`w-9 h-9 rounded-full backdrop-blur flex items-center justify-center transition-colors ${
+            viewMode === "pure"
+              ? "bg-transparent border border-[#c4783a]/20 text-[#cfc9bc]/50 hover:text-[#cfc9bc] hover:border-[#c4783a]/40"
+              : "bg-muted/60 text-muted-foreground/70 hover:text-foreground"
+          }`}
           aria-label={viewMode === "pure" ? "切换到时间线" : "切换到纯净模式"}
         >
           {viewMode === "pure" ? <LayoutGrid size={16} /> : <Minus size={16} />}
@@ -265,15 +273,25 @@ export default function Page() {
       </div>
 
       {viewMode === "pure" ? (
-        <main className="flex flex-col items-center justify-center min-h-[80dvh] select-none">
-          <p className="text-5xl font-extralight tracking-wider text-foreground">
+        <main className="fixed inset-0 flex flex-col items-center justify-center select-none bg-[#07090c]">
+          {/* Radial warm glow behind time */}
+          <div
+            className="absolute pointer-events-none"
+            style={{
+              width: 320,
+              height: 320,
+              borderRadius: "50%",
+              background: "radial-gradient(circle, rgba(196,120,58,0.06) 0%, rgba(196,120,58,0.02) 40%, transparent 70%)",
+            }}
+          />
+          <p className="relative font-serif text-6xl font-extralight tracking-wider text-[#cfc9bc] animate-breathe">
             {String(now.getHours()).padStart(2, "0")}:{String(now.getMinutes()).padStart(2, "0")}
           </p>
-          <p className="mt-3 text-sm text-muted-foreground/60">
+          <p className="relative mt-3 font-mono text-xs tracking-widest text-[#cfc9bc]/40">
             {now.getMonth() + 1}月{now.getDate()}日{" "}
             周{["日", "一", "二", "三", "四", "五", "六"][now.getDay()]}
           </p>
-          <div className="mt-6">
+          <div className="relative mt-6 [&_p]:!text-[#cfc9bc]/40">
             <LinkHint text={linkHint} />
           </div>
         </main>
