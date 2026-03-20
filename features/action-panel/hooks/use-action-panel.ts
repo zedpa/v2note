@@ -23,6 +23,21 @@ export function useActionPanel() {
       setPanel(data);
       setCurrentGoalIndex(0);
       setError(null);
+      // Write link hint for cognitive map
+      if (data.now) {
+        localStorage.setItem(
+          "v2note:lastLinkHint",
+          `当前聚焦：${data.now.goalName} → ${data.now.action}`,
+        );
+        window.dispatchEvent(new Event("v2note:linkHintUpdated"));
+      } else if (data.goals.length > 0) {
+        const g = data.goals[0];
+        localStorage.setItem(
+          "v2note:lastLinkHint",
+          `${g.goalName}：${g.actionCount} 项待办`,
+        );
+        window.dispatchEvent(new Event("v2note:linkHintUpdated"));
+      }
     } catch (e: any) {
       setError(e.message ?? "Failed to load action panel");
     } finally {

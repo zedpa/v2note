@@ -7,6 +7,7 @@ import {
   type ClusterSummary,
   type ClusterDetail,
 } from "@/shared/lib/api/cognitive";
+import { getGatewayHttpUrl } from "@/shared/lib/gateway-url";
 
 export function useCognitiveMap() {
   const [clusters, setClusters] = useState<ClusterSummary[]>([]);
@@ -20,7 +21,12 @@ export function useCognitiveMap() {
       const data = await fetchClusters();
       setClusters(data);
     } catch (e: any) {
-      console.warn("[cognitive-map] Failed to load clusters:", e.message);
+      console.error(
+        "[cognitive-map] Failed to load clusters:",
+        e.message,
+        "\n  gatewayUrl:", getGatewayHttpUrl(),
+        "\n  error:", e,
+      );
     } finally {
       setLoading(false);
     }
@@ -32,7 +38,7 @@ export function useCognitiveMap() {
       const data = await fetchClusterDetail(id);
       setSelectedDetail(data);
     } catch (e: any) {
-      console.warn("[cognitive-map] Failed to load detail:", e.message);
+      console.error("[cognitive-map] Failed to load detail:", e.message, "\n  error:", e);
     } finally {
       setDetailLoading(false);
     }

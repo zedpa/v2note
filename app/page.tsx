@@ -87,6 +87,11 @@ export default function Page() {
   const [linkHint, setLinkHint] = useState<string | null>(null);
   useEffect(() => {
     setLinkHint(localStorage.getItem("v2note:lastLinkHint"));
+    const onHintUpdate = () => {
+      setLinkHint(localStorage.getItem("v2note:lastLinkHint"));
+    };
+    window.addEventListener("v2note:linkHintUpdated", onHintUpdate);
+    return () => window.removeEventListener("v2note:linkHintUpdated", onHintUpdate);
   }, []);
 
   const NOTEBOOK_LABEL_MAP: Record<string, string> = {

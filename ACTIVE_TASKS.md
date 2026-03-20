@@ -1,114 +1,136 @@
-# ACTIVE_TASKS.md — 前端 P0: 行动面板
+# ACTIVE_TASKS.md — 前端 P2: 认知地图打磨
 
-> 设计文档：docs/PLAN-frontend-vision.md
-> P0 目标：行动面板上线——上滑呼出、此刻卡片、今日线、目标指示器、左右滑
-
----
-
-## TASK-FE-01: 后端 action-panel API
-
-**复杂度**: L
-**涉及文件**:
-- `gateway/src/cognitive/action-panel.ts`（新建）
-- `gateway/src/routes/action-panel.ts`（新建）
-- `gateway/src/index.ts`（注册路由）
-
-**具体任务**:
-1. 实现 computeActionPanel(userId)：
-   - 找活跃目标（Intend 类 Strike，salience 最高的 5 个）
-   - 每个目标沿 Bond 找待执行 Action（未完成的 Intend/Task Strike）
-   - 按 紧迫度×重要度 排序
-   - 取 top-1 为此刻卡片，2-5 为今日线
-   - 用 AI 语义粗分三档时长（快速/中等/深度）
-2. REST API：GET /api/v1/action-panel
-3. 缓存：计算结果存内存或 Redis，每次 Digest 完成后刷新
-
-**验收标准**:
-- [ ] API 返回 {now, today[], goals[]}
-- [ ] 无 Strike 数据时返回空面板不报错
+> 前置：P0 行动面板 ✅ / P1 纯净入口 ✅ / P2-P4 骨架代码已提交
+> 问题：组件已有但 cluster 数据为空，交互细节未打磨，导航链未完整串联
+> 目标：让用户能从录音到认知地图到决策工作台走通完整闭环
 
 ---
 
-## TASK-FE-02: 行动面板前端组件
-
-**复杂度**: L
-**涉及文件**:
-- `features/action-panel/components/action-panel.tsx`（新建）
-- `features/action-panel/components/now-card.tsx`（新建）
-- `features/action-panel/components/today-line.tsx`（新建）
-- `features/action-panel/components/goal-indicator.tsx`（新建）
-- `features/action-panel/hooks/use-action-panel.ts`（新建）
-- `shared/lib/api/action-panel.ts`（新建）
-
-**具体任务**:
-1. ActionPanel 容器：
-   - 从底部上滑呼出，占屏幕下半部分
-   - 毛玻璃半透明背景（backdrop-blur）
-   - 拖拽手柄下拉关闭
-2. NowCard 此刻卡片：
-   - 目标名 + 一句话行动 + 上下文 + 操作图标
-   - 左右滑交互（CSS transform + touch events）
-   - 左滑分叉：滑到一半停住，露出"稍后/今天不做"
-3. TodayLine 今日线：
-   - ●/○/◇ 三种状态符号
-   - 最多显示 4-5 项，超出折叠
-   - 点击展开上下文
-4. GoalIndicator 目标指示器：
-   - 底部一排小圆点
-   - 点击切换目标，面板内容刷新
-
-**验收标准**:
-- [ ] 上滑面板流畅（CSS transform，无卡顿）
-- [ ] 左右滑动流畅（60fps）
-- [ ] 左滑分叉交互正确（0.3s 停顿 + 双选项）
-- [ ] 目标切换正确
-
----
-
-## TASK-FE-03: 集成到 app/page.tsx
+## TASK-P2-01: 数据通路——确保 Digest 产出 Strike 后 Cluster 能涌现
 
 **复杂度**: M
-**涉及文件**:
-- `app/page.tsx`（改造）
+**问题**: 验证显示 /cognitive/clusters 返回空数组。因为 daily cognitive cycle 还没跑过。
 
 **具体任务**:
-1. 在页面底部添加 ActionPanel 的上滑触发区域
-2. 手势检测：底部区域上滑 → 呼出面板
-3. 面板呼出时，背景内容压暗（overlay）
-4. 面板关闭后回到原来的视图
+1. 手动触发一次 daily cognitive cycle（写一个测试脚本）
+2. 验证 seed 的 7 个 Strike + 5 个 Bond 能否产生 cluster
+3. 如果 Strike 数量不够触发聚类（三角密度阈值 > 0.3），降低阈值或补充更多测试数据
+4. 确保 /cognitive/clusters API 能返回有内容的列表
+5. 确保 /cognitive/clusters/:id API 能返回成员 + 矛盾 + 模式
 
 **验收标准**:
-- [ ] 从任何页面状态都能上滑呼出
-- [ ] 面板和现有 FAB/录音按钮不冲突
-- [ ] 手势不误触（需要从底部边缘开始才触发）
+- [ ] /cognitive/clusters 返回 ≥ 1 个 cluster
+- [ ] /cognitive/clusters/:id 返回成员列表 + 特征
 
 ---
 
-## TASK-FE-04: 左滑行为追踪
+## TASK-P2-02: Level 0 人生全景——Cluster 卡片真实渲染
 
-**复杂度**: M
-**涉及文件**:
-- `gateway/src/cognitive/swipe-tracker.ts`（新建）
-- `gateway/src/routes/action-panel.ts`（扩展）
+**复杂度**: S
+**前置**: P2-01
 
 **具体任务**:
-1. POST /api/v1/action-panel/swipe：记录滑动行为
-   - {strikeId, direction: 'left'|'right', reason?: 'later'|'wait'|'blocked'|'rethink'}
-2. 后端存储滑动记录（新表或现有表扩展）
-3. 右滑 → 标记 Strike 关联的 todo 为完成
-4. 左滑 3 标签 → 创建对应的行为信号 Strike
+1. LifeMap 组件已有，但需要验证真实数据渲染
+2. 确保活跃度圆点根据 memberCount 正确计算
+3. 空态文案已有（"认知世界还在萌芽中"）
+4. 添加下拉刷新手势（pull-to-refresh）
+5. Playwright 截图验证有数据时的卡片墙渲染
 
 **验收标准**:
-- [ ] 滑动行为正确记录
-- [ ] 右滑自动标记完成
-- [ ] 左滑标签正确创建行为信号
+- [ ] 有 cluster 数据时，卡片墙正确渲染
+- [ ] 活跃度圆点 1-4 个正确填充
+- [ ] 截图确认
+
+---
+
+## TASK-P2-03: Level 1 → Level 2 导航串联
+
+**复杂度**: M
+**前置**: P2-01
+
+**具体任务**:
+1. 当前 LifeMap 的 onSelectCluster 直接跳到 ClusterDetail（Level 2），跳过了 Level 1
+2. 评估：如果顶层 cluster 本身就是最终主题（没有子 cluster），Level 1 可以跳过
+3. 如果需要 Level 1：新建 cluster-wall.tsx，显示某领域下的子 cluster
+4. ClusterDetail 需要验证：模式区、对立观点区、目标状态区、时间线区都能渲染
+5. 对立观点的"帮我想想"按钮 → DecisionWorkspace 跳转已有，验证能否触发
+
+**验收标准**:
+- [ ] 从 LifeMap 点击 cluster 卡片 → ClusterDetail 正确打开
+- [ ] ClusterDetail 四个区域根据数据有无条件渲染
+- [ ] 对立观点 → DecisionWorkspace 跳转正常
+
+---
+
+## TASK-P2-04: 认知地图入口优化
+
+**复杂度**: S
+
+**具体任务**:
+1. Brain 图标已有（右上角），但下拉手势进入地图还未实现
+2. 评估：在 Level -1 纯净入口添加下拉手势进入 LifeMap
+   - onPointerDown/Move/Up，检测向下拖动 > 50px → setCognitiveMapOpen(true)
+3. 或者：保持 Brain 图标入口即可，下拉手势可以后做
+4. 纯净入口的关联提示（LinkHint）需要有数据写入 localStorage：
+   - 在 Digest 完成后，通过 WebSocket 推送或在 API 响应中附带 lastLinkHint
+   - 暂时方案：在 use-action-panel 或 gateway-client 中，每次 process 完成后写入 localStorage
+
+**验收标准**:
+- [ ] Brain 图标点击正常打开认知地图
+- [ ] 关联提示有数据时正确显示并 fade out
+
+---
+
+## TASK-P2-05: 决策工作台（Think）数据验证
+
+**复杂度**: M
+**前置**: P2-01
+
+**具体任务**:
+1. DecisionWorkspace 已有骨架，但 POST /api/v1/chat/decision 端点可能不存在
+2. 检查 chat.ts 中 decision 模式的触发方式——当前是通过 startChat(mode='decision')
+3. 需要新建一个简化的 REST 端点 POST /api/v1/chat/decision：
+   - body: { question: string }
+   - 内部调用 gatherDecisionContext + buildDecisionPrompt + chatCompletion
+   - 返回 { content: string }（AI 分析结果）
+4. 验证 parseSections 能正确解析 AI 返回的结构化文本
+
+**验收标准**:
+- [ ] POST /chat/decision 返回结构化分析
+- [ ] DecisionWorkspace 渲染支持/反对/缺口/模式四区域
+- [ ] "继续和 AI 讨论"按钮可点击
+
+---
+
+## TASK-P2-06: Playwright 截图验证全链路
+
+**复杂度**: S
+**前置**: P2-01 ~ P2-05
+
+**具体任务**:
+1. Seed 充足测试数据（包含 cluster + contradiction + pattern）
+2. Playwright 自动化：
+   - 登录 → 纯净入口截图
+   - Brain 按钮 → 认知地图截图
+   - 点击 cluster → Detail 截图
+   - 点击"帮我想想" → 决策工作台截图
+   - 上滑 → 行动面板截图
+3. 所有截图保存到 scripts/screenshots/
+
+**验收标准**:
+- [ ] 6 张截图覆盖完整导航链
+- [ ] 每张截图有实质内容（非空白/非报错）
 
 ---
 
 ## 执行顺序
 
 ```
-FE-01（后端 API）→ FE-02（前端组件）→ FE-03（集成）→ FE-04（行为追踪）
+P2-01（数据通路）→ P2-02（Level 0 渲染）
+                 → P2-03（导航串联）
+                 → P2-04（入口优化）
+                 → P2-05（决策端点）
+                 → P2-06（截图验证）
 ```
 
-串行执行，每步依赖前一步。
+P2-01 是前置。P2-02 到 P2-05 可并行。P2-06 最后。

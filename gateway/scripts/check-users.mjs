@@ -1,0 +1,12 @@
+import pg from 'pg';
+import { config } from 'dotenv';
+import { resolve, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+const __dirname = dirname(fileURLToPath(import.meta.url));
+config({ path: resolve(__dirname, '../.env') });
+const pool = new pg.Pool({ host: process.env.RDS_HOST, port: parseInt(process.env.RDS_PORT ?? '5432'), database: process.env.RDS_DATABASE, user: process.env.RDS_USER, password: process.env.RDS_PASSWORD, ssl: { rejectUnauthorized: false } });
+const { rows } = await pool.query("SELECT id, phone FROM app_user WHERE phone LIKE '%18793198472%'");
+console.log('Users matching phone:', JSON.stringify(rows));
+const { rows: clusters } = await pool.query("SELECT user_id, id, nucleus FROM strike WHERE is_cluster = true");
+console.log('Clusters:', JSON.stringify(clusters));
+await pool.end();
