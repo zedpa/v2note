@@ -27,10 +27,16 @@ export function ClusterDetailView({ clusterId, isOpen, onClose, onDecision }: Cl
 
   useEffect(() => {
     if (isOpen && clusterId) {
+      setDetail(null);
       setLoading(true);
       fetchClusterDetail(clusterId)
-        .then(setDetail)
-        .catch(() => setDetail(null))
+        .then((data) => {
+          setDetail(data);
+        })
+        .catch((err) => {
+          console.error("[ClusterDetail] fetchClusterDetail failed:", err, "url:", `/api/v1/cognitive/clusters/${clusterId}`);
+          setDetail(null);
+        })
         .finally(() => setLoading(false));
     }
   }, [isOpen, clusterId]);
