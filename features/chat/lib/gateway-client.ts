@@ -65,6 +65,7 @@ type MessageHandler = (msg: GatewayResponse) => void;
 import { getGatewayWsUrl } from "@/shared/lib/gateway-url";
 import { getAccessToken } from "@/shared/lib/auth";
 import { getApiDeviceId } from "@/shared/lib/api";
+import { getDeviceId } from "@/shared/lib/device";
 
 const MAX_RECONNECT_ATTEMPTS = 10;
 const BASE_RECONNECT_DELAY = 3000;
@@ -98,22 +99,57 @@ export class GatewayClient {
           this._connected = true;
           this.reconnectAttempts = 0;
           console.log("[gateway-client] Connected");
-          // Send auth message if logged in
+
+          // Send auth message if logged in.
+          // getApiDeviceId() may be null on app reopen (only set during
+          // login() or getDeviceId()). Fall back to async getDeviceId()
+          // so the WebSocket is always authenticated.
           const token = getAccessToken();
-          const deviceId = getApiDeviceId();
-          if (token && deviceId) {
-            this.ws?.send(JSON.stringify({
-              type: "auth",
-              payload: { token, deviceId },
-            }));
-          }
-          if (this.pendingMessages.length > 0) {
-            for (const pending of this.pendingMessages) {
-              this.ws?.send(JSON.stringify(pending));
+          let deviceId = getApiDeviceId();
+
+          const sendAuth = (did: string) => {
+            if (token && this.ws?.readyState === WebSocket.OPEN) {
+              this.ws.send(JSON.stringify({
+                type: "auth",
+                payload: { token, deviceId: did },
+              }));
             }
-            this.pendingMessages = [];
+            // Flush pending messages after auth
+            if (this.pendingMessages.length > 0) {
+              for (const pending of this.pendingMessages) {
+                this.ws?.send(JSON.stringify(pending));
+              }
+              this.pendingMessages = [];
+            }
+            resolve();
+          };
+
+          if (token && deviceId) {
+            sendAuth(deviceId);
+          } else if (token) {
+            // deviceId not yet initialized — fetch it, then send auth
+            getDeviceId()
+              .then((did) => sendAuth(did))
+              .catch(() => {
+                // Even if device lookup fails, flush pending and resolve
+                if (this.pendingMessages.length > 0) {
+                  for (const pending of this.pendingMessages) {
+                    this.ws?.send(JSON.stringify(pending));
+                  }
+                  this.pendingMessages = [];
+                }
+                resolve();
+              });
+          } else {
+            // No token — not logged in, just flush pending
+            if (this.pendingMessages.length > 0) {
+              for (const pending of this.pendingMessages) {
+                this.ws?.send(JSON.stringify(pending));
+              }
+              this.pendingMessages = [];
+            }
+            resolve();
           }
-          resolve();
         };
 
         this.ws.onmessage = (event) => {
