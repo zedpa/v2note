@@ -22,3 +22,6 @@ export * as notebookRepo from "./notebook.js";
 export * as appUserRepo from "./app-user.js";
 export * as refreshTokenRepo from "./refresh-token.js";
 export * as appReleaseRepo from "./app-release.js";
+export * as strikeRepo from "./strike.js";
+export * as bondRepo from "./bond.js";
+export * as strikeTagRepo from "./strike-tag.js";

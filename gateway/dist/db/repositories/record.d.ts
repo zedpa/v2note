@@ -8,6 +8,8 @@ export interface Record {
     location_text: string | null;
     notebook: string | null;
     archived: boolean;
+    digested: boolean;
+    digested_at: string | null;
     created_at: string;
     updated_at: string;
 }
@@ -47,4 +49,6 @@ export declare function search(deviceId: string, q: string): Promise<Record[]>;
 export declare function searchByUser(userId: string, q: string): Promise<Record[]>;
 export declare function countByDateRange(deviceId: string, start: string, end: string): Promise<number>;
 export declare function countByUserDateRange(userId: string, start: string, end: string): Promise<number>;
+export declare function findUndigested(userId: string): Promise<Record[]>;
+export declare function markDigested(id: string): Promise<void>;
 export declare function findByDeviceAndDateRange(deviceId: string, start: string, end: string): Promise<Record[]>;

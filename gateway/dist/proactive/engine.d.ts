@@ -17,6 +17,9 @@ export declare class ProactiveEngine {
     private intervalMs;
     private dailyPushSent;
     private fallbackTimer;
+    private digestTimer;
+    private cognitiveDailyTimer;
+    private emergenceWeeklyTimer;
     private queue;
     private worker;
     private redisAvailable;
@@ -35,6 +38,18 @@ export declare class ProactiveEngine {
     private handleTimedPush;
     private startFallbackTimer;
     checkAll(): Promise<void>;
+    /**
+     * Batch-digest unprocessed records for all users with pending content.
+     */
+    private runBatchDigest;
+    /**
+     * Run daily cognitive cycle for all users with active Strikes.
+     */
+    private runCognitiveDaily;
+    /**
+     * Run weekly emergence engine for all users with active clusters.
+     */
+    private runWeeklyEmergence;
     private checkDevice;
     private sendNudge;
     private sendMessage;

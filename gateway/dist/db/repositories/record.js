@@ -124,6 +124,13 @@ export async function countByUserDateRange(userId, start, end) {
      WHERE user_id = $1 AND created_at >= $2 AND created_at <= $3`, [userId, start, end]);
     return parseInt(row?.count ?? "0", 10);
 }
+export async function findUndigested(userId) {
+    return query(`SELECT * FROM record WHERE user_id = $1 AND digested = FALSE AND status = 'completed'
+     ORDER BY created_at ASC`, [userId]);
+}
+export async function markDigested(id) {
+    await execute(`UPDATE record SET digested = true, digested_at = now(), updated_at = now() WHERE id = $1`, [id]);
+}
 export async function findByDeviceAndDateRange(deviceId, start, end) {
     return query(`SELECT * FROM record WHERE device_id = $1
      AND created_at >= $2 AND created_at <= $3

@@ -13,7 +13,7 @@ const MAX_CACHE_SIZE = 500;
 /**
  * Get embedding vector for text using DashScope API.
  */
-async function getEmbedding(text) {
+export async function getEmbedding(text) {
     // Check cache
     const cacheKey = text.slice(0, 200); // truncate key
     const cached = embeddingCache.get(cacheKey);
@@ -55,7 +55,7 @@ async function getEmbedding(text) {
 /**
  * Compute cosine similarity between two vectors.
  */
-function cosineSimilarity(a, b) {
+export function cosineSimilarity(a, b) {
     if (a.length !== b.length)
         return 0;
     let dotProduct = 0;

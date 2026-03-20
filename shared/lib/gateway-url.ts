@@ -13,6 +13,9 @@ const ENV_URL = process.env.NEXT_PUBLIC_GATEWAY_URL ?? "ws://localhost:3001";
 function normalizeWsUrl(url: string): string {
   const trimmed = url.trim();
   if (/^wss?:\/\//.test(trimmed)) return trimmed;
+  // Convert http(s):// → ws(s)://
+  if (/^https:\/\//.test(trimmed)) return trimmed.replace(/^https:/, "wss:");
+  if (/^http:\/\//.test(trimmed)) return trimmed.replace(/^http:/, "ws:");
   // Bare host:port → add ws://
   return `ws://${trimmed}`;
 }

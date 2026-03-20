@@ -1,3 +1,4 @@
+import { digestRecords } from './digest.js';
 import { loadSkills, filterActiveSkills, mergeWithCustomSkills } from "../skills/loader.js";
 import { buildProcessPrompt } from "./process-prompt.js";
 import { chatCompletion } from "../ai/provider.js";
@@ -323,6 +324,15 @@ export async function processEntry(payload) {
         appendToDiary(payload.deviceId, diaryNotebook, diaryLine, payload.userId).catch((e) => {
             console.warn("[process] Diary append failed:", e.message);
         });
+        // 9. Cognitive layer: immediate digest for deep content
+        if (shouldDigestImmediately(result, payload.text.length)) {
+            digestRecords([payload.recordId], {
+                deviceId: payload.deviceId,
+                userId: payload.userId,
+            }).catch((e) => {
+                console.warn('[process] Digest failed:', e.message);
+            });
+        }
     }
     catch (err) {
         console.error(`[process] Fatal error processing record ${payload.recordId}:`, err);
@@ -335,5 +345,11 @@ export async function processEntry(payload) {
         result.error = err.message;
     }
     return result;
+}
+function shouldDigestImmediately(result, textLength) {
+    const deepTypes = new Set(['reflection', 'goal', 'complaint']);
+    const hasDeepIntent = result.intents.some(i => deepTypes.has(i.type));
+    const isSubstantial = textLength > 80;
+    return hasDeepIntent && isSubstantial;
 }
 //# sourceMappingURL=process.js.map

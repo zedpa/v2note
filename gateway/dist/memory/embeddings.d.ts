@@ -7,6 +7,14 @@
  * Design: runs alongside the existing keyword-based system as an optional
  * enhancement. Falls back gracefully if embedding API is unavailable.
  */
+/**
+ * Get embedding vector for text using DashScope API.
+ */
+export declare function getEmbedding(text: string): Promise<number[]>;
+/**
+ * Compute cosine similarity between two vectors.
+ */
+export declare function cosineSimilarity(a: number[], b: number[]): number;
 export interface SemanticSearchResult {
     id: string;
     content: string;

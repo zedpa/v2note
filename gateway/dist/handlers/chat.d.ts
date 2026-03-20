@@ -1,7 +1,7 @@
 export interface ChatStartPayload {
     deviceId: string;
     userId?: string;
-    mode: "review" | "command" | "insight";
+    mode: "review" | "command" | "insight" | "decision";
     dateRange: {
         start: string;
         end: string;

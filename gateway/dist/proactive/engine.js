@@ -12,15 +12,21 @@
  * - Multi-process safe (multiple gateways share one queue)
  */
 import { WebSocket } from "ws";
-import { todoRepo } from "../db/repositories/index.js";
+import { todoRepo, recordRepo } from "../db/repositories/index.js";
 import * as dailyBriefingRepo from "../db/repositories/daily-briefing.js";
 import { regenerateSummary, extractToMemory } from "../diary/manager.js";
+import { digestRecords } from "../handlers/digest.js";
+import { runDailyCognitiveCycle } from "../cognitive/daily-cycle.js";
+import { runEmergence } from "../cognitive/emergence.js";
 export class ProactiveEngine {
     devices = new Map();
     intervalMs = 30 * 60 * 1000; // 30 minutes
     dailyPushSent = new Set();
     // Fallback timer (used when Redis unavailable)
     fallbackTimer = null;
+    digestTimer = null;
+    cognitiveDailyTimer = null;
+    emergenceWeeklyTimer = null;
     // BullMQ instances (populated if Redis is available)
     queue = null;
     worker = null;
@@ -77,6 +83,18 @@ export class ProactiveEngine {
             clearInterval(this.fallbackTimer);
             this.fallbackTimer = null;
         }
+        if (this.digestTimer) {
+            clearInterval(this.digestTimer);
+            this.digestTimer = null;
+        }
+        if (this.cognitiveDailyTimer) {
+            clearInterval(this.cognitiveDailyTimer);
+            this.cognitiveDailyTimer = null;
+        }
+        if (this.emergenceWeeklyTimer) {
+            clearInterval(this.emergenceWeeklyTimer);
+            this.emergenceWeeklyTimer = null;
+        }
         if (this.worker) {
             this.worker.close().catch(() => { });
             this.worker = null;
@@ -132,6 +150,15 @@ export class ProactiveEngine {
                 case "evening-summary":
                     await this.handleTimedPush(job.data.deviceId, "evening");
                     break;
+                case "cognitive-digest":
+                    await this.runBatchDigest();
+                    break;
+                case "cognitive-daily":
+                    await this.runCognitiveDaily();
+                    break;
+                case "cognitive-weekly-emergence":
+                    await this.runWeeklyEmergence();
+                    break;
             }
         }, { connection: connectionConfig, concurrency: 5 });
         this.worker.on("failed", (job, err) => {
@@ -142,6 +169,12 @@ export class ProactiveEngine {
         });
         // Setup repeatable schedulers (idempotent)
         await this.queue.upsertJobScheduler("check-all-scheduler", { every: this.intervalMs }, { name: "check-all-devices", data: {} });
+        // Cognitive digest cron: every 3 hours, batch-digest unprocessed records
+        await this.queue.upsertJobScheduler("cognitive-digest-scheduler", { pattern: "0 */3 * * *" }, { name: "cognitive-digest", data: {} });
+        // Cognitive daily cycle: every day at 3 AM
+        await this.queue.upsertJobScheduler("cognitive-daily-scheduler", { pattern: "0 3 * * *" }, { name: "cognitive-daily", data: {} });
+        // Weekly emergence engine: every Sunday at 4 AM
+        await this.queue.upsertJobScheduler("cognitive-weekly-emergence-scheduler", { pattern: "0 4 * * 0" }, { name: "cognitive-weekly-emergence", data: {} });
         this.redisAvailable = true;
         console.log(`[proactive] Engine started with BullMQ (Redis: ${redisHost}:${redisPort})`);
     }
@@ -210,6 +243,27 @@ export class ProactiveEngine {
             });
         }, this.intervalMs);
         console.log(`[proactive] Fallback timer started (interval: ${this.intervalMs / 1000}s)`);
+        // Cognitive digest fallback: every 3 hours
+        this.digestTimer = setInterval(() => {
+            this.runBatchDigest().catch((err) => {
+                console.error("[proactive] Batch digest error:", err.message);
+            });
+        }, 3 * 60 * 60 * 1000);
+        console.log("[proactive] Cognitive digest fallback timer started (interval: 3h)");
+        // Cognitive daily cycle fallback: every 24 hours
+        this.cognitiveDailyTimer = setInterval(() => {
+            this.runCognitiveDaily().catch((err) => {
+                console.error("[proactive] Cognitive daily cycle error:", err.message);
+            });
+        }, 24 * 60 * 60 * 1000);
+        console.log("[proactive] Cognitive daily cycle fallback timer started (interval: 24h)");
+        // Weekly emergence fallback: every 7 days
+        this.emergenceWeeklyTimer = setInterval(() => {
+            this.runWeeklyEmergence().catch((err) => {
+                console.error("[proactive] Weekly emergence error:", err.message);
+            });
+        }, 7 * 24 * 60 * 60 * 1000);
+        console.log("[proactive] Weekly emergence fallback timer started (interval: 7d)");
     }
     // ── Core check logic (shared by BullMQ and fallback) ──
     async checkAll() {
@@ -228,6 +282,105 @@ export class ProactiveEngine {
             catch (err) {
                 console.warn(`[proactive] Check failed for ${deviceId}: ${err.message}`);
             }
+        }
+    }
+    /**
+     * Batch-digest unprocessed records for all users with pending content.
+     */
+    async runBatchDigest() {
+        try {
+            // Find all users with undigested records by querying connected devices
+            const userIds = new Set();
+            for (const device of this.devices.values()) {
+                if (device.userId)
+                    userIds.add(device.userId);
+            }
+            // Also check DB for any user with undigested records
+            const { query } = await import("../db/pool.js");
+            const rows = await query(`SELECT DISTINCT user_id FROM record WHERE digested = FALSE AND status = 'completed' AND user_id IS NOT NULL`, []);
+            for (const row of rows) {
+                userIds.add(row.user_id);
+            }
+            if (userIds.size === 0) {
+                console.log("[proactive:digest] No users with undigested records");
+                return;
+            }
+            console.log(`[proactive:digest] Processing ${userIds.size} users with undigested records`);
+            for (const userId of userIds) {
+                try {
+                    const records = await recordRepo.findUndigested(userId);
+                    if (records.length === 0)
+                        continue;
+                    const recordIds = records.map((r) => r.id);
+                    console.log(`[proactive:digest] User ${userId}: ${recordIds.length} undigested records`);
+                    // Find deviceId from connected devices or use userId as fallback
+                    let deviceId = userId;
+                    for (const device of this.devices.values()) {
+                        if (device.userId === userId) {
+                            deviceId = device.deviceId;
+                            break;
+                        }
+                    }
+                    await digestRecords(recordIds, { deviceId, userId });
+                }
+                catch (err) {
+                    console.error(`[proactive:digest] Failed for user ${userId}:`, err.message);
+                }
+            }
+        }
+        catch (err) {
+            console.error("[proactive:digest] Batch digest failed:", err.message);
+        }
+    }
+    /**
+     * Run daily cognitive cycle for all users with active Strikes.
+     */
+    async runCognitiveDaily() {
+        try {
+            const { query } = await import("../db/pool.js");
+            const rows = await query(`SELECT DISTINCT user_id FROM strike WHERE status = 'active'`, []);
+            if (rows.length === 0) {
+                console.log("[proactive:cognitive-daily] No users with active strikes");
+                return;
+            }
+            console.log(`[proactive:cognitive-daily] Processing ${rows.length} user(s)`);
+            for (const row of rows) {
+                try {
+                    await runDailyCognitiveCycle(row.user_id);
+                }
+                catch (err) {
+                    console.error(`[proactive:cognitive-daily] Failed for user ${row.user_id}:`, err.message);
+                }
+            }
+        }
+        catch (err) {
+            console.error("[proactive:cognitive-daily] Failed:", err.message);
+        }
+    }
+    /**
+     * Run weekly emergence engine for all users with active clusters.
+     */
+    async runWeeklyEmergence() {
+        try {
+            const { query } = await import("../db/pool.js");
+            const rows = await query(`SELECT DISTINCT user_id FROM strike WHERE is_cluster = true AND status = 'active'`, []);
+            if (rows.length === 0) {
+                console.log("[proactive:emergence] No users with active clusters");
+                return;
+            }
+            console.log(`[proactive:emergence] Processing ${rows.length} user(s)`);
+            for (const row of rows) {
+                try {
+                    const result = await runEmergence(row.user_id);
+                    console.log(`[proactive:emergence] User ${row.user_id}:`, result);
+                }
+                catch (err) {
+                    console.error(`[proactive:emergence] Failed for user ${row.user_id}:`, err.message);
+                }
+            }
+        }
+        catch (err) {
+            console.error("[proactive:emergence] Failed:", err.message);
         }
     }
     async checkDevice(device) {
