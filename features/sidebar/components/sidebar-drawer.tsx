@@ -1,6 +1,7 @@
 "use client";
 
 import { X, HelpCircle, Download, CreditCard, Info, Brain, UserCircle, Sun, Settings, LogOut, Wand2 } from "lucide-react";
+import { LuluLogo } from "@/components/brand/lulu-logo";
 import { cn } from "@/lib/utils";
 import { StatsPanel } from "./stats-panel";
 import { getCommandDefs } from "@/features/commands/lib/registry";
@@ -56,8 +57,8 @@ export function SidebarDrawer({
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-border/60">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-              <span className="text-lg">🎙</span>
+            <div className="w-10 h-10 rounded-full bg-cream flex items-center justify-center">
+              <LuluLogo size={28} variant="color" className="animate-none" />
             </div>
             <div>
               <p className="text-sm font-display font-bold text-foreground">

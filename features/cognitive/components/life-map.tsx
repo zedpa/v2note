@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowLeft, Link2 } from "lucide-react";
+import { LuluLogo } from "@/components/brand/lulu-logo";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useCognitiveMap } from "../hooks/use-cognitive-map";
@@ -181,9 +182,12 @@ export function LifeMap({ isOpen, onClose, onSelectCluster }: LifeMapProps) {
             <div className="w-6 h-6 rounded-full border-2 border-primary/30 border-t-primary animate-spin" />
           </div>
         ) : clusters.length === 0 ? (
-          <div className="text-center py-12 text-muted-foreground">
-            <p className="text-lg">认知世界还在萌芽中</p>
-            <p className="text-sm mt-2">继续记录，结构会自动涌现</p>
+          <div className="flex flex-col items-center py-12 text-muted-foreground">
+            <LuluLogo size={80} variant="color" />
+            <p className="text-sm mt-4 text-center leading-relaxed">
+              路路正在观察你的世界<br />
+              继续记录，结构会自然涌现
+            </p>
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-4">

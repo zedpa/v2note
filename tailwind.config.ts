@@ -13,6 +13,16 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
+        bark: '#3D3228',
+        deer: '#C8845C',
+        antler: '#A06B42',
+        cream: '#FAF6F0',
+        sand: '#F0E8DB',
+        'brand-border': '#E0D5C8',
+        forest: '#5C7A5E',
+        sky: '#7BA3C4',
+        dawn: '#E8A87C',
+        maple: '#C45C5C',
         background: 'hsl(var(--background))',
         foreground: 'hsl(var(--foreground))',
         card: {
@@ -72,7 +82,8 @@ const config: Config = {
       fontFamily: {
         body: ['var(--font-body)', 'var(--font-display)', 'system-ui', 'sans-serif'],
         display: ['var(--font-display)', 'var(--font-body)', 'system-ui', 'sans-serif'],
-        mono: ['var(--font-mono)', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
+        mono: ['SF Mono', 'Fira Code', 'JetBrains Mono', 'monospace'],
+        serif: ['Noto Serif SC', 'serif'],
         'serif-display': ['var(--font-serif-display)', 'Georgia', 'serif'],
       },
       keyframes: {

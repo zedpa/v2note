@@ -252,7 +252,7 @@ export default function Page() {
           onClick={() => setCognitiveMapOpen(true)}
           className={`w-9 h-9 rounded-full backdrop-blur flex items-center justify-center transition-colors ${
             viewMode === "pure"
-              ? "bg-transparent border border-[#c4783a]/20 text-[#cfc9bc]/50 hover:text-[#cfc9bc] hover:border-[#c4783a]/40"
+              ? "bg-transparent border border-bark/15 text-bark/40 hover:text-bark/70 hover:border-bark/30"
               : "bg-muted/60 text-muted-foreground/70 hover:text-foreground"
           }`}
           aria-label="认知地图"
@@ -263,7 +263,7 @@ export default function Page() {
           onClick={() => setViewMode(viewMode === "pure" ? "timeline" : "pure")}
           className={`w-9 h-9 rounded-full backdrop-blur flex items-center justify-center transition-colors ${
             viewMode === "pure"
-              ? "bg-transparent border border-[#c4783a]/20 text-[#cfc9bc]/50 hover:text-[#cfc9bc] hover:border-[#c4783a]/40"
+              ? "bg-transparent border border-bark/15 text-bark/40 hover:text-bark/70 hover:border-bark/30"
               : "bg-muted/60 text-muted-foreground/70 hover:text-foreground"
           }`}
           aria-label={viewMode === "pure" ? "切换到时间线" : "切换到纯净模式"}
@@ -273,7 +273,7 @@ export default function Page() {
       </div>
 
       {viewMode === "pure" ? (
-        <main className="fixed inset-0 flex flex-col items-center justify-center select-none bg-[#07090c]">
+        <main className="fixed inset-0 flex flex-col items-center justify-center select-none bg-cream">
           {/* Radial warm glow behind time */}
           <div
             className="absolute pointer-events-none"
@@ -281,17 +281,17 @@ export default function Page() {
               width: 320,
               height: 320,
               borderRadius: "50%",
-              background: "radial-gradient(circle, rgba(196,120,58,0.06) 0%, rgba(196,120,58,0.02) 40%, transparent 70%)",
+              background: "radial-gradient(circle, rgba(196,120,58,0.08) 0%, rgba(196,120,58,0.03) 40%, transparent 70%)",
             }}
           />
-          <p className="relative font-serif text-6xl font-extralight tracking-wider text-[#cfc9bc] animate-breathe">
+          <p className="relative font-serif text-6xl font-extralight tracking-wider text-bark animate-breathe">
             {String(now.getHours()).padStart(2, "0")}:{String(now.getMinutes()).padStart(2, "0")}
           </p>
-          <p className="relative mt-3 font-mono text-xs tracking-widest text-[#cfc9bc]/40">
+          <p className="relative mt-3 font-serif text-xs tracking-widest text-bark/40">
             {now.getMonth() + 1}月{now.getDate()}日{" "}
             周{["日", "一", "二", "三", "四", "五", "六"][now.getDay()]}
           </p>
-          <div className="relative mt-6 [&_p]:!text-[#cfc9bc]/40">
+          <div className="relative mt-6 [&_p]:!text-bark/40">
             <LinkHint text={linkHint} />
           </div>
         </main>

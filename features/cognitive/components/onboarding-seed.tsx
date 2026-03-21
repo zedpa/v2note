@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Mic, Send } from "lucide-react";
+import { LuluLogo } from "@/components/brand/lulu-logo";
 
 interface OnboardingSeedProps {
   onComplete: () => void;
@@ -41,9 +42,10 @@ export function OnboardingSeed({ onComplete, onSkip }: OnboardingSeedProps) {
     <div className="min-h-dvh bg-background flex flex-col items-center justify-center px-6">
       <div className="w-full max-w-sm space-y-8">
         {/* Header */}
-        <div className="space-y-2 text-center">
+        <div className="space-y-3 text-center flex flex-col items-center">
+          <LuluLogo size={64} variant="color" />
           <h1 className="text-xl font-light text-foreground tracking-wide">
-            你好，我是你的认知伙伴
+            你好，我是路路
           </h1>
           <p className="text-sm text-muted-foreground">
             在开始之前，随便聊聊：
