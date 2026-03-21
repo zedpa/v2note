@@ -402,6 +402,54 @@
 }
 
 /* ============================================
+   PC RESPONSIVE LAYOUT (>1024px)
+   ============================================ */
+
+@media (min-width: 1024px) {
+  body {
+    max-width: 1440px;
+    margin-left: auto;
+    margin-right: auto;
+    padding-left: 2rem;
+    padding-right: 2rem;
+  }
+}
+
+/* ============================================
+   OVERLAY ANIMATIONS
+   ============================================ */
+
+@keyframes overlay-backdrop-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes overlay-backdrop-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes overlay-modal-in {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes overlay-modal-out {
+  from { opacity: 1; transform: scale(1); }
+  to { opacity: 0; transform: scale(0.95); }
+}
+
+@keyframes overlay-sidebar-in {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
+@keyframes overlay-sidebar-out {
+  from { transform: translateX(0); }
+  to { transform: translateX(100%); }
+}
+
+/* ============================================
    SAFE AREA UTILITIES
    ============================================ */
 
