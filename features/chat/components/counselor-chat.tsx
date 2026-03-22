@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback, type ReactNode } from "react";
 import { LuluLogo } from "@/components/brand/lulu-logo";
+import { api } from "@/shared/lib/api";
 
 interface Message {
   role: "user" | "assistant";
@@ -13,21 +14,102 @@ interface CounselorChatProps {
   onClose: () => void;
 }
 
+/* ── framework prefixes ── */
+const FRAMEWORK_PREFIXES: Record<string, string> = {
+  "/munger":
+    "请以查理·芒格的多元思维模型（反转思考、能力圈、第二层思考、检查清单）来分析以下问题：\n\n",
+  "/mao":
+    "请以毛泽东的战略思维（矛盾论、实践论、群众路线、农村包围城市）来分析以下问题：\n\n",
+};
+
+/* ── parse [strike:xxx] into clickable links ── */
+const STRIKE_RE = /\[strike:([a-f0-9]+)\]/g;
+
+function renderContent(text: string): ReactNode {
+  const parts: ReactNode[] = [];
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  // Reset regex state
+  STRIKE_RE.lastIndex = 0;
+  while ((match = STRIKE_RE.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push(text.slice(lastIndex, match.index));
+    }
+    const strikeId = match[1];
+    parts.push(
+      <a
+        key={match.index}
+        href={`/timeline?strike=${strikeId}`}
+        className="underline underline-offset-2 text-bark/70 hover:text-bark transition-colors"
+        title={`认知记录 ${strikeId}`}
+      >
+        [{strikeId}]
+      </a>,
+    );
+    lastIndex = match.index + match[0].length;
+  }
+  if (lastIndex < text.length) {
+    parts.push(text.slice(lastIndex));
+  }
+  return parts.length > 0 ? parts : text;
+}
+
+/* ── save conversation as diary via ingest ── */
+async function saveConversationAsDiary(messages: Message[]) {
+  if (messages.length === 0) return;
+  const lines = messages.map(
+    (m) => (m.role === "user" ? "我：" : "路路：") + m.content,
+  );
+  const content = `【咨询对话记录】\n${lines.join("\n")}`;
+  try {
+    await api.post("/api/v1/ingest", { type: "text", content });
+  } catch {
+    // best-effort save
+  }
+}
+
 export default function CounselorChat({ context, onClose }: CounselorChatProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const messagesRef = useRef<Message[]>(messages);
+
+  // Keep ref in sync for cleanup
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  async function handleSend() {
-    const question = input.trim();
-    if (!question || loading) return;
+  // Save conversation on unmount (close)
+  useEffect(() => {
+    return () => {
+      saveConversationAsDiary(messagesRef.current);
+    };
+  }, []);
 
-    const userMsg: Message = { role: "user", content: question };
+  const handleSend = useCallback(async () => {
+    const raw = input.trim();
+    if (!raw || loading) return;
+
+    // Detect framework prefix
+    let question = raw;
+    let frameworkPrefix = "";
+    for (const [prefix, instruction] of Object.entries(FRAMEWORK_PREFIXES)) {
+      if (raw.toLowerCase().startsWith(prefix)) {
+        question = raw.slice(prefix.length).trim();
+        frameworkPrefix = instruction;
+        break;
+      }
+    }
+
+    if (!question) return;
+
+    const userMsg: Message = { role: "user", content: raw };
     setMessages((prev) => [...prev, userMsg]);
     setInput("");
     setLoading(true);
@@ -36,7 +118,7 @@ export default function CounselorChat({ context, onClose }: CounselorChatProps) 
       const res = await fetch("/api/v1/chat/decision", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question }),
+        body: JSON.stringify({ question: frameworkPrefix + question }),
       });
       const data = await res.json();
       const assistantMsg: Message = {
@@ -52,7 +134,7 @@ export default function CounselorChat({ context, onClose }: CounselorChatProps) 
     } finally {
       setLoading(false);
     }
-  }
+  }, [input, loading]);
 
   return (
     <div className="flex flex-col h-full bg-cream text-bark">
@@ -88,13 +170,13 @@ export default function CounselorChat({ context, onClose }: CounselorChatProps) 
               <LuluLogo size={24} className="shrink-0 mt-1" />
             )}
             <div
-              className={`max-w-[75%] rounded-xl px-3 py-2 text-sm leading-relaxed ${
+              className={`max-w-[75%] rounded-xl px-3 py-2 text-sm leading-relaxed whitespace-pre-wrap ${
                 msg.role === "user"
                   ? "bg-bark text-cream rounded-br-sm"
                   : "bg-sand text-bark rounded-bl-sm"
               }`}
             >
-              {msg.content}
+              {msg.role === "assistant" ? renderContent(msg.content) : msg.content}
             </div>
           </div>
         ))}
@@ -116,7 +198,7 @@ export default function CounselorChat({ context, onClose }: CounselorChatProps) 
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && !e.nativeEvent.isComposing && handleSend()}
-            placeholder="输入你的问题…"
+            placeholder="输入你的问题… (/munger 或 /mao 切换视角)"
             className="flex-1 rounded-lg border border-brand-border bg-white px-3 py-2 text-sm text-bark placeholder:text-bark/30 focus:outline-none focus:ring-1 focus:ring-bark/20"
           />
           <button

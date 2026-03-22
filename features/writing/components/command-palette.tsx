@@ -29,7 +29,7 @@ const COMMANDS: Command[] = [
 interface CommandPaletteProps {
   isOpen: boolean
   onClose: () => void
-  onSelect: (command: string) => void
+  onSelect: (command: Command) => void
   position?: { x: number; y: number }
 }
 
@@ -73,7 +73,7 @@ export function CommandPalette({ isOpen, onClose, onSelect, position }: CommandP
 
   const handleSelect = useCallback(
     (cmd: Command) => {
-      onSelect(cmd.key)
+      onSelect(cmd)
       onClose()
     },
     [onSelect, onClose]

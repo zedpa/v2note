@@ -136,6 +136,30 @@ function EveningContent() {
         </p>
       </Section>
 
+      {/* 最有价值记录 */}
+      <Section title="最有价值记录">
+        <div className="rounded-lg bg-sand/40 dark:bg-secondary/30 p-3">
+          <p className="text-sm text-bark/60 dark:text-muted-foreground italic">
+            今天还没有产出记录哦，记下点什么吧 ✨
+          </p>
+        </div>
+      </Section>
+
+      {/* 情绪 */}
+      <Section title="今日情绪">
+        <div className="flex items-center gap-3">
+          {["😊", "😐", "😔", "😤", "🤔"].map((emoji) => (
+            <button
+              key={emoji}
+              type="button"
+              className="w-9 h-9 rounded-full bg-sand/50 dark:bg-secondary/40 hover:bg-sand dark:hover:bg-secondary flex items-center justify-center text-lg transition-colors"
+            >
+              {emoji}
+            </button>
+          ))}
+        </div>
+      </Section>
+
       {/* 反思引导 */}
       <Section title="反思引导">
         <div className="border-2 border-dashed border-bark/15 dark:border-foreground/15 rounded-lg p-4">

@@ -10,6 +10,7 @@ interface MenuBarProps {
   currentScene: Scene;
   onSceneChange: (scene: Scene) => void;
   onAction: (action: string) => void;
+  hasNewReport?: boolean;
 }
 
 const scenes: { key: Scene; label: string }[] = [
@@ -31,6 +32,7 @@ export function MenuBar({
   currentScene,
   onSceneChange,
   onAction,
+  hasNewReport = false,
 }: MenuBarProps) {
   const [visible, setVisible] = useState(false);
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -108,10 +110,13 @@ export function MenuBar({
           <button
             key={a.action}
             onClick={() => onAction(a.action)}
-            className="px-2 py-1 rounded-lg text-sm hover:bg-sand transition"
+            className="relative px-2 py-1 rounded-lg text-sm hover:bg-sand transition"
           >
             {a.emoji}
             {a.label && <span className="ml-0.5">{a.label}</span>}
+            {a.action === "回顾" && hasNewReport && (
+              <span className="absolute top-0.5 right-0.5 w-2 h-2 rounded-full bg-deer" />
+            )}
           </button>
         ))}
       </div>

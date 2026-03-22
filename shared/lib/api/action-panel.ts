@@ -17,6 +17,7 @@ export interface ActionItem {
   goalName: string;
   symbol: "next" | "scheduled" | "flexible";
   scheduledTime?: string;
+  skipCount?: number;
 }
 
 export interface GoalIndicator {

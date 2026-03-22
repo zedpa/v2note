@@ -1,11 +1,15 @@
 # SCRATCH.md — 执行上下文备份
 
 ## 当前阶段
-前端 P2 认知地图 — 任务已拆为 6 张卡片，待逐个执行
+PC 端 Phase A-D 全部完成（18/18 任务）
 
-## 阻塞记录
-Claude Code CLI 大任务失败（exit code 1 无输出），原因：上下文窗口限制。
-解法：任务拆细，每次只给一个小任务。Zed 负责排查 CLI 问题。
+## Claude Code CLI 使用经验
+- exit code 1 ≠ 任务失败——Claude Code 已知 bug（sandbox cwd tracking 副作用）
+- 正确判断：看输出内容 + 检查目标文件 + 跑 tsc，不依赖 exit code
+- 不用 `| Out-String` 管道，直接 `2>&1`
+- prompt 用英文更稳定
+- 极简 prompt 先创建骨架再扩展
+- 参考 GitHub issues: anthropics/claude-code #36507 #36071 #37236
 
 ## 任务总览
 | ID | 任务 | 复杂度 | 前置 | 状态 |
