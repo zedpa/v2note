@@ -44,3 +44,30 @@ export async function uploadPCM(
   console.log(`[oss] Uploaded ${combined.length} bytes to ${path}`);
   return path;
 }
+
+/**
+ * Upload a generic file (Buffer) to OSS. Returns the public URL.
+ */
+export async function uploadFile(
+  folder: string,
+  filename: string,
+  data: Buffer,
+): Promise<string> {
+  const client = await getClient();
+  const path = `${folder}/${filename}`;
+  const result = await client.put(path, data);
+  console.log(`[oss] Uploaded ${data.length} bytes to ${path}`);
+  return result.url as string;
+}
+
+/**
+ * Returns true if OSS environment variables are configured.
+ */
+export function isOssConfigured(): boolean {
+  return !!(
+    process.env.OSS_REGION &&
+    process.env.OSS_ACCESS_KEY_ID &&
+    process.env.OSS_ACCESS_KEY_SECRET &&
+    process.env.OSS_BUCKET
+  );
+}
