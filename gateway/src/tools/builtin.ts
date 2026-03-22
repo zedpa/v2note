@@ -4,6 +4,8 @@
  */
 
 import { recordRepo, transcriptRepo, summaryRepo, customSkillRepo, todoRepo, goalRepo, pendingIntentRepo, notebookRepo } from "../db/repositories/index.js";
+import { extractUrl } from "../ingest/url-extractor.js";
+import { digestRecords } from "../handlers/digest.js";
 
 export interface BuiltinToolDef {
   name: string;
@@ -115,6 +117,19 @@ export const BUILTIN_TOOLS: BuiltinToolDef[] = [
     },
   },
   {
+    name: "ingest",
+    description: "将信息录入 v2note 认知系统。支持文本、URL。",
+    parameters: {
+      type: "object",
+      properties: {
+        text: { type: "string", description: "要录入的文本内容" },
+        url: { type: "string", description: "要导入的网页 URL" },
+        source_type: { type: "string", enum: ["think", "material"], description: "内容类型，默认 material" },
+      },
+      required: ["text"],
+    },
+  },
+  {
     name: "confirm_intent",
     description: "确认或处理一个待确认的意图。用户对之前提到的愿望/目标做出明确回应时使用。",
     parameters: {
@@ -159,6 +174,8 @@ export async function callBuiltinTool(
       return handleCreateGoal(args, deviceId, userId);
     case "create_notebook":
       return handleCreateNotebook(args, deviceId, userId);
+    case "ingest":
+      return handleIngest(args, deviceId, userId);
     case "confirm_intent":
       return handleConfirmIntent(args, deviceId, userId);
     default:
@@ -475,5 +492,65 @@ async function handleConfirmIntent(
   return {
     success: true,
     message: `已忽略「${intent.text}」`,
+  };
+}
+
+async function handleIngest(
+  args: Record<string, unknown>,
+  deviceId: string,
+  userId?: string,
+): Promise<ToolCallResult> {
+  const text = String(args.text ?? "").trim();
+  if (!text) {
+    return { success: false, message: "text 不能为空" };
+  }
+
+  const url = args.url ? String(args.url).trim() : undefined;
+  const sourceType = (args.source_type as "think" | "material") ?? "material";
+
+  let finalText = text;
+  let title = text.slice(0, 50);
+
+  if (url) {
+    try {
+      const extracted = await extractUrl(url);
+      finalText = `${text}\n\n---\n\n${extracted.content}`;
+      title = extracted.title || title;
+    } catch (err) {
+      console.error("[builtin-tool] ingest extractUrl failed:", err);
+      // Continue with just the text
+    }
+  }
+
+  const record = await recordRepo.create({
+    device_id: deviceId,
+    user_id: userId,
+    status: "completed",
+    source: "chat_tool",
+    source_type: sourceType,
+  });
+
+  await transcriptRepo.create({
+    record_id: record.id,
+    text: finalText,
+  });
+
+  await summaryRepo.create({
+    record_id: record.id,
+    title,
+    short_summary: finalText.slice(0, 200),
+  });
+
+  // Trigger digest in background
+  digestRecords([record.id], { deviceId, userId }).catch(
+    (err) => console.error("[builtin-tool] ingest digest failed:", err),
+  );
+
+  console.log(`[builtin-tool] ingest: record ${record.id} created for device ${deviceId}`);
+
+  return {
+    success: true,
+    message: `已录入 (ID: ${record.id})`,
+    data: { record_id: record.id },
   };
 }

@@ -2,7 +2,21 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { api } from '@/shared/lib/api'
+import { toast as sonnerToast } from 'sonner'
 import { CommandPalette, type Command } from '@/features/writing/components/command-palette'
+
+function fileToBase64(file: File | Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      const result = reader.result as string
+      // Strip data URL prefix (e.g. "data:image/png;base64,")
+      resolve(result.includes(',') ? result.split(',')[1] : result)
+    }
+    reader.onerror = reject
+    reader.readAsDataURL(file)
+  })
+}
 
 function getDateTitle(): string {
   const now = new Date()
@@ -392,12 +406,30 @@ export default function WritePage() {
         insertText = files
           .map((f) => {
             const isImage = f.type.startsWith('image/')
-            console.log('[upload]', isImage ? 'image' : 'file', f.name, f.size)
             return isImage ? `[📷 ${f.name}]` : `[📎 ${f.name}]`
           })
           .join('\n')
+        // Fire-and-forget uploads
+        for (const f of files) {
+          const isImage = f.type.startsWith('image/')
+          fileToBase64(f).then((base64) => {
+            if (isImage) {
+              return api.post<{ description?: string }>('/api/v1/ingest', {
+                type: 'image', file_base64: base64, source_type: 'material',
+              }).then((res) => sonnerToast.success(`图片已收录${res.description ? ` · ${res.description.slice(0, 30)}` : ''}`))
+            } else {
+              return api.post<{ preview?: string }>('/api/v1/ingest', {
+                type: 'file', file_base64: base64, filename: f.name, mimeType: f.type, source_type: 'material',
+              }).then((res) => sonnerToast.success(`${f.name} 已收录${res.preview ? ` · ${res.preview.slice(0, 30)}` : ''}`))
+            }
+          }).catch(() => sonnerToast.error(`${f.name} 上传失败`))
+        }
       } else if (uri) {
         insertText = `[🌐 ${uri}]`
+        api.post<{ title?: string }>('/api/v1/ingest', {
+          type: 'url', content: uri, source_type: 'material',
+        }).then((res) => sonnerToast.success(`链接已收录${res.title ? ` · ${res.title}` : ''}`))
+          .catch(() => sonnerToast.error('链接提取失败'))
       } else if (text) {
         insertText = text
       }
@@ -443,8 +475,17 @@ export default function WritePage() {
       for (let i = 0; i < items.length; i++) {
         if (items[i].type.startsWith('image/')) {
           e.preventDefault()
-          console.log('[upload] pasted image', items[i].type)
+          const file = items[i].getAsFile()
           insertAtCursor('[📷 image]')
+          if (file) {
+            fileToBase64(file).then((base64) =>
+              api.post<{ recordId: string; description?: string }>('/api/v1/ingest', {
+                type: 'image', file_base64: base64, source_type: 'material',
+              })
+            ).then((res) => {
+              sonnerToast.success(`图片已收录${res.description ? ` · ${res.description.slice(0, 30)}` : ''}`)
+            }).catch(() => sonnerToast.error('图片上传失败'))
+          }
           return
         }
       }
@@ -455,7 +496,13 @@ export default function WritePage() {
       // URL paste
       if (/^https?:\/\//.test(text.trim())) {
         e.preventDefault()
-        insertAtCursor(`[🌐 ${text.trim()}]`)
+        const url = text.trim()
+        insertAtCursor(`[🌐 ${url}]`)
+        api.post<{ recordId: string; title?: string; preview?: string }>('/api/v1/ingest', {
+          type: 'url', content: url, source_type: 'material',
+        }).then((res) => {
+          sonnerToast.success(`链接已收录${res.title ? ` · ${res.title}` : ''}`)
+        }).catch(() => sonnerToast.error('链接提取失败'))
         return
       }
 
@@ -476,6 +523,10 @@ export default function WritePage() {
     if (pasteModal) {
       const preview = pasteModal.text.slice(0, 30)
       insertAtCursor(`[📄 粘贴素材: ${preview}...]`)
+      api.post('/api/v1/ingest', {
+        type: 'text', content: pasteModal.text, source_type: 'material',
+      }).then(() => sonnerToast.success('素材已收录'))
+        .catch(() => sonnerToast.error('素材收录失败'))
       setPasteModal(null)
     }
   }, [pasteModal, insertAtCursor])
