@@ -13,7 +13,7 @@ function getDateTitle(): string {
   return `${month}月${day}日 ${weekday}`
 }
 
-const DRAFT_KEY = 'v2note_write_draft'
+const DRAFT_KEY = 'v2note:draft'
 
 interface PopupItem {
   id: string
@@ -23,10 +23,12 @@ interface PopupItem {
 export default function WritePage() {
   const [content, setContent] = useState('')
   const [toast, setToast] = useState(false)
+  const [toastText, setToastText] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [paletteOpen, setPaletteOpen] = useState(false)
   const [palettePos, setPalettePos] = useState<{ x: number; y: number } | undefined>()
   const [dragging, setDragging] = useState(false)
+  const [pasteModal, setPasteModal] = useState<{ text: string } | null>(null)
 
   // @ popup state
   const [atOpen, setAtOpen] = useState(false)
@@ -88,10 +90,12 @@ export default function WritePage() {
     const text = content.trim()
     if (!text || submitting) return
     setSubmitting(true)
+    const firstLine = text.split('\n')[0].slice(0, 10)
     try {
       await api.post('/api/v1/ingest', { type: 'text', content: text })
       setContent('')
       localStorage.removeItem(DRAFT_KEY)
+      setToastText(firstLine)
       setToast(true)
     } catch {
       // silently fail for now
@@ -384,11 +388,16 @@ export default function WritePage() {
       let insertText = ''
 
       if (e.dataTransfer.files.length > 0) {
-        // For files/images, insert a placeholder
-        const names = Array.from(e.dataTransfer.files).map((f) => f.name)
-        insertText = names.map((n) => `![${n}](attachment:${n})`).join('\n')
+        const files = Array.from(e.dataTransfer.files)
+        insertText = files
+          .map((f) => {
+            const isImage = f.type.startsWith('image/')
+            console.log('[upload]', isImage ? 'image' : 'file', f.name, f.size)
+            return isImage ? `[📷 ${f.name}]` : `[📎 ${f.name}]`
+          })
+          .join('\n')
       } else if (uri) {
-        insertText = `[链接](${uri})`
+        insertText = `[🌐 ${uri}]`
       } else if (text) {
         insertText = text
       }
@@ -408,6 +417,76 @@ export default function WritePage() {
     [content]
   )
 
+  // Insert text at cursor helper
+  const insertAtCursor = useCallback(
+    (text: string) => {
+      const ta = textareaRef.current
+      const cursor = ta?.selectionStart ?? content.length
+      const before = content.slice(0, cursor)
+      const after = content.slice(cursor)
+      const newContent = before + text + after
+      setContent(newContent)
+      const newCursor = before.length + text.length
+      requestAnimationFrame(() => {
+        ta?.focus()
+        ta?.setSelectionRange(newCursor, newCursor)
+      })
+    },
+    [content]
+  )
+
+  // Paste handling
+  const handlePaste = useCallback(
+    (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+      const items = e.clipboardData.items
+      // Check for pasted images
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].type.startsWith('image/')) {
+          e.preventDefault()
+          console.log('[upload] pasted image', items[i].type)
+          insertAtCursor('[📷 image]')
+          return
+        }
+      }
+
+      const text = e.clipboardData.getData('text/plain')
+      if (!text) return
+
+      // URL paste
+      if (/^https?:\/\//.test(text.trim())) {
+        e.preventDefault()
+        insertAtCursor(`[🌐 ${text.trim()}]`)
+        return
+      }
+
+      // Long text paste (>=100 chars) - show modal
+      if (text.length >= 100) {
+        e.preventDefault()
+        setPasteModal({ text })
+        return
+      }
+
+      // Short text (<100 chars) - let default paste behavior handle it
+    },
+    [insertAtCursor]
+  )
+
+  // Paste modal handlers
+  const handlePasteAsMaterial = useCallback(() => {
+    if (pasteModal) {
+      const preview = pasteModal.text.slice(0, 30)
+      insertAtCursor(`[📄 粘贴素材: ${preview}...]`)
+      setPasteModal(null)
+    }
+  }, [pasteModal, insertAtCursor])
+
+  const handlePasteAsText = useCallback(() => {
+    if (pasteModal) {
+      insertAtCursor(pasteModal.text)
+      setPasteModal(null)
+    }
+  }, [pasteModal, insertAtCursor])
+
   // Filter items for popups
   const filteredAtItems = atItems.filter((i) =>
     i.label.toLowerCase().includes(atFilter.toLowerCase())
@@ -419,15 +498,16 @@ export default function WritePage() {
   return (
     <div className="min-h-screen bg-cream flex flex-col">
       <div
-        className="w-full max-w-[680px] mx-auto px-6 flex flex-col flex-1 relative"
+        className="w-full max-w-[680px] mx-auto px-6 pb-16 flex flex-col flex-1 relative"
         onDragEnter={handleDragEnter}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
       >
         {/* Date header */}
-        <div className="pt-10 pb-4">
-          <p className="font-serif text-sm text-bark/60">{getDateTitle()}</p>
+        <div className="pt-16 pb-4">
+          <p className="font-serif text-sm text-[#9B8E82]">{getDateTitle()}</p>
+          <div className="mt-3 border-t border-brand-border" />
         </div>
 
         {/* Editor area */}
@@ -437,9 +517,10 @@ export default function WritePage() {
             value={content}
             onChange={handleTextareaChange}
             onKeyDown={handleTextareaKeyDown}
-            placeholder="开始记录...  输入 / 唤起命令"
+            onPaste={handlePaste}
+            placeholder="开始记录..."
             autoFocus
-            className="w-full min-h-[60vh] bg-transparent border-none outline-none resize-none font-mono text-[15px] leading-[2] text-bark placeholder:text-bark/30"
+            className="w-full min-h-[60vh] bg-transparent border-none outline-none resize-none font-mono text-[15px] leading-[2] text-[#2C2520] placeholder:text-bark/30"
           />
 
           {/* Command palette (positioned relative to editor) */}
@@ -453,7 +534,7 @@ export default function WritePage() {
           {/* @ popup: structure list (topics + goals) */}
           {atOpen && filteredAtItems.length > 0 && (
             <ul
-              className="absolute z-50 bg-white rounded-lg shadow-lg border border-brand-border py-1 max-h-48 overflow-y-auto w-56"
+              className="absolute z-50 bg-white rounded-lg shadow-sm border border-brand-border py-1 max-h-48 overflow-y-auto w-56"
               style={{ left: atPos.x, top: atPos.y }}
             >
               {filteredAtItems.map((item, i) => (
@@ -496,7 +577,7 @@ export default function WritePage() {
           {/* # popup: tag list */}
           {hashOpen && filteredHashItems.length > 0 && (
             <ul
-              className="absolute z-50 bg-white rounded-lg shadow-lg border border-brand-border py-1 max-h-48 overflow-y-auto w-48"
+              className="absolute z-50 bg-white rounded-lg shadow-sm border border-brand-border py-1 max-h-48 overflow-y-auto w-48"
               style={{ left: hashPos.x, top: hashPos.y }}
             >
               {filteredHashItems.map((item, i) => (
@@ -569,7 +650,7 @@ export default function WritePage() {
         )}
 
         {/* Status bar */}
-        <div className="sticky bottom-0 py-3 flex items-center justify-between text-xs text-bark/50 opacity-0 hover:opacity-100 transition-opacity duration-300">
+        <div className="sticky bottom-0 py-3 flex items-center justify-between text-xs text-bark/50 opacity-0 hover:opacity-100 transition-opacity duration-200">
           <span className="font-mono">Markdown</span>
           <span>{lineCount} 行 · {charCount} 字</span>
           <button
@@ -583,8 +664,31 @@ export default function WritePage() {
 
         {/* Toast */}
         {toast && (
-          <div className="fixed bottom-8 left-1/2 -translate-x-1/2 text-sm text-bark/80 bg-sand px-4 py-2 rounded-lg shadow animate-card-enter">
-            ✓ 路路收到了
+          <div className="fixed bottom-8 left-1/2 -translate-x-1/2 text-sm text-bark/80 bg-sand px-4 py-2 rounded-lg shadow-sm animate-card-enter">
+            ✓ 路路收到了{toastText ? ` · 关于${toastText}` : ''}
+          </div>
+        )}
+
+        {/* Paste modal */}
+        {pasteModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-bark/20">
+            <div className="bg-cream rounded-xl shadow-sm border border-brand-border px-6 py-5 max-w-sm">
+              <p className="text-sm text-[#2C2520] mb-4">作为素材导入？</p>
+              <div className="flex gap-3 justify-end">
+                <button
+                  onClick={handlePasteAsText}
+                  className="px-3 py-1.5 text-sm rounded-lg text-bark/70 hover:bg-sand transition-colors duration-200"
+                >
+                  否
+                </button>
+                <button
+                  onClick={handlePasteAsMaterial}
+                  className="px-3 py-1.5 text-sm rounded-lg bg-deer text-white hover:bg-deer/90 transition-colors duration-200"
+                >
+                  是
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </div>
