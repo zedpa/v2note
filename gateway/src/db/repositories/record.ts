@@ -9,6 +9,7 @@ export interface Record {
   duration_seconds: number | null;
   location_text: string | null;
   notebook: string | null;
+  source_type: string;
   archived: boolean;
   digested: boolean;
   digested_at: string | null;
@@ -94,19 +95,21 @@ export async function create(fields: {
   user_id?: string;
   status?: string;
   source?: string;
+  source_type?: string;
   audio_path?: string;
   duration_seconds?: number;
   location_text?: string;
   notebook?: string;
 }): Promise<Record> {
   const row = await queryOne<Record>(
-    `INSERT INTO record (device_id, user_id, status, source, audio_path, duration_seconds, location_text, notebook)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
+    `INSERT INTO record (device_id, user_id, status, source, source_type, audio_path, duration_seconds, location_text, notebook)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
     [
       fields.device_id,
       fields.user_id ?? null,
       fields.status ?? "uploading",
       fields.source ?? "voice",
+      fields.source_type ?? "think",
       fields.audio_path ?? null,
       fields.duration_seconds ?? null,
       fields.location_text ?? null,
@@ -125,7 +128,7 @@ export async function updateStatus(id: string, status: string): Promise<void> {
 
 export async function updateFields(
   id: string,
-  fields: { status?: string; archived?: boolean; duration_seconds?: number },
+  fields: { status?: string; archived?: boolean; duration_seconds?: number; source_type?: string },
 ): Promise<void> {
   const sets: string[] = ["updated_at = now()"];
   const params: any[] = [];
@@ -141,6 +144,10 @@ export async function updateFields(
   if (fields.duration_seconds !== undefined) {
     sets.push(`duration_seconds = $${i++}`);
     params.push(fields.duration_seconds);
+  }
+  if (fields.source_type !== undefined) {
+    sets.push(`source_type = $${i++}`);
+    params.push(fields.source_type);
   }
   params.push(id);
   await execute(`UPDATE record SET ${sets.join(", ")} WHERE id = $${i}`, params);

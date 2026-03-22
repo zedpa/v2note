@@ -1,28 +1,28 @@
 import { digestRecords } from './digest.js';
-import { loadSkills, filterActiveSkills, mergeWithCustomSkills } from "../skills/loader.js";
-import { buildProcessPrompt } from "./process-prompt.js";
+/* MOVED TO DIGEST */ // import { loadSkills, filterActiveSkills, mergeWithCustomSkills } from "../skills/loader.js";
+/* MOVED TO DIGEST */ // import { buildProcessPrompt } from "./process-prompt.js";
 import { chatCompletion, type ChatMessage } from "../ai/provider.js";
-import { MemoryManager } from "../memory/manager.js";
-import { updateSoul } from "../soul/manager.js";
-import { updateProfile } from "../profile/manager.js";
+/* MOVED TO DIGEST */ // import { MemoryManager } from "../memory/manager.js";
+/* MOVED TO DIGEST */ // import { updateSoul } from "../soul/manager.js";
+/* MOVED TO DIGEST */ // import { updateProfile } from "../profile/manager.js";
 import { appendToDiary } from "../diary/manager.js";
-import { join, dirname } from "node:path";
-import { fileURLToPath } from "node:url";
-import { skillConfigRepo } from "../db/repositories/index.js";
-import { todoRepo } from "../db/repositories/index.js";
-import { customerRequestRepo } from "../db/repositories/index.js";
-import { settingChangeRepo } from "../db/repositories/index.js";
-import { tagRepo } from "../db/repositories/index.js";
+/* MOVED TO DIGEST */ // import { join, dirname } from "node:path";
+/* MOVED TO DIGEST */ // import { fileURLToPath } from "node:url";
+/* MOVED TO DIGEST */ // import { skillConfigRepo } from "../db/repositories/index.js";
+/* MOVED TO DIGEST */ // import { todoRepo } from "../db/repositories/index.js";
+/* MOVED TO DIGEST */ // import { customerRequestRepo } from "../db/repositories/index.js";
+/* MOVED TO DIGEST */ // import { settingChangeRepo } from "../db/repositories/index.js";
+/* MOVED TO DIGEST */ // import { tagRepo } from "../db/repositories/index.js";
 import { recordRepo } from "../db/repositories/index.js";
 import { summaryRepo } from "../db/repositories/index.js";
-import { goalRepo } from "../db/repositories/index.js";
-import { pendingIntentRepo } from "../db/repositories/index.js";
-import { extractKeywords, maySoulUpdate, mayProfileUpdate } from "../lib/text-utils.js";
-import { estimateBatchTodos } from "../proactive/time-estimator.js";
-import { getSession } from "../session/manager.js";
+/* MOVED TO DIGEST */ // import { goalRepo } from "../db/repositories/index.js";
+/* MOVED TO DIGEST */ // import { pendingIntentRepo } from "../db/repositories/index.js";
+/* MOVED TO DIGEST */ // import { extractKeywords, maySoulUpdate, mayProfileUpdate } from "../lib/text-utils.js";
+/* MOVED TO DIGEST */ // import { estimateBatchTodos } from "../proactive/time-estimator.js";
+/* MOVED TO DIGEST */ // import { getSession } from "../session/manager.js";
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const SKILLS_DIR = join(__dirname, "../../skills");
+/* MOVED TO DIGEST */ // const __dirname = dirname(fileURLToPath(import.meta.url));
+/* MOVED TO DIGEST */ // const SKILLS_DIR = join(__dirname, "../../skills");
 
 export interface LocalConfigPayload {
   soul?: { content: string };
@@ -56,40 +56,37 @@ export interface IntentSignal {
 }
 
 export interface ProcessResult {
-  todos: string[];
-  intents: IntentSignal[];
-  pending_followups: number;
-  customer_requests: string[];
-  setting_changes: string[];
-  tags: string[];
-  relays: RelayExtract[];
+  todos?: string[];
+  intents?: IntentSignal[];
+  pending_followups?: number;
+  customer_requests?: string[];
+  setting_changes?: string[];
+  tags?: string[];
+  relays?: RelayExtract[];
   summary?: string;
   error?: string;
 }
 
+const CLEANUP_SYSTEM_PROMPT = `你是一个转写文本清理工具。对以下语音转写文本进行最小化清理：
+- 移除口语填充词（嗯、啊、那个、就是说等）
+- 修正错别字和语音识别错误
+- 严格保留原文表述结构
+- 不改写句式，不合并拆分句子
+返回 JSON: {"summary": "清理后的文本"}`;
 
 /**
- * Process a single diary entry: hardcoded prompt + optional skills.
+ * Process a single diary entry: clean transcript text, save summary, trigger digest.
  */
 export async function processEntry(payload: ProcessPayload): Promise<ProcessResult> {
-  const result: ProcessResult = {
-    todos: [],
-    intents: [],
-    pending_followups: 0,
-    customer_requests: [],
-    setting_changes: [],
-    tags: [],
-    relays: [],
-  };
+  const result: ProcessResult = {};
 
   try {
     console.log(`[process] Starting for record ${payload.recordId}, text length: ${payload.text.length}`);
 
-    // 1. Load optional skills (lightweight — just read files for prompt text)
+    /* MOVED TO DIGEST — skill loading, complex prompt building, structured extraction
     const builtinSkills = loadSkills(SKILLS_DIR);
     const allSkills = mergeWithCustomSkills(builtinSkills, payload.localConfig?.skills?.configs as any);
 
-    // Load skill config: prefer localConfig, fall back to server DB
     let skillConfigs: Array<{ skill_name: string; enabled: boolean }> = [];
     if (payload.localConfig?.skills?.configs) {
       skillConfigs = payload.localConfig.skills.configs.map((c) => ({
@@ -107,25 +104,24 @@ export async function processEntry(payload: ProcessPayload): Promise<ProcessResu
       }
     }
 
-    // Only load optional (non-hardcoded) skills — filter by enabled
     const enabledSkills = filterActiveSkills(allSkills, skillConfigs);
     const optionalPrompts = enabledSkills.map(s => `### ${s.name}\n${s.prompt}`);
-    console.log(`[process] Optional skills: ${enabledSkills.map(s => s.name).join(", ") || "(none)"}`);
 
-    // 2. Build hardcoded prompt + optional skill appendage
     const systemPrompt = buildProcessPrompt({
       existingTags: payload.localConfig?.existingTags,
       optionalSkillPrompts: optionalPrompts,
     });
-    console.log(`[process] System prompt length: ${systemPrompt.length}`);
+    */
 
-    // 3. Call AI
-    const dynamicTimeout = Math.min(300_000, 60_000 + Math.floor(payload.text.length / 1000) * 20_000);
-    console.log(`[process] Calling AI... (timeout: ${dynamicTimeout}ms, text: ${payload.text.length} chars)`);
+    // 1. Build simplified prompt — only text cleanup
     const messages: ChatMessage[] = [
-      { role: "system", content: systemPrompt },
+      { role: "system", content: CLEANUP_SYSTEM_PROMPT },
       { role: "user", content: payload.text },
     ];
+
+    // 2. Call AI
+    const dynamicTimeout = Math.min(300_000, 60_000 + Math.floor(payload.text.length / 1000) * 20_000);
+    console.log(`[process] Calling AI for text cleanup... (timeout: ${dynamicTimeout}ms, text: ${payload.text.length} chars)`);
 
     const response = await chatCompletion(messages, { json: true, temperature: 0.3, timeout: dynamicTimeout });
 
@@ -135,22 +131,23 @@ export async function processEntry(payload: ProcessPayload): Promise<ProcessResu
 
     console.log(`[process] AI response length: ${response.content.length}, usage: ${JSON.stringify(response.usage)}`);
 
-    // 4. Parse result
+    // 3. Parse response — only extract summary
     if (!response.content.trim()) {
       console.error("[process] AI returned empty content");
       result.error = "AI returned empty response";
     } else {
       try {
         const parsed = JSON.parse(response.content);
+        result.summary = typeof parsed.summary === "string" ? parsed.summary : undefined;
+        console.log(`[process] Parsed: summary: ${result.summary ? 'yes' : 'no'}`);
 
-        // Intent array (from hardcoded intent-classify rules)
+        /* MOVED TO DIGEST — intent/todo/tag/relay extraction
         if (Array.isArray(parsed.intents)) {
           result.intents = parsed.intents;
           result.todos = parsed.intents
             .filter((i: any) => i.type === "task")
             .map((i: any) => i.text);
         } else {
-          // Old format fallback
           result.todos = Array.isArray(parsed.todos) ? parsed.todos : [];
           result.intents = result.todos.map((t) => ({ type: "task" as const, text: t }));
         }
@@ -163,23 +160,35 @@ export async function processEntry(payload: ProcessPayload): Promise<ProcessResu
           : [];
         result.tags = Array.isArray(parsed.tags) ? parsed.tags : [];
         result.relays = Array.isArray(parsed.relays) ? parsed.relays : [];
-        result.summary = typeof parsed.summary === "string" ? parsed.summary : undefined;
 
-        // Filter tags: only keep tags that exist in the provided existing tags list
         if (payload.localConfig?.existingTags && result.tags.length > 0) {
           const existingSet = new Set(payload.localConfig.existingTags);
           result.tags = result.tags.filter((t: string) => existingSet.has(t));
         }
-
-        console.log(`[process] Parsed: ${result.todos.length} todos, ${result.intents.length} intents, ${result.customer_requests.length} requests, ${result.relays.length} relays, ${result.tags.length} tags, summary: ${result.summary ? 'yes' : 'no'}`);
+        */
       } catch {
         console.error("[process] Failed to parse AI response as JSON:", response.content.slice(0, 500));
         result.error = "AI response is not valid JSON";
       }
     }
 
-    // 5. Write extracted data to DB
+    // 4. Save summary to DB
     try {
+      if (result.summary) {
+        const existing = await summaryRepo.findByRecordId(payload.recordId);
+        if (existing) {
+          await summaryRepo.update(payload.recordId, { short_summary: result.summary });
+        } else {
+          await summaryRepo.create({
+            record_id: payload.recordId,
+            title: result.summary.slice(0, 50),
+            short_summary: result.summary,
+          });
+        }
+        console.log(`[process] Summary saved for record ${payload.recordId}`);
+      }
+
+      /* MOVED TO DIGEST — todos, customer_requests, relays, intents, goals, settings, tags DB writes
       if (result.todos.length > 0) {
         await todoRepo.createMany(
           result.todos.map((text) => ({
@@ -200,7 +209,6 @@ export async function processEntry(payload: ProcessPayload): Promise<ProcessResu
         );
       }
 
-      // Write relay todos
       if (result.relays.length > 0) {
         for (const relay of result.relays) {
           await todoRepo.createWithCategory({
@@ -216,10 +224,8 @@ export async function processEntry(payload: ProcessPayload): Promise<ProcessResu
             },
           });
         }
-        console.log(`[process] Created ${result.relays.length} relay todos`);
       }
 
-      // Route non-task intents to pending_intent table
       const nonTaskIntents = result.intents.filter((i) => i.type !== "task");
       for (const intent of nonTaskIntents) {
         if (intent.type === "wish" || intent.type === "goal") {
@@ -236,11 +242,7 @@ export async function processEntry(payload: ProcessPayload): Promise<ProcessResu
       result.pending_followups = nonTaskIntents.filter(
         (i) => i.type === "wish" || i.type === "goal",
       ).length;
-      if (result.pending_followups > 0) {
-        console.log(`[process] Created ${result.pending_followups} pending intents`);
-      }
 
-      // Auto-link new todos to active goals by keyword matching
       if (result.todos.length > 0) {
         try {
           const activeGoals = payload.userId
@@ -264,7 +266,6 @@ export async function processEntry(payload: ProcessPayload): Promise<ProcessResu
               }
               if (bestGoal) {
                 await todoRepo.update(todo.id, { goal_id: bestGoal.id } as any);
-                console.log(`[process] Linked todo "${todo.text}" to goal ${bestGoal.id} (score: ${bestGoal.score.toFixed(2)})`);
               }
             }
           }
@@ -283,48 +284,30 @@ export async function processEntry(payload: ProcessPayload): Promise<ProcessResu
         );
       }
 
-      // Save tags — only associate existing tags, never create new ones
       if (result.tags.length > 0) {
         for (const tagName of result.tags) {
           const tag = await tagRepo.findByName(tagName);
           if (tag) {
             await tagRepo.addToRecord(payload.recordId, tag.id);
-          } else {
-            console.log(`[process] Skipping unknown tag: ${tagName}`);
           }
         }
       }
-
-      // Save de-colloquialized summary to database
-      if (result.summary) {
-        const existing = await summaryRepo.findByRecordId(payload.recordId);
-        if (existing) {
-          await summaryRepo.update(payload.recordId, { short_summary: result.summary });
-        } else {
-          await summaryRepo.create({
-            record_id: payload.recordId,
-            title: result.summary.slice(0, 50),
-            short_summary: result.summary,
-          });
-        }
-        console.log(`[process] Summary saved for record ${payload.recordId}`);
-      }
+      */
     } catch (err: any) {
       console.error(`[process] DB write error: ${err.message}`);
     }
 
-    // 6. Update record status
+    // 5. Update record status
     await recordRepo.updateStatus(payload.recordId, "completed");
     console.log(`[process] Record ${payload.recordId} marked as completed`);
 
-    // 7. Background: enrich new todos
+    /* MOVED TO DIGEST — todo enrichment
     if (result.todos.length > 0) {
       const pendingTodos = payload.userId
         ? await todoRepo.findPendingByUser(payload.userId)
         : await todoRepo.findPendingByDevice(payload.deviceId);
       const newTodos = pendingTodos.slice(-result.todos.length);
       if (newTodos.length > 0) {
-        // Load memories only for enrichment (not injected into process prompt)
         let goalMemories: string[] = [];
         try {
           const activeGoals = payload.userId
@@ -362,15 +345,15 @@ export async function processEntry(payload: ProcessPayload): Promise<ProcessResu
                 ai_action_plan: estimate.ai_action_plan ?? null,
               });
             }
-            console.log(`[process] Todo enrichment updated for ${estimates.size} todos`);
           })
           .catch((err) => {
             console.warn("[process] Todo enrichment failed:", err.message);
           });
       }
     }
+    */
 
-    // 8. Background: maybe create long-term memory, conditionally update soul & profile
+    /* MOVED TO DIGEST — memory creation, soul update, profile update
     const today = new Date().toISOString().split("T")[0];
     const session = getSession(payload.deviceId);
     const memoryManager = session.memoryManager;
@@ -379,7 +362,6 @@ export async function processEntry(payload: ProcessPayload): Promise<ProcessResu
       console.warn("[process] Memory creation failed:", e.message);
     });
 
-    // Soul/Profile: only update when text likely contains relevant content
     const text = payload.text;
 
     if (maySoulUpdate(text)) {
@@ -392,8 +374,9 @@ export async function processEntry(payload: ProcessPayload): Promise<ProcessResu
         console.warn("[process] Profile update failed:", e.message);
       });
     }
+    */
 
-    // Append to daily diary
+    // 6. Append to daily diary
     const diaryLine = result.summary
       ? `[${new Date().toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })}] ${result.summary}`
       : `[${new Date().toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })}] ${payload.text.slice(0, 200)}`;
@@ -403,7 +386,7 @@ export async function processEntry(payload: ProcessPayload): Promise<ProcessResu
       console.warn("[process] Diary append failed:", e.message);
     });
 
-    // 9. Cognitive layer: immediate digest for deep content
+    // 7. Cognitive layer: trigger digest
     if (shouldDigestImmediately(result, payload.text.length)) {
       digestRecords([payload.recordId], {
         deviceId: payload.deviceId,
@@ -428,8 +411,9 @@ export async function processEntry(payload: ProcessPayload): Promise<ProcessResu
 }
 
 function shouldDigestImmediately(result: ProcessResult, textLength: number): boolean {
-  const deepTypes = new Set(['reflection', 'goal', 'complaint']);
-  const hasDeepIntent = result.intents.some(i => deepTypes.has(i.type));
+  /* MOVED TO DIGEST — intent-based detection no longer available here */
+  // const deepTypes = new Set(['reflection', 'goal', 'complaint']);
+  // const hasDeepIntent = result.intents.some(i => deepTypes.has(i.type));
   const isSubstantial = textLength > 80;
-  return hasDeepIntent && isSubstantial;
+  return isSubstantial;
 }

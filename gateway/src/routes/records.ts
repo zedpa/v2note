@@ -202,6 +202,17 @@ export function registerRecordRoutes(router: Router) {
     sendJson(res, { ok: true });
   });
 
+  // Toggle source_type
+  router.patch("/api/v1/records/:id/source-type", async (req, res, params) => {
+    const { source_type } = await readBody<{ source_type: "think" | "material" }>(req);
+    if (!source_type || !["think", "material"].includes(source_type)) {
+      sendJson(res, { error: "source_type must be 'think' or 'material'" }, 400);
+      return;
+    }
+    await recordRepo.updateFields(params.id, { source_type });
+    sendJson(res, { ok: true });
+  });
+
   // Delete records
   router.delete("/api/v1/records", async (req, res) => {
     const { ids } = await readBody<{ ids: string[] }>(req);
