@@ -1,0 +1,35 @@
+{
+  "name": "v2note",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "test:ui": "vitest --ui",
+    "lint": "eslint src/ --ext .ts,.tsx",
+    "typecheck": "tsc --noEmit",
+    "verify": "bash scripts/dev-loop.sh",
+    "spec:check": "bash scripts/spec-check.sh"
+  },
+  "dependencies": {
+    "next": "^15.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "dayjs": "^1.11.0",
+    "@prisma/client": "^6.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0",
+    "@vitest/coverage-v8": "^3.0.0",
+    "@vitest/ui": "^3.0.0",
+    "eslint": "^9.0.0",
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0"
+  }
+}
