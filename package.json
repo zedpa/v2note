@@ -15,7 +15,36 @@
     "build:android": "bash scripts/build-android.sh debug",
     "build:android:release": "bash scripts/build-android.sh release",
     "build:android:install": "bash scripts/build-android.sh debug --install",
-    "gateway": "cd gateway && pnpm dev"
+    "gateway": "cd gateway && pnpm dev",
+    "electron:dev": "next build && electron electron/main.js",
+    "electron:build": "next build && electron-builder --win --publish never",
+    "electron:build:mac": "next build && electron-builder --mac --publish never",
+    "electron:build:linux": "next build && electron-builder --linux --publish never"
+  },
+  "main": "electron/main.js",
+  "build": {
+    "appId": "com.v2note.desktop",
+    "productName": "念念有路",
+    "directories": {
+      "output": "dist-electron"
+    },
+    "files": [
+      "electron/**/*",
+      "out/**/*"
+    ],
+    "win": {
+      "target": "nsis"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    },
+    "mac": {
+      "target": "dmg"
+    },
+    "linux": {
+      "target": "AppImage"
+    }
   },
   "dependencies": {
     "@capacitor/android": "^8.0.2",
@@ -79,6 +108,12 @@
     "vaul": "^1.1.2",
     "zod": "^3.24.1"
   },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "electron",
+      "electron-winstaller"
+    ]
+  },
   "devDependencies": {
     "@capacitor/cli": "^8.0.2",
     "@playwright/test": "^1.58.2",
@@ -88,6 +123,8 @@
     "@types/node": "^22",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "electron": "^41.0.3",
+    "electron-builder": "^26.8.1",
     "jsdom": "^28.1.0",
     "playwright": "^1.58.2",
     "postcss": "^8.5",

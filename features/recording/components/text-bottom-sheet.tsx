@@ -1,13 +1,14 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Send } from "lucide-react";
+import { Send, Mic, Paperclip, Camera, Image, FileText, Link, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { executeCommand, getCommandDefs } from "@/features/commands/lib/registry";
 import type { CommandContext } from "@/features/commands/lib/registry";
 import { createManualNote } from "@/features/notes/lib/manual-note";
 import { emit } from "@/features/recording/lib/events";
 import { toast } from "sonner";
+import { api } from "@/shared/lib/api";
 
 interface TextBottomSheetProps {
   open: boolean;
@@ -16,6 +17,20 @@ interface TextBottomSheetProps {
   onCommandMode?: (text: string) => void;
   commandContext?: Partial<CommandContext>;
   activeNotebook?: string | null;
+  /** Called when mic button is tapped — closes sheet and starts recording */
+  onRecordPress?: () => void;
+}
+
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      resolve(result.includes(",") ? result.split(",")[1] : result);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
 }
 
 export function TextBottomSheet({
@@ -25,12 +40,17 @@ export function TextBottomSheet({
   onCommandMode,
   commandContext,
   activeNotebook,
+  onRecordPress,
 }: TextBottomSheetProps) {
   const [text, setText] = useState("");
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [bottomOffset, setBottomOffset] = useState(0);
+  const [showActions, setShowActions] = useState(false);
+  const [detectedUrl, setDetectedUrl] = useState<string | null>(null);
+  const [attachment, setAttachment] = useState<{ name: string; file: File } | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // ── visualViewport: keep sheet above keyboard ──
   useEffect(() => {
@@ -63,10 +83,13 @@ export function TextBottomSheet({
     if (!open) {
       setText("");
       setSuggestions([]);
+      setShowActions(false);
+      setDetectedUrl(null);
+      setAttachment(null);
     }
   }, [open]);
 
-  // Command suggestions (not for "/" alone — that triggers command mode)
+  // Command suggestions
   useEffect(() => {
     if (text === "/") {
       setSuggestions([]);
@@ -87,12 +110,18 @@ export function TextBottomSheet({
     }
   }, [text]);
 
+  // Detect URL in text
+  useEffect(() => {
+    const urlMatch = text.match(/https?:\/\/[^\s]+/);
+    setDetectedUrl(urlMatch ? urlMatch[0] : null);
+  }, [text]);
+
   // Auto-resize textarea
   const handleInput = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const value = e.target.value;
     setText(value);
 
-    // "/" alone (+ optional trailing whitespace from Android IME) → command mode
+    // "/" alone → command mode
     if (/^\/\s*$/.test(value)) {
       onCommandMode?.("/");
       onClose();
@@ -106,6 +135,40 @@ export function TextBottomSheet({
 
   const handleSubmit = useCallback(async () => {
     const trimmed = text.trim();
+
+    // Handle attachment upload
+    if (attachment) {
+      setSubmitting(true);
+      onClose();
+      try {
+        const base64 = await fileToBase64(attachment.file);
+        const isImage = attachment.file.type.startsWith("image/");
+        if (isImage) {
+          await api.post("/api/v1/ingest", {
+            type: "image",
+            file_base64: base64,
+            source_type: "material",
+          });
+          toast("图片已收录");
+        } else {
+          await api.post("/api/v1/ingest", {
+            type: "file",
+            file_base64: base64,
+            filename: attachment.name,
+            mimeType: attachment.file.type,
+            source_type: "material",
+          });
+          toast(`${attachment.name} 已收录`);
+        }
+        emit("recording:processed");
+      } catch {
+        toast.error("上传失败");
+      } finally {
+        setSubmitting(false);
+      }
+      return;
+    }
+
     if (!trimmed || submitting) return;
 
     // "/" alone → command mode
@@ -141,7 +204,33 @@ export function TextBottomSheet({
     } finally {
       setSubmitting(false);
     }
-  }, [text, submitting, commandContext, onStartReview, onClose, onCommandMode]);
+  }, [text, submitting, attachment, commandContext, onStartReview, onClose, onCommandMode, activeNotebook]);
+
+  const handleImportUrl = useCallback(() => {
+    if (!detectedUrl) return;
+    setSubmitting(true);
+    onClose();
+    api
+      .post("/api/v1/ingest", { type: "url", content: detectedUrl, source_type: "material" })
+      .then(() => {
+        toast("链接已收录");
+        emit("recording:processed");
+      })
+      .catch(() => toast.error("链接提取失败"))
+      .finally(() => setSubmitting(false));
+  }, [detectedUrl, onClose]);
+
+  const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setAttachment({ name: file.name, file });
+      setShowActions(false);
+    }
+    // Reset input so same file can be selected again
+    e.target.value = "";
+  }, []);
+
+  const hasContent = text.trim() || attachment;
 
   return (
     <>
@@ -153,7 +242,84 @@ export function TextBottomSheet({
         />
       )}
 
-      {/* Sheet — conditionally rendered for reliable Android display */}
+      {/* Hidden file input */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        className="hidden"
+        accept="image/*,.pdf,.docx,.xlsx,.txt,.md,.csv"
+        onChange={handleFileSelect}
+      />
+
+      {/* Action sheet for attachment options */}
+      {open && showActions && (
+        <div
+          className="fixed inset-0 z-[52] bg-black/30"
+          onClick={() => setShowActions(false)}
+        >
+          <div
+            className="absolute bottom-0 left-0 right-0 bg-background rounded-t-2xl animate-slide-up-sheet"
+            style={{ bottom: `${bottomOffset}px` }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-center pt-2.5 pb-1">
+              <div className="w-10 h-1 rounded-full bg-muted-foreground/25" />
+            </div>
+            <div className="px-4 pt-1 pb-4 pb-safe space-y-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowActions(false);
+                  const input = document.createElement("input");
+                  input.type = "file";
+                  input.accept = "image/*";
+                  input.capture = "environment";
+                  input.onchange = (e) => {
+                    const file = (e.target as HTMLInputElement).files?.[0];
+                    if (file) setAttachment({ name: file.name, file });
+                  };
+                  input.click();
+                }}
+                className="flex items-center gap-3 w-full px-3 py-3 rounded-xl text-foreground hover:bg-secondary transition-colors"
+              >
+                <Camera className="w-5 h-5 text-primary" />
+                <span className="text-sm">拍照</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowActions(false);
+                  const input = document.createElement("input");
+                  input.type = "file";
+                  input.accept = "image/*";
+                  input.onchange = (e) => {
+                    const file = (e.target as HTMLInputElement).files?.[0];
+                    if (file) setAttachment({ name: file.name, file });
+                  };
+                  input.click();
+                }}
+                className="flex items-center gap-3 w-full px-3 py-3 rounded-xl text-foreground hover:bg-secondary transition-colors"
+              >
+                <Image className="w-5 h-5 text-primary" />
+                <span className="text-sm">从相册选择</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowActions(false);
+                  fileInputRef.current?.click();
+                }}
+                className="flex items-center gap-3 w-full px-3 py-3 rounded-xl text-foreground hover:bg-secondary transition-colors"
+              >
+                <FileText className="w-5 h-5 text-primary" />
+                <span className="text-sm">选择文件</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Sheet */}
       {open && (
       <div
         className="fixed left-0 right-0 z-50 bg-background rounded-t-2xl shadow-2xl animate-slide-up-sheet"
@@ -182,7 +348,55 @@ export function TextBottomSheet({
             </div>
           )}
 
+          {/* Attachment preview */}
+          {attachment && (
+            <div className="flex items-center gap-2 mb-3 px-3 py-2 rounded-xl bg-secondary">
+              {attachment.file.type.startsWith("image/") ? (
+                <Image className="w-4 h-4 text-primary shrink-0" />
+              ) : (
+                <FileText className="w-4 h-4 text-primary shrink-0" />
+              )}
+              <span className="text-sm text-foreground flex-1 truncate">
+                {attachment.name}
+              </span>
+              <button
+                type="button"
+                onClick={() => setAttachment(null)}
+                className="text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+
+          {/* URL preview */}
+          {detectedUrl && !attachment && (
+            <div className="flex items-center gap-2 mb-3 px-3 py-2 rounded-xl bg-secondary">
+              <Link className="w-4 h-4 text-primary shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-medium text-foreground">链接已识别</p>
+                <p className="text-xs text-primary truncate">{detectedUrl}</p>
+              </div>
+              <button
+                type="button"
+                onClick={handleImportUrl}
+                className="text-xs px-2.5 py-1 rounded-full bg-primary text-primary-foreground font-medium shrink-0"
+              >
+                导入
+              </button>
+            </div>
+          )}
+
           <div className="flex items-end gap-2">
+            {/* Attach button */}
+            <button
+              type="button"
+              onClick={() => setShowActions(true)}
+              className="flex items-center justify-center w-9 h-9 shrink-0 text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <Paperclip className="w-5 h-5" />
+            </button>
+
             <textarea
               ref={textareaRef}
               autoFocus
@@ -199,19 +413,32 @@ export function TextBottomSheet({
               className="flex-1 bg-transparent resize-none text-[15px] leading-relaxed outline-none placeholder:text-muted-foreground/40 max-h-40 py-1"
               style={{ minHeight: "36px" }}
             />
-            <button
-              type="button"
-              onClick={handleSubmit}
-              disabled={!text.trim() || submitting}
-              className={cn(
-                "flex items-center justify-center w-9 h-9 rounded-full shrink-0 transition-colors",
-                text.trim()
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-secondary text-muted-foreground",
-              )}
-            >
-              <Send className="w-4 h-4" />
-            </button>
+
+            {/* Mic / Send button */}
+            {hasContent ? (
+              <button
+                type="button"
+                onClick={handleSubmit}
+                disabled={submitting}
+                className={cn(
+                  "flex items-center justify-center w-9 h-9 rounded-full shrink-0 transition-colors",
+                  "bg-primary text-primary-foreground",
+                )}
+              >
+                <Send className="w-4 h-4" />
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onRecordPress?.();
+                }}
+                className="flex items-center justify-center w-9 h-9 shrink-0 text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <Mic className="w-5 h-5" />
+              </button>
+            )}
           </div>
         </div>
       </div>

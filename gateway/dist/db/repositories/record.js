@@ -52,12 +52,13 @@ export async function findById(id) {
     return queryOne(`SELECT * FROM record WHERE id = $1`, [id]);
 }
 export async function create(fields) {
-    const row = await queryOne(`INSERT INTO record (device_id, user_id, status, source, audio_path, duration_seconds, location_text, notebook)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`, [
+    const row = await queryOne(`INSERT INTO record (device_id, user_id, status, source, source_type, audio_path, duration_seconds, location_text, notebook)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`, [
         fields.device_id,
         fields.user_id ?? null,
         fields.status ?? "uploading",
         fields.source ?? "voice",
+        fields.source_type ?? "think",
         fields.audio_path ?? null,
         fields.duration_seconds ?? null,
         fields.location_text ?? null,
@@ -83,6 +84,14 @@ export async function updateFields(id, fields) {
     if (fields.duration_seconds !== undefined) {
         sets.push(`duration_seconds = $${i++}`);
         params.push(fields.duration_seconds);
+    }
+    if (fields.source_type !== undefined) {
+        sets.push(`source_type = $${i++}`);
+        params.push(fields.source_type);
+    }
+    if (fields.audio_path !== undefined) {
+        sets.push(`audio_path = $${i++}`);
+        params.push(fields.audio_path);
     }
     params.push(id);
     await execute(`UPDATE record SET ${sets.join(", ")} WHERE id = $${i}`, params);

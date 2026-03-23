@@ -128,7 +128,7 @@ export async function updateStatus(id: string, status: string): Promise<void> {
 
 export async function updateFields(
   id: string,
-  fields: { status?: string; archived?: boolean; duration_seconds?: number; source_type?: string },
+  fields: { status?: string; archived?: boolean; duration_seconds?: number; source_type?: string; audio_path?: string },
 ): Promise<void> {
   const sets: string[] = ["updated_at = now()"];
   const params: any[] = [];
@@ -148,6 +148,10 @@ export async function updateFields(
   if (fields.source_type !== undefined) {
     sets.push(`source_type = $${i++}`);
     params.push(fields.source_type);
+  }
+  if (fields.audio_path !== undefined) {
+    sets.push(`audio_path = $${i++}`);
+    params.push(fields.audio_path);
   }
   params.push(id);
   await execute(`UPDATE record SET ${sets.join(", ")} WHERE id = $${i}`, params);

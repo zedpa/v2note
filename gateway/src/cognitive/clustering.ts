@@ -42,7 +42,7 @@ async function loadGraph(userId: string) {
   const strikeMap = new Map<string, StrikeEntry>();
   const ids: string[] = [];
   for (const s of strikes) {
-    if (!s.is_cluster) {
+    if (!s.is_cluster && s.source_type !== "material") {
       strikeMap.set(s.id, s);
       ids.push(s.id);
     }

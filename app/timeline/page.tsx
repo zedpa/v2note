@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, type MouseEvent } from 'react'
 import { fetchClusters, type ClusterSummary } from '@/shared/lib/api/cognitive'
 import { listRecords, getRecord } from '@/shared/lib/api/records'
+import { PCLayout } from '@/components/layout/pc-layout'
 
 type FilterType = '全部' | '语音' | '文字' | '图片' | '带文件'
 
@@ -100,6 +101,7 @@ export default function TimelinePage() {
   })
 
   return (
+    <PCLayout>
     <div className="h-screen bg-cream flex" onClick={() => setContextMenu(null)}>
       {/* Left: Structure Navigation */}
       <aside className="w-[200px] shrink-0 border-r border-brand-border overflow-y-auto bg-sand">
@@ -424,5 +426,6 @@ export default function TimelinePage() {
         )}
       </aside>
     </div>
+    </PCLayout>
   )
 }

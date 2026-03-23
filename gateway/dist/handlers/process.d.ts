@@ -37,17 +37,17 @@ export interface IntentSignal {
     context?: string;
 }
 export interface ProcessResult {
-    todos: string[];
-    intents: IntentSignal[];
-    pending_followups: number;
-    customer_requests: string[];
-    setting_changes: string[];
-    tags: string[];
-    relays: RelayExtract[];
+    todos?: string[];
+    intents?: IntentSignal[];
+    pending_followups?: number;
+    customer_requests?: string[];
+    setting_changes?: string[];
+    tags?: string[];
+    relays?: RelayExtract[];
     summary?: string;
     error?: string;
 }
 /**
- * Process a single diary entry: hardcoded prompt + optional skills.
+ * Process a single diary entry: clean transcript text, save summary, trigger digest.
  */
 export declare function processEntry(payload: ProcessPayload): Promise<ProcessResult>;

@@ -1,11 +1,12 @@
 "use client";
 
 import { useState, useRef, useCallback, useEffect } from "react";
-import { Play, Pause } from "lucide-react";
+import { Play, Pause, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { api } from "@/shared/lib/api";
 
 interface MiniAudioPlayerProps {
-  src: string;
+  recordId: string;
   className?: string;
 }
 
@@ -22,14 +23,17 @@ function seededBars(seed: string, count: number): number[] {
   return bars;
 }
 
-export function MiniAudioPlayer({ src, className }: MiniAudioPlayerProps) {
+export function MiniAudioPlayer({ recordId, className }: MiniAudioPlayerProps) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [playing, setPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
   const [duration, setDuration] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [audioSrc, setAudioSrc] = useState<string | null>(null);
+  const [error, setError] = useState(false);
   const rafRef = useRef<number>(0);
 
-  const bars = seededBars(src, 20);
+  const bars = seededBars(recordId, 20);
 
   const updateProgress = useCallback(() => {
     const audio = audioRef.current;
@@ -48,24 +52,61 @@ export function MiniAudioPlayer({ src, className }: MiniAudioPlayerProps) {
     };
   }, []);
 
-  const toggle = useCallback(
-    (e: React.MouseEvent) => {
-      e.stopPropagation();
-      const audio = audioRef.current;
-      if (!audio) return;
+  const loadAndPlay = useCallback(async () => {
+    if (error) return;
 
+    // If already loaded, just toggle
+    if (audioSrc && audioRef.current) {
       if (playing) {
-        audio.pause();
+        audioRef.current.pause();
         setPlaying(false);
       } else {
-        audio.play().then(() => {
+        audioRef.current.play().then(() => {
           setPlaying(true);
           rafRef.current = requestAnimationFrame(updateProgress);
         }).catch(() => {});
       }
-    },
-    [playing, updateProgress],
-  );
+      return;
+    }
+
+    // Fetch signed URL from gateway
+    setLoading(true);
+    try {
+      const data = await api.get(`/api/v1/records/${recordId}/audio`) as { url: string };
+      setAudioSrc(data.url);
+    } catch {
+      setError(true);
+      setLoading(false);
+    }
+  }, [recordId, audioSrc, playing, error, updateProgress]);
+
+  // Auto-play when audioSrc is set
+  useEffect(() => {
+    if (!audioSrc || !audioRef.current) return;
+    const audio = audioRef.current;
+
+    const onCanPlay = () => {
+      setLoading(false);
+      setDuration(audio.duration);
+      audio.play().then(() => {
+        setPlaying(true);
+        rafRef.current = requestAnimationFrame(updateProgress);
+      }).catch(() => setLoading(false));
+    };
+
+    const onError = () => {
+      setLoading(false);
+      setError(true);
+    };
+
+    audio.addEventListener("canplaythrough", onCanPlay, { once: true });
+    audio.addEventListener("error", onError, { once: true });
+
+    return () => {
+      audio.removeEventListener("canplaythrough", onCanPlay);
+      audio.removeEventListener("error", onError);
+    };
+  }, [audioSrc, updateProgress]);
 
   const handleEnded = useCallback(() => {
     setPlaying(false);
@@ -93,20 +134,31 @@ export function MiniAudioPlayer({ src, className }: MiniAudioPlayerProps) {
       )}
       onClick={(e) => e.stopPropagation()}
     >
-      <audio
-        ref={audioRef}
-        src={src}
-        preload="metadata"
-        onEnded={handleEnded}
-        onLoadedMetadata={handleLoadedMetadata}
-      />
+      {audioSrc && (
+        <audio
+          ref={audioRef}
+          src={audioSrc}
+          preload="metadata"
+          onEnded={handleEnded}
+          onLoadedMetadata={handleLoadedMetadata}
+        />
+      )}
 
       <button
         type="button"
-        onClick={toggle}
-        className="flex items-center justify-center w-7 h-7 rounded-full bg-primary text-primary-foreground shrink-0"
+        onClick={(e) => {
+          e.stopPropagation();
+          loadAndPlay();
+        }}
+        disabled={error}
+        className={cn(
+          "flex items-center justify-center w-7 h-7 rounded-full shrink-0",
+          error ? "bg-muted text-muted-foreground" : "bg-primary text-primary-foreground",
+        )}
       >
-        {playing ? (
+        {loading ? (
+          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+        ) : playing ? (
           <Pause className="w-3.5 h-3.5 fill-current" />
         ) : (
           <Play className="w-3.5 h-3.5 fill-current ml-0.5" />

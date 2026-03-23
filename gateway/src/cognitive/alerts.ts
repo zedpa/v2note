@@ -44,6 +44,8 @@ export async function generateAlerts(
      WHERE sa.user_id = $1
        AND b.type = 'contradiction'
        AND b.created_at >= NOW() - INTERVAL '7 days'
+       AND COALESCE(sa.source_type, 'think') != 'material'
+       AND COALESCE(sb.source_type, 'think') != 'material'
      ORDER BY b.created_at DESC`,
     [userId],
   );

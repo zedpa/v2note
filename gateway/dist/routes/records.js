@@ -2,6 +2,26 @@ import { readBody, sendJson, getDeviceId, getUserId } from "../lib/http-helpers.
 import { recordRepo, transcriptRepo, summaryRepo, tagRepo, todoRepo, ideaRepo, } from "../db/repositories/index.js";
 import { processEntry } from "../handlers/process.js";
 export function registerRecordRoutes(router) {
+    // Get signed audio URL for a record
+    router.get("/api/v1/records/:id/audio", async (_req, res, params) => {
+        const record = await recordRepo.findById(params.id);
+        if (!record || !record.audio_path) {
+            sendJson(res, { error: "Audio not found" }, 404);
+            return;
+        }
+        try {
+            const { getSignedUrl, isOssConfigured } = await import("../storage/oss.js");
+            if (!isOssConfigured()) {
+                sendJson(res, { error: "OSS not configured" }, 500);
+                return;
+            }
+            const url = await getSignedUrl(record.audio_path);
+            sendJson(res, { url });
+        }
+        catch (err) {
+            sendJson(res, { error: err.message }, 500);
+        }
+    });
     // List records (with summary + tags)
     router.get("/api/v1/records", async (req, res, _params, query) => {
         const deviceId = getDeviceId(req);
@@ -143,6 +163,16 @@ export function registerRecordRoutes(router) {
         if (short_summary !== undefined) {
             await summaryRepo.update(params.id, { short_summary });
         }
+        sendJson(res, { ok: true });
+    });
+    // Toggle source_type
+    router.patch("/api/v1/records/:id/source-type", async (req, res, params) => {
+        const { source_type } = await readBody(req);
+        if (!source_type || !["think", "material"].includes(source_type)) {
+            sendJson(res, { error: "source_type must be 'think' or 'material'" }, 400);
+            return;
+        }
+        await recordRepo.updateFields(params.id, { source_type });
         sendJson(res, { ok: true });
     });
     // Delete records

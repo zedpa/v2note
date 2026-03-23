@@ -7,6 +7,7 @@ export interface Record {
     duration_seconds: number | null;
     location_text: string | null;
     notebook: string | null;
+    source_type: string;
     archived: boolean;
     digested: boolean;
     digested_at: string | null;
@@ -32,6 +33,7 @@ export declare function create(fields: {
     user_id?: string;
     status?: string;
     source?: string;
+    source_type?: string;
     audio_path?: string;
     duration_seconds?: number;
     location_text?: string;
@@ -42,6 +44,8 @@ export declare function updateFields(id: string, fields: {
     status?: string;
     archived?: boolean;
     duration_seconds?: number;
+    source_type?: string;
+    audio_path?: string;
 }): Promise<void>;
 export declare function deleteByIds(ids: string[]): Promise<number>;
 export declare function archive(id: string): Promise<void>;

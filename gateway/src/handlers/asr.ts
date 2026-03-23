@@ -256,9 +256,8 @@ export function sendAudioChunk(deviceId: string, chunk: Buffer, sourceWs?: WsWeb
     console.warn(`[asr] Python stdin not writable for device ${deviceId}`);
   }
 
-  if (session.saveAudio) {
-    session.audioChunks.push(Buffer.from(chunk));
-  }
+  // Always accumulate audio for potential playback
+  session.audioChunks.push(Buffer.from(chunk));
 }
 
 /**
@@ -438,13 +437,16 @@ async function createRecordAndProcess(
     },
   });
 
-  // Optional: save audio to OSS
-  if (session.saveAudio && session.audioChunks.length > 0) {
+  // Save audio to OSS and update record with the URL
+  if (session.audioChunks.length > 0) {
     try {
-      const { uploadPCM } = await import("../storage/oss.js");
-      await uploadPCM(session.deviceId, session.audioChunks);
+      const { uploadPCM, isOssConfigured } = await import("../storage/oss.js");
+      if (isOssConfigured()) {
+        const audioUrl = await uploadPCM(session.deviceId, session.audioChunks);
+        await recordRepo.updateFields(record.id, { audio_path: audioUrl });
+      }
     } catch (err) {
-      console.error("[asr] OSS upload failed:", err);
+      console.error("[asr] OSS audio upload failed:", err);
     }
   }
 

@@ -12,6 +12,7 @@ interface FabGestureResult {
   deltaX: number;
   deltaY: number;
   reset: () => void;
+  forcePhase: (phase: FabPhase) => void;
   handlers: {
     onPointerDown: (e: React.PointerEvent) => void;
     onPointerMove: (e: React.PointerEvent) => void;
@@ -195,6 +196,7 @@ export function useFabGestures(callbacks: FabGestureCallbacks): FabGestureResult
     deltaX,
     deltaY,
     reset,
+    forcePhase: setPhaseSync,
     handlers: { onPointerDown, onPointerMove, onPointerUp, onPointerCancel },
   };
 }

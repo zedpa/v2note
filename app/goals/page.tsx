@@ -6,6 +6,7 @@ import {
   type GoalIndicator,
 } from "@/shared/lib/api/action-panel";
 import { getDeviceId } from "@/shared/lib/device";
+import { PCLayout } from "@/components/layout/pc-layout";
 
 /* ── Local types for three-level hierarchy ── */
 
@@ -342,6 +343,7 @@ export default function GoalsPage() {
   }, [newGoalName]);
 
   return (
+    <PCLayout>
     <div className="min-h-screen bg-cream dark:bg-background p-6">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-bark dark:text-foreground">
@@ -485,6 +487,7 @@ export default function GoalsPage() {
         />
       )}
     </div>
+    </PCLayout>
   );
 }
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
 import { initStatusBar } from "@/shared/lib/status-bar";
 import { NewHeader } from "@/shared/components/new-header";
@@ -31,6 +32,7 @@ import { LayoutGrid, Minus, Brain } from "lucide-react";
 import { toast } from "sonner";
 import { getCommandDefs } from "@/features/commands/lib/registry";
 // NudgeToastListener replaced by AiWindow (inside NotesTimeline)
+import { on } from "@/features/recording/lib/events";
 import { useBackHandler } from "@/shared/hooks/use-back-handler";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { LoginPage } from "@/features/auth/components/login-page";
@@ -55,6 +57,7 @@ type OverlayName =
   | null;
 
 export default function Page() {
+  const router = useRouter();
   const { setTheme } = useTheme();
   const { loggedIn, user, loading: authLoading, error: authError, login, register, logout } = useAuth();
   const { update, dismiss, applying } = useUpdateCheck();
@@ -109,6 +112,14 @@ export default function Page() {
 
   useEffect(() => {
     initStatusBar();
+  }, []);
+
+  // Auto-switch to timeline when recording completes (so user sees the result)
+  useEffect(() => {
+    const unsub = on("recording:uploaded", () => {
+      setViewMode("timeline");
+    });
+    return unsub;
   }, []);
 
   // Auto-show morning briefing (7-10am, once per day)
@@ -178,6 +189,27 @@ export default function Page() {
   const handleExport = useCallback((_format: string) => {
     toast("导出功能开发中...");
   }, []);
+
+  // PC redirect: wide screens go to /write (PC layout)
+  // Check immediately on mount to avoid mobile UI flash
+  const [pcRedirecting] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return window.innerWidth >= 768;
+  });
+  useEffect(() => {
+    if (pcRedirecting) {
+      router.replace("/write");
+    }
+  }, [pcRedirecting, router]);
+
+  // Wait for PC redirect before rendering mobile UI
+  if (pcRedirecting) {
+    return (
+      <div className="min-h-dvh flex items-center justify-center bg-cream">
+        <p className="text-sm text-bark/50">加载中...</p>
+      </div>
+    );
+  }
 
   // Auth gate: show login/register if not logged in
   if (authLoading) {

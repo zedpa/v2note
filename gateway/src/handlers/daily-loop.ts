@@ -8,6 +8,8 @@ import * as briefingRepo from "../db/repositories/daily-briefing.js";
 import { MemoryManager } from "../memory/manager.js";
 import { loadSoul } from "../soul/manager.js";
 import { loadProfile } from "../profile/manager.js";
+import { generateAlerts } from "../cognitive/alerts.js";
+import { aiDiaryRepo } from "../db/repositories/index.js";
 
 // ── Types ──
 
@@ -102,6 +104,21 @@ export async function generateMorningBriefing(
     ]);
     soulContent = soul?.content ?? "";
     profileContent = profile?.content ?? "";
+  } catch {
+    // non-critical
+  }
+
+  // 3b. Load cognitive alerts (recent contradictions/changes)
+  let cognitiveHints: string[] = [];
+  try {
+    const uid = userId ?? deviceId;
+    const alerts = await generateAlerts(uid);
+    cognitiveHints = alerts.slice(0, 3).map((a) => {
+      // Convert to warm, non-technical language
+      const aShort = a.strikeA.nucleus.slice(0, 30);
+      const bShort = a.strikeB.nucleus.slice(0, 30);
+      return `你之前关于「${aShort}」的想法似乎有些变化（与「${bShort}」），可以在复盘中聊聊`;
+    });
   } catch {
     // non-critical
   }
@@ -209,6 +226,7 @@ ${aiActionableContext}
 
 ## 近期记忆
 ${memoryContext}
+${cognitiveHints.length > 0 ? `\n## 思考变化提醒\n${cognitiveHints.join("\n")}\n将这些变化自然地编入 followups 字段，用温和的语气提醒用户可以回顾。不要使用"矛盾""聚类"等技术术语。` : ""}
 
 ## 昨日统计
 完成: ${yesterdayStats.done}/${yesterdayStats.total}
@@ -348,6 +366,26 @@ export async function generateEveningSummary(
     // non-critical
   }
 
+  // 5b. Load today's cognitive digest from ai-self diary
+  let cognitiveDigest = "";
+  try {
+    const diaryEntry = userId
+      ? await aiDiaryRepo.findByUser(userId, "ai-self", today)
+      : await aiDiaryRepo.findFull(deviceId, "ai-self", today);
+    if (diaryEntry?.full_content) {
+      // Extract [认知摘要] lines
+      const lines = diaryEntry.full_content
+        .split("\n")
+        .filter((l) => l.includes("[认知摘要]"))
+        .map((l) => l.replace("[认知摘要]", "").trim());
+      if (lines.length > 0) {
+        cognitiveDigest = lines.join("；");
+      }
+    }
+  } catch {
+    // non-critical
+  }
+
   // 6. Generate summary via AI
   const messages: ChatMessage[] = [
     {
@@ -377,7 +415,8 @@ ${pending.slice(0, 10).map((t) => `- ${t.text}`).join("\n") || "无"}
 已完成: ${relaysCompleted}, 待处理: ${relaysPending.length}
 ${relaysPending.map((t) => `- ${t.text}`).join("\n") || "无待转达"}
 
-## 今日新记录数: ${newRecordCount}`,
+## 今日新记录数: ${newRecordCount}
+${cognitiveDigest ? `\n## 今日思考发现\n${cognitiveDigest}\n将这些发现自然地编入 tomorrow_seeds 或 accomplishments。用"想法演进""新的联系""思路变化"等温和表述，不要使用"聚类""Strike""矛盾检测"等技术术语。` : ""}`,
     },
   ];
 

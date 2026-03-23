@@ -60,6 +60,12 @@ export async function digestRecords(
       .filter((r) => r !== null)
       .map((r) => r!.id);
 
+    // Build sourceType mapping: material stays material, everything else → think
+    const sourceTypeMap = new Map<string, string>();
+    for (const r of records.filter(Boolean)) {
+      sourceTypeMap.set(r!.id, r!.source_type === "material" ? "material" : "think");
+    }
+
     if (validIds.length === 0) {
       console.warn("[digest] No valid records found for ids:", recordIds);
       return;
@@ -133,7 +139,7 @@ export async function digestRecords(
           polarity: s.polarity,
           confidence: s.confidence ?? 0.5,
           source_id: validIds[0],
-          source_type: "voice",
+          source_type: sourceTypeMap.get(validIds[0]) ?? "think",
         });
         idxToId.set(i, entry.id);
 

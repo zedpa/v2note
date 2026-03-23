@@ -15,6 +15,7 @@ import { pendingIntentRepo } from "../db/repositories/index.js";
 import { isBuiltinTool, callBuiltinTool } from "../tools/builtin.js";
 import { maySoulUpdate, mayProfileUpdate } from "../lib/text-utils.js";
 import { gatherDecisionContext, buildDecisionPrompt } from "../cognitive/decision.js";
+import { generateAlerts } from "../cognitive/alerts.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const INSIGHTS_DIR = join(__dirname, "../../insights");
@@ -131,6 +132,24 @@ export async function startChat(
     }
   }
 
+  // Load cognitive context for review/insight modes
+  let cognitiveContext: string | undefined;
+  if (payload.mode === "review" || payload.mode === "insight") {
+    try {
+      const uid = payload.userId ?? payload.deviceId;
+      const alerts = await generateAlerts(uid);
+      if (alerts.length > 0) {
+        cognitiveContext = alerts.slice(0, 5).map((a) => {
+          const aShort = a.strikeA.nucleus.slice(0, 40);
+          const bShort = a.strikeB.nucleus.slice(0, 40);
+          return `- 用户之前说过「${aShort}」，后来又说「${bShort}」，想法有所变化`;
+        }).join("\n");
+      }
+    } catch {
+      // non-critical
+    }
+  }
+
   const systemPrompt = buildSystemPrompt({
     skills: activeSkills,
     soul: soul?.content,
@@ -138,6 +157,7 @@ export async function startChat(
     memory: memories,
     mode: "chat",
     pendingIntentContext,
+    cognitiveContext,
   });
 
   // Set up session context

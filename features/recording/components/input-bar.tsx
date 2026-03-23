@@ -100,12 +100,16 @@ export function InputBar({ onStartReview, onCommandDetected, commandContext }: I
           setPartialText("");
           break;
         case "asr.done":
+          setConfirmedText("");
+          setPartialText("");
           if (msg.payload.recordId) {
             emit("recording:uploaded");
             emit("recording:processed");
           }
           break;
         case "asr.error":
+          setConfirmedText("");
+          setPartialText("");
           toast.error(`识别错误: ${msg.payload.message}`);
           break;
         case "process.result":

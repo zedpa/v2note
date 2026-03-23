@@ -3,6 +3,10 @@
     "mobile-mcp": {
       "command": "cmd",
       "args": ["/c", "npx", "-y", "@mobilenext/mobile-mcp@latest"]
+    },
+    "stitch": {
+      "command": "cmd",
+      "args": ["/c", "npx", "-y", "@_davideast/stitch-mcp", "proxy"]
     }
   }
 }

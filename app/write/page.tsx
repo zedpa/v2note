@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect, useRef } from 'react'
 import { api } from '@/shared/lib/api'
 import { toast as sonnerToast } from 'sonner'
 import { CommandPalette, type Command } from '@/features/writing/components/command-palette'
+import { PCLayout } from '@/components/layout/pc-layout'
 
 function fileToBase64(file: File | Blob): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -409,20 +410,20 @@ export default function WritePage() {
             return isImage ? `[📷 ${f.name}]` : `[📎 ${f.name}]`
           })
           .join('\n')
-        // Fire-and-forget uploads
+        // Upload files
         for (const f of files) {
           const isImage = f.type.startsWith('image/')
-          fileToBase64(f).then((base64) => {
-            if (isImage) {
-              return api.post<{ description?: string }>('/api/v1/ingest', {
-                type: 'image', file_base64: base64, source_type: 'material',
-              }).then((res) => sonnerToast.success(`图片已收录${res.description ? ` · ${res.description.slice(0, 30)}` : ''}`))
-            } else {
-              return api.post<{ preview?: string }>('/api/v1/ingest', {
-                type: 'file', file_base64: base64, filename: f.name, mimeType: f.type, source_type: 'material',
-              }).then((res) => sonnerToast.success(`${f.name} 已收录${res.preview ? ` · ${res.preview.slice(0, 30)}` : ''}`))
-            }
-          }).catch(() => sonnerToast.error(`${f.name} 上传失败`))
+          fileToBase64(f)
+            .then((base64) =>
+              isImage
+                ? api.post<{ description?: string }>('/api/v1/ingest', {
+                    type: 'image', file_base64: base64, source_type: 'material',
+                  }).then((res) => sonnerToast.success(`图片已收录${res.description ? ` · ${res.description.slice(0, 30)}` : ''}`))
+                : api.post<{ preview?: string }>('/api/v1/ingest', {
+                    type: 'file', file_base64: base64, filename: f.name, mimeType: f.type, source_type: 'material',
+                  }).then((res) => sonnerToast.success(`${f.name} 已收录${res.preview ? ` · ${res.preview.slice(0, 30)}` : ''}`))
+            )
+            .catch(() => sonnerToast.error(`${f.name} 上传失败`))
         }
       } else if (uri) {
         insertText = `[🌐 ${uri}]`
@@ -478,13 +479,16 @@ export default function WritePage() {
           const file = items[i].getAsFile()
           insertAtCursor('[📷 image]')
           if (file) {
-            fileToBase64(file).then((base64) =>
-              api.post<{ recordId: string; description?: string }>('/api/v1/ingest', {
-                type: 'image', file_base64: base64, source_type: 'material',
+            fileToBase64(file)
+              .then((base64) =>
+                api.post<{ recordId: string; description?: string }>('/api/v1/ingest', {
+                  type: 'image', file_base64: base64, source_type: 'material',
+                })
+              )
+              .then((res) => {
+                sonnerToast.success(`图片已收录${res.description ? ` · ${res.description.slice(0, 30)}` : ''}`)
               })
-            ).then((res) => {
-              sonnerToast.success(`图片已收录${res.description ? ` · ${res.description.slice(0, 30)}` : ''}`)
-            }).catch(() => sonnerToast.error('图片上传失败'))
+              .catch(() => sonnerToast.error('图片上传失败'))
           }
           return
         }
@@ -547,6 +551,7 @@ export default function WritePage() {
   )
 
   return (
+    <PCLayout>
     <div className="min-h-screen bg-cream flex flex-col">
       <div
         className="w-full max-w-[680px] mx-auto px-6 pb-16 flex flex-col flex-1 relative"
@@ -744,5 +749,6 @@ export default function WritePage() {
         )}
       </div>
     </div>
+    </PCLayout>
   )
 }

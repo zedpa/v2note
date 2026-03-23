@@ -317,9 +317,14 @@ export async function hybridRetrieve(
   const results: RetrievalResult[] = [...map.values()].map((v) => {
     // Normalize structuredHits to 0-1 range (max possible = 4 channels)
     const structuredScore = Math.min(v.structuredHits / 4, 1);
+    let score = v.similarity * 0.6 + structuredScore * 0.4;
+    // Material strikes are reference data — heavily downweight to avoid polluting retrieval
+    if (v.strike.source_type === "material") {
+      score *= 0.2;
+    }
     return {
       strike: v.strike,
-      score: v.similarity * 0.6 + structuredScore * 0.4,
+      score,
       channels: [...v.channels],
     };
   });

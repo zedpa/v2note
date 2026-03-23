@@ -23,6 +23,25 @@ interface IngestBody {
   metadata?: string;
 }
 
+// 50MB base64 ≈ 37.5MB decoded
+const MAX_BASE64_LENGTH = 50 * 1024 * 1024;
+// Text content max 100KB
+const MAX_TEXT_LENGTH = 100_000;
+
+function isValidBase64(str: string): boolean {
+  if (str.length > MAX_BASE64_LENGTH) return false;
+  return /^[A-Za-z0-9+/]*={0,2}$/.test(str);
+}
+
+function isValidUrl(str: string): boolean {
+  try {
+    const url = new URL(str);
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
 export function registerIngestRoutes(router: Router) {
   router.post("/api/v1/ingest", async (req, res) => {
     const userId = getUserId(req);
@@ -38,6 +57,11 @@ export function registerIngestRoutes(router: Router) {
       case "text": {
         if (!body.content) {
           sendJson(res, { error: "content is required for type=text" }, 400);
+          return;
+        }
+
+        if (body.content.length > MAX_TEXT_LENGTH) {
+          sendJson(res, { error: `content exceeds max length (${MAX_TEXT_LENGTH} chars)` }, 400);
           return;
         }
 
@@ -60,9 +84,8 @@ export function registerIngestRoutes(router: Router) {
           short_summary: body.content,
         });
 
-        // Trigger digest in background
         digestRecords([record.id], { deviceId, userId: userId ?? undefined }).catch(
-          (err) => console.error("[ingest] digest failed:", err),
+          (err) => console.error("[ingest] digest failed for record", record.id, ":", err),
         );
 
         sendJson(res, { recordId: record.id, status: "processing" }, 201);
@@ -75,18 +98,28 @@ export function registerIngestRoutes(router: Router) {
           return;
         }
 
-        // Determine image URL: upload to OSS if configured, otherwise use data URL
+        if (!isValidBase64(body.file_base64)) {
+          sendJson(res, { error: "file_base64 is invalid or exceeds size limit (50MB)" }, 400);
+          return;
+        }
+
         let imageUrl: string;
+        const buf = Buffer.from(body.file_base64, "base64");
+
         if (isOssConfigured()) {
-          const buf = Buffer.from(body.file_base64, "base64");
-          const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-          const filename = `${deviceId}-${timestamp}.jpg`;
-          imageUrl = await uploadFile("images", filename, buf);
+          try {
+            const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+            const filename = `${deviceId}-${timestamp}.jpg`;
+            imageUrl = await uploadFile("images", filename, buf);
+          } catch (err) {
+            console.error("[ingest] OSS upload failed, using data URL fallback:", err);
+            imageUrl = `data:image/jpeg;base64,${body.file_base64}`;
+          }
         } else {
           imageUrl = `data:image/jpeg;base64,${body.file_base64}`;
         }
 
-        const description = await describeImage(imageUrl);
+        const visionResult = await describeImage(imageUrl);
 
         const imgRecord = await recordRepo.create({
           device_id: deviceId,
@@ -98,20 +131,25 @@ export function registerIngestRoutes(router: Router) {
 
         await transcriptRepo.create({
           record_id: imgRecord.id,
-          text: description,
+          text: visionResult.text,
         });
 
         await summaryRepo.create({
           record_id: imgRecord.id,
-          title: description.slice(0, 50),
-          short_summary: description,
+          title: visionResult.success ? visionResult.text.slice(0, 50) : "[图片分析失败]",
+          short_summary: visionResult.text,
         });
 
         digestRecords([imgRecord.id], { deviceId, userId: userId ?? undefined }).catch(
-          (err) => console.error("[ingest] digest failed:", err),
+          (err) => console.error("[ingest] digest failed for record", imgRecord.id, ":", err),
         );
 
-        sendJson(res, { recordId: imgRecord.id, status: "processing", description }, 201);
+        sendJson(res, {
+          recordId: imgRecord.id,
+          status: "processing",
+          description: visionResult.text,
+          visionSuccess: visionResult.success,
+        }, 201);
         break;
       }
 
@@ -121,14 +159,30 @@ export function registerIngestRoutes(router: Router) {
           return;
         }
 
+        if (!isValidBase64(body.file_base64)) {
+          sendJson(res, { error: "file_base64 is invalid or exceeds size limit (50MB)" }, 400);
+          return;
+        }
+
+        // Sanitize filename: strip path components
+        const safeFilename = body.filename.replace(/[/\\]/g, "_").replace(/\.\./g, "_");
+
         const fileBuf = Buffer.from(body.file_base64, "base64");
-        const content = await parseFile(fileBuf, body.filename, body.mimeType);
+        const parseResult = await parseFile(fileBuf, safeFilename, body.mimeType);
+
+        if (!parseResult.success) {
+          console.warn("[ingest] file parse failed:", parseResult.error);
+        }
 
         // Upload to OSS if configured
         if (isOssConfigured()) {
-          const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-          const ossName = `${deviceId}-${timestamp}-${body.filename}`;
-          await uploadFile("files", ossName, fileBuf);
+          try {
+            const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+            const ossName = `${deviceId}-${timestamp}-${safeFilename}`;
+            await uploadFile("files", ossName, fileBuf);
+          } catch (err) {
+            console.error("[ingest] OSS file upload failed:", err);
+          }
         }
 
         const fileRecord = await recordRepo.create({
@@ -141,24 +195,27 @@ export function registerIngestRoutes(router: Router) {
 
         await transcriptRepo.create({
           record_id: fileRecord.id,
-          text: content,
+          text: parseResult.content,
         });
 
         await summaryRepo.create({
           record_id: fileRecord.id,
-          title: body.filename,
-          short_summary: content.slice(0, 200),
+          title: safeFilename,
+          short_summary: parseResult.content.slice(0, 200),
         });
 
-        digestRecords([fileRecord.id], { deviceId, userId: userId ?? undefined }).catch(
-          (err) => console.error("[ingest] digest failed:", err),
-        );
+        if (parseResult.success) {
+          digestRecords([fileRecord.id], { deviceId, userId: userId ?? undefined }).catch(
+            (err) => console.error("[ingest] digest failed for record", fileRecord.id, ":", err),
+          );
+        }
 
         sendJson(res, {
           recordId: fileRecord.id,
-          status: "processing",
-          filename: body.filename,
-          preview: content.slice(0, 200),
+          status: parseResult.success ? "processing" : "parse_failed",
+          filename: safeFilename,
+          preview: parseResult.content.slice(0, 200),
+          parseSuccess: parseResult.success,
         }, 201);
         break;
       }
@@ -166,6 +223,11 @@ export function registerIngestRoutes(router: Router) {
       case "url": {
         if (!body.content) {
           sendJson(res, { error: "content (URL) is required for type=url" }, 400);
+          return;
+        }
+
+        if (!isValidUrl(body.content)) {
+          sendJson(res, { error: "Invalid URL. Only http/https URLs are accepted." }, 400);
           return;
         }
 
@@ -191,7 +253,7 @@ export function registerIngestRoutes(router: Router) {
         });
 
         digestRecords([urlRecord.id], { deviceId, userId: userId ?? undefined }).catch(
-          (err) => console.error("[ingest] digest failed:", err),
+          (err) => console.error("[ingest] digest failed for record", urlRecord.id, ":", err),
         );
 
         sendJson(res, {

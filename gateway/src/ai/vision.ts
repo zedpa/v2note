@@ -10,14 +10,24 @@ const SYSTEM_PROMPT =
 
 const FALLBACK = "[图片内容无法识别]";
 
+export interface VisionResult {
+  success: boolean;
+  text: string;
+}
+
 /**
  * Describe an image using a vision-capable LLM.
  * @param imageUrl - HTTP URL or data URL of the image
  */
-export async function describeImage(imageUrl: string): Promise<string> {
+export async function describeImage(imageUrl: string): Promise<VisionResult> {
   try {
     const { provider } = getProvider();
     const model = process.env.VISION_MODEL ?? "qwen-vl-max";
+
+    // data URL: pass as base64 string directly; HTTP URL: pass as URL object
+    const imageContent = imageUrl.startsWith("data:")
+      ? { type: "image" as const, image: imageUrl }
+      : { type: "image" as const, image: new URL(imageUrl) };
 
     const result = await generateText({
       model: provider.chat(model),
@@ -25,7 +35,7 @@ export async function describeImage(imageUrl: string): Promise<string> {
         {
           role: "user",
           content: [
-            { type: "image", image: new URL(imageUrl) },
+            imageContent,
             { type: "text", text: SYSTEM_PROMPT },
           ],
         },
@@ -34,9 +44,10 @@ export async function describeImage(imageUrl: string): Promise<string> {
       abortSignal: AbortSignal.timeout(30_000),
     });
 
-    return result.text || FALLBACK;
+    const text = result.text || FALLBACK;
+    return { success: !!result.text, text };
   } catch (err) {
     console.error("[vision] describeImage failed:", err);
-    return FALLBACK;
+    return { success: false, text: FALLBACK };
   }
 }

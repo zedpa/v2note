@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useRef, useCallback } from "react";
+import { useMemo, useState, useRef, useCallback, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { MapPin, Clock, Trash2, X, CheckCircle2, Mic, Type, MoreVertical, Pencil, Copy } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -10,6 +10,7 @@ import { MiniAudioPlayer } from "./mini-audio-player";
 import { toast } from "sonner";
 import type { NoteItem } from "@/shared/lib/types";
 import { AiWindow } from "@/features/ai-bubble/components/ai-window";
+import { api } from "@/shared/lib/api";
 
 interface NotesTimelineProps {
   filter?: string;
@@ -255,6 +256,22 @@ function TimelineCard({
   const [editing, setEditing] = useState(false);
   const [editText, setEditText] = useState("");
 
+  // Related records (lazy load on expand)
+  const [relatedRecords, setRelatedRecords] = useState<Array<{
+    record_id: string; short_summary: string; relation: string;
+  }> | null>(null);
+  const relatedFetched = useRef(false);
+
+  useEffect(() => {
+    if (!expanded || relatedFetched.current) return;
+    relatedFetched.current = true;
+    api.get<{ related: Array<{ record_id: string; short_summary: string; relation: string }> }>(
+      `/api/v1/records/${note.id}/related`,
+    ).then((data) => {
+      if (data.related?.length > 0) setRelatedRecords(data.related);
+    }).catch(() => { /* non-critical */ });
+  }, [expanded, note.id]);
+
   const handlePointerDown = useCallback(() => {
     longPressTriggered.current = false;
     timerRef.current = setTimeout(() => {
@@ -462,7 +479,7 @@ function TimelineCard({
           {/* Audio player */}
           {note.audio_path && !selectionMode && (
             <div className="mt-3">
-              <MiniAudioPlayer src={note.audio_path} />
+              <MiniAudioPlayer recordId={note.id} />
             </div>
           )}
 
@@ -476,8 +493,8 @@ function TimelineCard({
                 </div>
               ) : detail && (
                 <>
-                  {/* Transcript */}
-                  {detail.transcript?.text && (
+                  {/* Transcript — only show for voice recordings */}
+                  {detail.transcript?.text && note.duration_seconds != null && note.duration_seconds > 0 && (
                     <div>
                       <h4 className="text-xs font-medium text-muted-foreground mb-1">原文</h4>
                       <p className="text-sm text-foreground/70 leading-relaxed whitespace-pre-wrap">
@@ -503,6 +520,24 @@ function TimelineCard({
                           </span>
                         </div>
                       ))}
+                    </div>
+                  )}
+                  {/* Related records */}
+                  {relatedRecords && relatedRecords.length > 0 && (
+                    <div>
+                      <h4 className="text-xs font-medium text-muted-foreground mb-1.5">相关记录</h4>
+                      <div className="flex flex-wrap gap-1.5">
+                        {relatedRecords.map((r) => (
+                          <span
+                            key={r.record_id}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 bg-secondary/60 rounded-full text-xs text-foreground/70 max-w-[200px]"
+                          >
+                            <span className="truncate">{r.short_summary}</span>
+                            <span className="text-muted-foreground/50 shrink-0">·</span>
+                            <span className="text-muted-foreground/60 shrink-0">{r.relation}</span>
+                          </span>
+                        ))}
+                      </div>
                     </div>
                   )}
                 </>

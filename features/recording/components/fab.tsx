@@ -707,6 +707,11 @@ export function FAB({
         }}
         commandContext={commandContext}
         activeNotebook={activeNotebook}
+        onRecordPress={() => {
+          longPressTriggeredRef.current = true;
+          gestures.forcePhase("locked");
+          startRecording();
+        }}
       />
     </>
   );

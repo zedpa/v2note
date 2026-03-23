@@ -11,6 +11,26 @@ import {
 import { processEntry } from "../handlers/process.js";
 
 export function registerRecordRoutes(router: Router) {
+  // Get signed audio URL for a record
+  router.get("/api/v1/records/:id/audio", async (_req, res, params) => {
+    const record = await recordRepo.findById(params.id);
+    if (!record || !record.audio_path) {
+      sendJson(res, { error: "Audio not found" }, 404);
+      return;
+    }
+    try {
+      const { getSignedUrl, isOssConfigured } = await import("../storage/oss.js");
+      if (!isOssConfigured()) {
+        sendJson(res, { error: "OSS not configured" }, 500);
+        return;
+      }
+      const url = await getSignedUrl(record.audio_path);
+      sendJson(res, { url });
+    } catch (err: any) {
+      sendJson(res, { error: err.message }, 500);
+    }
+  });
+
   // List records (with summary + tags)
   router.get("/api/v1/records", async (req, res, _params, query) => {
     const deviceId = getDeviceId(req);

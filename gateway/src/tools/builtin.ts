@@ -512,13 +512,22 @@ async function handleIngest(
   let title = text.slice(0, 50);
 
   if (url) {
+    // Validate URL protocol
+    try {
+      const parsed = new URL(url);
+      if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+        return { success: false, message: "URL 仅支持 http/https 协议" };
+      }
+    } catch {
+      return { success: false, message: "无效的 URL 格式" };
+    }
+
     try {
       const extracted = await extractUrl(url);
       finalText = `${text}\n\n---\n\n${extracted.content}`;
       title = extracted.title || title;
     } catch (err) {
       console.error("[builtin-tool] ingest extractUrl failed:", err);
-      // Continue with just the text
     }
   }
 
