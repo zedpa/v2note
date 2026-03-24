@@ -43,8 +43,8 @@ find_test_file() {
 
 # 遍历所有 spec 文件（排除模板）
 for spec_file in "$SPECS_DIR"/*.md; do
-  # 跳过模板
-  if [[ "$spec_file" == *"_template"* ]]; then
+  # 跳过模板、路线图索引、归档目录
+  if [[ "$spec_file" == *"_template"* ]] || [[ "$spec_file" == *"ROADMAP"* ]] || [[ "$spec_file" == *"_archive"* ]]; then
     continue
   fi
 

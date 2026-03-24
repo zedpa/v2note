@@ -24,6 +24,17 @@ export async function findByRecordIds(recordIds: string[]): Promise<Transcript[]
   );
 }
 
+export async function update(recordId: string, fields: { text?: string; language?: string }): Promise<void> {
+  const sets: string[] = [];
+  const vals: any[] = [];
+  let i = 1;
+  if (fields.text !== undefined) { sets.push(`text = $${i++}`); vals.push(fields.text); }
+  if (fields.language !== undefined) { sets.push(`language = $${i++}`); vals.push(fields.language); }
+  if (sets.length === 0) return;
+  vals.push(recordId);
+  await query(`UPDATE transcript SET ${sets.join(", ")} WHERE record_id = $${i}`, vals);
+}
+
 export async function create(fields: {
   record_id: string;
   text: string;

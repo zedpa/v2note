@@ -1,4 +1,4 @@
-import { queryOne } from "../pool.js";
+import { query, queryOne } from "../pool.js";
 import { execute } from "../pool.js";
 
 export interface Summary {
@@ -14,6 +14,15 @@ export async function findByRecordId(recordId: string): Promise<Summary | null> 
   return queryOne<Summary>(
     `SELECT * FROM summary WHERE record_id = $1`,
     [recordId],
+  );
+}
+
+export async function findByRecordIds(recordIds: string[]): Promise<Summary[]> {
+  if (recordIds.length === 0) return [];
+  const placeholders = recordIds.map((_, i) => `$${i + 1}`).join(", ");
+  return query<Summary>(
+    `SELECT * FROM summary WHERE record_id IN (${placeholders})`,
+    recordIds,
   );
 }
 

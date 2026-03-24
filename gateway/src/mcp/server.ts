@@ -1,21 +1,25 @@
 /**
- * MCP Server — exposes v2note built-in tools as standard MCP protocol.
+ * MCP Server — exposes v2note tools as standard MCP protocol.
  *
- * This allows external AI agents (Claude, ChatGPT, etc.) to discover
- * and use v2note's capabilities via the Model Context Protocol.
+ * Now uses ToolRegistry instead of legacy BUILTIN_TOOLS.
  *
  * Endpoint: POST /mcp (JSON-RPC 2.0)
  */
 
 import type { Router } from "../router.js";
 import { readBody, sendJson, sendError, getDeviceId, getUserId } from "../lib/http-helpers.js";
-import { BUILTIN_TOOLS, callBuiltinTool, type BuiltinToolDef } from "../tools/builtin.js";
+import { createDefaultRegistry } from "../tools/definitions/index.js";
+import type { ToolContext } from "../tools/types.js";
 import { loadSkills } from "../skills/loader.js";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { jsonSchema } from "ai";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SKILLS_DIR = join(__dirname, "../../skills");
+
+/** MCP 共享注册表 */
+const registry = createDefaultRegistry();
 
 interface JsonRpcRequest {
   jsonrpc: "2.0";
@@ -39,14 +43,6 @@ function rpcError(id: number | string | null, code: number, message: string): Js
   return { jsonrpc: "2.0", id, error: { code, message } };
 }
 
-function toolDefsToMCP(tools: BuiltinToolDef[]) {
-  return tools.map((t) => ({
-    name: t.name,
-    description: t.description,
-    inputSchema: t.parameters,
-  }));
-}
-
 /**
  * Handle a single JSON-RPC request.
  */
@@ -58,12 +54,17 @@ async function handleRpcRequest(req: JsonRpcRequest, deviceId: string, userId?: 
         capabilities: { tools: {} },
         serverInfo: {
           name: "v2note-gateway",
-          version: "1.0.0",
+          version: "2.0.0",
         },
       });
 
     case "tools/list": {
-      const builtinMCP = toolDefsToMCP(BUILTIN_TOOLS);
+      // 从注册表导出工具列表
+      const toolList = registry.getAll().map((t) => ({
+        name: t.name,
+        description: t.description,
+        inputSchema: { type: "object" },  // MCP 简化 schema
+      }));
 
       // Also expose skills as "info" tools (read-only skill prompts)
       let skillTools: Array<{ name: string; description: string; inputSchema: Record<string, unknown> }> = [];
@@ -78,7 +79,7 @@ async function handleRpcRequest(req: JsonRpcRequest, deviceId: string, userId?: 
         // skills dir may not exist
       }
 
-      return rpcResult(req.id, { tools: [...builtinMCP, ...skillTools] });
+      return rpcResult(req.id, { tools: [...toolList, ...skillTools] });
     }
 
     case "tools/call": {
@@ -103,19 +104,18 @@ async function handleRpcRequest(req: JsonRpcRequest, deviceId: string, userId?: 
         });
       }
 
-      // Handle built-in tools
-      try {
-        const result = await callBuiltinTool(toolName, args, deviceId, userId);
-        return rpcResult(req.id, {
-          content: [{ type: "text", text: result.message }],
-          isError: !result.success,
-        });
-      } catch (err: any) {
-        return rpcResult(req.id, {
-          content: [{ type: "text", text: `Error: ${err.message}` }],
-          isError: true,
-        });
-      }
+      // Handle registered tools via ToolRegistry
+      const ctx: ToolContext = {
+        deviceId,
+        userId,
+        sessionId: `mcp-${Date.now()}`,
+      };
+
+      const result = await registry.execute(toolName, args, ctx);
+      return rpcResult(req.id, {
+        content: [{ type: "text", text: result.message }],
+        isError: !result.success,
+      });
     }
 
     default:

@@ -2,7 +2,6 @@ import { readFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Skill } from "./types.js";
-import { BUILTIN_TOOLS } from "../tools/builtin.js";
 import type { ContextTier, ContextBuildOptions } from "../context/tiers.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -58,29 +57,14 @@ export function buildTieredContext(opts: ContextBuildOptions): ContextTier {
     }
   }
 
-  // Tools
-  const allTools = [
-    ...BUILTIN_TOOLS.map((t) => ({ name: t.name, description: t.description, parameters: t.parameters })),
-    ...(opts.mcpTools ?? []),
-  ];
-  if (allTools.length > 0) {
-    warm.push(`## 可用工具\n你可以调用以下工具来执行操作。`);
-    for (const tool of allTools) {
+  // Tools — 工具通过 Vercel AI SDK 原生 function calling 注入，
+  // 不再在 system prompt 中注入工具列表和调用规则。
+  // MCP 外部工具仍通过描述注入（兼容性保留）
+  if (opts.mcpTools && opts.mcpTools.length > 0) {
+    warm.push(`## 外部工具（MCP）`);
+    for (const tool of opts.mcpTools) {
       warm.push(`\n### ${tool.name}\n${tool.description}`);
     }
-
-    warm.push(`\n## 工具调用规则（重要）
-当你需要调用工具时，你的**整条回复**必须是且仅是一个 JSON 对象，不要包含任何其他文字。格式：
-{"tool_calls": [{"name": "工具名", "arguments": {...}}]}
-
-错误示范（不要这样做）：
-好的，我来帮你记录。{"tool_calls": [...]}
-
-正确示范：
-{"tool_calls": [{"name": "create_diary", "arguments": {"content": "明天开会", "title": "开会"}}]}
-
-工具执行后系统会自动把结果告诉你，届时你再用自然语言回复用户。
-如果不需要调用工具，正常用自然语言回复即可。`);
   }
 
   return {

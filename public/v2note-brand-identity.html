@@ -79,6 +79,7 @@
     width: 180px;
     height: 180px;
     animation: breathe 4s ease-in-out infinite;
+    object-fit: contain;
   }
 
   @keyframes breathe {
@@ -455,7 +456,7 @@
     border-top: 1px solid var(--border);
   }
 
-  .footer svg { width: 36px; height: 36px; opacity: 0.3; }
+  .footer svg, .footer img.footer-logo { width: 36px; height: 36px; opacity: 0.3; object-fit: contain; }
   .footer p { font-size: 12px; color: var(--text-muted); margin-top: 16px; letter-spacing: 1px; }
 </style>
 </head>
@@ -465,58 +466,7 @@
 <section class="hero">
   <div class="logo-container">
     <!-- DEER LOGO: 路路 -->
-    <svg class="deer-logo" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <!-- Antlers -->
-      <path d="M72 68 C72 52, 58 38, 52 26" stroke="#A06B42" stroke-width="3.5" stroke-linecap="round" fill="none"/>
-      <path d="M52 26 C48 18, 42 16, 38 12" stroke="#A06B42" stroke-width="3" stroke-linecap="round" fill="none"/>
-      <path d="M52 26 C56 20, 62 18, 66 14" stroke="#A06B42" stroke-width="3" stroke-linecap="round" fill="none"/>
-      <path d="M52 38 C46 32, 40 32, 36 28" stroke="#A06B42" stroke-width="2.5" stroke-linecap="round" fill="none"/>
-
-      <path d="M128 68 C128 52, 142 38, 148 26" stroke="#A06B42" stroke-width="3.5" stroke-linecap="round" fill="none"/>
-      <path d="M148 26 C152 18, 158 16, 162 12" stroke="#A06B42" stroke-width="3" stroke-linecap="round" fill="none"/>
-      <path d="M148 26 C144 20, 138 18, 134 14" stroke="#A06B42" stroke-width="3" stroke-linecap="round" fill="none"/>
-      <path d="M148 38 C154 32, 160 32, 164 28" stroke="#A06B42" stroke-width="2.5" stroke-linecap="round" fill="none"/>
-
-      <!-- Ears -->
-      <ellipse cx="66" cy="72" rx="14" ry="9" transform="rotate(-25 66 72)" fill="#D4A07A"/>
-      <ellipse cx="66" cy="72" rx="9" ry="5.5" transform="rotate(-25 66 72)" fill="#E8BFA0"/>
-      <ellipse cx="134" cy="72" rx="14" ry="9" transform="rotate(25 134 72)" fill="#D4A07A"/>
-      <ellipse cx="134" cy="72" rx="9" ry="5.5" transform="rotate(25 134 72)" fill="#E8BFA0"/>
-
-      <!-- Head -->
-      <ellipse cx="100" cy="100" rx="40" ry="44" fill="#C8845C"/>
-
-      <!-- Face patch -->
-      <ellipse cx="100" cy="108" rx="26" ry="30" fill="#E8C9A8"/>
-
-      <!-- Eyes -->
-      <circle cx="84" cy="92" r="5.5" fill="#3D3228"/>
-      <circle cx="116" cy="92" r="5.5" fill="#3D3228"/>
-      <circle cx="85.5" cy="90.5" r="2" fill="white" opacity="0.9"/>
-      <circle cx="117.5" cy="90.5" r="2" fill="white" opacity="0.9"/>
-
-      <!-- Nose -->
-      <ellipse cx="100" cy="108" rx="6" ry="4.5" fill="#8B5E3C" opacity="0.8"/>
-
-      <!-- Mouth - gentle smile -->
-      <path d="M94 114 C96 117, 104 117, 106 114" stroke="#8B5E3C" stroke-width="1.8" stroke-linecap="round" fill="none" opacity="0.6"/>
-
-      <!-- Cheek blush -->
-      <circle cx="76" cy="104" r="7" fill="#E8A87C" opacity="0.25"/>
-      <circle cx="124" cy="104" r="7" fill="#E8A87C" opacity="0.25"/>
-
-      <!-- Spots on forehead -->
-      <circle cx="92" cy="78" r="2.5" fill="#D4A07A" opacity="0.5"/>
-      <circle cx="108" cy="80" r="2" fill="#D4A07A" opacity="0.4"/>
-
-      <!-- Neck/body hint -->
-      <path d="M82 140 C82 145, 90 155, 100 158 C110 155, 118 145, 118 140" fill="#C8845C"/>
-      <path d="M88 142 C88 147, 94 154, 100 156 C106 154, 112 147, 112 142" fill="#E8C9A8"/>
-
-      <!-- Small path/trail below (representing 路/path) -->
-      <path d="M85 168 C90 165, 95 167, 100 165 C105 163, 110 166, 115 164" stroke="#C8845C" stroke-width="2" stroke-linecap="round" fill="none" opacity="0.3"/>
-      <path d="M80 174 C88 171, 95 173, 100 171 C105 169, 112 172, 120 170" stroke="#C8845C" stroke-width="1.5" stroke-linecap="round" fill="none" opacity="0.2"/>
-    </svg>
+    <img class="deer-logo" src="lulu-logo.png" alt="路路 - 念念有路品牌吉祥物" />
 
     <div style="text-align: center;">
       <div class="brand-name">念念有路</div>
@@ -538,22 +488,7 @@
     <!-- Light background -->
     <div class="logo-card light">
       <div class="logo-lockup">
-        <svg viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg" width="52" height="52">
-          <path d="M72 68 C72 52, 58 38, 52 26" stroke="#A06B42" stroke-width="3.5" stroke-linecap="round"/>
-          <path d="M52 26 C48 18, 42 16, 38 12" stroke="#A06B42" stroke-width="3" stroke-linecap="round"/>
-          <path d="M52 26 C56 20, 62 18, 66 14" stroke="#A06B42" stroke-width="3" stroke-linecap="round"/>
-          <path d="M128 68 C128 52, 142 38, 148 26" stroke="#A06B42" stroke-width="3.5" stroke-linecap="round"/>
-          <path d="M148 26 C152 18, 158 16, 162 12" stroke="#A06B42" stroke-width="3" stroke-linecap="round"/>
-          <path d="M148 26 C144 20, 138 18, 134 14" stroke="#A06B42" stroke-width="3" stroke-linecap="round"/>
-          <ellipse cx="100" cy="100" rx="40" ry="44" fill="#C8845C"/>
-          <ellipse cx="100" cy="108" rx="26" ry="30" fill="#E8C9A8"/>
-          <circle cx="84" cy="92" r="5.5" fill="#3D3228"/>
-          <circle cx="116" cy="92" r="5.5" fill="#3D3228"/>
-          <circle cx="85.5" cy="90.5" r="2" fill="white" opacity="0.9"/>
-          <circle cx="117.5" cy="90.5" r="2" fill="white" opacity="0.9"/>
-          <ellipse cx="100" cy="108" rx="6" ry="4.5" fill="#8B5E3C" opacity="0.8"/>
-          <path d="M94 114 C96 117, 104 117, 106 114" stroke="#8B5E3C" stroke-width="1.8" stroke-linecap="round" fill="none" opacity="0.6"/>
-        </svg>
+        <img src="lulu-logo.png" alt="路路" width="52" height="52" style="object-fit: contain;" />
         <span class="text" style="color: #3D3228;">念念有路</span>
       </div>
       <div class="label">浅色背景</div>
@@ -562,22 +497,7 @@
     <!-- Dark background -->
     <div class="logo-card dark">
       <div class="logo-lockup on-dark">
-        <svg viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg" width="52" height="52">
-          <path d="M72 68 C72 52, 58 38, 52 26" stroke="#D4A07A" stroke-width="3.5" stroke-linecap="round"/>
-          <path d="M52 26 C48 18, 42 16, 38 12" stroke="#D4A07A" stroke-width="3" stroke-linecap="round"/>
-          <path d="M52 26 C56 20, 62 18, 66 14" stroke="#D4A07A" stroke-width="3" stroke-linecap="round"/>
-          <path d="M128 68 C128 52, 142 38, 148 26" stroke="#D4A07A" stroke-width="3.5" stroke-linecap="round"/>
-          <path d="M148 26 C152 18, 158 16, 162 12" stroke="#D4A07A" stroke-width="3" stroke-linecap="round"/>
-          <path d="M148 26 C144 20, 138 18, 134 14" stroke="#D4A07A" stroke-width="3" stroke-linecap="round"/>
-          <ellipse cx="100" cy="100" rx="40" ry="44" fill="#C8845C"/>
-          <ellipse cx="100" cy="108" rx="26" ry="30" fill="#E8C9A8"/>
-          <circle cx="84" cy="92" r="5.5" fill="#3D3228"/>
-          <circle cx="116" cy="92" r="5.5" fill="#3D3228"/>
-          <circle cx="85.5" cy="90.5" r="2" fill="white" opacity="0.9"/>
-          <circle cx="117.5" cy="90.5" r="2" fill="white" opacity="0.9"/>
-          <ellipse cx="100" cy="108" rx="6" ry="4.5" fill="#8B5E3C" opacity="0.8"/>
-          <path d="M94 114 C96 117, 104 117, 106 114" stroke="#8B5E3C" stroke-width="1.8" stroke-linecap="round" fill="none" opacity="0.6"/>
-        </svg>
+        <img src="lulu-logo.png" alt="路路" width="52" height="52" style="object-fit: contain;" />
         <span class="text">念念有路</span>
       </div>
       <div class="label">深色背景</div>
@@ -586,22 +506,7 @@
     <!-- Color background -->
     <div class="logo-card color">
       <div class="logo-lockup on-color">
-        <svg viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg" width="52" height="52">
-          <path d="M72 68 C72 52, 58 38, 52 26" stroke="rgba(255,255,255,0.7)" stroke-width="3.5" stroke-linecap="round"/>
-          <path d="M52 26 C48 18, 42 16, 38 12" stroke="rgba(255,255,255,0.7)" stroke-width="3" stroke-linecap="round"/>
-          <path d="M52 26 C56 20, 62 18, 66 14" stroke="rgba(255,255,255,0.7)" stroke-width="3" stroke-linecap="round"/>
-          <path d="M128 68 C128 52, 142 38, 148 26" stroke="rgba(255,255,255,0.7)" stroke-width="3.5" stroke-linecap="round"/>
-          <path d="M148 26 C152 18, 158 16, 162 12" stroke="rgba(255,255,255,0.7)" stroke-width="3" stroke-linecap="round"/>
-          <path d="M148 26 C144 20, 138 18, 134 14" stroke="rgba(255,255,255,0.7)" stroke-width="3" stroke-linecap="round"/>
-          <ellipse cx="100" cy="100" rx="40" ry="44" fill="white" opacity="0.95"/>
-          <ellipse cx="100" cy="108" rx="26" ry="30" fill="white"/>
-          <circle cx="84" cy="92" r="5.5" fill="#3D3228"/>
-          <circle cx="116" cy="92" r="5.5" fill="#3D3228"/>
-          <circle cx="85.5" cy="90.5" r="2" fill="white" opacity="0.9"/>
-          <circle cx="117.5" cy="90.5" r="2" fill="white" opacity="0.9"/>
-          <ellipse cx="100" cy="108" rx="6" ry="4.5" fill="#8B5E3C" opacity="0.5"/>
-          <path d="M94 114 C96 117, 104 117, 106 114" stroke="#8B5E3C" stroke-width="1.8" stroke-linecap="round" fill="none" opacity="0.4"/>
-        </svg>
+        <img src="lulu-logo.png" alt="路路" width="52" height="52" style="object-fit: contain;" />
         <span class="text">念念有路</span>
       </div>
       <div class="label">品牌色背景</div>
@@ -616,36 +521,7 @@
 
   <div class="mascot-section">
     <div class="mascot-display">
-      <svg viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg" width="200" height="200">
-        <path d="M72 68 C72 52, 58 38, 52 26" stroke="#A06B42" stroke-width="3.5" stroke-linecap="round"/>
-        <path d="M52 26 C48 18, 42 16, 38 12" stroke="#A06B42" stroke-width="3" stroke-linecap="round"/>
-        <path d="M52 26 C56 20, 62 18, 66 14" stroke="#A06B42" stroke-width="3" stroke-linecap="round"/>
-        <path d="M52 38 C46 32, 40 32, 36 28" stroke="#A06B42" stroke-width="2.5" stroke-linecap="round"/>
-        <path d="M128 68 C128 52, 142 38, 148 26" stroke="#A06B42" stroke-width="3.5" stroke-linecap="round"/>
-        <path d="M148 26 C152 18, 158 16, 162 12" stroke="#A06B42" stroke-width="3" stroke-linecap="round"/>
-        <path d="M148 26 C144 20, 138 18, 134 14" stroke="#A06B42" stroke-width="3" stroke-linecap="round"/>
-        <path d="M148 38 C154 32, 160 32, 164 28" stroke="#A06B42" stroke-width="2.5" stroke-linecap="round"/>
-        <ellipse cx="66" cy="72" rx="14" ry="9" transform="rotate(-25 66 72)" fill="#D4A07A"/>
-        <ellipse cx="66" cy="72" rx="9" ry="5.5" transform="rotate(-25 66 72)" fill="#E8BFA0"/>
-        <ellipse cx="134" cy="72" rx="14" ry="9" transform="rotate(25 134 72)" fill="#D4A07A"/>
-        <ellipse cx="134" cy="72" rx="9" ry="5.5" transform="rotate(25 134 72)" fill="#E8BFA0"/>
-        <ellipse cx="100" cy="100" rx="40" ry="44" fill="#C8845C"/>
-        <ellipse cx="100" cy="108" rx="26" ry="30" fill="#E8C9A8"/>
-        <circle cx="84" cy="92" r="5.5" fill="#3D3228"/>
-        <circle cx="116" cy="92" r="5.5" fill="#3D3228"/>
-        <circle cx="85.5" cy="90.5" r="2" fill="white" opacity="0.9"/>
-        <circle cx="117.5" cy="90.5" r="2" fill="white" opacity="0.9"/>
-        <ellipse cx="100" cy="108" rx="6" ry="4.5" fill="#8B5E3C" opacity="0.8"/>
-        <path d="M94 114 C96 117, 104 117, 106 114" stroke="#8B5E3C" stroke-width="1.8" stroke-linecap="round" fill="none" opacity="0.6"/>
-        <circle cx="76" cy="104" r="7" fill="#E8A87C" opacity="0.25"/>
-        <circle cx="124" cy="104" r="7" fill="#E8A87C" opacity="0.25"/>
-        <circle cx="92" cy="78" r="2.5" fill="#D4A07A" opacity="0.5"/>
-        <circle cx="108" cy="80" r="2" fill="#D4A07A" opacity="0.4"/>
-        <path d="M82 140 C82 145, 90 155, 100 158 C110 155, 118 145, 118 140" fill="#C8845C"/>
-        <path d="M88 142 C88 147, 94 154, 100 156 C106 154, 112 147, 112 142" fill="#E8C9A8"/>
-        <path d="M85 168 C90 165, 95 167, 100 165 C105 163, 110 166, 115 164" stroke="#C8845C" stroke-width="2" stroke-linecap="round" fill="none" opacity="0.3"/>
-        <path d="M80 174 C88 171, 95 173, 100 171 C105 169, 112 172, 120 170" stroke="#C8845C" stroke-width="1.5" stroke-linecap="round" fill="none" opacity="0.2"/>
-      </svg>
+      <img src="lulu-logo.png" alt="路路 Lùlù" width="200" height="200" style="object-fit: contain;" />
     </div>
 
     <div class="mascot-info">
@@ -835,16 +711,7 @@
 
 <!-- ═══════ FOOTER ═══════ -->
 <div class="footer">
-  <svg viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <ellipse cx="100" cy="100" rx="40" ry="44" fill="#C8845C"/>
-    <ellipse cx="100" cy="108" rx="26" ry="30" fill="#E8C9A8"/>
-    <circle cx="84" cy="92" r="5.5" fill="#3D3228"/>
-    <circle cx="116" cy="92" r="5.5" fill="#3D3228"/>
-    <circle cx="85.5" cy="90.5" r="2" fill="white" opacity="0.9"/>
-    <circle cx="117.5" cy="90.5" r="2" fill="white" opacity="0.9"/>
-    <ellipse cx="100" cy="108" rx="6" ry="4.5" fill="#8B5E3C" opacity="0.8"/>
-    <path d="M94 114 C96 117, 104 117, 106 114" stroke="#8B5E3C" stroke-width="1.8" stroke-linecap="round" fill="none" opacity="0.6"/>
-  </svg>
+  <img class="footer-logo" src="lulu-logo.png" alt="路路" />
   <p>念念有路 · 你说的每一句话，都会变为行动</p>
   <p style="margin-top: 8px; font-size: 11px;">© 2026 v2note. All rights reserved.</p>
   <p style="margin-top: 8px; font-size: 11px;"><a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer" style="color: var(--text-muted); text-decoration: none;">陇ICP备2026001728号</a></p>

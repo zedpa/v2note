@@ -1,0 +1,6 @@
+{
+  "disabledMcpjsonServers": [
+    "mobile-mcp",
+    "stitch"
+  ]
+}

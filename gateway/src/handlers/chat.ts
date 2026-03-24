@@ -1,7 +1,7 @@
 import { loadSkills, mergeWithCustomSkills } from "../skills/loader.js";
 import type { Skill } from "../skills/types.js";
 import { buildSystemPrompt } from "../skills/prompt-builder.js";
-import { chatCompletion, chatCompletionStream } from "../ai/provider.js";
+import { streamWithTools } from "../ai/provider.js";
 import { MemoryManager } from "../memory/manager.js";
 import { updateSoul } from "../soul/manager.js";
 import { updateProfile } from "../profile/manager.js";
@@ -12,7 +12,8 @@ import { fileURLToPath } from "node:url";
 import { recordRepo } from "../db/repositories/index.js";
 import { transcriptRepo } from "../db/repositories/index.js";
 import { pendingIntentRepo } from "../db/repositories/index.js";
-import { isBuiltinTool, callBuiltinTool } from "../tools/builtin.js";
+import { createDefaultRegistry } from "../tools/definitions/index.js";
+import type { ToolContext } from "../tools/types.js";
 import { maySoulUpdate, mayProfileUpdate } from "../lib/text-utils.js";
 import { gatherDecisionContext, buildDecisionPrompt } from "../cognitive/decision.js";
 import { generateAlerts } from "../cognitive/alerts.js";
@@ -22,6 +23,9 @@ const INSIGHTS_DIR = join(__dirname, "../../insights");
 
 /** Max characters for transcript context injected into prompt */
 const MAX_TRANSCRIPT_CHARS = 8000;
+
+/** 全局工具注册表——启动时初始化一次 */
+const toolRegistry = createDefaultRegistry();
 
 export interface ChatStartPayload {
   deviceId: string;
@@ -125,7 +129,7 @@ export async function startChat(
           const date = new Date(pi.created_at).toLocaleDateString("zh-CN");
           return `- [${pi.intent_type}] "${pi.text}"${pi.context ? ` (${pi.context})` : ""} (${date}, id: ${pi.id})`;
         });
-        pendingIntentContext = `\n## 待确认意图\n以下是用户近期提到但未确认的愿望/目标，在对话中自然地跟进（不要一开口就问，找合适时机）：\n${lines.join("\n")}\n不要逐条审问用户，自然聊天中确认即可。确认后使用 confirm_intent 工具处理。`;
+        pendingIntentContext = `\n## 待确认意图\n以下是用户近期提到但未确认的愿望/目标，在对话中自然地跟进（不要一开口就问，找合适时机）：\n${lines.join("\n")}\n不要逐条审问用户，自然聊天中确认即可。确认后使用 confirm 工具处理。`;
       }
     } catch (err: any) {
       console.warn(`[chat] Failed to load pending intents: ${err.message}`);
@@ -150,6 +154,7 @@ export async function startChat(
     }
   }
 
+  // 构建 system prompt（不再注入工具调用规则，由 AI SDK 原生处理）
   const systemPrompt = buildSystemPrompt({
     skills: activeSkills,
     soul: soul?.content,
@@ -195,8 +200,8 @@ export async function startChat(
     }
   }
 
-  // Stream initial response (with tool-call support)
-  return streamWithToolCalls(session, payload.deviceId);
+  // Stream initial response with native tool calling
+  return streamWithNativeTools(session, payload.deviceId);
 }
 
 /**
@@ -212,107 +217,46 @@ export async function sendChatMessage(
   }
 
   session.context.addMessage({ role: "user", content: text });
-  return streamWithToolCalls(session, deviceId);
+  return streamWithNativeTools(session, deviceId);
 }
 
 /**
- * Extract tool_calls from AI response text.
- * Handles both pure JSON and mixed text+JSON responses.
+ * Stream response using Vercel AI SDK native function calling.
+ *
+ * Replaces the old manual JSON extraction + 3-round loop.
+ * AI SDK handles tool execution automatically via maxSteps.
  */
-function extractToolCalls(content: string): { toolCalls: any[]; textPart: string } | null {
-  // 1. Try pure JSON parse
-  try {
-    const parsed = JSON.parse(content.trim());
-    if (Array.isArray(parsed.tool_calls) && parsed.tool_calls.length > 0) {
-      return { toolCalls: parsed.tool_calls, textPart: "" };
-    }
-  } catch {
-    // Not pure JSON
-  }
-
-  // 2. Try to find JSON object containing tool_calls in mixed text
-  const jsonMatch = content.match(/\{[\s\S]*?"tool_calls"\s*:\s*\[[\s\S]*?\]\s*\}/);
-  if (jsonMatch) {
-    try {
-      const parsed = JSON.parse(jsonMatch[0]);
-      if (Array.isArray(parsed.tool_calls) && parsed.tool_calls.length > 0) {
-        const textPart = content.replace(jsonMatch[0], "").trim();
-        return { toolCalls: parsed.tool_calls, textPart };
-      }
-    } catch {
-      // JSON parse failed
-    }
-  }
-
-  // 3. Try to find tool_calls array directly
-  const arrayMatch = content.match(/tool_calls\s*[:：]\s*(\[[\s\S]*?\])/);
-  if (arrayMatch) {
-    try {
-      const arr = JSON.parse(arrayMatch[1]);
-      if (Array.isArray(arr) && arr.length > 0) {
-        const textPart = content.replace(arrayMatch[0], "").trim();
-        return { toolCalls: arr, textPart };
-      }
-    } catch {
-      // parse failed
-    }
-  }
-
-  return null;
-}
-
-/**
- * Stream response with tool-call loop support.
- * Up to 3 rounds: if the AI returns tool_calls, execute them
- * and re-call AI. Final round always streams.
- */
-async function* streamWithToolCalls(
+async function* streamWithNativeTools(
   session: ReturnType<typeof getSession>,
   deviceId: string,
 ): AsyncGenerator<string, void, undefined> {
-  const MAX_TOOL_ROUNDS = 3;
+  // 构建工具执行上下文
+  const toolCtx: ToolContext = {
+    deviceId,
+    userId: session.userId,
+    sessionId: session.id,
+  };
 
-  for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
-    const response = await chatCompletion(session.context.getMessages(), {
-      temperature: 0.7,
-    });
+  // 将注册表导出为 AI SDK tools 格式（绑定执行上下文）
+  const aiTools = toolRegistry.toAISDKTools(toolCtx);
 
-    const content = response.content.trim();
-    if (!content) break;
+  // 使用 AI SDK streamText + tools + maxSteps
+  // AI SDK 自动处理：工具调用 → 执行 → 结果反馈 → 继续生成
+  const stream = streamWithTools(
+    session.context.getMessages(),
+    aiTools,
+    { temperature: 0.7, maxSteps: 5 },
+  );
 
-    const extracted = extractToolCalls(content);
-
-    if (!extracted) {
-      // No tool calls — normal text response
-      session.context.addMessage({ role: "assistant", content });
-      yield content;
-      return;
-    }
-
-    // Execute tool calls
-    console.log(`[chat] Tool call round ${round + 1}: ${extracted.toolCalls.length} calls`);
-    const toolResults: string[] = [];
-    for (const call of extracted.toolCalls) {
-      if (isBuiltinTool(call.name)) {
-        const res = await callBuiltinTool(call.name, call.arguments ?? {}, deviceId, session.userId);
-        toolResults.push(`工具 "${call.name}" 结果: ${res.message}`);
-        console.log(`[chat] Built-in tool ${call.name}: ${res.success ? "success" : "failed"}`);
-      } else {
-        toolResults.push(`工具 "${call.name}" 错误: 未知工具`);
-      }
-    }
-
-    session.context.addMessage({ role: "assistant", content });
-    session.context.addMessage({
-      role: "user",
-      content: `工具调用结果：\n${toolResults.join("\n")}\n\n请基于工具执行结果，给用户一个简短的自然语言回复。不要再输出 tool_calls。`,
-    });
+  let fullResponse = "";
+  for await (const chunk of stream) {
+    fullResponse += chunk;
+    yield chunk;
   }
 
-  // Final round: stream the response
-  const stream = chatCompletionStream(session.context.getMessages());
-  for await (const chunk of stream) {
-    yield chunk;
+  // 记录完整回复到 session context
+  if (fullResponse) {
+    session.context.addMessage({ role: "assistant", content: fullResponse });
   }
 }
 
@@ -357,3 +301,6 @@ export async function endChat(deviceId: string): Promise<void> {
   session.mode = "idle";
   session.context.clear();
 }
+
+/** 导出 toolRegistry 供 MCP server 等外部模块使用 */
+export { toolRegistry };

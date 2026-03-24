@@ -147,5 +147,62 @@ export async function generateStructured<T>(
   return { object: result.object, usage: mapUsage(result.usage) };
 }
 
+/**
+ * AI call with native function calling (tool use).
+ *
+ * Uses Vercel AI SDK's generateText with tools + maxSteps.
+ * Replaces the old manual JSON extraction + 3-round loop.
+ */
+export async function generateWithTools(
+  messages: ChatMessage[],
+  tools: Record<string, any>,
+  opts?: { temperature?: number; timeout?: number; maxSteps?: number },
+): Promise<{ text: string; usage?: { prompt_tokens: number; completion_tokens: number } }> {
+  const { provider, model, timeout } = getProvider();
+  const effectiveTimeout = opts?.timeout ?? timeout;
+
+  // maxSteps 在 AI SDK v6 运行时支持但类型定义可能未包含
+  const result = await generateText({
+    model: provider.chat(model),
+    messages: messages as ModelMessage[],
+    tools,
+    temperature: opts?.temperature ?? 0.7,
+    maxRetries: 1,
+    abortSignal: AbortSignal.timeout(effectiveTimeout),
+    maxSteps: opts?.maxSteps ?? 5,
+  } as any);
+
+  return { text: result.text ?? "", usage: mapUsage(result.usage) };
+}
+
+/**
+ * Streaming AI call with native function calling.
+ *
+ * Tools are executed automatically by the AI SDK between stream chunks.
+ * Yields text chunks as they arrive.
+ */
+export async function* streamWithTools(
+  messages: ChatMessage[],
+  tools: Record<string, any>,
+  opts?: { temperature?: number; maxSteps?: number },
+): AsyncGenerator<string, void, undefined> {
+  const { provider, model, timeout } = getProvider();
+
+  // maxSteps 在 AI SDK v6 运行时支持但类型定义可能未包含
+  const result = streamText({
+    model: provider.chat(model),
+    messages: messages as ModelMessage[],
+    tools,
+    temperature: opts?.temperature ?? 0.7,
+    maxRetries: 1,
+    abortSignal: AbortSignal.timeout(timeout),
+    maxSteps: opts?.maxSteps ?? 5,
+  } as any);
+
+  for await (const chunk of result.textStream) {
+    if (chunk) yield chunk;
+  }
+}
+
 // Re-export for convenience
 export { getProvider };
