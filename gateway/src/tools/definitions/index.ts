@@ -17,6 +17,9 @@ import { createProjectTool } from "./create-project.js";
 import { createLinkTool } from "./create-link.js";
 import { searchTool } from "./search.js";
 import { confirmTool } from "./confirm.js";
+import { webSearchToolDef } from "../../web/web-search-tool.js";
+import { fetchUrlToolDef } from "../../web/fetch-url-tool.js";
+import { getSearchProvider } from "../../web/search-provider.js";
 
 /** 所有内置工具定义列表 */
 export const ALL_TOOL_DEFINITIONS = [
@@ -35,14 +38,21 @@ export const ALL_TOOL_DEFINITIONS = [
   searchTool,
   // 系统
   confirmTool,
-  // web_search, fetch_url — 待 agent-web-tools 实现
 ];
 
-/** 创建并初始化全量工具注册表 */
+/** 创建并初始化全量工具注册表（含条件注册的 web 工具） */
 export function createDefaultRegistry(): ToolRegistry {
   const registry = new ToolRegistry();
   for (const tool of ALL_TOOL_DEFINITIONS) {
     registry.register(tool);
   }
+
+  // 条件注册联网工具：有 API key 才注册 web_search
+  if (getSearchProvider()) {
+    registry.register(webSearchToolDef);
+  }
+  // fetch_url 始终注册（不依赖外部 API）
+  registry.register(fetchUrlToolDef);
+
   return registry;
 }

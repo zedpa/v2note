@@ -14,6 +14,8 @@ export interface StrikeEntry {
   status: string;
   superseded_by: string | null;
   is_cluster: boolean;
+  level: number | null;
+  origin: string | null;
   created_at: string;
   digested_at: string | null;
 }
@@ -30,10 +32,12 @@ export async function create(fields: {
   salience?: number;
   status?: string;
   is_cluster?: boolean;
+  level?: number;
+  origin?: string;
 }): Promise<StrikeEntry> {
   const row = await queryOne<StrikeEntry>(
-    `INSERT INTO strike (user_id, nucleus, polarity, field, source_id, source_span, source_type, confidence, salience, status, is_cluster)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`,
+    `INSERT INTO strike (user_id, nucleus, polarity, field, source_id, source_span, source_type, confidence, salience, status, is_cluster, level, origin)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING *`,
     [
       fields.user_id,
       fields.nucleus,
@@ -46,6 +50,8 @@ export async function create(fields: {
       fields.salience ?? 1.0,
       fields.status ?? "active",
       fields.is_cluster ?? false,
+      fields.level ?? null,
+      fields.origin ?? null,
     ],
   );
   return row!;

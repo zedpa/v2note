@@ -1,6 +1,6 @@
 # Agent 自适应——交互偏好学习 + Soul 守护
 
-> 状态：🟡 待开发 | 优先级：Phase 5+（需要足够交互数据）| 预计：4-5 天
+> 状态：✅ completed | 优先级：Phase 5+（需要足够交互数据）| 预计：4-5 天
 > 依赖：agent-plan（Plan 完成后回调触发偏好提取）、agent-tool-layer（unmet_request 表）
 
 ## 概述

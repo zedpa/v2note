@@ -1,6 +1,6 @@
 # 完整涌现链 L1→L2→L3
 
-> 状态：🟡 待开发 | 优先级：Phase 3 | 预计：5-7 天
+> 状态：✅ 已完成 | 优先级：Phase 3 | 完成日期：2026-03-24
 > 依赖：source-type-weight, top-level-dimensions
 
 ## 概述
@@ -71,7 +71,7 @@
 | migration | strike 表加 level 字段 (INT, 默认 NULL, Cluster 专用 1/2/3) |
 
 ## AI 调用
-- L2 涌现判断：1 次/周
+- L2 涌现判断：1 次/周，如果当天有3个以上L1 Cluster 涌现，则直接调用 L2 涌现判断
 - L3 归属：0 次（embedding 匹配）
 
 ## 验收标准

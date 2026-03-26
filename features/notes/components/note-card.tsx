@@ -1,9 +1,10 @@
 "use client";
 
 import { useRef, useCallback, useState } from "react";
-import { MapPin, Clock, Sparkles, Check, AlertCircle, ChevronDown } from "lucide-react";
+import { MapPin, Clock, Sparkles, Check, AlertCircle, ChevronDown, Link } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useStrikes } from "@/features/notes/hooks/use-strikes";
+import { useRelated } from "@/features/notes/hooks/use-related";
 import { StrikePreview, strikeSummaryText } from "./strike-preview";
 
 export interface Note {
@@ -251,12 +252,37 @@ export function NoteCard({
           {note.summary}
         </p>
 
-        {/* Strikes — only for completed notes */}
+        {/* Strikes + Related — only for completed notes */}
         {note.status === "completed" && (
-          <StrikesSection noteId={note.id} />
+          <div className="flex items-center gap-3 mt-2 border-t border-border/40 pt-2">
+            <div className="flex-1">
+              <StrikesSection noteId={note.id} />
+            </div>
+            <RelatedBadge noteId={note.id} />
+          </div>
         )}
       </button>
     </div>
+  );
+}
+
+function RelatedBadge({ noteId }: { noteId: string }) {
+  const { count, loaded, fetch } = useRelated(noteId);
+
+  // 懒加载：首次渲染时触发
+  if (!loaded) {
+    fetch();
+    return null;
+  }
+
+  // 场景5: 无关联时不显示
+  if (count === 0) return null;
+
+  return (
+    <span className="flex items-center gap-0.5 text-[11px] text-muted-foreground shrink-0">
+      <Link className="w-3 h-3" />
+      <span>{count}</span>
+    </span>
   );
 }
 
@@ -273,7 +299,7 @@ function StrikesSection({ noteId }: { noteId: string }) {
   if (loaded && strikes.length === 0) return null;
 
   return (
-    <div className="mt-2 border-t border-border/40 pt-2">
+    <div>
       <button
         type="button"
         onClick={handleToggle}

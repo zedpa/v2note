@@ -6,6 +6,7 @@
  */
 
 import { recordRepo, goalRepo, todoRepo, summaryRepo } from "../db/repositories/index.js";
+import { query as dbQuery } from "../db/pool.js";
 import type { SearchParams, SearchResultItem } from "./types.js";
 
 interface SearchContext {
@@ -25,7 +26,7 @@ export async function unifiedSearch(
   const results: SearchResultItem[] = [];
 
   const scopes = scope === "all"
-    ? ["records", "goals", "todos"] as const
+    ? ["records", "goals", "todos", "clusters"] as const
     : [scope] as const;
 
   // 并行搜索所有目标 scope
@@ -39,6 +40,9 @@ export async function unifiedSearch(
   }
   if (scopes.includes("todos")) {
     promises.push(searchTodos(query, ctx, results));
+  }
+  if (scopes.includes("clusters")) {
+    promises.push(searchClusters(query, ctx, results));
   }
 
   await Promise.all(promises);
@@ -137,5 +141,45 @@ async function searchTodos(
     }
   } catch (err) {
     console.warn("[search] todos search failed:", err);
+  }
+}
+
+/** 搜索 Cluster — 在 nucleus 中模糊匹配 */
+async function searchClusters(
+  query: string,
+  ctx: SearchContext,
+  results: SearchResultItem[],
+): Promise<void> {
+  try {
+    const userId = ctx.userId ?? ctx.deviceId;
+    const clusters = await dbQuery<{
+      id: string;
+      nucleus: string;
+      status: string;
+      created_at: string;
+    }>(
+      `SELECT id, nucleus, status, created_at FROM strike
+       WHERE user_id = $1 AND is_cluster = true AND status = 'active'
+         AND nucleus ILIKE $2
+       ORDER BY created_at DESC LIMIT 10`,
+      [userId, `%${query}%`],
+    );
+
+    for (const c of clusters) {
+      // 提取方括号内的名称
+      const nameMatch = c.nucleus.match(/^\[(.+?)\]/);
+      const name = nameMatch ? nameMatch[1] : c.nucleus;
+      results.push({
+        id: c.id,
+        type: "cluster",
+        title: name,
+        snippet: c.nucleus,
+        score: 0.85,
+        status: c.status,
+        created_at: c.created_at,
+      });
+    }
+  } catch (err) {
+    console.warn("[search] clusters search failed:", err);
   }
 }

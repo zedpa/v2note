@@ -1,6 +1,6 @@
 # 参谋上下文合并
 
-> 状态：🟡 待开发 | 优先级：Phase 5 | 预计：3-4 天
+> 状态：✅ completed | 优先级：Phase 5 | 预计：3-4 天
 > 依赖：cognitive-report, goal-auto-link
 
 ## 概述

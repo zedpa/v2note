@@ -42,13 +42,14 @@ export async function runEmergence(userId: string): Promise<EmergenceResult> {
       return result;
     }
 
-    // Load cluster members
+    // Load cluster members (exclude material for density analysis)
     const clusterMembers = new Map<string, StrikeEntry[]>();
     for (const c of clusters) {
       const members = await query<StrikeEntry>(
         `SELECT s.* FROM strike s
-         JOIN cluster_member cm ON cm.member_strike_id = s.id
-         WHERE cm.cluster_strike_id = $1 AND s.status = 'active'`,
+         JOIN bond cm ON cm.target_strike_id = s.id AND cm.type = 'cluster_member'
+         WHERE cm.source_strike_id = $1 AND s.status = 'active'
+           AND COALESCE(s.source_type, 'think') != 'material'`,
         [c.id],
       );
       clusterMembers.set(c.id, members);
@@ -315,6 +316,7 @@ async function extractPatterns(userId: string): Promise<number> {
      FROM strike s
      LEFT JOIN strike_tag st ON st.strike_id = s.id
      WHERE s.user_id = $1 AND s.status = 'active' AND s.polarity = 'judge'
+       AND COALESCE(s.source_type, 'think') != 'material'
      GROUP BY s.id
      ORDER BY s.created_at DESC
      LIMIT 50`,

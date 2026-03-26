@@ -18,6 +18,22 @@ export function buildDigestPrompt(): string {
 - confidence: 0-1，确信程度
 - tags: string[] — 自由标签（人名、主题、领域等）
 
+**当 polarity = "intend" 时，额外提取以下字段到 field 对象中：**
+- granularity: "action" | "goal" | "project"
+  - action: 单步可完成（"明天打电话给张总"）
+  - goal: 长期、多步（"今年把身体搞好"）
+  - project: 复合方向、多目标（"做一个供应链管理系统"）
+- scheduled_start?: ISO 时间字符串 — 明确的开始/执行时间（"明天下午3点" → 计算绝对日期）
+- deadline?: ISO 日期字符串 — 截止时间（"这周之内" "月底前"）
+- person?: string — 相关人物（"张总" "小李"）
+- priority?: "high" | "medium" | "low" — 从语气推断（"挺急的"→high, "不着急"→low, 无明确信号→不填）
+
+时间识别规则：
+- 绝对时间："3月25号下午3点" → "2026-03-25T15:00:00"
+- 相对时间："明天" "后天" "下周一" → 计算绝对日期
+- 模糊时间："这周之内" "月底前" "尽快" → deadline
+- 无时间："记一下" → 不填 scheduled_start/deadline
+
 同时输出 Strike 之间的 bond（关系）：
 - source_idx: 源 Strike 索引（0-based）
 - target_idx: 目标 Strike 索引
@@ -26,9 +42,14 @@ export function buildDigestPrompt(): string {
 
 返回纯 JSON，不要包含任何其他文字：
 {
-  "strikes": [{"nucleus": "...", "polarity": "...", "confidence": 0.9, "tags": ["..."]}],
-  "bonds": [{"source_idx": 0, "target_idx": 1, "type": "causal", "strength": 0.8}]
-}`;
+  "strikes": [
+    {"nucleus": "铝价又涨了5%", "polarity": "perceive", "confidence": 0.9, "tags": ["铝", "成本"]},
+    {"nucleus": "明天下午3点找张总确认报价", "polarity": "intend", "confidence": 0.9, "tags": ["张总", "报价"], "field": {"granularity": "action", "scheduled_start": "2026-03-26T15:00:00", "person": "张总", "priority": "high"}}
+  ],
+  "bonds": [{"source_idx": 0, "target_idx": 1, "type": "triggers", "strength": 0.8}]
+}
+
+注意：只有 polarity="intend" 的 Strike 需要 field 对象。其他 polarity 不需要。`;
 }
 
 export function buildCrossLinkPrompt(): string {

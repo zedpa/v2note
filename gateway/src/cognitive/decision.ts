@@ -65,9 +65,9 @@ export async function gatherDecisionContext(
   // 2. Related clusters
   try {
     const clusters = await query<StrikeEntry & { member_count: string }>(
-      `SELECT s.*, COUNT(cm.member_strike_id) as member_count
+      `SELECT s.*, COUNT(cm.target_strike_id) as member_count
        FROM strike s
-       JOIN cluster_member cm ON cm.cluster_strike_id = s.id
+       JOIN bond cm ON cm.source_strike_id = s.id AND cm.type = 'cluster_member'
        WHERE s.user_id = $1 AND s.is_cluster = true AND s.status = 'active'
        GROUP BY s.id
        ORDER BY member_count DESC LIMIT 10`,

@@ -9,6 +9,7 @@ import { MemoryManager } from "../memory/manager.js";
 import { loadSoul } from "../soul/manager.js";
 import { loadProfile } from "../profile/manager.js";
 import { generateAlerts } from "../cognitive/alerts.js";
+import { generateCognitiveReport } from "../cognitive/report.js";
 import { aiDiaryRepo } from "../db/repositories/index.js";
 
 // ── Types ──
@@ -123,6 +124,39 @@ export async function generateMorningBriefing(
     // non-critical
   }
 
+  // 3c. Load cognitive report (yesterday's)
+  let cognitiveReportSection = "";
+  try {
+    const uid = userId ?? deviceId;
+    const report = await generateCognitiveReport(uid);
+    if (!report.is_empty) {
+      const lines: string[] = [];
+      const { today_strikes: ts } = report;
+      const total = ts.perceive + ts.judge + ts.realize + ts.intend + ts.feel;
+      if (total > 0) {
+        lines.push(`认知动态: 感知${ts.perceive} 判断${ts.judge} 领悟${ts.realize} 意图${ts.intend} 感受${ts.feel}`);
+      }
+      if (report.contradictions.length > 0) {
+        const cList = report.contradictions.slice(0, 3).map(
+          (c) => `「${c.strikeA_nucleus.slice(0, 20)}」↔「${c.strikeB_nucleus.slice(0, 20)}」`,
+        );
+        lines.push(`想法变化: ${cList.join("; ")}`);
+      }
+      if (report.cluster_changes.length > 0) {
+        lines.push(`新主题: ${report.cluster_changes.map((c) => c.name).join(", ")}`);
+      }
+      if (report.behavior_drift.intend_count > 0) {
+        const { intend_count, todo_completed, completion_rate } = report.behavior_drift;
+        lines.push(`行动力: ${intend_count}个目标, 完成${todo_completed}个(${Math.round(completion_rate * 100)}%)`);
+      }
+      if (lines.length > 0) {
+        cognitiveReportSection = `\n## 认知洞察\n${lines.join("\n")}\n将这些洞察自然编入简报。不要使用"矛盾""聚类""极性"等技术术语，用温暖自然的口吻转述。`;
+      }
+    }
+  } catch {
+    // non-critical
+  }
+
   // 4. Yesterday's stats
   const yesterdayStart = `${yesterday}T00:00:00Z`;
   const yesterdayEnd = `${yesterday}T23:59:59Z`;
@@ -226,7 +260,7 @@ ${aiActionableContext}
 
 ## 近期记忆
 ${memoryContext}
-${cognitiveHints.length > 0 ? `\n## 思考变化提醒\n${cognitiveHints.join("\n")}\n将这些变化自然地编入 followups 字段，用温和的语气提醒用户可以回顾。不要使用"矛盾""聚类"等技术术语。` : ""}
+${cognitiveHints.length > 0 ? `\n## 思考变化提醒\n${cognitiveHints.join("\n")}\n将这些变化自然地编入 followups 字段，用温和的语气提醒用户可以回顾。不要使用"矛盾""聚类"等技术术语。` : ""}${cognitiveReportSection}
 
 ## 昨日统计
 完成: ${yesterdayStats.done}/${yesterdayStats.total}
@@ -366,7 +400,33 @@ export async function generateEveningSummary(
     // non-critical
   }
 
-  // 5b. Load today's cognitive digest from ai-self diary
+  // 5b. Load cognitive report for today's stats
+  let eveningCognitiveSection = "";
+  try {
+    const uid = userId ?? deviceId;
+    const report = await generateCognitiveReport(uid);
+    if (!report.is_empty) {
+      const lines: string[] = [];
+      const { today_strikes: ts } = report;
+      const total = ts.perceive + ts.judge + ts.realize + ts.intend + ts.feel;
+      if (total > 0) {
+        lines.push(`今日思考: 感知${ts.perceive}次, 判断${ts.judge}次, 领悟${ts.realize}次, 意图${ts.intend}个, 感受${ts.feel}次`);
+      }
+      if (report.contradictions.length > 0) {
+        lines.push(`想法变化: ${report.contradictions.length}处`);
+      }
+      if (report.behavior_drift.completion_rate > 0) {
+        lines.push(`行动完成率: ${Math.round(report.behavior_drift.completion_rate * 100)}%`);
+      }
+      if (lines.length > 0) {
+        eveningCognitiveSection = `\n## 今日认知统计\n${lines.join("\n")}\n将这些数据自然编入总结，用温暖的口吻。如果有领悟，重点提及。不要使用技术术语。`;
+      }
+    }
+  } catch {
+    // non-critical
+  }
+
+  // 5c. Load today's cognitive digest from ai-self diary
   let cognitiveDigest = "";
   try {
     const diaryEntry = userId
@@ -416,7 +476,7 @@ ${pending.slice(0, 10).map((t) => `- ${t.text}`).join("\n") || "无"}
 ${relaysPending.map((t) => `- ${t.text}`).join("\n") || "无待转达"}
 
 ## 今日新记录数: ${newRecordCount}
-${cognitiveDigest ? `\n## 今日思考发现\n${cognitiveDigest}\n将这些发现自然地编入 tomorrow_seeds 或 accomplishments。用"想法演进""新的联系""思路变化"等温和表述，不要使用"聚类""Strike""矛盾检测"等技术术语。` : ""}`,
+${cognitiveDigest ? `\n## 今日思考发现\n${cognitiveDigest}\n将这些发现自然地编入 tomorrow_seeds 或 accomplishments。用"想法演进""新的联系""思路变化"等温和表述，不要使用"聚类""Strike""矛盾检测"等技术术语。` : ""}${eveningCognitiveSection}`,
     },
   ];
 

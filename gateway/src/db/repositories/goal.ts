@@ -5,8 +5,9 @@ export interface Goal {
   device_id: string;
   title: string;
   parent_id: string | null;
-  status: "active" | "paused" | "completed" | "abandoned";
+  status: "active" | "paused" | "completed" | "abandoned" | "progressing" | "blocked" | "suggested" | "dismissed";
   source: "speech" | "chat" | "manual";
+  cluster_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -59,7 +60,7 @@ export async function create(fields: {
 
 export async function update(
   id: string,
-  fields: { title?: string; status?: string; parent_id?: string | null },
+  fields: { title?: string; status?: string; parent_id?: string | null; cluster_id?: string | null },
 ): Promise<void> {
   const sets: string[] = [];
   const params: any[] = [];
@@ -75,6 +76,10 @@ export async function update(
   if (fields.parent_id !== undefined) {
     sets.push(`parent_id = $${i++}`);
     params.push(fields.parent_id);
+  }
+  if (fields.cluster_id !== undefined) {
+    sets.push(`cluster_id = $${i++}`);
+    params.push(fields.cluster_id);
   }
   if (sets.length === 0) return;
   sets.push(`updated_at = now()`);

@@ -387,7 +387,11 @@ export async function processEntry(payload: ProcessPayload): Promise<ProcessResu
     });
 
     // 7. Cognitive layer: trigger digest
-    if (shouldDigestImmediately(result, payload.text.length)) {
+    const recordCount = payload.userId
+      ? await recordRepo.countByUser(payload.userId)
+      : 999;
+    const isColdStart = recordCount < 20;
+    if (shouldDigestImmediately(result, payload.text.length, isColdStart)) {
       digestRecords([payload.recordId], {
         deviceId: payload.deviceId,
         userId: payload.userId,
@@ -410,10 +414,9 @@ export async function processEntry(payload: ProcessPayload): Promise<ProcessResu
   return result;
 }
 
-function shouldDigestImmediately(result: ProcessResult, textLength: number): boolean {
-  /* MOVED TO DIGEST — intent-based detection no longer available here */
-  // const deepTypes = new Set(['reflection', 'goal', 'complaint']);
-  // const hasDeepIntent = result.intents.some(i => deepTypes.has(i.type));
+function shouldDigestImmediately(result: ProcessResult, textLength: number, isColdStart?: boolean): boolean {
+  // 冷启动期（record < 20）无论长度都立即 Digest
+  if (isColdStart) return true;
   const isSubstantial = textLength > 80;
   return isSubstantial;
 }

@@ -388,11 +388,12 @@ export class ProactiveEngine {
       console.log(`[proactive:digest] Processing ${userIds.size} users with undigested records`);
 
       for (const userId of userIds) {
+        let recordIds: string[] = [];
         try {
           const records = await recordRepo.findUndigested(userId);
           if (records.length === 0) continue;
 
-          const recordIds = records.map((r) => r.id);
+          recordIds = records.map((r) => r.id);
           console.log(`[proactive:digest] User ${userId}: ${recordIds.length} undigested records`);
 
           // Find deviceId from connected devices or use userId as fallback
@@ -407,6 +408,14 @@ export class ProactiveEngine {
           await digestRecords(recordIds, { deviceId, userId });
         } catch (err: any) {
           console.error(`[proactive:digest] Failed for user ${userId}:`, err.message);
+          // 失败时增加重试计数
+          for (const id of recordIds) {
+            try {
+              await recordRepo.incrementDigestAttempts(id);
+            } catch {
+              // 忽略
+            }
+          }
         }
       }
     } catch (err: any) {

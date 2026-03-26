@@ -1,6 +1,6 @@
 # Agent Plan 机制
 
-> 状态：🟡 待开发 | 优先级：Phase 2.5（Agent 基础能力）| 预计：6-8 天
+> 状态：✅ 已完成 | 优先级：Phase 2.5（Agent 基础能力）| 完成日期：2026-03-24
 > 依赖：agent-tool-layer（工具注册 + 原生 function calling）
 
 ## 概述

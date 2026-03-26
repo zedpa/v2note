@@ -22,6 +22,7 @@ export interface Todo {
   impact?: number;
   ai_actionable?: boolean;
   ai_action_plan?: string[];
+  strike_id?: string | null;
 }
 
 export async function findByDevice(deviceId: string): Promise<Todo[]> {
@@ -54,6 +55,13 @@ export async function findPendingByUser(userId: string): Promise<Todo[]> {
   );
 }
 
+export async function findByGoalId(goalId: string): Promise<Todo[]> {
+  return query<Todo>(
+    `SELECT * FROM todo WHERE goal_id = $1 ORDER BY created_at`,
+    [goalId],
+  );
+}
+
 export async function findByRecordId(recordId: string): Promise<Todo[]> {
   return query<Todo>(
     `SELECT * FROM todo WHERE record_id = $1 ORDER BY created_at`,
@@ -65,10 +73,11 @@ export async function create(fields: {
   record_id: string;
   text: string;
   done?: boolean;
+  strike_id?: string;
 }): Promise<Todo> {
   const row = await queryOne<Todo>(
-    `INSERT INTO todo (record_id, text, done) VALUES ($1, $2, $3) RETURNING *`,
-    [fields.record_id, fields.text, fields.done ?? false],
+    `INSERT INTO todo (record_id, text, done, strike_id) VALUES ($1, $2, $3, $4) RETURNING *`,
+    [fields.record_id, fields.text, fields.done ?? false, fields.strike_id ?? null],
   );
   return row!;
 }
@@ -104,6 +113,7 @@ export async function update(
     ai_actionable?: boolean;
     ai_action_plan?: string[] | null;
     goal_id?: string | null;
+    strike_id?: string | null;
   },
 ): Promise<void> {
   const sets: string[] = [];
@@ -152,6 +162,10 @@ export async function update(
   if (fields.goal_id !== undefined) {
     sets.push(`goal_id = $${i++}`);
     params.push(fields.goal_id);
+  }
+  if (fields.strike_id !== undefined) {
+    sets.push(`strike_id = $${i++}`);
+    params.push(fields.strike_id);
   }
   if (sets.length === 0) return;
   params.push(id);

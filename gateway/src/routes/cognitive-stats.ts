@@ -18,15 +18,20 @@ interface CountRow {
   count: string;
 }
 
+// material 过滤条件（排除 material，保留 think/voice/null 等）
+const THINK_ONLY = `AND COALESCE(source_type, 'think') != 'material'`;
+
 export function registerCognitiveStatsRoutes(router: Router) {
-  router.get("/api/v1/cognitive/stats", async (req, res) => {
+  router.get("/api/v1/cognitive/stats", async (req, res, _params, queryParams) => {
     const userId = getUserId(req);
     if (!userId) {
       sendError(res, "Unauthorized", 401);
       return;
     }
 
-    // Run all queries in parallel
+    const includeMaterial = queryParams?.include_material === "true";
+
+    // Run all queries in parallel — main stats only count think
     const [
       polarityRows,
       lagRow,
@@ -36,10 +41,10 @@ export function registerCognitiveStatsRoutes(router: Router) {
       totalBondsRow,
       totalClustersRow,
     ] = await Promise.all([
-      // 1. Polarity distribution
+      // 1. Polarity distribution (think only)
       query<PolarityRow>(
         `SELECT polarity, COUNT(*) as count FROM strike
-         WHERE user_id = $1 AND status = 'active'
+         WHERE user_id = $1 AND status = 'active' ${THINK_ONLY}
          GROUP BY polarity`,
         [userId],
       ),
@@ -69,10 +74,10 @@ export function registerCognitiveStatsRoutes(router: Router) {
          WHERE s.user_id = $1 AND b.type = 'contradiction'`,
         [userId],
       ),
-      // 5. Total active strikes
+      // 5. Total active strikes (think only)
       queryOne<CountRow>(
         `SELECT COUNT(*) as count FROM strike
-         WHERE user_id = $1 AND status = 'active'`,
+         WHERE user_id = $1 AND status = 'active' ${THINK_ONLY}`,
         [userId],
       ),
       // 6. Total bonds
@@ -96,7 +101,7 @@ export function registerCognitiveStatsRoutes(router: Router) {
       polarityDistribution[row.polarity] = parseInt(row.count, 10);
     }
 
-    const stats = {
+    const stats: Record<string, any> = {
       polarityDistribution,
       realizeLag: lagRow?.avg_days ? parseFloat(lagRow.avg_days) : null,
       topClusters: clusterRows.map((c) => ({
@@ -109,6 +114,33 @@ export function registerCognitiveStatsRoutes(router: Router) {
       totalBonds: parseInt(totalBondsRow?.count ?? "0", 10),
       totalClusters: parseInt(totalClustersRow?.count ?? "0", 10),
     };
+
+    // 可选：返回 material 独立统计
+    if (includeMaterial) {
+      const [matPolarityRows, matTotalRow] = await Promise.all([
+        query<PolarityRow>(
+          `SELECT polarity, COUNT(*) as count FROM strike
+           WHERE user_id = $1 AND status = 'active' AND source_type = 'material'
+           GROUP BY polarity`,
+          [userId],
+        ),
+        queryOne<CountRow>(
+          `SELECT COUNT(*) as count FROM strike
+           WHERE user_id = $1 AND status = 'active' AND source_type = 'material'`,
+          [userId],
+        ),
+      ]);
+
+      const matPolarityDist: Record<string, number> = {};
+      for (const row of matPolarityRows) {
+        matPolarityDist[row.polarity] = parseInt(row.count, 10);
+      }
+
+      stats.materialStats = {
+        polarityDistribution: matPolarityDist,
+        totalStrikes: parseInt(matTotalRow?.count ?? "0", 10),
+      };
+    }
 
     sendJson(res, stats);
   });

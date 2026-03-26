@@ -202,6 +202,14 @@ export async function searchByUser(
   );
 }
 
+export async function countByUser(userId: string): Promise<number> {
+  const row = await queryOne<{ count: string }>(
+    `SELECT COUNT(*)::text AS count FROM record WHERE user_id = $1`,
+    [userId],
+  );
+  return parseInt(row?.count ?? "0", 10);
+}
+
 export async function countByDateRange(
   deviceId: string,
   start: string,
@@ -231,8 +239,16 @@ export async function countByUserDateRange(
 export async function findUndigested(userId: string): Promise<Record[]> {
   return query<Record>(
     `SELECT * FROM record WHERE user_id = $1 AND digested = FALSE AND status = 'completed'
+       AND COALESCE(digest_attempts, 0) < 3
      ORDER BY created_at ASC`,
     [userId],
+  );
+}
+
+export async function incrementDigestAttempts(id: string): Promise<void> {
+  await execute(
+    `UPDATE record SET digest_attempts = COALESCE(digest_attempts, 0) + 1, updated_at = now() WHERE id = $1`,
+    [id],
   );
 }
 

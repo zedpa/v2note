@@ -1,6 +1,7 @@
 import type { Router } from "../router.js";
 import { readBody, sendJson, getDeviceId, getUserId } from "../lib/http-helpers.js";
 import { todoRepo } from "../db/repositories/index.js";
+import { onTodoComplete } from "../cognitive/todo-projector.js";
 
 export function registerTodoRoutes(router: Router) {
   // List todos
@@ -34,6 +35,12 @@ export function registerTodoRoutes(router: Router) {
       priority?: number;
     }>(req);
     await todoRepo.update(params.id, body);
+    // todo 完成时触发双向一致性：降低 Strike salience
+    if (body.done === true) {
+      onTodoComplete(params.id).catch((e) =>
+        console.error("[todos] onTodoComplete failed:", e),
+      );
+    }
     sendJson(res, { ok: true });
   });
 

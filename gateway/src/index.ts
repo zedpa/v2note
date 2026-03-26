@@ -35,6 +35,7 @@ import { registerActionPanelRoutes } from "./routes/action-panel.js";
 import { registerCognitiveClusterRoutes } from "./routes/cognitive-clusters.js";
 import { registerIngestRoutes } from "./routes/ingest.js";
 import { registerCognitiveRelationRoutes } from "./routes/cognitive-relations.js";
+import { registerOnboardingRoutes } from "./routes/onboarding.js";
 import { getProactiveEngine } from "./proactive/engine.js";
 import { verifyAccessToken } from "./auth/jwt.js";
 import { generateAiStatus } from "./handlers/reflect.js";
@@ -109,6 +110,7 @@ registerActionPanelRoutes(router);
 registerCognitiveClusterRoutes(router);
 registerIngestRoutes(router);
 registerCognitiveRelationRoutes(router);
+registerOnboardingRoutes(router);
 
 // ── HTTP Server ──
 

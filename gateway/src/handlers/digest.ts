@@ -14,12 +14,14 @@ import {
   summaryRepo,
 } from "../db/repositories/index.js";
 import { buildDigestPrompt, buildCrossLinkPrompt } from "./digest-prompt.js";
+import { projectIntendStrike } from "../cognitive/todo-projector.js";
 
 interface RawStrike {
   nucleus: string;
   polarity: string;
   confidence: number;
   tags: string[];
+  field?: Record<string, any>;
 }
 
 interface RawBond {
@@ -133,13 +135,16 @@ export async function digestRecords(
     for (let i = 0; i < rawStrikes.length; i++) {
       const s = rawStrikes[i];
       try {
+        const strikeSourceType = sourceTypeMap.get(validIds[0]) ?? "think";
         const entry = await strikeRepo.create({
           user_id: userId,
           nucleus: s.nucleus,
           polarity: s.polarity,
+          field: s.field,
           confidence: s.confidence ?? 0.5,
+          salience: strikeSourceType === "material" ? 0.2 : undefined,
           source_id: validIds[0],
-          source_type: sourceTypeMap.get(validIds[0]) ?? "think",
+          source_type: strikeSourceType,
         });
         idxToId.set(i, entry.id);
 
@@ -151,6 +156,15 @@ export async function digestRecords(
               label,
             })),
           );
+        }
+
+        // intend Strike 自动投影为 todo/goal
+        if (s.polarity === "intend") {
+          try {
+            await projectIntendStrike(entry, userId);
+          } catch (e) {
+            console.error(`[digest] Failed to project intend strike ${entry.id} to todo:`, e);
+          }
         }
       } catch (e) {
         console.error(`[digest] Failed to write strike ${i}:`, e);

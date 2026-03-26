@@ -51,6 +51,7 @@ function mockGoal(id: string, title: string) {
     parent_id: null,
     status: "active" as const,
     source: "chat" as const,
+    cluster_id: null,
     created_at: "2026-03-10",
     updated_at: "2026-03-10",
   };

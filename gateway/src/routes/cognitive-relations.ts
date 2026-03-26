@@ -1,6 +1,7 @@
 import type { Router } from "../router.js";
 import { sendJson, sendError, getUserId } from "../lib/http-helpers.js";
 import { strikeRepo, bondRepo, summaryRepo } from "../db/repositories/index.js";
+import { computeRecordRelations } from "../cognitive/record-relations.js";
 
 /** Bond type → user-facing label */
 const BOND_LABEL: Record<string, string> = {
@@ -11,14 +12,18 @@ const BOND_LABEL: Record<string, string> = {
   perspective_of: "不同视角",
 };
 
-function bondLabel(type: string): string {
-  return BOND_LABEL[type] ?? "相关";
-}
+// 内部图结构 bond 类型，不参与关联聚合
+const INTERNAL_BOND_TYPES = new Set([
+  "cluster_member",
+  "abstracted_from",
+  "cluster_link",
+]);
 
 export function registerCognitiveRelationRoutes(router: Router) {
   /**
    * GET /api/v1/records/:id/related
-   * Returns up to 5 related records based on cognitive bonds.
+   * 日记级关联推荐，使用 bond 聚合公式。
+   * 返回关联度 > 0.4 的日记，按关联度降序，最多 10 条。
    */
   router.get("/api/v1/records/:id/related", async (req, res, params) => {
     const userId = getUserId(req);
@@ -34,71 +39,78 @@ export function registerCognitiveRelationRoutes(router: Router) {
     }
 
     try {
-      // 1. Find strikes belonging to this record
+      // 1. 当前日记的 strikes
       const strikes = await strikeRepo.findBySource(recordId);
       if (strikes.length === 0) {
-        sendJson(res, { related: [] });
+        sendJson(res, { related: [], count: 0 });
         return;
       }
 
-      // 2. Collect bonds for each strike
-      const seenRecords = new Set<string>();
-      seenRecords.add(recordId); // exclude self
-      const candidates: Array<{
-        record_id: string;
-        relation: string;
-        bond_strength: number;
-        source_id: string;
-      }> = [];
+      // 2. 收集所有跨记录 bond
+      const allBonds = [];
+      const otherStrikeIds = new Set<string>();
 
       for (const strike of strikes) {
         const bonds = await bondRepo.findByStrike(strike.id);
-
         for (const bond of bonds) {
-          // Skip cluster/abstraction bonds — internal graph mechanics
-          if (bond.type === "cluster_member" || bond.type === "abstracted_from" || bond.type === "cluster_link") {
-            continue;
-          }
+          if (INTERNAL_BOND_TYPES.has(bond.type)) continue;
 
-          // Find the other side of the bond
           const otherId = bond.source_strike_id === strike.id
             ? bond.target_strike_id
             : bond.source_strike_id;
 
-          const otherStrike = await strikeRepo.findById(otherId);
-          if (!otherStrike || !otherStrike.source_id) continue;
-          if (seenRecords.has(otherStrike.source_id)) continue;
-
-          seenRecords.add(otherStrike.source_id);
-          candidates.push({
-            record_id: otherStrike.source_id,
-            relation: bondLabel(bond.type),
-            bond_strength: bond.strength,
-            source_id: otherStrike.source_id,
-          });
+          allBonds.push(bond);
+          otherStrikeIds.add(otherId);
         }
       }
 
-      // 3. Sort by bond strength descending, take top 5
-      candidates.sort((a, b) => b.bond_strength - a.bond_strength);
-      const top = candidates.slice(0, 5);
+      if (allBonds.length === 0) {
+        sendJson(res, { related: [], count: 0 });
+        return;
+      }
 
-      // 4. Load summaries for related records
+      // 3. 加载对端 strike 信息，构建映射
+      const strikeToRecord: Record<string, string> = {};
+      const strikeSourceTypes: Record<string, string> = {};
+      const recordStrikeCounts: Record<string, number> = {};
+
+      for (const id of otherStrikeIds) {
+        const s = await strikeRepo.findById(id);
+        if (!s || !s.source_id || s.source_id === recordId) continue;
+
+        strikeToRecord[id] = s.source_id;
+        if (s.source_type) strikeSourceTypes[id] = s.source_type;
+        recordStrikeCounts[s.source_id] = (recordStrikeCounts[s.source_id] ?? 0) + 1;
+      }
+
+      // 4. 聚合
+      const relations = await computeRecordRelations(
+        recordId,
+        strikes,
+        allBonds,
+        recordStrikeCounts,
+        strikeSourceTypes,
+        strikeToRecord,
+      );
+
+      // 5. 加载摘要
       const related = await Promise.all(
-        top.map(async (c) => {
-          const summary = await summaryRepo.findByRecordId(c.record_id);
+        relations.map(async (r) => {
+          const summary = await summaryRepo.findByRecordId(r.record_id);
           return {
-            record_id: c.record_id,
+            record_id: r.record_id,
             title: summary?.title ?? "",
             short_summary: summary?.short_summary ?? summary?.long_summary?.slice(0, 80) ?? "",
-            relation: c.relation,
+            relevance: Math.round(r.relevance * 100) / 100,
             created_at: summary?.created_at ?? "",
           };
         }),
       );
 
-      // Filter out records with no summary
-      sendJson(res, { related: related.filter((r) => r.short_summary) });
+      sendJson(res, {
+        related: related.filter((r) => r.short_summary),
+        count: relations.length,
+      });
     } catch (err: any) {
       console.error("[cognitive-relations] Error:", err);
       sendError(res, err.message, 500);

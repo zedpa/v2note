@@ -8,6 +8,13 @@ import { scanContradictions, type ContradictionResult } from "./contradiction.js
 import { runPromote, type PromoteResult } from "./promote.js";
 import { normalizeBondTypes, decayBondStrength, decaySalience } from "./maintenance.js";
 import { generateAlerts, type CognitiveAlert } from "./alerts.js";
+import { syncClusterTags } from "./tag-sync.js";
+import { generateCognitiveReport, type CognitiveReport } from "./report.js";
+import { runEmergence } from "./emergence.js";
+import { discoverL2Clusters } from "./l2-emergence.js";
+import { query } from "../db/pool.js";
+import type { StrikeEntry } from "../db/repositories/strike.js";
+import type { BondEntry } from "../db/repositories/bond.js";
 import { appendToDiary } from "../diary/manager.js";
 
 export interface CognitiveCycleResult {
@@ -34,6 +41,40 @@ export async function runDailyCognitiveCycle(
     console.log("[cognitive] Clustering:", clusterResult);
   } catch (err) {
     console.error("[cognitive] Clustering failed:", err);
+  }
+
+  // 2a-2. Emergence (cross-cluster bonds, resonance, patterns)
+  try {
+    const emergenceResult = await runEmergence(userId);
+    console.log("[cognitive] Emergence:", emergenceResult);
+  } catch (err) {
+    console.error("[cognitive] Emergence failed:", err);
+  }
+
+  // 2a-3. L2 emergence (when 3+ new L1 clusters created)
+  if (clusterResult && clusterResult.newClusters >= 3) {
+    try {
+      const l1Clusters = await query<StrikeEntry>(
+        `SELECT * FROM strike WHERE user_id = $1 AND is_cluster = true AND level = 1 AND status = 'active'`,
+        [userId],
+      );
+      const l1Bonds = await query<BondEntry>(
+        `SELECT b.* FROM bond b
+         JOIN strike s1 ON s1.id = b.source_strike_id AND s1.is_cluster = true AND s1.level = 1
+         JOIN strike s2 ON s2.id = b.target_strike_id AND s2.is_cluster = true AND s2.level = 1
+         WHERE s1.user_id = $1 AND b.type != 'cluster_member'`,
+        [userId],
+      );
+      const clusterBonds = l1Bonds.map((b) => ({
+        source: b.source_strike_id,
+        target: b.target_strike_id,
+        strength: b.strength,
+      }));
+      const l2Result = await discoverL2Clusters(userId, l1Clusters, clusterBonds);
+      console.log(`[cognitive] L2 emergence: ${l2Result.created} created`);
+    } catch (err) {
+      console.error("[cognitive] L2 emergence failed:", err);
+    }
   }
 
   // 2b. Contradiction scan
@@ -80,6 +121,23 @@ export async function runDailyCognitiveCycle(
     );
   } catch (err) {
     console.error("[cognitive] Maintenance failed:", err);
+  }
+
+  // 2e. Tag sync — Cluster 标签反写到成员 Strike
+  try {
+    const tagSync = await syncClusterTags(userId);
+    console.log(`[cognitive] Tag sync: created=${tagSync.created} retired=${tagSync.retired}`);
+  } catch (err) {
+    console.error("[cognitive] Tag sync failed:", err);
+  }
+
+  // 2f. Cognitive report — 结构化认知报告
+  let cognitiveReport: CognitiveReport | null = null;
+  try {
+    cognitiveReport = await generateCognitiveReport(userId);
+    console.log(`[cognitive] Report: empty=${cognitiveReport.is_empty} strikes=${JSON.stringify(cognitiveReport.today_strikes)}`);
+  } catch (err) {
+    console.error("[cognitive] Report generation failed:", err);
   }
 
   // Store cognitive digest into AI diary (ai-self notebook)

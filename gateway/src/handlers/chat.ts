@@ -14,9 +14,11 @@ import { transcriptRepo } from "../db/repositories/index.js";
 import { pendingIntentRepo } from "../db/repositories/index.js";
 import { createDefaultRegistry } from "../tools/definitions/index.js";
 import type { ToolContext } from "../tools/types.js";
-import { maySoulUpdate, mayProfileUpdate } from "../lib/text-utils.js";
+import { mayProfileUpdate } from "../lib/text-utils.js";
+import { shouldUpdateSoulStrict } from "../cognitive/self-evolution.js";
 import { gatherDecisionContext, buildDecisionPrompt } from "../cognitive/decision.js";
 import { generateAlerts } from "../cognitive/alerts.js";
+import { detectCognitiveQuery, loadChatCognitive, buildGoalDiscussionContext, buildInsightDiscussionContext, saveConversationAsRecord } from "../cognitive/advisor-context.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const INSIGHTS_DIR = join(__dirname, "../../insights");
@@ -136,21 +138,17 @@ export async function startChat(
     }
   }
 
-  // Load cognitive context for review/insight modes
+  // Load cognitive context for review/insight modes (enriched with clusters + alerts)
   let cognitiveContext: string | undefined;
   if (payload.mode === "review" || payload.mode === "insight") {
     try {
       const uid = payload.userId ?? payload.deviceId;
-      const alerts = await generateAlerts(uid);
-      if (alerts.length > 0) {
-        cognitiveContext = alerts.slice(0, 5).map((a) => {
-          const aShort = a.strikeA.nucleus.slice(0, 40);
-          const bShort = a.strikeB.nucleus.slice(0, 40);
-          return `- 用户之前说过「${aShort}」，后来又说「${bShort}」，想法有所变化`;
-        }).join("\n");
+      const cognitive = await loadChatCognitive(uid);
+      if (cognitive.contextString) {
+        cognitiveContext = cognitive.contextString;
       }
     } catch {
-      // non-critical
+      // non-critical — fall back to no cognitive context
     }
   }
 
@@ -214,6 +212,22 @@ export async function sendChatMessage(
   const session = getSession(deviceId);
   if (session.mode !== "chat") {
     throw new Error("No active chat session");
+  }
+
+  // 检测认知相关提问，动态注入认知数据
+  if (detectCognitiveQuery(text) && session.userId) {
+    try {
+      const cognitive = await loadChatCognitive(session.userId);
+      if (cognitive.contextString) {
+        session.context.addMessage({
+          role: "user",
+          content: `[系统补充上下文]\n${cognitive.contextString}\n\n${text}`,
+        });
+        return streamWithNativeTools(session, deviceId);
+      }
+    } catch {
+      // non-critical
+    }
   }
 
   session.context.addMessage({ role: "user", content: text });
@@ -283,7 +297,7 @@ export async function endChat(deviceId: string): Promise<void> {
     if (!userId) {
       console.warn(`[chat] endChat: session.userId is undefined for device ${deviceId}, soul/profile updates will use deviceId only`);
     }
-    if (maySoulUpdate(userText)) {
+    if (shouldUpdateSoulStrict(history.filter(m => m.role === "user").map(m => m.content))) {
       updateSoul(deviceId, `[复盘对话] ${summary}`, userId).catch((e) => {
         console.warn(`[chat] Soul update failed: ${e.message}`);
       });
@@ -296,6 +310,14 @@ export async function endChat(deviceId: string): Promise<void> {
     appendToDiary(deviceId, "ai-self", `[对话摘要] ${summary.slice(0, 500)}`, userId).catch((e) => {
       console.warn(`[chat] Diary append failed: ${e.message}`);
     });
+
+    // 场景 5: 有价值的对话保存为日记 record，进入 Digest 管道
+    if (history.length >= 4 && userId) {
+      const messages = history.map(m => ({ role: m.role, content: m.content }));
+      saveConversationAsRecord(messages, userId, deviceId).catch((e) => {
+        console.warn(`[chat] Save conversation failed: ${e.message}`);
+      });
+    }
   }
 
   session.mode = "idle";

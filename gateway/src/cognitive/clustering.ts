@@ -265,6 +265,8 @@ async function createCluster(
     confidence: 0.7,
     salience: 1.0,
     source_type: "clustering",
+    level: 1,
+    origin: "emerged",
   });
 
   await bondRepo.createMany(

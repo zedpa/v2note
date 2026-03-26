@@ -40,6 +40,25 @@ export async function fetchClusterDetail(
   return api.get(`/api/v1/cognitive/clusters/${id}`);
 }
 
+export interface RelatedRecord {
+  record_id: string;
+  title: string;
+  short_summary: string;
+  relevance: number;
+  created_at: string;
+}
+
+export interface RelatedResponse {
+  related: RelatedRecord[];
+  count: number;
+}
+
+export async function fetchRelatedRecords(
+  recordId: string,
+): Promise<RelatedResponse> {
+  return api.get(`/api/v1/records/${recordId}/related`);
+}
+
 export async function createBond(params: {
   sourceStrikeId: string;
   targetStrikeId: string;
