@@ -1,6 +1,8 @@
 import type { Router } from "../router.js";
 import { sendJson, sendError, getUserId } from "../lib/http-helpers.js";
 import { query, queryOne } from "../db/pool.js";
+import { digestRecords } from "../handlers/digest.js";
+import { runDailyCognitiveCycle } from "../cognitive/daily-cycle.js";
 
 interface PolarityRow {
   polarity: string;
@@ -143,5 +145,70 @@ export function registerCognitiveStatsRoutes(router: Router) {
     }
 
     sendJson(res, stats);
+  });
+
+  // ── POST /api/v1/cognitive/redigest — 补跑未消化的记录（异步） ──
+  router.post("/api/v1/cognitive/redigest", async (req, res) => {
+    const userId = getUserId(req);
+    if (!userId) { sendError(res, "Unauthorized", 401); return; }
+
+    // 查总共还有多少未消化
+    const totalRow = await queryOne<CountRow>(
+      `SELECT COUNT(*) as count FROM record
+       WHERE user_id = $1 AND (digested = false OR digested IS NULL) AND status = 'completed'`,
+      [userId],
+    );
+    const totalRemaining = parseInt(totalRow?.count ?? "0", 10);
+
+    if (totalRemaining === 0) {
+      sendJson(res, { message: "所有记录已消化", remaining: 0 });
+      return;
+    }
+
+    // 立即返回，后台异步处理
+    sendJson(res, { message: `开始后台处理 ${totalRemaining} 条记录`, remaining: totalRemaining });
+
+    // 异步：每次取 5 条串行处理，处理完再取下一批
+    const batchSize = 5;
+    (async () => {
+      let processed = 0;
+      let failed = 0;
+      while (true) {
+        const batch = await query<{ id: string; device_id: string }>(
+          `SELECT id, device_id FROM record
+           WHERE user_id = $1 AND (digested = false OR digested IS NULL) AND status = 'completed'
+           ORDER BY created_at ASC LIMIT $2`,
+          [userId, batchSize],
+        );
+        if (batch.length === 0) break;
+
+        for (const record of batch) {
+          try {
+            await digestRecords([record.id], { deviceId: record.device_id, userId });
+            processed++;
+          } catch (e: any) {
+            console.error(`[redigest] Failed for ${record.id}:`, e.message);
+            failed++;
+          }
+        }
+        console.log(`[redigest] Progress: ${processed} processed, ${failed} failed`);
+      }
+      console.log(`[redigest] Done: ${processed} processed, ${failed} failed`);
+    })().catch(e => console.error("[redigest] Background task failed:", e));
+  });
+
+  // ── POST /api/v1/cognitive/cycle — 手动触发认知循环（聚类+涌现+维护） ──
+  router.post("/api/v1/cognitive/cycle", async (req, res) => {
+    const userId = getUserId(req);
+    if (!userId) { sendError(res, "Unauthorized", 401); return; }
+
+    // 立即返回，后台执行
+    sendJson(res, { message: "认知循环已启动" });
+
+    runDailyCognitiveCycle(userId).then(result => {
+      console.log(`[cognitive/cycle] Done: clusters=${result.clustering?.newClusters ?? 0} contradictions=${result.contradictions.length}`);
+    }).catch(e => {
+      console.error("[cognitive/cycle] Failed:", e);
+    });
   });
 }

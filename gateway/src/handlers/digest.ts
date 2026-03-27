@@ -21,6 +21,11 @@ import { updateSoul } from "../soul/manager.js";
 import { updateProfile } from "../profile/manager.js";
 import { maySoulUpdate, mayProfileUpdate } from "../lib/text-utils.js";
 
+// ── 聚类+涌现节流：同一用户 10 分钟内最多触发一次 ──
+const lastClusteringRun = new Map<string, number>();
+const CLUSTERING_THROTTLE_MS = 10 * 60 * 1000; // 10 分钟
+const MIN_STRIKES_FOR_CLUSTERING = 3; // 至少产生 3 个新 Strike 才触发
+
 interface RawStrike {
   nucleus: string;
   polarity: string;
@@ -345,9 +350,45 @@ export async function digestRecords(
     } catch (e) {
       console.warn("[digest] Memory/soul/profile step failed:", e);
     }
+
+    // ── Step 9: 聚类+涌现（节流触发） ──────────────────────────
+    // 当新 Strike 数量足够且距上次聚类超过 10 分钟时，异步运行聚类+涌现
+    if (idxToId.size >= MIN_STRIKES_FOR_CLUSTERING) {
+      const lastRun = lastClusteringRun.get(userId) ?? 0;
+      const now = Date.now();
+      if (now - lastRun > CLUSTERING_THROTTLE_MS) {
+        lastClusteringRun.set(userId, now);
+        // 异步执行，不阻塞 digest 返回
+        triggerClusteringAndEmergence(userId).catch((e) =>
+          console.warn("[digest] Async clustering/emergence failed:", e.message),
+        );
+      }
+    }
   } catch (e) {
     console.error("[digest] Pipeline failed:", e);
     // Don't rethrow — digest failure should not crash the caller
+  }
+}
+
+/**
+ * 异步触发聚类 + 涌现检查（轻量版 daily-cycle，只做聚类和涌现）
+ */
+async function triggerClusteringAndEmergence(userId: string): Promise<void> {
+  console.log(`[digest] Triggering async clustering + emergence for user ${userId}`);
+
+  try {
+    const { runClustering } = await import("../cognitive/clustering.js");
+    const clusterResult = await runClustering(userId);
+    console.log(`[digest] Clustering: new=${clusterResult.newClusters} updated=${clusterResult.updatedClusters}`);
+
+    // 有新聚类或更新时才做涌现检查
+    if (clusterResult.newClusters > 0 || clusterResult.updatedClusters > 0) {
+      const { runEmergence } = await import("../cognitive/emergence.js");
+      const emergenceResult = await runEmergence(userId);
+      console.log(`[digest] Emergence: higherOrder=${emergenceResult.higherOrderClusters} goals=${emergenceResult.goalEmergence}`);
+    }
+  } catch (e) {
+    console.error("[digest] Clustering/emergence failed:", e);
   }
 }
 

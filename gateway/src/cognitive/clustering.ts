@@ -53,11 +53,13 @@ async function loadGraph(userId: string) {
 
   if (ids.length === 0) return { adj, strikeMap };
 
-  const ph = ids.map((_, i) => `$${i + 1}`).join(", ");
+  const n = ids.length;
+  const ph1 = ids.map((_, i) => `$${i + 1}`).join(", ");
+  const ph2 = ids.map((_, i) => `$${n + i + 1}`).join(", ");
   const bonds = await query<BondEntry>(
     `SELECT * FROM bond
-     WHERE source_strike_id IN (${ph})
-       AND target_strike_id IN (${ph})`,
+     WHERE source_strike_id IN (${ph1})
+       AND target_strike_id IN (${ph2})`,
     [...ids, ...ids],
   );
 

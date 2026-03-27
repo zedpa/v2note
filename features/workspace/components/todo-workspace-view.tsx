@@ -9,9 +9,14 @@ import { TodoDetailSheet } from "@/features/todos/components/todo-detail-sheet";
 import { getDomainStyle } from "@/features/todos/lib/domain-config";
 import type { TodoItem } from "@/shared/lib/types";
 import { listGoals, listPendingIntents } from "@/shared/lib/api/goals";
+import { useActionPanel } from "@/features/action-panel/hooks/use-action-panel";
+import { NowCard } from "@/features/action-panel/components/now-card";
+import { GoalIndicator } from "@/features/action-panel/components/goal-indicator";
+import { reportSwipe } from "@/shared/lib/api/action-panel";
 
 interface TodoWorkspaceViewProps {
   onOpenChat?: (initial?: string) => void;
+  onReflect?: (strikeId: string) => void;
 }
 
 // 分组待办按时间：今日/转达/明天/稍后
@@ -21,14 +26,39 @@ interface TodoGroup {
   items: TodoItem[];
 }
 
-export function TodoWorkspaceView({ onOpenChat }: TodoWorkspaceViewProps) {
+export function TodoWorkspaceView({ onOpenChat, onReflect }: TodoWorkspaceViewProps) {
   const { todos: todayTodos, loading: todayLoading, toggleTodo } = useTodayTodos();
   const { todos: allTodos, loading: allLoading } = useTodos();
+  const {
+    now: nowCard,
+    goals: actionGoals,
+    currentGoalIndex,
+    switchGoal,
+    refetch: refetchPanel,
+  } = useActionPanel();
   const [selectedTodo, setSelectedTodo] = useState<TodoItem | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const [pendingIntents, setPendingIntents] = useState<any[]>([]);
   const [confirmCollapsed, setConfirmCollapsed] = useState(false);
+
+  // NowCard 完成/跳过后刷新
+  const handleNowComplete = useCallback(
+    (strikeId: string) => {
+      reportSwipe({ strikeId, direction: "right" }).catch(() => {});
+      refetchPanel();
+      setRefreshKey((k) => k + 1);
+    },
+    [refetchPanel],
+  );
+
+  const handleNowSkip = useCallback(
+    (strikeId: string, reason?: string) => {
+      reportSwipe({ strikeId, direction: "left", reason }).catch(() => {});
+      refetchPanel();
+    },
+    [refetchPanel],
+  );
 
   // 加载待确认意图
   useEffect(() => {
@@ -127,6 +157,26 @@ export function TodoWorkspaceView({ onOpenChat }: TodoWorkspaceViewProps) {
                 </div>
               </div>
             ))}
+        </section>
+      )}
+
+      {/* Now Card — Tinder 式焦点卡片 */}
+      {nowCard && (
+        <section className="px-4 pt-4">
+          <NowCard
+            card={nowCard}
+            onComplete={handleNowComplete}
+            onSkip={handleNowSkip}
+            onReflect={onReflect}
+          />
+          {/* 目标呼吸指示器 */}
+          {actionGoals.length > 1 && (
+            <GoalIndicator
+              goals={actionGoals}
+              selected={currentGoalIndex}
+              onSelect={switchGoal}
+            />
+          )}
         </section>
       )}
 

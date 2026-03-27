@@ -7,6 +7,7 @@
 import * as todoRepo from "../db/repositories/todo.js";
 import * as strikeRepo from "../db/repositories/strike.js";
 import * as goalRepo from "../db/repositories/goal.js";
+import * as recordRepo from "../db/repositories/record.js";
 import { query, queryOne } from "../db/pool.js";
 import { chatCompletion } from "../ai/provider.js";
 import type { StrikeEntry } from "../db/repositories/strike.js";
@@ -119,6 +120,13 @@ export async function projectIntendStrike(
   const parsed = parseIntendField(strike.field ?? {});
   const uid = userId ?? strike.user_id;
 
+  // 获取真实 device_id（从 record 或 device 表）
+  let deviceId = uid;
+  if (strike.source_id) {
+    const rec = await recordRepo.findById(strike.source_id);
+    if (rec?.device_id) deviceId = rec.device_id;
+  }
+
   if (parsed.granularity === "goal" || parsed.granularity === "project") {
     // B2/B3: 检查同方向是否已有 active goal（关键词重叠检测）
     const existingGoals = await goalRepo.findActiveByUser(uid);
@@ -130,7 +138,7 @@ export async function projectIntendStrike(
 
     // 创建 goal (source=explicit 因为来自用户明确表达)
     const goal = await goalRepo.create({
-      device_id: uid,
+      device_id: deviceId,
       user_id: uid,
       title: strike.nucleus,
       source: "explicit",
@@ -237,7 +245,7 @@ async function generateSubGoalSuggestions(parentGoal: Goal, userId: string): Pro
     for (const sub of subGoals) {
       if (!sub.title) continue;
       await goalRepo.create({
-        device_id: userId,
+        device_id: parentGoal.device_id,
         user_id: userId,
         title: sub.title,
         parent_id: parentGoal.id,

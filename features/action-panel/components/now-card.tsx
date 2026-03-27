@@ -209,21 +209,43 @@ export function NowCard({ card, onComplete, onSkip, onTraverse, onReflect }: Now
   const isRight = offsetX > 0;
   const icon = ACTION_ICONS[card.actionType] ?? "▶";
   const showReflection = (card.skipCount ?? 0) >= 5;
+  // 标签激活态：滑动距离 > 40px 时从半透明变为全不透明
+  const labelActivated = Math.abs(offsetX) > 40;
 
   return (
     <div ref={containerRef} className="relative select-none touch-none">
-      {/* Swipe background layers */}
+      {/* 右滑背景：森林色 + 完成标签 */}
       <div
-        className={cn(
-          "absolute inset-0 rounded-2xl flex items-center px-6 transition-opacity",
-          isRight ? "bg-forest/15 justify-start" : "bg-surface-high justify-end",
-        )}
-        style={{ opacity: Math.min(ratio * 2, 1) }}
+        className="absolute inset-0 rounded-2xl flex items-center justify-start px-6 bg-forest/15"
+        style={{ opacity: isRight ? Math.min(ratio * 2, 1) : 0 }}
       >
-        <span className="text-2xl">{isRight ? "✓" : "→"}</span>
+        <div className={cn(
+          "flex items-center gap-2 transition-opacity",
+          labelActivated && isRight ? "opacity-100" : "opacity-50",
+        )}>
+          <div className="w-8 h-8 rounded-full bg-forest/30 flex items-center justify-center">
+            <span className="text-forest text-lg">✓</span>
+          </div>
+          <span className="text-sm font-medium text-forest">完成</span>
+        </div>
       </div>
 
-      {/* Fork options (during forking/dropping) */}
+      {/* 左滑背景：晨光色 + 跳过原因标签 */}
+      <div
+        className="absolute inset-0 rounded-2xl flex items-center justify-end px-4 bg-dawn/15"
+        style={{ opacity: !isRight && ratio > 0 ? Math.min(ratio * 2, 1) : 0 }}
+      >
+        <div className={cn(
+          "flex flex-col gap-1.5 transition-opacity",
+          labelActivated && !isRight ? "opacity-100" : "opacity-50",
+        )}>
+          <span className="px-3 py-1.5 rounded-full bg-dawn/20 text-xs text-dawn-dark whitespace-nowrap">⏳等条件</span>
+          <span className="px-3 py-1.5 rounded-full bg-dawn/20 text-xs text-dawn-dark whitespace-nowrap">🚧有阻力</span>
+          <span className="px-3 py-1.5 rounded-full bg-dawn/20 text-xs text-dawn-dark whitespace-nowrap">🔄要重想</span>
+        </div>
+      </div>
+
+      {/* Fork 选项（长按下拉时显示在卡片下方） */}
       {(phase === "forking" || phase === "dropping") && (
         <div className="absolute inset-x-0 bottom-0 translate-y-full pt-2 flex justify-center gap-3 z-10">
           <span className="px-3 py-1.5 rounded-full bg-surface-high text-xs text-muted-accessible">⏳等条件</span>

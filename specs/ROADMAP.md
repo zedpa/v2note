@@ -52,10 +52,22 @@ Phase 5: 深度体验（Week 11-13）
 
 Phase 7: 前端重构（Week 14-18）🆕
   app-mobile-redesign     移动端重构——工作区+侧边栏架构，日记/待办双视图
+  mobile-action-panel     行动面板完善——Tinder滑动标签+跳过反思+目标切换
+  topic-lifecycle         主题生命周期——Cluster即主题+四阶段视图+收获沉淀飞轮
+  ai-companion-window     AI伴侣窗口——像素小鹿+心情系统+工具可视化+主动闲聊
+  domain-vocabulary       领域词库——冷启动领域选择+专业名词RAG+语音修正
 
   ※ 抛弃 Tab Bar + 纯净入口方案
   ※ 工作区 Segment 切换（日记|待办），侧边栏管理低频功能
   ※ FAB 语音优先：点击=录音，AI 自动判断记录/指令（依赖 voice-action）
+  ※ Now Card Tinder 交互：右滑露出森林色完成标签，左滑露出晨光色跳过原因标签
+  ※ Now Card 嵌入待办视图顶部（非独立弹窗），目标呼吸指示器底部
+  ※ 主题生命周期：Cluster 即天然主题，选中后四阶段视图(Now/Growing/Seeds/Harvest)
+  ※ 认知-实践飞轮：Goal完成→收获Strike反哺Cluster→新涌现→新Goal→循环
+  ※ 侧边栏「我的方向」：活跃方向(有Goal的Cluster)/独立目标/沉默区(有认知无行动)
+  ※ 领域词库：冷启动选工作领域→预置专业术语→ASR后处理修正→自动收录新词
+  ※ AI 伴侣窗口：像素小鹿状态映射真实数据+心情影响对话语气+工具步骤可视化(仅Chat)
+  ※ UI 设计提示词：docs/DESIGN-mobile-ui-prompt.md（Apple HIG 映射）
   ※ PC 端另开 spec
 
 Phase 6+: 增强与扩展
@@ -75,10 +87,10 @@ Phase 6+: 增强与扩展
 | Phase 3 | 2 | 10 | ✅ |
 | Phase 4 | 4 | 31 | ✅ |
 | Phase 5 | 4 | 24 | ✅ |
-| Phase 7 | 1 | 37 | ✅ |
+| Phase 7 | 5 | 74 | 🔄 |
 | Phase 6 | 4 | 17 | ✅ |
 | Phase 6+ | 2 | — | 🟡 |
-| **总计** | **28** | **174** | |
+| **总计** | **31** | **206** | |
 
 ## 已完成
 
@@ -107,4 +119,8 @@ Phase 6+: 增强与扩展
 - `knowledge-lifecycle.md` — ✅ 知识生命周期 (过期扫描 + supersede确认alert + 撤销API)
 - `person-profile.md` — ✅ 人物画像 (高频人物扫描 + AI行为模式提取 + 参谋对话注入)
 - `decision-template.md` — ✅ 决策模板涌现 (闭环检测 + 模板保存 + 语义匹配引用)
-- `mobile-action-panel.md` — ✅ 行动面板完善 (手势滑动 + 跳过反思提示 + 目标切换 + Editorial Serenity)
+- `mobile-action-panel.md` — ✅ 行动面板完善 (Tinder滑动露出标签 + 跳过反思提示 + 目标切换 + Now Card嵌入待办视图)
+- `app-mobile-redesign.md` — 🔄 移动端重构 (Now Card Tinder交互 + 主题筛选态 + UI设计提示词)
+- `topic-lifecycle.md` — 🟡 主题生命周期 (四阶段视图 + 收获沉淀飞轮 + 侧边栏方向列表)
+- `ai-companion-window.md` — 🟡 AI伴侣窗口 (像素小鹿10态+心情7维+工具步骤面板+主动闲聊策略)
+- `domain-vocabulary.md` — 🟡 领域词库 (冷启动领域选择 + ASR修正RAG + 自动收录)

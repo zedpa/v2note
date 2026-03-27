@@ -1,6 +1,7 @@
 # 移动端行动面板完善
 
-> 状态：✅ completed | 优先级：Phase 6 | 预计：3-4 天
+> 状态：✅ completed | 优先级：Phase 7 | 预计：3-4 天
+> 增强：2026-03-27 滑动露出标签 + Now Card 嵌入待办视图
 
 ## 概述
 当前 `features/action-panel/` 已有基础组件（now-card, today-line, goal-indicator），但移动端手势交互（Tinder 滑动、上滑呼出、长按分叉）需要完善。
@@ -69,9 +70,12 @@
 ## 涉及文件
 | 文件 | 改动类型 |
 |------|---------|
-| `features/action-panel/components/now-card.tsx` | 修改：手势交互 |
-| `features/action-panel/components/action-panel.tsx` | 修改：长按 + 原因选择 |
-| `features/action-panel/components/goal-indicator.tsx` | 修改：滑动切换 |
+| `features/action-panel/components/now-card.tsx` | 修改：滑动露出标签（森林色完成/晨光色跳过） |
+| `features/action-panel/components/now-card.test.tsx` | 新增：8 个测试用例 |
+| `features/action-panel/components/todo-nowcard-integration.test.tsx` | 新增：4 个集成测试 |
+| `features/action-panel/components/action-panel.tsx` | 现有：独立弹窗（保留） |
+| `features/action-panel/components/goal-indicator.tsx` | 现有：滑动切换 |
+| `features/workspace/components/todo-workspace-view.tsx` | 修改：嵌入 NowCard + GoalIndicator |
 
 ## 验收标准
 移动端行动面板支持完整的 Tinder 式滑动操作。
