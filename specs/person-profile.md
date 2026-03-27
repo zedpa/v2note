@@ -1,6 +1,6 @@
 # 人物画像系统
 
-> 状态：🟡 待开发 | 优先级：Phase 6 | 预计：4 天
+> 状态：✅ completed | 优先级：Phase 6 | 预计：4 天
 > 注意：当前人名提取用正则 extractChineseNames，精度有限。建议 Phase 1 时在 Digest prompt 中加入 NER 能力。
 
 ## 概述

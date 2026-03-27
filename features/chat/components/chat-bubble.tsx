@@ -15,29 +15,24 @@ export function ChatBubble({ message, streaming }: ChatBubbleProps) {
   return (
     <div
       className={cn(
-        "flex gap-2 mb-3",
+        "flex gap-2.5 mb-4",
         isUser ? "flex-row-reverse" : "flex-row",
       )}
     >
-      {/* Avatar */}
-      <div
-        className={cn(
-          "w-8 h-8 rounded-full flex items-center justify-center shrink-0 text-xs font-display font-semibold",
-          isUser
-            ? "bg-gradient-to-br from-primary/20 to-primary/10 text-primary"
-            : "bg-gradient-to-br from-accent/15 to-secondary text-accent",
-        )}
-      >
-        {isUser ? "U" : "AI"}
-      </div>
+      {/* 头像 */}
+      {!isUser && (
+        <div className="w-7 h-7 rounded-full flex items-center justify-center shrink-0 text-sm mt-0.5">
+          🦌
+        </div>
+      )}
 
-      {/* Bubble */}
+      {/* 气泡 */}
       <div
         className={cn(
           "max-w-[80%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed",
           isUser
-            ? "bg-primary text-primary-foreground rounded-tr-sm"
-            : "bg-card border border-border/60 text-foreground rounded-tl-sm",
+            ? "bg-sky/15 text-on-surface rounded-tr-sm"
+            : "bg-surface-low text-on-surface rounded-tl-sm",
         )}
       >
         {message.content ? (
@@ -48,9 +43,9 @@ export function ChatBubble({ message, streaming }: ChatBubbleProps) {
           )
         ) : streaming ? (
           <span className="inline-flex gap-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-current animate-bounce" style={{ animationDelay: "0ms" }} />
-            <span className="w-1.5 h-1.5 rounded-full bg-current animate-bounce" style={{ animationDelay: "150ms" }} />
-            <span className="w-1.5 h-1.5 rounded-full bg-current animate-bounce" style={{ animationDelay: "300ms" }} />
+            <span className="w-1.5 h-1.5 rounded-full bg-deer animate-bounce" style={{ animationDelay: "0ms" }} />
+            <span className="w-1.5 h-1.5 rounded-full bg-deer animate-bounce" style={{ animationDelay: "150ms" }} />
+            <span className="w-1.5 h-1.5 rounded-full bg-deer animate-bounce" style={{ animationDelay: "300ms" }} />
           </span>
         ) : null}
       </div>

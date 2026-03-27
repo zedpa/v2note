@@ -1,6 +1,6 @@
 # 决策模板涌现
 
-> 状态：🟡 待开发 | 优先级：Phase 6 | 预计：2-3 天
+> 状态：✅ completed | 优先级：Phase 6 | 预计：2-3 天
 > 依赖：goal-auto-link, action-tracking
 
 ## 概述

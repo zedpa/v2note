@@ -15,6 +15,11 @@ import {
 } from "../db/repositories/index.js";
 import { buildDigestPrompt, buildCrossLinkPrompt } from "./digest-prompt.js";
 import { projectIntendStrike } from "../cognitive/todo-projector.js";
+import { linkNewStrikesToGoals } from "../cognitive/goal-auto-link.js";
+import { getSession } from "../session/manager.js";
+import { updateSoul } from "../soul/manager.js";
+import { updateProfile } from "../profile/manager.js";
+import { maySoulUpdate, mayProfileUpdate } from "../lib/text-utils.js";
 
 interface RawStrike {
   nucleus: string;
@@ -298,8 +303,48 @@ export async function digestRecords(
       }
     }
 
+    // ── Step 6.5: 新 Strike 自动关联已有目标 ─────────────────────
+    try {
+      const newStrikesForGoalLink = Array.from(idxToId.entries()).map(([_idx, id]) => ({
+        id,
+        source_id: validIds[0] ?? null,
+      }));
+      await linkNewStrikesToGoals(newStrikesForGoalLink, userId);
+    } catch (e) {
+      console.error("[digest] Goal auto-link failed:", e);
+    }
+
     // ── Step 7: Mark records as digested ─────────────────────────
     await markAllDigested(validIds);
+
+    // ── Step 8: 记忆/Soul/Profile 更新（Mem0 两阶段） ──────────
+    // 在 Digest 完成后，异步更新长期记忆和用户画像
+    try {
+      const today = new Date().toISOString().split("T")[0];
+      const session = getSession(context.deviceId);
+      const memoryManager = session.memoryManager;
+
+      // 8a. 记忆提取（每条记录都提取，异步不阻塞）
+      memoryManager
+        .maybeCreateMemory(context.deviceId, combinedText, today, context.userId)
+        .catch((e) => console.warn("[digest] Memory creation failed:", e.message));
+
+      // 8b. Soul 更新（关键词预过滤，避免不必要的 AI 调用）
+      if (maySoulUpdate(combinedText)) {
+        updateSoul(context.deviceId, combinedText, context.userId).catch((e) =>
+          console.warn("[digest] Soul update failed:", e.message),
+        );
+      }
+
+      // 8c. Profile 更新（关键词预过滤）
+      if (mayProfileUpdate(combinedText)) {
+        updateProfile(context.deviceId, combinedText, context.userId).catch((e) =>
+          console.warn("[digest] Profile update failed:", e.message),
+        );
+      }
+    } catch (e) {
+      console.warn("[digest] Memory/soul/profile step failed:", e);
+    }
   } catch (e) {
     console.error("[digest] Pipeline failed:", e);
     // Don't rethrow — digest failure should not crash the caller

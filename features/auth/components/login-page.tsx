@@ -1,8 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
+import { LuluLogo } from "@/components/brand/lulu-logo";
 
 interface LoginPageProps {
   onLogin: (phone: string, password: string) => Promise<void>;
@@ -32,57 +31,56 @@ export function LoginPage({ onLogin, onSwitchToRegister, error, loading }: Login
   const isLoading = loading || submitting;
 
   return (
-    <div className="min-h-dvh flex flex-col items-center justify-center px-6 bg-background">
-      <div className="w-full max-w-sm space-y-8">
-        {/* Logo area */}
-        <div className="text-center space-y-2">
-          <div className="w-16 h-16 mx-auto rounded-2xl bg-primary/10 flex items-center justify-center">
-            <span className="text-3xl">🎙</span>
+    <div className="min-h-dvh flex flex-col items-center justify-center px-6 bg-surface">
+      <div className="w-full max-w-sm space-y-10">
+        {/* Logo */}
+        <div className="text-center space-y-3">
+          <div className="w-20 h-20 mx-auto">
+            <LuluLogo size={80} variant="color" className="animate-none" />
           </div>
-          <h1 className="text-2xl font-display font-bold text-foreground">VoiceNote</h1>
-          <p className="text-sm text-muted-foreground">AI 个人助手</p>
+          <h1 className="font-serif text-2xl text-on-surface">念念有路</h1>
+          <p className="text-sm text-muted-accessible">你的每一个想法，我都帮你记住</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Input
-              type="tel"
-              placeholder="手机号"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              disabled={isLoading}
-              autoComplete="tel"
-              className="h-12 text-base"
-            />
-            <Input
-              type="password"
-              placeholder="密码"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              disabled={isLoading}
-              autoComplete="current-password"
-              className="h-12 text-base"
-            />
-          </div>
+          <input
+            type="tel"
+            placeholder="手机号"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            disabled={isLoading}
+            autoComplete="tel"
+            className="w-full h-12 px-4 rounded-xl bg-surface-lowest text-on-surface text-base outline-none placeholder:text-muted-accessible/50 focus:ring-2 focus:ring-deer/30"
+          />
+          <input
+            type="password"
+            placeholder="密码"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            disabled={isLoading}
+            autoComplete="current-password"
+            className="w-full h-12 px-4 rounded-xl bg-surface-lowest text-on-surface text-base outline-none placeholder:text-muted-accessible/50 focus:ring-2 focus:ring-deer/30"
+          />
 
           {error && (
-            <p className="text-sm text-destructive text-center">{error}</p>
+            <p className="text-sm text-maple text-center">{error}</p>
           )}
 
-          <Button
+          <button
             type="submit"
-            className="w-full h-12 text-base font-semibold"
+            className="w-full h-12 rounded-xl text-base font-medium text-white transition-opacity disabled:opacity-50"
+            style={{ background: "linear-gradient(135deg, #89502C, #C8845C)" }}
             disabled={isLoading || !phone.trim() || !password.trim()}
           >
             {isLoading ? "登录中..." : "登录"}
-          </Button>
+          </button>
         </form>
 
         <div className="text-center">
           <button
             type="button"
             onClick={onSwitchToRegister}
-            className="text-sm text-primary hover:underline"
+            className="text-sm text-antler hover:underline"
           >
             没有账号？立即注册
           </button>

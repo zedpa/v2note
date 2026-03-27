@@ -9,6 +9,7 @@ export interface ActionCard {
   targetPerson?: string;
   durationEstimate?: string;
   goalId: string;
+  skipCount?: number;
 }
 
 export interface ActionItem {

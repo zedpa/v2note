@@ -376,7 +376,7 @@ export function FAB({
     onSwipeRight: () => {
       // phase transitions to "locked" by gesture hook
     },
-    onSwipeUp: () => finishRecording(true),
+    onSwipeUp: () => finishRecording(false), // 上滑不再区分指令模式，统一发送
     onRelease: () => finishRecording(false),
   });
 
@@ -636,7 +636,10 @@ export function FAB({
       >
         {/* Processing capsule */}
         {processing && phase === "idle" ? (
-          <div className="flex items-center gap-2 h-12 px-4 rounded-full bg-primary text-primary-foreground shadow-lg shadow-primary/30 animate-bubble-enter">
+          <div
+            className="flex items-center gap-2 h-12 px-4 rounded-full text-white animate-bubble-enter"
+            style={{ background: "linear-gradient(135deg, #89502C, #C8845C)", boxShadow: "0 8px 24px rgba(28, 28, 24, 0.06)" }}
+          >
             <Sparkles className="w-5 h-5 animate-spin-slow shrink-0" />
             <span className="text-sm font-medium whitespace-nowrap">{wittyText}</span>
           </div>
@@ -678,18 +681,24 @@ export function FAB({
               }}
               className={cn(
                 "relative flex items-center justify-center rounded-full select-none touch-none transition-all duration-300",
-                "bg-primary text-primary-foreground shadow-lg shadow-primary/30",
-                phase === "idle" && "w-16 h-16 animate-fab-breathe",
-                phase === "pressing" && "w-[72px] h-[72px] scale-105",
-                phase === "recording" && "w-16 h-16",
+                "text-white",
+                phase === "idle" && "w-14 h-14",
+                phase === "pressing" && "w-16 h-16 scale-105",
+                phase === "recording" && "w-14 h-14",
               )}
+              style={{
+                background: phase === "recording"
+                  ? "#C45C5C"
+                  : "linear-gradient(135deg, #89502C, #C8845C)",
+                boxShadow: "0 8px 24px rgba(28, 28, 24, 0.06)",
+              }}
             >
               {phase === "idle" ? (
-                <Sparkles className="w-7 h-7" />
+                <Mic className="w-6 h-6" />
               ) : (
                 <Mic className={cn(
                   "transition-all duration-200",
-                  phase === "recording" ? "w-7 h-7" : "w-8 h-8",
+                  phase === "recording" ? "w-6 h-6 animate-pulse" : "w-7 h-7",
                 )} />
               )}
             </button>

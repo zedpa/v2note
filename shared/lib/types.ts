@@ -199,8 +199,9 @@ export interface Goal {
   device_id: string
   title: string
   parent_id: string | null
-  status: 'active' | 'paused' | 'completed' | 'abandoned'
-  source: 'speech' | 'chat' | 'manual'
+  cluster_id?: string | null
+  status: 'active' | 'paused' | 'completed' | 'abandoned' | 'progressing' | 'blocked' | 'suggested' | 'dismissed'
+  source: 'speech' | 'chat' | 'manual' | 'explicit' | 'emerged'
   created_at: string
   updated_at: string
 }

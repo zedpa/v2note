@@ -2,6 +2,7 @@ import type { Router } from "../router.js";
 import { readBody, sendJson, getDeviceId, getUserId } from "../lib/http-helpers.js";
 import { goalRepo, pendingIntentRepo } from "../db/repositories/index.js";
 import { computeGoalHealth, createActionEvent, updateGoalStatus, getGoalTimeline } from "../cognitive/goal-linker.js";
+import { goalAutoLink, getProjectProgress } from "../cognitive/goal-auto-link.js";
 
 export function registerGoalRoutes(router: Router) {
   // List active goals
@@ -86,6 +87,22 @@ export function registerGoalRoutes(router: Router) {
   router.post("/api/v1/goals/:id/archive", async (_req, res, params) => {
     await updateGoalStatus(params.id, "user_archive");
     sendJson(res, { ok: true });
+  });
+
+  // Goal auto-link (创建后全量关联)
+  router.post("/api/v1/goals/:id/auto-link", async (req, res, params) => {
+    const userId = getUserId(req);
+    const deviceId = getDeviceId(req);
+    const result = await goalAutoLink(params.id, userId ?? deviceId);
+    sendJson(res, result);
+  });
+
+  // Project progress (项目级子目标进度汇总)
+  router.get("/api/v1/goals/:id/progress", async (req, res, params) => {
+    const userId = getUserId(req);
+    const deviceId = getDeviceId(req);
+    const progress = await getProjectProgress(params.id, userId ?? deviceId);
+    sendJson(res, progress);
   });
 
   // List pending intents

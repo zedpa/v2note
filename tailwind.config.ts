@@ -15,6 +15,7 @@ const config: Config = {
       colors: {
         bark: '#3D3228',
         deer: '#C8845C',
+        'deer-dark': '#89502C',
         antler: '#A06B42',
         cream: '#FAF6F0',
         sand: '#F0E8DB',
@@ -23,6 +24,15 @@ const config: Config = {
         sky: '#7BA3C4',
         dawn: '#E8A87C',
         maple: '#C45C5C',
+        // Editorial Serenity surface hierarchy
+        surface: '#FDF9F3',
+        'surface-low': '#F7F3ED',
+        'surface-lowest': '#FFFFFF',
+        'surface-high': '#EBE8E2',
+        'on-surface': '#1C1C18',
+        'ghost-border': 'rgba(215, 194, 184, 0.15)',
+        // Accessible muted text (contrast ≥ 4.5:1 on surface)
+        'muted-accessible': '#7B6E62',
         background: 'hsl(var(--background))',
         foreground: 'hsl(var(--foreground))',
         card: {
@@ -117,6 +127,18 @@ const config: Config = {
           '0%': { opacity: '1' },
           '100%': { opacity: '0' },
         },
+        'bubble-enter': {
+          from: { opacity: '0', transform: 'translateY(8px)' },
+          to: { opacity: '1', transform: 'translateY(0)' },
+        },
+        'slide-left': {
+          from: { transform: 'translateX(0)' },
+          to: { transform: 'translateX(-100%)' },
+        },
+        'slide-right': {
+          from: { transform: 'translateX(-100%)' },
+          to: { transform: 'translateX(0)' },
+        },
       },
       animation: {
         'card-enter': 'card-enter 0.4s cubic-bezier(0.22,1,0.36,1) both',
@@ -126,6 +148,7 @@ const config: Config = {
         'todo-check-mark': 'todo-check-mark 0.3s cubic-bezier(0.34,1.56,0.64,1) 0.15s both',
         'impact-fill': 'impact-fill 0.6s cubic-bezier(0.22,1,0.36,1) both',
         'fade-out': 'fade-out 0.3s ease-out forwards',
+        'bubble-enter': 'bubble-enter 0.3s ease-out both',
       },
     },
   },

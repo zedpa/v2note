@@ -426,6 +426,26 @@ export async function generateEveningSummary(
     // non-critical
   }
 
+  // 5c-1. Load skip alerts and result tracking
+  let skipAlertSection = "";
+  let resultTrackingSection = "";
+  try {
+    const uid = userId ?? deviceId;
+    const { getSkipAlerts, getResultTrackingPrompts } = await import("../cognitive/action-tracking.js");
+    const [skipAlerts, resultPrompts] = await Promise.all([
+      getSkipAlerts(uid),
+      getResultTrackingPrompts(uid),
+    ]);
+    if (skipAlerts.length > 0) {
+      skipAlertSection = `\n## 需要关注的行动\n${skipAlerts.map((a) => `- ${a.description}`).join("\n")}\n请在总结中温和提及这些被多次跳过的事项，建议用户思考是否需要调整。`;
+    }
+    if (resultPrompts.length > 0) {
+      resultTrackingSection = `\n## 待跟进结果\n${resultPrompts.map((p) => `- ${p.prompt}`).join("\n")}\n请在 tomorrow_seeds 中包含这些跟进提示。`;
+    }
+  } catch {
+    // non-critical
+  }
+
   // 5c. Load today's cognitive digest from ai-self diary
   let cognitiveDigest = "";
   try {
@@ -476,7 +496,7 @@ ${pending.slice(0, 10).map((t) => `- ${t.text}`).join("\n") || "无"}
 ${relaysPending.map((t) => `- ${t.text}`).join("\n") || "无待转达"}
 
 ## 今日新记录数: ${newRecordCount}
-${cognitiveDigest ? `\n## 今日思考发现\n${cognitiveDigest}\n将这些发现自然地编入 tomorrow_seeds 或 accomplishments。用"想法演进""新的联系""思路变化"等温和表述，不要使用"聚类""Strike""矛盾检测"等技术术语。` : ""}${eveningCognitiveSection}`,
+${cognitiveDigest ? `\n## 今日思考发现\n${cognitiveDigest}\n将这些发现自然地编入 tomorrow_seeds 或 accomplishments。用"想法演进""新的联系""思路变化"等温和表述，不要使用"聚类""Strike""矛盾检测"等技术术语。` : ""}${eveningCognitiveSection}${skipAlertSection}${resultTrackingSection}`,
     },
   ];
 

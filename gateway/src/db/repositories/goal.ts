@@ -6,7 +6,7 @@ export interface Goal {
   title: string;
   parent_id: string | null;
   status: "active" | "paused" | "completed" | "abandoned" | "progressing" | "blocked" | "suggested" | "dismissed";
-  source: "speech" | "chat" | "manual";
+  source: "speech" | "chat" | "manual" | "explicit" | "emerged";
   cluster_id: string | null;
   created_at: string;
   updated_at: string;
@@ -50,10 +50,11 @@ export async function create(fields: {
   title: string;
   parent_id?: string;
   source?: string;
+  status?: string;
 }): Promise<Goal> {
   const row = await queryOne<Goal>(
-    `INSERT INTO goal (device_id, user_id, title, parent_id, source) VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-    [fields.device_id, fields.user_id ?? null, fields.title, fields.parent_id ?? null, fields.source ?? "speech"],
+    `INSERT INTO goal (device_id, user_id, title, parent_id, source, status) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+    [fields.device_id, fields.user_id ?? null, fields.title, fields.parent_id ?? null, fields.source ?? "speech", fields.status ?? "active"],
   );
   return row!;
 }

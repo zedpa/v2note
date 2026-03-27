@@ -1,28 +1,8 @@
 import { digestRecords } from './digest.js';
-/* MOVED TO DIGEST */ // import { loadSkills, filterActiveSkills, mergeWithCustomSkills } from "../skills/loader.js";
-/* MOVED TO DIGEST */ // import { buildProcessPrompt } from "./process-prompt.js";
 import { chatCompletion, type ChatMessage } from "../ai/provider.js";
-/* MOVED TO DIGEST */ // import { MemoryManager } from "../memory/manager.js";
-/* MOVED TO DIGEST */ // import { updateSoul } from "../soul/manager.js";
-/* MOVED TO DIGEST */ // import { updateProfile } from "../profile/manager.js";
 import { appendToDiary } from "../diary/manager.js";
-/* MOVED TO DIGEST */ // import { join, dirname } from "node:path";
-/* MOVED TO DIGEST */ // import { fileURLToPath } from "node:url";
-/* MOVED TO DIGEST */ // import { skillConfigRepo } from "../db/repositories/index.js";
-/* MOVED TO DIGEST */ // import { todoRepo } from "../db/repositories/index.js";
-/* MOVED TO DIGEST */ // import { customerRequestRepo } from "../db/repositories/index.js";
-/* MOVED TO DIGEST */ // import { settingChangeRepo } from "../db/repositories/index.js";
-/* MOVED TO DIGEST */ // import { tagRepo } from "../db/repositories/index.js";
-import { recordRepo } from "../db/repositories/index.js";
-import { summaryRepo } from "../db/repositories/index.js";
-/* MOVED TO DIGEST */ // import { goalRepo } from "../db/repositories/index.js";
-/* MOVED TO DIGEST */ // import { pendingIntentRepo } from "../db/repositories/index.js";
-/* MOVED TO DIGEST */ // import { extractKeywords, maySoulUpdate, mayProfileUpdate } from "../lib/text-utils.js";
-/* MOVED TO DIGEST */ // import { estimateBatchTodos } from "../proactive/time-estimator.js";
-/* MOVED TO DIGEST */ // import { getSession } from "../session/manager.js";
-
-/* MOVED TO DIGEST */ // const __dirname = dirname(fileURLToPath(import.meta.url));
-/* MOVED TO DIGEST */ // const SKILLS_DIR = join(__dirname, "../../skills");
+import { recordRepo, summaryRepo } from "../db/repositories/index.js";
+import { classifyVoiceIntent, executeVoiceAction, type VoiceAction, type ActionExecResult } from "./voice-action.js";
 
 export interface LocalConfigPayload {
   soul?: { content: string };
@@ -65,6 +45,10 @@ export interface ProcessResult {
   relays?: RelayExtract[];
   summary?: string;
   error?: string;
+  /** voice-action: 执行结果（指令型/混合型时存在） */
+  action_results?: ActionExecResult[];
+  /** voice-action: 意图类型 (record/action/mixed) */
+  voice_intent_type?: "record" | "action" | "mixed";
 }
 
 const CLEANUP_SYSTEM_PROMPT = `你是一个转写文本清理工具。对以下语音转写文本进行最小化清理：
@@ -82,6 +66,41 @@ export async function processEntry(payload: ProcessPayload): Promise<ProcessResu
 
   try {
     console.log(`[process] Starting for record ${payload.recordId}, text length: ${payload.text.length}`);
+
+    // ── Step 0: Voice action — 意图分类（记录/指令/混合） ──────────
+    // 文本长度 > 10 才做分类（太短的不判断）
+    if (payload.text.length > 10) {
+      try {
+        const intentResult = await classifyVoiceIntent(payload.text);
+        result.voice_intent_type = intentResult.type;
+
+        if (intentResult.type === "action" || intentResult.type === "mixed") {
+          const actionResults: ActionExecResult[] = [];
+          for (const action of intentResult.actions) {
+            const execResult = await executeVoiceAction(action, {
+              userId: payload.userId,
+              deviceId: payload.deviceId,
+            });
+            actionResults.push(execResult);
+          }
+          result.action_results = actionResults;
+
+          // 纯指令型：执行完就返回，不走 Digest 管道
+          if (intentResult.type === "action") {
+            console.log(`[process] Pure action intent, skipping digest. Results: ${actionResults.length}`);
+            await recordRepo.updateStatus(payload.recordId, "completed");
+            return result;
+          }
+
+          // 混合型：继续走 Digest（只处理记录部分）
+          console.log(`[process] Mixed intent, will also digest record portion`);
+        }
+      } catch (err: any) {
+        // 意图分类失败不阻塞，降级为正常记录处理
+        console.warn(`[process] Voice intent classification failed, falling back to record: ${err.message}`);
+        result.voice_intent_type = "record";
+      }
+    }
 
     /* MOVED TO DIGEST — skill loading, complex prompt building, structured extraction
     const builtinSkills = loadSkills(SKILLS_DIR);

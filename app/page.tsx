@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
 import { initStatusBar } from "@/shared/lib/status-bar";
-import { NewHeader } from "@/shared/components/new-header";
+import { WorkspaceHeader, type WorkspaceTab } from "@/features/workspace/components/workspace-header";
 import { NotesTimeline } from "@/features/notes/components/notes-timeline";
+import { TodoWorkspaceView } from "@/features/workspace/components/todo-workspace-view";
 import { FAB } from "@/features/recording/components/fab";
 import { SidebarDrawer } from "@/features/sidebar/components/sidebar-drawer";
 import { SearchView } from "@/features/search/components/search-view";
@@ -22,16 +23,15 @@ import { SkillsPage } from "@/features/skills/components/skills-page";
 import { NotebookList } from "@/features/diary/components/notebook-list";
 import { MorningBriefing } from "@/features/daily/components/morning-briefing";
 import { EveningSummary } from "@/features/daily/components/evening-summary";
-import { ActionPanel } from "@/features/action-panel/components/action-panel";
 import { LifeMap } from "@/features/cognitive/components/life-map";
 import { ClusterDetailView } from "@/features/cognitive/components/cluster-detail";
 import { DecisionWorkspace } from "@/features/cognitive/components/decision-workspace";
-import { LinkHint } from "@/features/cognitive/components/link-hint";
 import { OnboardingSeed } from "@/features/cognitive/components/onboarding-seed";
-import { LayoutGrid, Minus, Brain } from "lucide-react";
+import { GoalDetailOverlay } from "@/features/goals/components/goal-detail-overlay";
+import { ProjectDetailOverlay } from "@/features/goals/components/project-detail-overlay";
+import { GoalList } from "@/features/goals/components/goal-list";
 import { toast } from "sonner";
 import { getCommandDefs } from "@/features/commands/lib/registry";
-// NudgeToastListener replaced by AiWindow (inside NotesTimeline)
 import { on } from "@/features/recording/lib/events";
 import { useBackHandler } from "@/shared/hooks/use-back-handler";
 import { useAuth } from "@/features/auth/hooks/use-auth";
@@ -39,6 +39,8 @@ import { LoginPage } from "@/features/auth/components/login-page";
 import { RegisterPage } from "@/features/auth/components/register-page";
 import { useUpdateCheck } from "@/shared/hooks/use-update-check";
 import { UpdateDialog } from "@/shared/components/update-dialog";
+import { NotificationCenter } from "@/features/notifications/components/notification-center";
+import type { AppNotification } from "@/features/notifications/hooks/use-notifications";
 
 type OverlayName =
   | "search"
@@ -54,6 +56,10 @@ type OverlayName =
   | "notebooks"
   | "morning-briefing"
   | "evening-summary"
+  | "goals"
+  | "goal-detail"
+  | "project-detail"
+  | "notifications"
   | null;
 
 export default function Page() {
@@ -63,7 +69,6 @@ export default function Page() {
   const { update, dismiss, applying } = useUpdateCheck();
   const [authMode, setAuthMode] = useState<"login" | "register">("login");
   const [showSidebar, setShowSidebar] = useState(false);
-  const [actionPanelOpen, setActionPanelOpen] = useState(false);
   const [cognitiveMapOpen, setCognitiveMapOpen] = useState(false);
   const [selectedClusterId, setSelectedClusterId] = useState<string | null>(null);
   const [decisionQuestion, setDecisionQuestion] = useState<string | null>(null);
@@ -74,10 +79,21 @@ export default function Page() {
   } | null>(null);
   const [chatInitialMessage, setChatInitialMessage] = useState<string | undefined>();
   const [chatMode, setChatMode] = useState<"review" | "command" | "insight">("review");
-  const [viewMode, setViewMode] = useState<"pure" | "timeline">("pure");
+  const [selectedGoalId, setSelectedGoalId] = useState<string | null>(null);
+
+  // Workspace: Segment tab (日记 | 待办)
+  const [activeTab, setActiveTab] = useState<WorkspaceTab>(() => {
+    if (typeof window === "undefined") return "diary";
+    return (localStorage.getItem("v2note:activeTab") as WorkspaceTab) || "diary";
+  });
+
+  // 持久化 tab 选择
+  useEffect(() => {
+    localStorage.setItem("v2note:activeTab", activeTab);
+  }, [activeTab]);
+
   /** null = voice notes timeline, string = diary notebook name */
   const [activeNotebook, setActiveNotebook] = useState<string | null>(null);
-  const [activeNotebookColor, setActiveNotebookColor] = useState<string | null>(null);
 
   // Onboarding state
   const [isFirstTime, setIsFirstTime] = useState(() => {
@@ -85,41 +101,8 @@ export default function Page() {
     return localStorage.getItem("v2note:onboarded") !== "true";
   });
 
-  // Real-time clock for pure view
-  const [now, setNow] = useState(() => new Date());
-  useEffect(() => {
-    if (viewMode !== "pure") return;
-    const id = setInterval(() => setNow(new Date()), 60_000);
-    return () => clearInterval(id);
-  }, [viewMode]);
-
-  // LinkHint text from localStorage
-  const [linkHint, setLinkHint] = useState<string | null>(null);
-  useEffect(() => {
-    setLinkHint(localStorage.getItem("v2note:lastLinkHint"));
-    const onHintUpdate = () => {
-      setLinkHint(localStorage.getItem("v2note:lastLinkHint"));
-    };
-    window.addEventListener("v2note:linkHintUpdated", onHintUpdate);
-    return () => window.removeEventListener("v2note:linkHintUpdated", onHintUpdate);
-  }, []);
-
-  const NOTEBOOK_LABEL_MAP: Record<string, string> = {
-    "ai-self": "AI 工作日志",
-    default: "日常日记",
-  };
-  const activeNotebookName = activeNotebook ? (NOTEBOOK_LABEL_MAP[activeNotebook] ?? activeNotebook) : null;
-
   useEffect(() => {
     initStatusBar();
-  }, []);
-
-  // Auto-switch to timeline when recording completes (so user sees the result)
-  useEffect(() => {
-    const unsub = on("recording:uploaded", () => {
-      setViewMode("timeline");
-    });
-    return unsub;
   }, []);
 
   // Auto-show morning briefing (7-10am, once per day)
@@ -149,7 +132,6 @@ export default function Page() {
 
   const closeOverlay = useCallback(() => {
     setActiveOverlay(null);
-    // Notify AiWindow that chat/overlay was closed
     window.dispatchEvent(new Event("ai-window:chat-return"));
   }, []);
 
@@ -161,7 +143,6 @@ export default function Page() {
   }, []);
 
   const handleStartInsight = useCallback((range: { start: string; end: string }, _skillName: string) => {
-    // skillName is already saved to local config by ReviewOverlay
     setChatDateRange(range);
     setChatInitialMessage(undefined);
     setChatMode("insight");
@@ -190,36 +171,71 @@ export default function Page() {
     toast("导出功能开发中...");
   }, []);
 
-  // PC redirect: wide screens go to /write (PC layout)
-  // Check immediately on mount to avoid mobile UI flash
+  const handleNotificationNavigate = useCallback((type: AppNotification["type"]) => {
+    switch (type) {
+      case "morning_briefing":
+        setActiveOverlay("morning-briefing");
+        break;
+      case "evening_summary":
+        setActiveOverlay("evening-summary");
+        break;
+      case "todo_nudge":
+        setActiveTab("todo");
+        setActiveOverlay(null);
+        break;
+      case "relay_reminder":
+        setActiveTab("todo");
+        setActiveOverlay(null);
+        break;
+      case "cognitive_alert":
+        setCognitiveMapOpen(true);
+        setActiveOverlay(null);
+        break;
+    }
+  }, []);
+
+  // Swipe between diary ↔ todo
+  const touchStartX = useRef(0);
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+  }, []);
+  const handleTouchEnd = useCallback(
+    (e: React.TouchEvent) => {
+      const dx = e.changedTouches[0].clientX - touchStartX.current;
+      if (Math.abs(dx) > 80) {
+        if (dx < 0 && activeTab === "diary") setActiveTab("todo"); // 左滑 → 待办
+        if (dx > 0 && activeTab === "todo") setActiveTab("diary"); // 右滑 → 日记
+      }
+    },
+    [activeTab],
+  );
+
+  // PC redirect
   const [pcRedirecting] = useState(() => {
     if (typeof window === "undefined") return false;
     return window.innerWidth >= 768;
   });
   useEffect(() => {
-    if (pcRedirecting) {
-      router.replace("/write");
-    }
+    if (pcRedirecting) router.replace("/write");
   }, [pcRedirecting, router]);
 
-  // Wait for PC redirect before rendering mobile UI
   if (pcRedirecting) {
     return (
-      <div className="min-h-dvh flex items-center justify-center bg-cream">
-        <p className="text-sm text-bark/50">加载中...</p>
+      <div className="min-h-dvh flex items-center justify-center bg-surface">
+        <p className="text-sm text-muted-accessible">加载中...</p>
       </div>
     );
   }
 
-  // Auth gate: show login/register if not logged in
+  // Auth gate
   if (authLoading) {
     return (
-      <div className="min-h-dvh flex items-center justify-center bg-background">
+      <div className="min-h-dvh flex items-center justify-center bg-surface">
         <div className="text-center space-y-3">
-          <div className="w-12 h-12 mx-auto rounded-xl bg-primary/10 flex items-center justify-center">
-            <span className="text-2xl">🎙</span>
+          <div className="w-12 h-12 mx-auto rounded-xl bg-deer/10 flex items-center justify-center">
+            <span className="text-2xl">🦌</span>
           </div>
-          <p className="text-sm text-muted-foreground">加载中...</p>
+          <p className="text-sm text-muted-accessible">加载中...</p>
         </div>
       </div>
     );
@@ -260,7 +276,7 @@ export default function Page() {
   }
 
   return (
-    <div className="min-h-dvh bg-background max-w-lg mx-auto relative">
+    <div className="min-h-dvh bg-surface max-w-lg mx-auto relative">
       <SidebarDrawer
         open={showSidebar}
         onClose={() => setShowSidebar(false)}
@@ -270,107 +286,53 @@ export default function Page() {
         onViewBriefing={() => setActiveOverlay("morning-briefing")}
         onViewSettings={() => setActiveOverlay("settings")}
         onViewSkills={() => setActiveOverlay("skills")}
+        onViewReview={() => setActiveOverlay("review")}
+        onViewSearch={() => setActiveOverlay("search")}
+        onViewGoal={(goalId) => {
+          setSelectedGoalId(goalId);
+          setActiveOverlay("goal-detail");
+        }}
+        onViewGoals={() => setActiveOverlay("goals")}
         onLogout={logout}
         userName={user?.displayName}
         userPhone={user?.phone}
       />
       <OfflineBanner />
       <UpdateDialog update={update} onDismiss={dismiss} applying={applying} />
-      {/* Proactive messages now handled by AiWindow inside NotesTimeline */}
 
-      {/* View mode toggle + cognitive map entry */}
-      <div className="fixed top-4 right-4 z-40 flex gap-2">
-        <button
-          onClick={() => setCognitiveMapOpen(true)}
-          className={`w-9 h-9 rounded-full backdrop-blur flex items-center justify-center transition-colors ${
-            viewMode === "pure"
-              ? "bg-transparent border border-bark/15 text-bark/40 hover:text-bark/70 hover:border-bark/30"
-              : "bg-muted/60 text-muted-foreground/70 hover:text-foreground"
-          }`}
-          aria-label="认知地图"
-        >
-          <Brain size={16} />
-        </button>
-        <button
-          onClick={() => setViewMode(viewMode === "pure" ? "timeline" : "pure")}
-          className={`w-9 h-9 rounded-full backdrop-blur flex items-center justify-center transition-colors ${
-            viewMode === "pure"
-              ? "bg-transparent border border-bark/15 text-bark/40 hover:text-bark/70 hover:border-bark/30"
-              : "bg-muted/60 text-muted-foreground/70 hover:text-foreground"
-          }`}
-          aria-label={viewMode === "pure" ? "切换到时间线" : "切换到纯净模式"}
-        >
-          {viewMode === "pure" ? <LayoutGrid size={16} /> : <Minus size={16} />}
-        </button>
-      </div>
+      {/* Workspace Header: 头像 + Segment(日记|待办) + 搜索 + 通知 */}
+      <WorkspaceHeader
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        onAvatarClick={() => setShowSidebar(true)}
+        onSearchClick={() => setActiveOverlay("search")}
+        onNotificationClick={() => setActiveOverlay("notifications")}
+        userName={user?.displayName}
+      />
 
-      {viewMode === "pure" ? (
-        <main className="fixed inset-0 flex flex-col items-center justify-center select-none bg-cream">
-          {/* Radial warm glow behind time */}
-          <div
-            className="absolute pointer-events-none"
-            style={{
-              width: 320,
-              height: 320,
-              borderRadius: "50%",
-              background: "radial-gradient(circle, rgba(196,120,58,0.08) 0%, rgba(196,120,58,0.03) 40%, transparent 70%)",
-            }}
-          />
-          <p className="relative font-serif text-6xl font-extralight tracking-wider text-bark animate-breathe">
-            {String(now.getHours()).padStart(2, "0")}:{String(now.getMinutes()).padStart(2, "0")}
-          </p>
-          <p className="relative mt-3 font-serif text-xs tracking-widest text-bark/40">
-            {now.getMonth() + 1}月{now.getDate()}日{" "}
-            周{["日", "一", "二", "三", "四", "五", "六"][now.getDay()]}
-          </p>
-          <div className="relative mt-6 [&_p]:!text-bark/40">
-            <LinkHint text={linkHint} />
-          </div>
-        </main>
-      ) : (
-        <>
-          <NewHeader
-            onSearchClick={() => setActiveOverlay("search")}
-            onAvatarClick={() => setShowSidebar(true)}
-            onInsightClick={() => setActiveOverlay("review")}
-            onTodosClick={() => setActiveOverlay("todos")}
-            onNotebookClick={() => setActiveOverlay("notebooks")}
-            activeNotebookName={activeNotebookName}
-            activeNotebookColor={activeNotebookColor}
-            userName={user?.displayName}
-          />
-
-          <main className="pb-6">
+      {/* 工作区内容: 日记 or 待办 (swipeable) */}
+      <main
+        className="overflow-x-hidden"
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+      >
+        {activeTab === "diary" ? (
+          <div className="bg-surface-low">
             <NotesTimeline
               notebook={activeNotebook}
               onOpenChat={handleOpenCommandChat}
               onOpenOverlay={openOverlay}
             />
-          </main>
-        </>
-      )}
+          </div>
+        ) : (
+          <TodoWorkspaceView onOpenChat={handleOpenCommandChat} />
+        )}
+      </main>
 
-      {/* Swipe-up trigger zone for ActionPanel */}
-      {!actionPanelOpen && (
-        <div
-          className="fixed bottom-0 left-0 right-0 h-6 z-30"
-          onPointerDown={(e) => {
-            (e.currentTarget as HTMLElement).dataset.startY = String(e.clientY);
-          }}
-          onPointerMove={(e) => {
-            const startY = Number((e.currentTarget as HTMLElement).dataset.startY);
-            if (startY && startY - e.clientY > 30) {
-              setActionPanelOpen(true);
-              (e.currentTarget as HTMLElement).dataset.startY = "";
-            }
-          }}
-        />
-      )}
-
-      {!actionPanelOpen && (
-        <FAB
-          activeNotebook={activeNotebook}
-          onStartReview={(range) => {
+      {/* FAB 录音按钮 — 常驻底部 */}
+      <FAB
+        activeNotebook={activeNotebook}
+        onStartReview={(range) => {
           setChatDateRange(range);
           setChatInitialMessage(undefined);
           setActiveOverlay("chat");
@@ -383,16 +345,6 @@ export default function Page() {
           startReview: handleStartReview,
           showHelp,
           openOverlay,
-        }}
-      />
-      )}
-
-      <ActionPanel
-        isOpen={actionPanelOpen}
-        onClose={() => setActionPanelOpen(false)}
-        onTraverse={() => {
-          setActionPanelOpen(false);
-          setCognitiveMapOpen(true);
         }}
       />
 
@@ -419,7 +371,7 @@ export default function Page() {
         />
       )}
 
-      {/* Decision Workspace (Think) */}
+      {/* Decision Workspace */}
       {decisionQuestion && (
         <DecisionWorkspace
           question={decisionQuestion}
@@ -428,11 +380,9 @@ export default function Page() {
         />
       )}
 
-      {/* Overlays — command-driven */}
+      {/* Overlays */}
       {activeOverlay === "search" && (
-        <SearchView
-          onClose={closeOverlay}
-        />
+        <SearchView onClose={closeOverlay} />
       )}
       {activeOverlay === "chat" && chatDateRange && (
         <ChatView
@@ -487,7 +437,6 @@ export default function Page() {
           onClose={closeOverlay}
           onSelect={(name, color) => {
             setActiveNotebook(name);
-            setActiveNotebookColor(name ? (color ?? null) : null);
           }}
         />
       )}
@@ -496,6 +445,42 @@ export default function Page() {
       )}
       {activeOverlay === "evening-summary" && (
         <EveningSummary onClose={closeOverlay} />
+      )}
+      {activeOverlay === "notifications" && (
+        <NotificationCenter
+          onClose={closeOverlay}
+          onNavigate={handleNotificationNavigate}
+        />
+      )}
+      {activeOverlay === "goals" && (
+        <GoalList
+          onClose={closeOverlay}
+          onViewGoal={(goalId) => {
+            setSelectedGoalId(goalId);
+            setActiveOverlay("goal-detail");
+          }}
+          onViewProject={(projectId) => {
+            setSelectedGoalId(projectId);
+            setActiveOverlay("project-detail");
+          }}
+        />
+      )}
+      {activeOverlay === "goal-detail" && selectedGoalId && (
+        <GoalDetailOverlay
+          goalId={selectedGoalId}
+          onClose={closeOverlay}
+          onOpenChat={handleOpenCommandChat}
+        />
+      )}
+      {activeOverlay === "project-detail" && selectedGoalId && (
+        <ProjectDetailOverlay
+          projectId={selectedGoalId}
+          onClose={closeOverlay}
+          onViewGoal={(goalId) => {
+            setSelectedGoalId(goalId);
+            setActiveOverlay("goal-detail");
+          }}
+        />
       )}
     </div>
   );

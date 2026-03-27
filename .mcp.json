@@ -7,6 +7,11 @@
     "stitch": {
       "command": "cmd",
       "args": ["/c", "npx", "-y", "@_davideast/stitch-mcp", "proxy"]
+    },
+    "pencil": {
+      "command": "D:\\program files\\pencil\\resources\\app.asar.unpacked\\out\\mcp-server-windows-x64.exe",
+      "args": ["--app", "desktop"],
+      "env": {}
     }
   }
 }

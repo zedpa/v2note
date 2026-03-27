@@ -1,6 +1,6 @@
 # 目标场景前端骨架
 
-> 状态：🟡 待开发 | 优先级：Phase 4 | 预计：3-4 天
+> 状态：✅ completed | 优先级：Phase 4 | 预计：3-4 天
 > 说明：后端 goal 表 + CRUD API 已存在，但 features/goals/ 目录不存在。此 spec 补全前端。
 
 ## 概述

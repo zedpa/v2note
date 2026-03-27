@@ -11,9 +11,10 @@ interface ActionPanelProps {
   isOpen: boolean;
   onClose: () => void;
   onTraverse?: (strikeId: string) => void;
+  onReflect?: (strikeId: string) => void;
 }
 
-export function ActionPanel({ isOpen, onClose, onTraverse }: ActionPanelProps) {
+export function ActionPanel({ isOpen, onClose, onTraverse, onReflect }: ActionPanelProps) {
   const { now, today, goals, currentGoalIndex, switchGoal } = useActionPanel();
 
   const [dragY, setDragY] = useState(0);
@@ -53,11 +54,11 @@ export function ActionPanel({ isOpen, onClose, onTraverse }: ActionPanelProps) {
         />
       )}
 
-      {/* Panel */}
+      {/* Panel — Glass & Soul */}
       <div
         className={cn(
           "fixed inset-x-0 bottom-0 z-50 max-h-[60vh]",
-          "rounded-t-3xl bg-background/80 backdrop-blur-xl",
+          "rounded-t-3xl bg-surface/80 backdrop-blur-[12px]",
           "transition-transform duration-300 ease-out",
           isOpen ? "translate-y-0" : "translate-y-full",
         )}
@@ -75,7 +76,7 @@ export function ActionPanel({ isOpen, onClose, onTraverse }: ActionPanelProps) {
           onPointerUp={onPointerUp}
           onPointerCancel={() => { setDragY(0); setDragging(false); }}
         >
-          <div className="w-10 h-1 rounded-full bg-muted-foreground/30" />
+          <div className="w-10 h-1 rounded-full bg-muted-accessible/30" />
         </div>
 
         {/* Content */}
@@ -86,11 +87,13 @@ export function ActionPanel({ isOpen, onClose, onTraverse }: ActionPanelProps) {
               onComplete={(id) => console.log("complete", id)}
               onSkip={(id) => console.log("skip", id)}
               onTraverse={onTraverse}
+              onReflect={onReflect}
             />
           )}
 
           <TodayLine items={today} />
 
+          {/* Scene 5: 目标呼吸指示器 */}
           {goals.length > 1 && (
             <GoalIndicator
               goals={goals}

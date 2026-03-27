@@ -75,6 +75,11 @@ vi.mock("../memory/embeddings.js", () => ({
   isEmbeddingAvailable: vi.fn().mockReturnValue(true),
 }));
 
+const mockCheckIntendEmergence = vi.fn().mockResolvedValue(null);
+vi.mock("./goal-linker.js", () => ({
+  checkIntendEmergence: (...args: any[]) => mockCheckIntendEmergence(...args),
+}));
+
 // =====================================================================
 // P3-1: level 字段
 // =====================================================================
@@ -252,5 +257,41 @@ describe("P3-3: L2 涌现", () => {
 
     const result = await discoverL2Clusters("user-1", l1Clusters, clusterBonds);
     expect(result.created).toBe(0);
+  });
+});
+
+// =====================================================================
+// A1: 周涌现引擎运行时检查 intend 密度并触发目标涌现
+// =====================================================================
+describe("A1: runEmergence 应集成 intend 密度检测", () => {
+  beforeEach(() => { vi.clearAllMocks(); });
+
+  it("should_check_intend_emergence_for_each_cluster_during_weekly_run", async () => {
+    const { runEmergence } = await import("./emergence.js");
+
+    // 提供 2 个 cluster
+    const clusters = [
+      makeStrike({ id: "c1", is_cluster: true, level: 1, nucleus: "供应链管理" }),
+      makeStrike({ id: "c2", is_cluster: true, level: 1, nucleus: "团队管理" }),
+    ];
+    mockQuery.mockResolvedValueOnce(clusters); // 加载所有 clusters
+
+    // cluster 成员查询（各返回空）
+    mockQuery.mockResolvedValueOnce([]); // c1 members
+    mockQuery.mockResolvedValueOnce([]); // c2 members
+
+    // checkIntendEmergence 对 c1 返回一个 goal
+    mockCheckIntendEmergence
+      .mockResolvedValueOnce({ id: "g1", title: "供应链管理" })
+      .mockResolvedValueOnce(null);
+
+    const result = await runEmergence("user-1");
+
+    // 验证结果包含 goalEmergence 字段
+    expect(result).toBeDefined();
+    expect(typeof result.goalEmergence).toBe("number");
+    expect(result.goalEmergence).toBe(1);
+    // 验证每个 cluster 都被检查了
+    expect(mockCheckIntendEmergence).toHaveBeenCalledTimes(2);
   });
 });

@@ -104,38 +104,42 @@ export function ChatView({ dateRange, onClose, initialMessage, title, mode: mode
 
   return (
     <SwipeBack onClose={onClose}>
-      <div className="flex flex-col min-h-dvh pt-safe">
-        {/* Header */}
-        <div className="flex items-center gap-3 px-4 py-3 border-b border-border/60 shrink-0">
+      <div className="flex flex-col min-h-dvh bg-surface pt-safe">
+        {/* Header — Glass & Soul */}
+        <header
+          className="flex items-center gap-3 px-4 h-[44px] bg-surface/80 backdrop-blur-[12px] shrink-0"
+          style={{ paddingTop: "env(safe-area-inset-top)" }}
+        >
           <button
             type="button"
             onClick={onClose}
-            className="p-1 rounded-full hover:bg-secondary/60 transition-colors"
+            className="w-9 h-9 flex items-center justify-center rounded-full text-muted-accessible hover:text-on-surface transition-colors"
+            aria-label="返回"
           >
-            <ArrowLeft className="w-5 h-5 text-foreground" />
+            <ArrowLeft size={20} />
           </button>
           <div className="flex-1">
-            <p className="text-sm font-semibold text-foreground">
-              {title ?? (resolvedMode === "insight" ? "洞察分析" : initialMessage ? "指令模式" : "复盘")}
+            <p className="text-sm font-medium text-on-surface">
+              {title ?? (resolvedMode === "insight" ? "洞察分析" : initialMessage ? "和路路聊聊" : "复盘")}
             </p>
             {resolvedMode === "insight" ? (
-              <p className="text-[10px] text-muted-foreground">
+              <p className="text-[10px] text-muted-accessible">
                 {dateRange.start} — {dateRange.end}
               </p>
             ) : !initialMessage ? (
-              <p className="text-[10px] text-muted-foreground">
+              <p className="text-[10px] text-muted-accessible">
                 {dateRange.start} - {dateRange.end}
               </p>
             ) : (
-              <p className="text-[10px] text-muted-foreground">
-                通过对话修改设置、提示词、记忆等
+              <p className="text-[10px] text-muted-accessible">
+                和路路对话
               </p>
             )}
           </div>
           {!connected && (
-            <span className="text-[10px] text-amber-500">连接中...</span>
+            <span className="text-[10px] text-dawn">连接中...</span>
           )}
-        </div>
+        </header>
 
         {/* Messages */}
         <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4">
@@ -155,7 +159,7 @@ export function ChatView({ dateRange, onClose, initialMessage, title, mode: mode
                   key={cmd.name}
                   type="button"
                   onClick={() => handleCommandChip(cmd.name)}
-                  className="px-3 py-1.5 rounded-full bg-primary/10 text-primary text-xs font-medium hover:bg-primary/20 transition-colors"
+                  className="px-3 py-1.5 rounded-full bg-deer/10 text-deer text-xs font-medium hover:bg-deer/20 transition-colors"
                 >
                   /{cmd.name}
                 </button>
@@ -165,7 +169,7 @@ export function ChatView({ dateRange, onClose, initialMessage, title, mode: mode
         </div>
 
         {/* Input bar */}
-        <div className="border-t border-border/60 px-4 py-3 pb-safe shrink-0">
+        <div className="px-4 py-3 pb-safe shrink-0 bg-surface/80 backdrop-blur-[12px]">
           <div className="flex items-end gap-2">
             <textarea
               ref={inputRef}
@@ -179,7 +183,7 @@ export function ChatView({ dateRange, onClose, initialMessage, title, mode: mode
               }}
               placeholder="输入你的想法..."
               rows={1}
-              className="flex-1 bg-card border border-border/60 rounded-xl px-4 py-2.5 text-sm outline-none resize-none placeholder:text-muted-foreground/50 max-h-24"
+              className="flex-1 bg-surface-lowest rounded-xl px-4 py-2.5 text-sm text-on-surface outline-none resize-none placeholder:text-muted-accessible/50 max-h-24"
               style={{ minHeight: "40px" }}
               disabled={streaming}
             />
@@ -190,11 +194,17 @@ export function ChatView({ dateRange, onClose, initialMessage, title, mode: mode
               className={cn(
                 "flex items-center justify-center w-10 h-10 rounded-full transition-colors shrink-0",
                 input.trim() && !streaming
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-secondary/40 text-muted-foreground",
+                  ? "text-white"
+                  : "bg-surface-high text-muted-accessible",
               )}
+              style={
+                input.trim() && !streaming
+                  ? { background: "linear-gradient(135deg, #89502C, #C8845C)" }
+                  : undefined
+              }
+              aria-label="发送"
             >
-              <Send className="w-4 h-4" />
+              <Send size={16} />
             </button>
           </div>
         </div>

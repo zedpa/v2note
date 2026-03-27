@@ -1,6 +1,6 @@
 # 移动端行动面板完善
 
-> 状态：🟡 待开发 | 优先级：Phase 6 | 预计：3-4 天
+> 状态：✅ completed | 优先级：Phase 6 | 预计：3-4 天
 
 ## 概述
 当前 `features/action-panel/` 已有基础组件（now-card, today-line, goal-indicator），但移动端手势交互（Tinder 滑动、上滑呼出、长按分叉）需要完善。
@@ -12,19 +12,34 @@
 ### 场景 1: Now Card 右滑完成
 ```
 假设 (Given)  行动 A 显示在 Now Card
-当   (When)   用户右滑超过阈值
-那么 (Then)   行动 A 标记完成
-并且 (And)    下一行动上升到 Now Card
-并且 (And)    完成动画（绿色消散）
+当   (When)   用户开始右滑
+那么 (Then)   卡片右侧逐渐露出森林色(#5C7A5E)背景区域
+并且 (And)    露出区域显示「✓ 完成」标签 + 森林色圆形勾选图标
+并且 (And)    滑动距离 >40px 时标签从半透明变为全不透明（激活态）
+当   (When)   用户右滑超过阈值(80px)并松手
+那么 (Then)   行动 A 标记完成，POST /action-panel/event {type:"complete"}
+并且 (And)    完成动画：卡片向右飞出 + 森林色消散粒子效果，300ms ease-out
+并且 (And)    下一行动从下方上升到 Now Card（spring animation）
+当   (When)   用户右滑未超过阈值并松手
+那么 (Then)   卡片弹回原位，200ms ease-out
 ```
 
 ### 场景 2: Now Card 左滑"稍后"
 ```
 假设 (Given)  行动 A 显示在 Now Card
-当   (When)   用户左滑
-那么 (Then)   行动 A 回到队列末尾
-并且 (And)    skip_count += 1
-并且 (And)    下一行动上升
+当   (When)   用户开始左滑
+那么 (Then)   卡片左侧逐渐露出晨光色(#E8A87C)背景区域
+并且 (And)    露出区域显示三个跳过原因标签（纵向排列）：
+              ⏳ 等条件 | 🚧 有阻力 | 🔄 要重想
+并且 (And)    滑动距离 >40px 时标签从半透明变为全不透明（激活态）
+当   (When)   用户左滑超过阈值(80px)并松手
+那么 (Then)   露出区域固定显示，等待用户点击某个原因标签
+当   (When)   用户点击某个原因标签
+那么 (Then)   POST /action-panel/event {type:"skip", reason}
+并且 (And)    行动 A 向左飞出 + skip_count += 1
+并且 (And)    下一行动上升到 Now Card
+当   (When)   用户左滑未超过阈值并松手
+那么 (Then)   卡片弹回原位，200ms ease-out
 ```
 
 ### 场景 3: 长按下拉"今天不做"

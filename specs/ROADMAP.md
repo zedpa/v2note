@@ -37,10 +37,12 @@ Phase 4: 认知→行动闭环（Week 8-12）🔄重构
   todo-strike-bridge      数据桥梁——todo.strike_id + goal.cluster_id 统一模型
   smart-todo              智能待办——自然语言全生命周期管理（核心体验）
   goal-lifecycle          目标全生命周期——前端+关联+追踪+涌现+状态流转
+  voice-action            语音指令自动识别——统一入口，AI判断记录/指令/混合
 
   ※ 架构决策：todo/goal 不再是独立实体，而是 Strike/Cluster 的行动投影
   ※ todo-strike-bridge 最先做（纯后端地基），然后 smart-todo + goal-lifecycle 可并行
   ※ smart-todo 依赖 Agent Plan 能力（目标拆解 = Plan 驱动）
+  ※ voice-action 消除"录日记"vs"发指令"的隐藏手势，process层统一路由
 
 Phase 5: 深度体验（Week 11-13）
   advisor-context         参谋上下文合并
@@ -48,11 +50,18 @@ Phase 5: 深度体验（Week 11-13）
   annotation              批注系统
   agent-self-evolution    Agent自适应——交互偏好学习 + Soul守护
 
+Phase 7: 前端重构（Week 14-18）🆕
+  app-mobile-redesign     移动端重构——工作区+侧边栏架构，日记/待办双视图
+
+  ※ 抛弃 Tab Bar + 纯净入口方案
+  ※ 工作区 Segment 切换（日记|待办），侧边栏管理低频功能
+  ※ FAB 语音优先：点击=录音，AI 自动判断记录/指令（依赖 voice-action）
+  ※ PC 端另开 spec
+
 Phase 6+: 增强与扩展
   knowledge-lifecycle     知识生命周期管理
   person-profile          人物画像系统
   decision-template       决策模板涌现
-  mobile-action-panel     移动端行动面板完善
   external-integration    外部数据源集成
 ```
 
@@ -64,10 +73,12 @@ Phase 6+: 增强与扩展
 | Phase 2 | 2 | 11 | ✅ |
 | Phase 2.5 | 3 | 30 | ✅ |
 | Phase 3 | 2 | 10 | ✅ |
-| Phase 4 | 3 | 21 | ✅ |
+| Phase 4 | 4 | 31 | ✅ |
 | Phase 5 | 4 | 24 | ✅ |
-| Phase 6+ | 5 | 17 | 🟡 |
-| **总计** | **23** | **127** | |
+| Phase 7 | 1 | 37 | ✅ |
+| Phase 6 | 4 | 17 | ✅ |
+| Phase 6+ | 2 | — | 🟡 |
+| **总计** | **28** | **174** | |
 
 ## 已完成
 
@@ -89,3 +100,11 @@ Phase 6+: 增强与扩展
 - `reader.md` — ✅ 阅读器 (阈值检测 + 排版配置 + 工具栏 + 问路路 + 回顾格式化 + 素材模式)
 - `annotation.md` — ✅ 批注系统 (高亮Strike + 批注record + 素材想法 + 管理)
 - `agent-self-evolution.md` — ✅ Agent自适应 (Soul严格门控 + Plan偏好提取 + 偏好衰减 + unmet聚合 + Profile分类)
+- `goal-granularity.md` — ✅ 目标粒度 (action→todo, goal→goal+cluster关联, project→子目标建议, 涌现集成)
+- `goal-auto-link.md` — ✅ 目标自动关联 (全量扫描cluster/记录/todo + digest增量关联 + 项目进度汇总)
+- `goals-scaffold.md` — ✅ 目标前端骨架 (use-goals hook + GoalList + 创建/确认/归档 UI)
+- `action-tracking.md` — ✅ 行动追踪 (行为统计 + 跳过alert回流晚间回顾 + 结果追踪提示)
+- `knowledge-lifecycle.md` — ✅ 知识生命周期 (过期扫描 + supersede确认alert + 撤销API)
+- `person-profile.md` — ✅ 人物画像 (高频人物扫描 + AI行为模式提取 + 参谋对话注入)
+- `decision-template.md` — ✅ 决策模板涌现 (闭环检测 + 模板保存 + 语义匹配引用)
+- `mobile-action-panel.md` — ✅ 行动面板完善 (手势滑动 + 跳过反思提示 + 目标切换 + Editorial Serenity)

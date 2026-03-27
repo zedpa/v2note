@@ -8,6 +8,7 @@ import * as todoRepo from "../db/repositories/todo.js";
 import * as strikeRepo from "../db/repositories/strike.js";
 import * as goalRepo from "../db/repositories/goal.js";
 import { query, queryOne } from "../db/pool.js";
+import { chatCompletion } from "../ai/provider.js";
 import type { StrikeEntry } from "../db/repositories/strike.js";
 import type { Todo } from "../db/repositories/todo.js";
 import type { Goal } from "../db/repositories/goal.js";
@@ -105,7 +106,8 @@ function extractKeywords(text: string): Set<string> {
 /**
  * 将 intend Strike 投影为 todo 或 goal。
  * - action → 创建 todo
- * - goal/project → 创建 goal
+ * - goal → 创建 goal + 自动关联 cluster/todo（B2 快路径）
+ * - project → 创建 goal + AI 生成子目标建议（B3 快路径）
  */
 export async function projectIntendStrike(
   strike: StrikeEntry,
@@ -115,15 +117,33 @@ export async function projectIntendStrike(
   if (!strike.source_id) return null;
 
   const parsed = parseIntendField(strike.field ?? {});
+  const uid = userId ?? strike.user_id;
 
   if (parsed.granularity === "goal" || parsed.granularity === "project") {
-    // 创建 goal
+    // B2/B3: 检查同方向是否已有 active goal（关键词重叠检测）
+    const existingGoals = await goalRepo.findActiveByUser(uid);
+    const duplicate = findDuplicateGoal(strike.nucleus, existingGoals);
+    if (duplicate) {
+      // 不新建，返回已有 goal
+      return duplicate;
+    }
+
+    // 创建 goal (source=explicit 因为来自用户明确表达)
     const goal = await goalRepo.create({
-      device_id: userId ?? strike.user_id,
-      user_id: userId ?? strike.user_id,
+      device_id: uid,
+      user_id: uid,
       title: strike.nucleus,
-      source: "speech",
+      source: "explicit",
     });
+
+    // 自动关联 cluster（通过 embedding 匹配）
+    await linkNewGoalToCluster(goal.id, uid);
+
+    // B3: 项目级 → AI 生成子目标建议
+    if (parsed.granularity === "project") {
+      await generateSubGoalSuggestions(goal, uid);
+    }
+
     return goal;
   }
 
@@ -147,6 +167,88 @@ export async function projectIntendStrike(
   }
 
   return todo;
+}
+
+// ── 同方向 goal 重复检测 ──────────────────────────────────────────────
+
+function findDuplicateGoal(nucleus: string, goals: Goal[]): Goal | null {
+  if (goals.length === 0) return null;
+  const newKeywords = extractKeywords(nucleus);
+  if (newKeywords.size === 0) return null;
+
+  for (const goal of goals) {
+    const goalKeywords = extractKeywords(goal.title);
+    if (goalKeywords.size === 0) continue;
+    const intersection = new Set([...newKeywords].filter((k) => goalKeywords.has(k)));
+    const overlap = intersection.size / Math.min(newKeywords.size, goalKeywords.size);
+    if (overlap >= DUPLICATE_KEYWORD_THRESHOLD) return goal;
+  }
+  return null;
+}
+
+// ── 新 goal 自动关联 cluster ──────────────────────────────────────────
+
+async function linkNewGoalToCluster(goalId: string, userId: string): Promise<void> {
+  try {
+    const matches = await query<{ id: string; similarity: number }>(
+      `SELECT s.id,
+              1 - (s.embedding <=> (SELECT embedding FROM strike WHERE id = (SELECT strike_id FROM todo WHERE goal_id = $1 LIMIT 1))) as similarity
+       FROM strike s
+       WHERE s.user_id = $2 AND s.is_cluster = true AND s.status = 'active'
+       ORDER BY similarity DESC
+       LIMIT 1`,
+      [goalId, userId],
+    );
+
+    if (matches.length > 0 && matches[0].similarity >= BACKFILL_SIMILARITY_THRESHOLD) {
+      await goalRepo.update(goalId, { cluster_id: matches[0].id });
+    }
+  } catch {
+    // embedding 不可用时静默跳过
+  }
+}
+
+// ── B3: AI 生成子目标建议 ─────────────────────────────────────────────
+
+async function generateSubGoalSuggestions(parentGoal: Goal, userId: string): Promise<void> {
+  try {
+    const resp = await chatCompletion(
+      [
+        {
+          role: "system",
+          content: `用户表达了一个项目级目标。请分析并建议 2-4 个子目标，帮助用户拆解这个大方向。
+
+返回 JSON：
+{"sub_goals": [{"title": "子目标标题", "reason": "为什么需要这个子目标"}]}
+
+要求：
+- 每个子目标应该是可独立追踪的
+- 按逻辑顺序排列
+- 标题简洁明确`,
+        },
+        { role: "user", content: `项目目标：${parentGoal.title}` },
+      ],
+      { json: true, temperature: 0.3 },
+    );
+
+    const parsed = JSON.parse(resp.content);
+    const subGoals = parsed.sub_goals ?? [];
+
+    for (const sub of subGoals) {
+      if (!sub.title) continue;
+      await goalRepo.create({
+        device_id: userId,
+        user_id: userId,
+        title: sub.title,
+        parent_id: parentGoal.id,
+        source: "explicit",
+        status: "suggested",
+      });
+    }
+  } catch (err) {
+    console.error("[todo-projector] Sub-goal generation failed:", err);
+    // 项目 goal 已创建，子目标生成失败不影响主流程
+  }
 }
 
 // ── 回补关联 ──────────────────────────────────────────────────────────

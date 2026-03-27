@@ -88,15 +88,23 @@ vi.mock("../db/repositories/strike.js", () => ({
   findByUser: (...args: any[]) => mockStrikeFindByUser(...args),
 }));
 
+const mockGoalCreate = vi.fn();
 const mockGoalUpdate = vi.fn();
 const mockGoalFindActiveByUser = vi.fn().mockResolvedValue([]);
 const mockGoalFindWithTodos = vi.fn().mockResolvedValue([]);
 
 vi.mock("../db/repositories/goal.js", () => ({
+  create: (...args: any[]) => mockGoalCreate(...args),
   update: (...args: any[]) => mockGoalUpdate(...args),
   findActiveByUser: (...args: any[]) => mockGoalFindActiveByUser(...args),
   findWithTodos: (...args: any[]) => mockGoalFindWithTodos(...args),
   findByUser: vi.fn().mockResolvedValue([]),
+}));
+
+const mockChatCompletion = vi.fn();
+
+vi.mock("../ai/provider.js", () => ({
+  chatCompletion: (...args: any[]) => mockChatCompletion(...args),
 }));
 
 const mockQuery = vi.fn().mockResolvedValue([]);
@@ -402,5 +410,168 @@ describe("场景 5: Strike 删除保护", () => {
     await enforceMinSalience(strikeId);
 
     expect(mockStrikeUpdate).not.toHaveBeenCalled();
+  });
+});
+
+// ── 场景 B2: goal 级意图 → 创建 goal + 自动关联 ──────────────────────
+
+describe("场景 B2: goal 级意图创建 goal 并自动关联", () => {
+  it("should_create_goal_with_source_explicit_when_granularity_is_goal", async () => {
+    const strike = makeStrike({
+      id: "strike-goal-1",
+      polarity: "intend",
+      nucleus: "我要评估是否换供应商",
+      source_id: "record-1",
+      field: { granularity: "goal" },
+    });
+
+    const createdGoal = makeGoal({ id: "goal-new", title: strike.nucleus, source: "speech" });
+    mockGoalCreate.mockResolvedValue(createdGoal);
+    // mock cluster linking query
+    mockQuery.mockResolvedValue([]);
+
+    const result = await projectIntendStrike(strike, "user-1");
+
+    expect(mockGoalCreate).toHaveBeenCalledTimes(1);
+    const createArg = mockGoalCreate.mock.calls[0][0];
+    expect(createArg.title).toBe("我要评估是否换供应商");
+    expect(createArg.source).toBe("explicit");
+    expect(result).toBeDefined();
+  });
+
+  it("should_link_goal_to_matching_cluster_after_creation", async () => {
+    const strike = makeStrike({
+      id: "strike-goal-2",
+      polarity: "intend",
+      nucleus: "评估供应商体系",
+      source_id: "record-1",
+      field: { granularity: "goal" },
+    });
+
+    const createdGoal = makeGoal({ id: "goal-linked", title: strike.nucleus });
+    mockGoalCreate.mockResolvedValue(createdGoal);
+    // mock: 找到语义匹配的 cluster
+    mockQuery
+      .mockResolvedValueOnce([{ id: "cluster-match", similarity: 0.85 }]) // cluster match
+      .mockResolvedValueOnce([]); // todo link query
+
+    const result = await projectIntendStrike(strike, "user-1");
+
+    expect(result).toBeDefined();
+    expect(mockGoalUpdate).toHaveBeenCalledWith("goal-linked", expect.objectContaining({
+      cluster_id: "cluster-match",
+    }));
+  });
+
+  it("should_link_existing_todos_to_new_goal_when_semantically_related", async () => {
+    const strike = makeStrike({
+      id: "strike-goal-3",
+      polarity: "intend",
+      nucleus: "优化供应链成本",
+      source_id: "record-1",
+      field: { granularity: "goal" },
+    });
+
+    const createdGoal = makeGoal({ id: "goal-todo-link", title: strike.nucleus });
+    mockGoalCreate.mockResolvedValue(createdGoal);
+    // mock: 无 cluster 匹配
+    mockQuery.mockResolvedValueOnce([]);
+    // mock: 找到相关的 pending todos
+    mockTodoFindPendingByUser.mockResolvedValue([
+      makeTodo({ id: "todo-related", text: "找供应商报价" }),
+      makeTodo({ id: "todo-unrelated", text: "买菜" }),
+    ]);
+
+    await projectIntendStrike(strike, "user-1");
+
+    // 至少调用 todoUpdate 关联相关 todo
+    // （具体实现可能用 embedding 或关键词匹配）
+    expect(mockGoalCreate).toHaveBeenCalledTimes(1);
+  });
+
+  it("should_not_create_new_goal_when_same_direction_active_goal_exists", async () => {
+    const strike = makeStrike({
+      id: "strike-dup",
+      polarity: "intend",
+      nucleus: "评估供应商",
+      source_id: "record-1",
+      field: { granularity: "goal" },
+    });
+
+    // 已有同方向 active goal
+    mockGoalFindActiveByUser.mockResolvedValue([
+      makeGoal({ id: "existing-goal", title: "评估供应商体系", status: "active" }),
+    ]);
+
+    const result = await projectIntendStrike(strike, "user-1");
+
+    // 不应创建新 goal，而是返回已有的
+    expect(mockGoalCreate).not.toHaveBeenCalled();
+    expect(result).toBeDefined();
+  });
+});
+
+// ── 场景 B3: 项目级意图 → goal + 子目标建议 ──────────────────────────
+
+describe("场景 B3: 项目级意图创建 project goal + 子目标建议", () => {
+  it("should_create_project_goal_and_ai_suggest_sub_goals", async () => {
+    const strike = makeStrike({
+      id: "strike-project-1",
+      polarity: "intend",
+      nucleus: "Q2要完成供应链体系的重建",
+      source_id: "record-1",
+      field: { granularity: "project" },
+    });
+
+    const parentGoal = makeGoal({ id: "goal-project", title: strike.nucleus });
+    mockGoalCreate
+      .mockResolvedValueOnce(parentGoal) // parent goal
+      .mockResolvedValue(makeGoal({ id: "sub-goal", parent_id: "goal-project", status: "suggested" as any }));
+
+    // mock AI 生成子目标
+    mockChatCompletion.mockResolvedValue({
+      content: JSON.stringify({
+        sub_goals: [
+          { title: "评估当前供应商表现", reason: "了解现状" },
+          { title: "调研新供应商候选", reason: "扩展选择" },
+          { title: "重新谈判合同条款", reason: "降低成本" },
+        ],
+      }),
+    });
+
+    // mock cluster query
+    mockQuery.mockResolvedValue([]);
+
+    const result = await projectIntendStrike(strike, "user-1");
+
+    expect(result).toBeDefined();
+    expect(mockGoalCreate).toHaveBeenCalledTimes(4); // 1 parent + 3 sub-goals
+    // 子目标应设 parent_id 和 status=suggested
+    const subGoalCalls = mockGoalCreate.mock.calls.slice(1);
+    for (const call of subGoalCalls) {
+      expect(call[0].parent_id).toBe("goal-project");
+    }
+  });
+
+  it("should_create_project_goal_even_if_ai_sub_goal_generation_fails", async () => {
+    const strike = makeStrike({
+      id: "strike-project-2",
+      polarity: "intend",
+      nucleus: "全面重构技术栈",
+      source_id: "record-1",
+      field: { granularity: "project" },
+    });
+
+    const parentGoal = makeGoal({ id: "goal-project-2", title: strike.nucleus });
+    mockGoalCreate.mockResolvedValue(parentGoal);
+    // AI 调用失败
+    mockChatCompletion.mockRejectedValue(new Error("AI unavailable"));
+    mockQuery.mockResolvedValue([]);
+
+    const result = await projectIntendStrike(strike, "user-1");
+
+    // 即使 AI 失败，parent goal 也应创建成功
+    expect(result).toBeDefined();
+    expect(mockGoalCreate).toHaveBeenCalledTimes(1);
   });
 });

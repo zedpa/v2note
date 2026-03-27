@@ -95,12 +95,12 @@ export async function checkIntendEmergence(
 
   if (existingGoals.length > 0) return null;
 
-  // 创建 suggested goal
+  // 创建 suggested goal (source=emerged 表示涌现产生)
   const goal = await goalRepo.create({
     device_id: userId,
     user_id: userId,
     title: cluster.nucleus,
-    source: "speech",
+    source: "emerged",
   });
 
   // 关联 cluster

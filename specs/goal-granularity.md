@@ -1,6 +1,6 @@
 # 目标粒度处理——快路径 + 慢路径
 
-> 状态：🟡 待开发 | 优先级：Phase 4 | 预计：4-5 天
+> 状态：✅ completed | 优先级：Phase 4 | 预计：4-5 天
 > 依赖：goals-scaffold, emergence-chain
 
 ## 概述

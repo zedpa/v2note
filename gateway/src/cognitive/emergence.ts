@@ -8,6 +8,7 @@
 import { chatCompletion, type ChatMessage } from "../ai/provider.js";
 import { strikeRepo, bondRepo } from "../db/repositories/index.js";
 import { query, execute } from "../db/pool.js";
+import { checkIntendEmergence } from "./goal-linker.js";
 import type { StrikeEntry } from "../db/repositories/strike.js";
 import type { BondEntry } from "../db/repositories/bond.js";
 
@@ -16,6 +17,7 @@ export interface EmergenceResult {
   evolutionDetected: number;
   resonanceDiscovered: number;
   patternsExtracted: number;
+  goalEmergence: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -28,6 +30,7 @@ export async function runEmergence(userId: string): Promise<EmergenceResult> {
     evolutionDetected: 0,
     resonanceDiscovered: 0,
     patternsExtracted: 0,
+    goalEmergence: 0,
   };
 
   try {
@@ -39,6 +42,11 @@ export async function runEmergence(userId: string): Promise<EmergenceResult> {
 
     if (clusters.length < 2) {
       console.log("[emergence] Not enough clusters for emergence analysis");
+      // 即使 cluster 不足以做 cross-analysis，仍检查 intend 密度
+      for (const c of clusters) {
+        const goal = await checkIntendEmergence(c, userId);
+        if (goal) result.goalEmergence++;
+      }
       return result;
     }
 
@@ -66,6 +74,16 @@ export async function runEmergence(userId: string): Promise<EmergenceResult> {
 
     // Step 4: Pattern extraction
     result.patternsExtracted = await extractPatterns(userId);
+
+    // Step 5: intend 密度涌现 → 自动建议目标
+    for (const c of clusters) {
+      try {
+        const goal = await checkIntendEmergence(c, userId);
+        if (goal) result.goalEmergence++;
+      } catch (err) {
+        console.error(`[emergence] Goal emergence check failed for cluster ${c.id}:`, err);
+      }
+    }
 
   } catch (err) {
     console.error("[emergence] Fatal error:", err);

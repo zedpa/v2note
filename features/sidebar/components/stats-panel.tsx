@@ -1,6 +1,6 @@
 "use client";
 
-import { BarChart3, CheckSquare, Mic, ChevronRight } from "lucide-react";
+import { Mic, CheckSquare, TrendingUp } from "lucide-react";
 import { useStats } from "@/features/sidebar/hooks/use-stats";
 
 interface StatsPanelProps {
@@ -12,35 +12,35 @@ export function StatsPanel({ onViewDetails }: StatsPanelProps) {
 
   if (loading) {
     return (
-      <div className="p-4 animate-pulse">
-        <div className="h-4 bg-secondary rounded w-24 mb-3" />
-        <div className="grid grid-cols-3 gap-3">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="h-16 bg-secondary rounded-lg" />
-          ))}
-        </div>
+      <div className="space-y-3">
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="h-14 rounded-xl bg-surface animate-pulse" />
+        ))}
       </div>
     );
   }
 
+  const completionRate =
+    totalTodos > 0 ? Math.round((completedTodos / totalTodos) * 100) : 0;
+
   return (
-    <div className="p-4">
-      <h3 className="text-xs font-semibold text-muted-foreground mb-3">本周概览</h3>
-      <div className="grid grid-cols-3 gap-3">
+    <div>
+      <h3 className="font-serif text-sm text-on-surface mb-3">本周概览</h3>
+      <div className="grid grid-cols-3 gap-2">
         <StatCard
-          icon={<Mic className="w-4 h-4 text-primary" />}
+          icon={<Mic size={16} className="text-deer" />}
           value={totalRecords}
           label="记录"
         />
         <StatCard
-          icon={<CheckSquare className="w-4 h-4 text-emerald-500" />}
+          icon={<CheckSquare size={16} className="text-forest" />}
           value={`${completedTodos}/${totalTodos}`}
-          label="待办完成"
+          label="待办"
         />
         <StatCard
-          icon={<BarChart3 className="w-4 h-4 text-amber-500" />}
-          value={totalTodos > 0 ? Math.round((completedTodos / totalTodos) * 100) : 0}
-          label="完成率%"
+          icon={<TrendingUp size={16} className="text-dawn" />}
+          value={`${completionRate}%`}
+          label="完成率"
         />
       </div>
 
@@ -48,10 +48,9 @@ export function StatsPanel({ onViewDetails }: StatsPanelProps) {
         <button
           type="button"
           onClick={onViewDetails}
-          className="flex items-center justify-center gap-1 w-full mt-3 py-2 rounded-lg text-xs text-muted-foreground hover:bg-secondary/40 transition-colors"
+          className="w-full mt-3 py-2 rounded-xl text-xs text-muted-accessible hover:bg-surface/60 transition-colors text-center"
         >
-          查看详情
-          <ChevronRight className="w-3 h-3" />
+          查看详细统计 →
         </button>
       )}
     </div>
@@ -68,10 +67,10 @@ function StatCard({
   label: string;
 }) {
   return (
-    <div className="flex flex-col items-center gap-1 p-3 rounded-lg bg-secondary/40">
+    <div className="flex flex-col items-center gap-1 p-3 rounded-xl bg-surface-lowest">
       {icon}
-      <span className="text-lg font-semibold text-foreground">{value}</span>
-      <span className="text-[10px] text-muted-foreground">{label}</span>
+      <span className="text-base font-semibold text-on-surface">{value}</span>
+      <span className="text-[10px] text-muted-accessible">{label}</span>
     </div>
   );
 }

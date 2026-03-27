@@ -24,6 +24,55 @@ export async function listGoalTodos(goalId: string) {
   return api.get<Array<{ id: string; text: string; done: boolean }>>(`/api/v1/goals/${goalId}/todos`);
 }
 
+export async function getGoalHealth(goalId: string) {
+  return api.get<{
+    direction: number;
+    resource: number;
+    path: number;
+    drive: number;
+  }>(`/api/v1/goals/${goalId}/health`);
+}
+
+export async function getGoalTimeline(goalId: string) {
+  return api.get<Array<{
+    id: string;
+    type: string;
+    text: string;
+    date: string;
+  }>>(`/api/v1/goals/${goalId}/timeline`);
+}
+
+export async function confirmGoal(goalId: string): Promise<void> {
+  await api.post(`/api/v1/goals/${goalId}/confirm`, {});
+}
+
+export async function archiveGoal(goalId: string): Promise<void> {
+  await api.post(`/api/v1/goals/${goalId}/archive`, {});
+}
+
+export async function triggerAutoLink(goalId: string) {
+  return api.post<{ clusterLinked: boolean; recordsFound: number; todosLinked: number }>(
+    `/api/v1/goals/${goalId}/auto-link`,
+    {},
+  );
+}
+
+export async function getProjectProgress(goalId: string) {
+  return api.get<{
+    children: Array<{
+      id: string;
+      title: string;
+      status: string;
+      totalTodos: number;
+      completedTodos: number;
+      completionPercent: number;
+    }>;
+    totalTodos: number;
+    completedTodos: number;
+    overallPercent: number;
+  }>(`/api/v1/goals/${goalId}/progress`);
+}
+
 export async function listPendingIntents(): Promise<PendingIntent[]> {
   return api.get("/api/v1/intents/pending");
 }
