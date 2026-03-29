@@ -77,6 +77,22 @@
     --tag-health-fg: 152 50% 34%;
     --tag-travel-bg: 240 50% 96%;
     --tag-travel-fg: 240 45% 48%;
+
+    /* Surface hierarchy (light) */
+    --surface: 36 67% 97%;
+    --surface-low: 35 36% 94%;
+    --surface-lowest: 0 0% 100%;
+    --surface-high: 38 14% 89%;
+    --on-surface: 60 5% 10%;
+    /* Brand palette (light) */
+    --cream: 36 50% 96%;
+    --sand: 35 36% 91%;
+    --brand-border: 35 25% 83%;
+    --muted-accessible: 25 10% 44%;
+    --ghost-border: rgba(215, 194, 184, 0.15);
+    /* Shadows */
+    --shadow-ambient: rgba(28, 28, 24, 0.06);
+    --shadow-ambient-lg: rgba(28, 28, 24, 0.08);
   }
 
   .dark {
@@ -144,6 +160,22 @@
     --tag-health-fg: 152 45% 60%;
     --tag-travel-bg: 240 25% 18%;
     --tag-travel-fg: 240 40% 68%;
+
+    /* Surface hierarchy (dark) */
+    --surface: 25 8% 11%;
+    --surface-low: 25 8% 9%;
+    --surface-lowest: 25 6% 7%;
+    --surface-high: 25 6% 18%;
+    --on-surface: 30 10% 93%;
+    /* Brand palette (dark) */
+    --cream: 25 10% 7%;
+    --sand: 25 6% 15%;
+    --brand-border: 25 6% 20%;
+    --muted-accessible: 25 5% 55%;
+    --ghost-border: rgba(255, 255, 255, 0.07);
+    /* Shadows */
+    --shadow-ambient: rgba(0, 0, 0, 0.25);
+    --shadow-ambient-lg: rgba(0, 0, 0, 0.35);
   }
 }
 
