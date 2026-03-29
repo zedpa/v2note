@@ -1,6 +1,6 @@
 import { loadSkills, mergeWithCustomSkills } from "../skills/loader.js";
 import { buildSystemPrompt } from "../skills/prompt-builder.js";
-import { chatCompletion, chatCompletionStream } from "../ai/provider.js";
+import { streamWithTools } from "../ai/provider.js";
 import { updateSoul } from "../soul/manager.js";
 import { updateProfile } from "../profile/manager.js";
 import { appendToDiary } from "../diary/manager.js";
@@ -10,13 +10,18 @@ import { fileURLToPath } from "node:url";
 import { recordRepo } from "../db/repositories/index.js";
 import { transcriptRepo } from "../db/repositories/index.js";
 import { pendingIntentRepo } from "../db/repositories/index.js";
-import { isBuiltinTool, callBuiltinTool } from "../tools/builtin.js";
-import { maySoulUpdate, mayProfileUpdate } from "../lib/text-utils.js";
+import { createDefaultRegistry } from "../tools/definitions/index.js";
+import { mayProfileUpdate } from "../lib/text-utils.js";
+import { shouldUpdateSoulStrict } from "../cognitive/self-evolution.js";
 import { gatherDecisionContext, buildDecisionPrompt } from "../cognitive/decision.js";
+import { detectCognitiveQuery, loadChatCognitive, saveConversationAsRecord } from "../cognitive/advisor-context.js";
+import { computeMood, buildMoodPromptSection } from "../companion/mood.js";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const INSIGHTS_DIR = join(__dirname, "../../insights");
 /** Max characters for transcript context injected into prompt */
 const MAX_TRANSCRIPT_CHARS = 8000;
+/** 全局工具注册表——启动时初始化一次 */
+const toolRegistry = createDefaultRegistry();
 /**
  * Start a review/insight chat session.
  * Loads memory, soul, and skills into the session context.
@@ -85,13 +90,28 @@ export async function startChat(payload) {
                     const date = new Date(pi.created_at).toLocaleDateString("zh-CN");
                     return `- [${pi.intent_type}] "${pi.text}"${pi.context ? ` (${pi.context})` : ""} (${date}, id: ${pi.id})`;
                 });
-                pendingIntentContext = `\n## 待确认意图\n以下是用户近期提到但未确认的愿望/目标，在对话中自然地跟进（不要一开口就问，找合适时机）：\n${lines.join("\n")}\n不要逐条审问用户，自然聊天中确认即可。确认后使用 confirm_intent 工具处理。`;
+                pendingIntentContext = `\n## 待确认意图\n以下是用户近期提到但未确认的愿望/目标，在对话中自然地跟进（不要一开口就问，找合适时机）：\n${lines.join("\n")}\n不要逐条审问用户，自然聊天中确认即可。确认后使用 confirm 工具处理。`;
             }
         }
         catch (err) {
             console.warn(`[chat] Failed to load pending intents: ${err.message}`);
         }
     }
+    // Load cognitive context for review/insight modes (enriched with clusters + alerts)
+    let cognitiveContext;
+    if (payload.mode === "review" || payload.mode === "insight") {
+        try {
+            const uid = payload.userId ?? payload.deviceId;
+            const cognitive = await loadChatCognitive(uid);
+            if (cognitive.contextString) {
+                cognitiveContext = cognitive.contextString;
+            }
+        }
+        catch {
+            // non-critical — fall back to no cognitive context
+        }
+    }
+    // 构建 system prompt（不再注入工具调用规则，由 AI SDK 原生处理）
     const systemPrompt = buildSystemPrompt({
         skills: activeSkills,
         soul: soul?.content,
@@ -99,9 +119,25 @@ export async function startChat(payload) {
         memory: memories,
         mode: "chat",
         pendingIntentContext,
+        cognitiveContext,
     });
+    // 注入路路心情（场景 6.2）
+    let moodSection = "";
+    try {
+        const hour = new Date().getHours();
+        const moodResult = computeMood({
+            completedTodayCount: 0, // 简化：后续可从 todoRepo 查
+            hasNewCluster: false,
+            hasSkippedTodo: false,
+            hoursSinceLastRecord: 0,
+            currentHour: hour,
+            isDigestRunning: false,
+        });
+        moodSection = buildMoodPromptSection(moodResult);
+    }
+    catch { /* non-critical */ }
     // Set up session context
-    session.context.setSystemPrompt(systemPrompt);
+    session.context.setSystemPrompt(moodSection ? `${systemPrompt}\n\n${moodSection}` : systemPrompt);
     if (payload.mode === "decision") {
         // Decision mode: deep cognitive graph traversal for decision support
         const userId = payload.userId ?? payload.deviceId;
@@ -135,8 +171,8 @@ export async function startChat(payload) {
             });
         }
     }
-    // Stream initial response (with tool-call support)
-    return streamWithToolCalls(session, payload.deviceId);
+    // Stream initial response with native tool calling
+    return streamWithNativeTools(session, payload.deviceId);
 }
 /**
  * Send a message in an ongoing chat session.
@@ -146,98 +182,51 @@ export async function sendChatMessage(deviceId, text) {
     if (session.mode !== "chat") {
         throw new Error("No active chat session");
     }
+    // 检测认知相关提问，动态注入认知数据
+    if (detectCognitiveQuery(text) && session.userId) {
+        try {
+            const cognitive = await loadChatCognitive(session.userId);
+            if (cognitive.contextString) {
+                session.context.addMessage({
+                    role: "user",
+                    content: `[系统补充上下文]\n${cognitive.contextString}\n\n${text}`,
+                });
+                return streamWithNativeTools(session, deviceId);
+            }
+        }
+        catch {
+            // non-critical
+        }
+    }
     session.context.addMessage({ role: "user", content: text });
-    return streamWithToolCalls(session, deviceId);
+    return streamWithNativeTools(session, deviceId);
 }
 /**
- * Extract tool_calls from AI response text.
- * Handles both pure JSON and mixed text+JSON responses.
+ * Stream response using Vercel AI SDK native function calling.
+ *
+ * Replaces the old manual JSON extraction + 3-round loop.
+ * AI SDK handles tool execution automatically via maxSteps.
  */
-function extractToolCalls(content) {
-    // 1. Try pure JSON parse
-    try {
-        const parsed = JSON.parse(content.trim());
-        if (Array.isArray(parsed.tool_calls) && parsed.tool_calls.length > 0) {
-            return { toolCalls: parsed.tool_calls, textPart: "" };
-        }
-    }
-    catch {
-        // Not pure JSON
-    }
-    // 2. Try to find JSON object containing tool_calls in mixed text
-    const jsonMatch = content.match(/\{[\s\S]*?"tool_calls"\s*:\s*\[[\s\S]*?\]\s*\}/);
-    if (jsonMatch) {
-        try {
-            const parsed = JSON.parse(jsonMatch[0]);
-            if (Array.isArray(parsed.tool_calls) && parsed.tool_calls.length > 0) {
-                const textPart = content.replace(jsonMatch[0], "").trim();
-                return { toolCalls: parsed.tool_calls, textPart };
-            }
-        }
-        catch {
-            // JSON parse failed
-        }
-    }
-    // 3. Try to find tool_calls array directly
-    const arrayMatch = content.match(/tool_calls\s*[:：]\s*(\[[\s\S]*?\])/);
-    if (arrayMatch) {
-        try {
-            const arr = JSON.parse(arrayMatch[1]);
-            if (Array.isArray(arr) && arr.length > 0) {
-                const textPart = content.replace(arrayMatch[0], "").trim();
-                return { toolCalls: arr, textPart };
-            }
-        }
-        catch {
-            // parse failed
-        }
-    }
-    return null;
-}
-/**
- * Stream response with tool-call loop support.
- * Up to 3 rounds: if the AI returns tool_calls, execute them
- * and re-call AI. Final round always streams.
- */
-async function* streamWithToolCalls(session, deviceId) {
-    const MAX_TOOL_ROUNDS = 3;
-    for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
-        const response = await chatCompletion(session.context.getMessages(), {
-            temperature: 0.7,
-        });
-        const content = response.content.trim();
-        if (!content)
-            break;
-        const extracted = extractToolCalls(content);
-        if (!extracted) {
-            // No tool calls — normal text response
-            session.context.addMessage({ role: "assistant", content });
-            yield content;
-            return;
-        }
-        // Execute tool calls
-        console.log(`[chat] Tool call round ${round + 1}: ${extracted.toolCalls.length} calls`);
-        const toolResults = [];
-        for (const call of extracted.toolCalls) {
-            if (isBuiltinTool(call.name)) {
-                const res = await callBuiltinTool(call.name, call.arguments ?? {}, deviceId, session.userId);
-                toolResults.push(`工具 "${call.name}" 结果: ${res.message}`);
-                console.log(`[chat] Built-in tool ${call.name}: ${res.success ? "success" : "failed"}`);
-            }
-            else {
-                toolResults.push(`工具 "${call.name}" 错误: 未知工具`);
-            }
-        }
-        session.context.addMessage({ role: "assistant", content });
-        session.context.addMessage({
-            role: "user",
-            content: `工具调用结果：\n${toolResults.join("\n")}\n\n请基于工具执行结果，给用户一个简短的自然语言回复。不要再输出 tool_calls。`,
-        });
-    }
-    // Final round: stream the response
-    const stream = chatCompletionStream(session.context.getMessages());
+async function* streamWithNativeTools(session, deviceId) {
+    // 构建工具执行上下文
+    const toolCtx = {
+        deviceId,
+        userId: session.userId,
+        sessionId: session.id,
+    };
+    // 将注册表导出为 AI SDK tools 格式（绑定执行上下文）
+    const aiTools = toolRegistry.toAISDKTools(toolCtx);
+    // 使用 AI SDK streamText + tools + maxSteps
+    // AI SDK 自动处理：工具调用 → 执行 → 结果反馈 → 继续生成
+    const stream = streamWithTools(session.context.getMessages(), aiTools, { temperature: 0.7, maxSteps: 5 });
+    let fullResponse = "";
     for await (const chunk of stream) {
+        fullResponse += chunk;
         yield chunk;
+    }
+    // 记录完整回复到 session context
+    if (fullResponse) {
+        session.context.addMessage({ role: "assistant", content: fullResponse });
     }
 }
 /**
@@ -261,7 +250,7 @@ export async function endChat(deviceId) {
         if (!userId) {
             console.warn(`[chat] endChat: session.userId is undefined for device ${deviceId}, soul/profile updates will use deviceId only`);
         }
-        if (maySoulUpdate(userText)) {
+        if (shouldUpdateSoulStrict(history.filter(m => m.role === "user").map(m => m.content))) {
             updateSoul(deviceId, `[复盘对话] ${summary}`, userId).catch((e) => {
                 console.warn(`[chat] Soul update failed: ${e.message}`);
             });
@@ -274,8 +263,17 @@ export async function endChat(deviceId) {
         appendToDiary(deviceId, "ai-self", `[对话摘要] ${summary.slice(0, 500)}`, userId).catch((e) => {
             console.warn(`[chat] Diary append failed: ${e.message}`);
         });
+        // 场景 5: 有价值的对话保存为日记 record，进入 Digest 管道
+        if (history.length >= 4 && userId) {
+            const messages = history.map(m => ({ role: m.role, content: m.content }));
+            saveConversationAsRecord(messages, userId, deviceId).catch((e) => {
+                console.warn(`[chat] Save conversation failed: ${e.message}`);
+            });
+        }
     }
     session.mode = "idle";
     session.context.clear();
 }
+/** 导出 toolRegistry 供 MCP server 等外部模块使用 */
+export { toolRegistry };
 //# sourceMappingURL=chat.js.map

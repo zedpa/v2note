@@ -164,6 +164,7 @@ export interface NoteItem {
   duration_seconds: number | null
   audio_path: string | null
   created_at: string
+  domain?: string | null
 }
 
 // Composite type for note detail
@@ -192,6 +193,12 @@ export interface TodoItem {
   ai_actionable?: boolean
   ai_action_plan?: string[]
   goal_id?: string
+  parent_id?: string | null
+  level?: number
+  cluster_id?: string | null
+  status?: string
+  subtask_count?: number
+  subtask_done_count?: number
 }
 
 export interface Goal {
@@ -200,6 +207,7 @@ export interface Goal {
   title: string
   parent_id: string | null
   cluster_id?: string | null
+  domain?: string | null
   status: 'active' | 'paused' | 'completed' | 'abandoned' | 'progressing' | 'blocked' | 'suggested' | 'dismissed'
   source: 'speech' | 'chat' | 'manual' | 'explicit' | 'emerged'
   created_at: string

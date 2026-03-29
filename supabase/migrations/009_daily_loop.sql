@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS daily_briefing (
   UNIQUE(device_id, briefing_date, briefing_type)
 );
 
-CREATE INDEX idx_daily_briefing_device_date ON daily_briefing (device_id, briefing_date DESC);
+CREATE INDEX IF NOT EXISTS idx_daily_briefing_device_date ON daily_briefing (device_id, briefing_date DESC);
 
 -- 2. Extend todo table for relay tracking
 ALTER TABLE todo ADD COLUMN IF NOT EXISTS category TEXT DEFAULT 'action';
@@ -20,10 +20,11 @@ ALTER TABLE todo ADD COLUMN IF NOT EXISTS category TEXT DEFAULT 'action';
 ALTER TABLE todo ADD COLUMN IF NOT EXISTS relay_meta JSONB;
 -- {"source_person":"张总", "target_person":"李经理", "context":"Q2预算调整", "direction":"outgoing"}
 
-CREATE INDEX idx_todo_category ON todo (category) WHERE done = false;
+CREATE INDEX IF NOT EXISTS idx_todo_category ON todo (category) WHERE done = false;
 
 -- 3. RLS policies for daily_briefing
 ALTER TABLE daily_briefing ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "daily_briefing_device_access" ON daily_briefing;
 CREATE POLICY "daily_briefing_device_access" ON daily_briefing
   FOR ALL USING (true);

@@ -7,6 +7,7 @@ export interface Summary {
     created_at: string;
 }
 export declare function findByRecordId(recordId: string): Promise<Summary | null>;
+export declare function findByRecordIds(recordIds: string[]): Promise<Summary[]>;
 export declare function create(fields: {
     record_id: string;
     title?: string;

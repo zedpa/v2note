@@ -1,3 +1,10 @@
+/**
+ * Goal 适配层 — 统一模型过渡期
+ *
+ * 所有查询已切换到 todo 表（level>=1），对外接口保持不变。
+ * Goal interface 的 title 映射自 todo.text。
+ * 调用方无需修改，等所有模块逐步切换到 todoRepo 后可删除此文件。
+ */
 import { query, queryOne, execute } from "../pool.js";
 
 export interface Goal {
@@ -12,36 +19,53 @@ export interface Goal {
   updated_at: string;
 }
 
+/** SQL: todo → Goal 字段映射 */
+const SELECT_AS_GOAL = `
+  SELECT id, device_id, text AS title, parent_id, status,
+         COALESCE(category, 'speech') AS source, cluster_id,
+         created_at, COALESCE(updated_at, created_at) AS updated_at
+  FROM todo
+  WHERE level >= 1
+`;
+
 export async function findActiveByDevice(deviceId: string): Promise<Goal[]> {
   return query<Goal>(
-    `SELECT * FROM goal WHERE device_id = $1 AND status = 'active' ORDER BY created_at DESC`,
+    `${SELECT_AS_GOAL} AND device_id = $1 AND status IN ('active', 'progressing')
+     ORDER BY created_at DESC`,
     [deviceId],
   );
 }
 
 export async function findActiveByUser(userId: string): Promise<Goal[]> {
   return query<Goal>(
-    `SELECT * FROM goal WHERE user_id = $1 AND status = 'active' ORDER BY created_at DESC`,
+    `${SELECT_AS_GOAL} AND user_id = $1 AND status IN ('active', 'progressing')
+     ORDER BY created_at DESC`,
     [userId],
   );
 }
 
 export async function findByUser(userId: string): Promise<Goal[]> {
   return query<Goal>(
-    `SELECT * FROM goal WHERE user_id = $1 ORDER BY created_at DESC`,
+    `${SELECT_AS_GOAL} AND user_id = $1 ORDER BY created_at DESC`,
     [userId],
   );
 }
 
 export async function findByDevice(deviceId: string): Promise<Goal[]> {
   return query<Goal>(
-    `SELECT * FROM goal WHERE device_id = $1 ORDER BY created_at DESC`,
+    `${SELECT_AS_GOAL} AND device_id = $1 ORDER BY created_at DESC`,
     [deviceId],
   );
 }
 
 export async function findById(id: string): Promise<Goal | null> {
-  return queryOne<Goal>(`SELECT * FROM goal WHERE id = $1`, [id]);
+  return queryOne<Goal>(
+    `SELECT id, device_id, text AS title, parent_id, status,
+            COALESCE(category, 'speech') AS source, cluster_id,
+            created_at, COALESCE(updated_at, created_at) AS updated_at
+     FROM todo WHERE id = $1 AND level >= 1`,
+    [id],
+  );
 }
 
 export async function create(fields: {
@@ -53,8 +77,19 @@ export async function create(fields: {
   status?: string;
 }): Promise<Goal> {
   const row = await queryOne<Goal>(
-    `INSERT INTO goal (device_id, user_id, title, parent_id, source, status) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-    [fields.device_id, fields.user_id ?? null, fields.title, fields.parent_id ?? null, fields.source ?? "speech", fields.status ?? "active"],
+    `INSERT INTO todo (device_id, user_id, text, parent_id, category, status, level, done)
+     VALUES ($1, $2, $3, $4, $5, $6, 1, false)
+     RETURNING id, device_id, text AS title, parent_id, status,
+               COALESCE(category, 'speech') AS source, cluster_id,
+               created_at, COALESCE(updated_at, created_at) AS updated_at`,
+    [
+      fields.device_id,
+      fields.user_id ?? null,
+      fields.title,
+      fields.parent_id ?? null,
+      fields.source ?? "speech",
+      fields.status ?? "active",
+    ],
   );
   return row!;
 }
@@ -67,12 +102,15 @@ export async function update(
   const params: any[] = [];
   let i = 1;
   if (fields.title !== undefined) {
-    sets.push(`title = $${i++}`);
+    sets.push(`text = $${i++}`);
     params.push(fields.title);
   }
   if (fields.status !== undefined) {
     sets.push(`status = $${i++}`);
     params.push(fields.status);
+    // 同步 done 字段
+    sets.push(`done = $${i++}`);
+    params.push(fields.status === "completed");
   }
   if (fields.parent_id !== undefined) {
     sets.push(`parent_id = $${i++}`);
@@ -85,13 +123,20 @@ export async function update(
   if (sets.length === 0) return;
   sets.push(`updated_at = now()`);
   params.push(id);
-  await execute(`UPDATE goal SET ${sets.join(", ")} WHERE id = $${i}`, params);
+  await execute(`UPDATE todo SET ${sets.join(", ")} WHERE id = $${i}`, params);
+}
+
+/** 批量更新 cluster_id 引用（聚类合并时用） */
+export async function updateClusterRef(oldClusterId: string, newClusterId: string): Promise<void> {
+  await execute(
+    `UPDATE todo SET cluster_id = $1 WHERE cluster_id = $2 AND level >= 1`,
+    [newClusterId, oldClusterId],
+  );
 }
 
 export async function findWithTodos(goalId: string) {
-  const todos = await query<{ id: string; text: string; done: boolean }>(
-    `SELECT id, text, done FROM todo WHERE goal_id = $1 ORDER BY created_at`,
+  return query<{ id: string; text: string; done: boolean }>(
+    `SELECT id, text, done FROM todo WHERE parent_id = $1 AND level = 0 ORDER BY created_at`,
     [goalId],
   );
-  return todos;
 }

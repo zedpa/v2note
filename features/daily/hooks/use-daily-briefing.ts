@@ -6,23 +6,39 @@ import { getDeviceId } from "@/shared/lib/device";
 
 interface BriefingResult {
   greeting: string;
-  priority_items: string[];
-  unfinished: string[];
+  today_focus: string[];
+  goal_progress: Array<{
+    title: string;
+    pending_count: number;
+    today_todos: string[];
+  }>;
+  carry_over: string[];
   relay_pending: Array<{
     person: string;
     context: string;
     todoId: string;
   }>;
-  followups: string[];
+  ai_suggestions: string[];
   stats: { yesterday_done: number; yesterday_total: number; streak: number };
 }
 
 interface SummaryResult {
   accomplishments: string[];
-  pending_items: string[];
+  cognitive_highlights: string[];
+  goal_updates: Array<{
+    title: string;
+    completed_count: number;
+    remaining_count: number;
+    note: string;
+  }>;
+  attention_needed: string[];
   relay_summary: string[];
-  stats: { done: number; new_records: number; relays_completed: number };
-  tomorrow_seeds: string[];
+  stats: { done: number; new_records: number; new_strikes: number; relays_completed: number };
+  tomorrow_preview: {
+    scheduled: string[];
+    carry_over: string[];
+    follow_up: string[];
+  };
 }
 
 export function useDailyBriefing() {

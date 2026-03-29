@@ -30,17 +30,19 @@
 假设 (Given)  行动 A 显示在 Now Card
 当   (When)   用户开始左滑
 那么 (Then)   卡片左侧逐渐露出晨光色(#E8A87C)背景区域
-并且 (And)    露出区域显示三个跳过原因标签（纵向排列）：
-              ⏳ 等条件 | 🚧 有阻力 | 🔄 要重想
+并且 (And)    露出区域显示「跳过 →」标签
 并且 (And)    滑动距离 >40px 时标签从半透明变为全不透明（激活态）
 当   (When)   用户左滑超过阈值(80px)并松手
-那么 (Then)   露出区域固定显示，等待用户点击某个原因标签
-当   (When)   用户点击某个原因标签
-那么 (Then)   POST /action-panel/event {type:"skip", reason}
-并且 (And)    行动 A 向左飞出 + skip_count += 1
+那么 (Then)   卡片向左飞出 + skip_count += 1
+并且 (And)    弹出底部 Action Sheet 选择跳过原因：
+              ⏳ 等条件 | 🚧 有阻力 | 🔄 要重想 | [取消]
+并且 (And)    用户选择原因 → POST /action-panel/event {type:"skip", reason}
+并且 (And)    用户点击取消 → 行动仍然跳过（已飞出），reason 记录为 "later"
 并且 (And)    下一行动上升到 Now Card
 当   (When)   用户左滑未超过阈值并松手
 那么 (Then)   卡片弹回原位，200ms ease-out
+
+注意：改为单步滑动+弹Sheet，避免原"滑到位再精确点击小标签"的两步认知负担
 ```
 
 ### 场景 3: 长按下拉"今天不做"

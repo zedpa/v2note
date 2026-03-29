@@ -1,17 +1,18 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { MessageCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ActionCard } from "@/shared/lib/api/action-panel";
 import { reportSwipe } from "@/shared/lib/api/action-panel";
+import { motion, useSpring, useMotionValue, AnimatePresence } from "framer-motion";
 
 const ACTION_ICONS: Record<string, string> = {
-  call: "📞",
-  write: "📝",
-  review: "👁",
-  think: "💭",
-  record: "🎙",
+  call: "\u{1F4DE}",
+  write: "\u{1F4DD}",
+  review: "\u{1F441}",
+  think: "\u{1F4AD}",
+  record: "\u{1F399}",
 };
 
 type SkipReason = "wait" | "blocked" | "rethink";
@@ -24,20 +25,23 @@ interface NowCardProps {
   onReflect?: (strikeId: string) => void;
 }
 
-type SwipePhase = "idle" | "swiping" | "forking" | "dropping";
+type SwipePhase = "idle" | "swiping";
+
+const SKIP_OPTIONS: { reason: SkipReason; icon: string; label: string }[] = [
+  { reason: "wait", icon: "\u23F3", label: "\u7B49\u6761\u4EF6" },
+  { reason: "blocked", icon: "\u{1F6A7}", label: "\u6709\u963B\u529B" },
+  { reason: "rethink", icon: "\u{1F504}", label: "\u8981\u91CD\u60F3" },
+];
 
 export function NowCard({ card, onComplete, onSkip, onTraverse, onReflect }: NowCardProps) {
   const [offsetX, setOffsetX] = useState(0);
-  const [offsetY, setOffsetY] = useState(0);
   const [phase, setPhase] = useState<SwipePhase>("idle");
-  const [transitioning, setTransitioning] = useState(false);
+  const [showSkipSheet, setShowSkipSheet] = useState(false);
 
   const startXRef = useRef(0);
   const startYRef = useRef(0);
   const widthRef = useRef(0);
   const containerRef = useRef<HTMLDivElement>(null);
-  const forkTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const forkedRef = useRef(false);
   const phaseRef = useRef<SwipePhase>("idle");
 
   const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -48,33 +52,52 @@ export function NowCard({ card, onComplete, onSkip, onTraverse, onReflect }: Now
     setPhase(p);
   }, []);
 
+  // framer-motion spring 驱动
+  const motionX = useMotionValue(0);
+  const motionY = useMotionValue(0);
+  const springX = useSpring(motionX, { stiffness: 300, damping: 25 });
+  const springY = useSpring(motionY, { stiffness: 300, damping: 25 });
+
+  // 粒子状态 (场景 7.3)
+  const [particles, setParticles] = useState<Array<{ id: number; x: number; y: number; angle: number; speed: number }>>([]);
+
   const resetCard = useCallback(() => {
-    setTransitioning(true);
+    motionX.set(0);
+    motionY.set(0);
     setOffsetX(0);
-    setOffsetY(0);
     setPhaseSync("idle");
-    forkedRef.current = false;
-    if (forkTimerRef.current) {
-      clearTimeout(forkTimerRef.current);
-      forkTimerRef.current = null;
-    }
-    setTimeout(() => setTransitioning(false), 300);
-  }, [setPhaseSync]);
+  }, [setPhaseSync, motionX, motionY]);
+
+  const spawnParticles = useCallback(() => {
+    // 检查 prefers-reduced-motion
+    if (typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const count = 10;
+    const ps = Array.from({ length: count }, (_, i) => ({
+      id: Date.now() + i,
+      x: 0,
+      y: 0,
+      angle: (Math.random() - 0.3) * Math.PI, // 偏右散射
+      speed: 60 + Math.random() * 80,
+    }));
+    setParticles(ps);
+    setTimeout(() => setParticles([]), 500);
+  }, []);
 
   const flyOut = useCallback(
     (direction: "left" | "right", cb: () => void) => {
-      setTransitioning(true);
-      setOffsetX(direction === "right" ? widthRef.current * 1.2 : -widthRef.current * 1.2);
+      const target = direction === "right" ? widthRef.current * 1.2 : -widthRef.current * 1.2;
+      motionX.set(target);
+      setOffsetX(target);
+      if (direction === "right") spawnParticles();
       setTimeout(() => {
         cb();
+        motionX.jump(0);
+        motionY.jump(0);
         setOffsetX(0);
-        setOffsetY(0);
         setPhaseSync("idle");
-        setTransitioning(false);
-        forkedRef.current = false;
       }, 300);
     },
-    [setPhaseSync],
+    [setPhaseSync, motionX, motionY, spawnParticles],
   );
 
   const clearLongPress = useCallback(() => {
@@ -84,16 +107,29 @@ export function NowCard({ card, onComplete, onSkip, onTraverse, onReflect }: Now
     }
   }, []);
 
+  // Action Sheet 选择原因
+  const handleSkipReason = useCallback((reason: SkipReason) => {
+    setShowSkipSheet(false);
+    reportSwipe({ strikeId: card.strikeId, direction: "left", reason });
+    onSkip(card.strikeId, reason);
+  }, [card.strikeId, onSkip]);
+
+  // Action Sheet 取消
+  const handleSkipCancel = useCallback(() => {
+    setShowSkipSheet(false);
+    reportSwipe({ strikeId: card.strikeId, direction: "left", reason: "later" });
+    onSkip(card.strikeId);
+  }, [card.strikeId, onSkip]);
+
   const onPointerDown = useCallback(
     (e: React.PointerEvent) => {
-      if (phaseRef.current !== "idle") return;
+      if (phaseRef.current !== "idle" || showSkipSheet) return;
       const el = containerRef.current;
       if (!el) return;
       (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
       startXRef.current = e.clientX;
       startYRef.current = e.clientY;
       widthRef.current = el.offsetWidth;
-      forkedRef.current = false;
       longPressFiredRef.current = false;
 
       clearLongPress();
@@ -106,13 +142,12 @@ export function NowCard({ card, onComplete, onSkip, onTraverse, onReflect }: Now
 
       setPhaseSync("swiping");
     },
-    [setPhaseSync, clearLongPress, onTraverse, card.strikeId],
+    [setPhaseSync, clearLongPress, onTraverse, card.strikeId, showSkipSheet],
   );
 
   const onPointerMove = useCallback(
     (e: React.PointerEvent) => {
-      const p = phaseRef.current;
-      if (p !== "swiping" && p !== "forking" && p !== "dropping") return;
+      if (phaseRef.current !== "swiping") return;
 
       const dx = e.clientX - startXRef.current;
       const dy = e.clientY - startYRef.current;
@@ -120,35 +155,11 @@ export function NowCard({ card, onComplete, onSkip, onTraverse, onReflect }: Now
       if (Math.abs(dx) > 10 || Math.abs(dy) > 10) {
         clearLongPress();
       }
-      const ratio = Math.abs(dx) / widthRef.current;
-
-      // Left swipe fork zone: 30-40%
-      if (dx < 0 && ratio >= 0.3 && ratio < 0.4 && !forkedRef.current) {
-        forkedRef.current = true;
-        setPhaseSync("forking");
-        setOffsetX(dx);
-        if (forkTimerRef.current) clearTimeout(forkTimerRef.current);
-        forkTimerRef.current = setTimeout(() => {
-          forkedRef.current = true;
-        }, 300);
-        return;
-      }
-
-      if (p === "forking" || p === "dropping") {
-        if (dy > 40) {
-          setPhaseSync("dropping");
-          setOffsetY(dy - 40);
-        }
-        if (ratio >= 0.4 && dy <= 40) {
-          setPhaseSync("swiping");
-        } else {
-          return;
-        }
-      }
 
       setOffsetX(dx);
+      motionX.set(dx);
     },
-    [setPhaseSync, clearLongPress],
+    [clearLongPress, motionX],
   );
 
   const onPointerUp = useCallback(
@@ -164,23 +175,6 @@ export function NowCard({ card, onComplete, onSkip, onTraverse, onReflect }: Now
 
       const ratio = Math.abs(offsetX) / (widthRef.current || 1);
 
-      // Dropping = fork reason
-      if (p === "dropping") {
-        const dropX = Math.abs(offsetX);
-        const dropZone = widthRef.current / 3;
-        let reason: SkipReason;
-        if (dropX < dropZone) {
-          reason = "wait";
-        } else if (dropX < dropZone * 2) {
-          reason = "blocked";
-        } else {
-          reason = "rethink";
-        }
-        reportSwipe({ strikeId: card.strikeId, direction: "left", reason });
-        flyOut("left", () => onSkip(card.strikeId, reason));
-        return;
-      }
-
       // Right swipe > 40% = complete
       if (offsetX > 0 && ratio > 0.4) {
         reportSwipe({ strikeId: card.strikeId, direction: "right" });
@@ -188,16 +182,17 @@ export function NowCard({ card, onComplete, onSkip, onTraverse, onReflect }: Now
         return;
       }
 
-      // Left swipe > 40% = skip
-      if (offsetX < 0 && ratio > 0.4) {
-        reportSwipe({ strikeId: card.strikeId, direction: "left", reason: "later" });
-        flyOut("left", () => onSkip(card.strikeId));
+      // Left swipe > 40% (or > 80px) = fly out + show Action Sheet
+      if (offsetX < 0 && (ratio > 0.4 || Math.abs(offsetX) > 80)) {
+        flyOut("left", () => {
+          setShowSkipSheet(true);
+        });
         return;
       }
 
       resetCard();
     },
-    [offsetX, card.strikeId, onComplete, onSkip, flyOut, resetCard, clearLongPress],
+    [offsetX, card.strikeId, onComplete, flyOut, resetCard, clearLongPress],
   );
 
   const onPointerCancel = useCallback(() => {
@@ -207,7 +202,7 @@ export function NowCard({ card, onComplete, onSkip, onTraverse, onReflect }: Now
 
   const ratio = widthRef.current ? Math.abs(offsetX) / widthRef.current : 0;
   const isRight = offsetX > 0;
-  const icon = ACTION_ICONS[card.actionType] ?? "▶";
+  const icon = ACTION_ICONS[card.actionType] ?? "\u25B6";
   const showReflection = (card.skipCount ?? 0) >= 5;
   // 标签激活态：滑动距离 > 40px 时从半透明变为全不透明
   const labelActivated = Math.abs(offsetX) > 40;
@@ -224,45 +219,49 @@ export function NowCard({ card, onComplete, onSkip, onTraverse, onReflect }: Now
           labelActivated && isRight ? "opacity-100" : "opacity-50",
         )}>
           <div className="w-8 h-8 rounded-full bg-forest/30 flex items-center justify-center">
-            <span className="text-forest text-lg">✓</span>
+            <span className="text-forest text-lg">{"\u2713"}</span>
           </div>
-          <span className="text-sm font-medium text-forest">完成</span>
+          <span className="text-sm font-medium text-forest">{"\u5B8C\u6210"}</span>
         </div>
       </div>
 
-      {/* 左滑背景：晨光色 + 跳过原因标签 */}
+      {/* 左滑背景：晨光色 + 跳过标签 */}
       <div
-        className="absolute inset-0 rounded-2xl flex items-center justify-end px-4 bg-dawn/15"
+        className="absolute inset-0 rounded-2xl flex items-center justify-end px-6 bg-dawn/15"
         style={{ opacity: !isRight && ratio > 0 ? Math.min(ratio * 2, 1) : 0 }}
       >
         <div className={cn(
-          "flex flex-col gap-1.5 transition-opacity",
+          "flex items-center gap-2 transition-opacity",
           labelActivated && !isRight ? "opacity-100" : "opacity-50",
         )}>
-          <span className="px-3 py-1.5 rounded-full bg-dawn/20 text-xs text-dawn-dark whitespace-nowrap">⏳等条件</span>
-          <span className="px-3 py-1.5 rounded-full bg-dawn/20 text-xs text-dawn-dark whitespace-nowrap">🚧有阻力</span>
-          <span className="px-3 py-1.5 rounded-full bg-dawn/20 text-xs text-dawn-dark whitespace-nowrap">🔄要重想</span>
+          <span className="text-sm font-medium text-dawn-dark">{"\u8DF3\u8FC7 \u2192"}</span>
         </div>
       </div>
 
-      {/* Fork 选项（长按下拉时显示在卡片下方） */}
-      {(phase === "forking" || phase === "dropping") && (
-        <div className="absolute inset-x-0 bottom-0 translate-y-full pt-2 flex justify-center gap-3 z-10">
-          <span className="px-3 py-1.5 rounded-full bg-surface-high text-xs text-muted-accessible">⏳等条件</span>
-          <span className="px-3 py-1.5 rounded-full bg-surface-high text-xs text-muted-accessible">🚧有阻力</span>
-          <span className="px-3 py-1.5 rounded-full bg-surface-high text-xs text-muted-accessible">🔄要重想</span>
+      {/* 粒子效果 (场景 7.3) */}
+      {particles.length > 0 && (
+        <div className="absolute inset-0 pointer-events-none overflow-visible z-10">
+          {particles.map((p) => (
+            <motion.div
+              key={p.id}
+              className="absolute w-2 h-2 rounded-full bg-forest"
+              initial={{ x: "50%", y: "50%", opacity: 1, scale: 1 }}
+              animate={{
+                x: `calc(50% + ${Math.cos(p.angle) * p.speed}px)`,
+                y: `calc(50% + ${Math.sin(p.angle) * p.speed}px)`,
+                opacity: 0,
+                scale: 0.3,
+              }}
+              transition={{ duration: 0.4, ease: "easeOut" }}
+            />
+          ))}
         </div>
       )}
 
-      {/* Card — Editorial Serenity style */}
-      <div
-        className={cn(
-          "relative rounded-2xl bg-surface-lowest p-5",
-          transitioning && "transition-transform duration-300 ease-out",
-        )}
-        style={{
-          transform: `translateX(${offsetX}px) translateY(${offsetY}px)`,
-        }}
+      {/* Card — Editorial Serenity style, spring-driven */}
+      <motion.div
+        className="relative rounded-2xl bg-surface-lowest p-5 shadow-ambient-lg"
+        style={{ x: springX, y: springY }}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
@@ -284,15 +283,15 @@ export function NowCard({ card, onComplete, onSkip, onTraverse, onReflect }: Now
 
         {/* Meta row */}
         <div className="flex items-center gap-3 mt-3 text-[11px] text-muted-accessible">
-          {card.targetPerson && <span>→ {card.targetPerson}</span>}
-          {card.durationEstimate && <span>⏱ {card.durationEstimate}</span>}
+          {card.targetPerson && <span>{"\u2192"} {card.targetPerson}</span>}
+          {card.durationEstimate && <span>{"\u23F1"} {card.durationEstimate}</span>}
         </div>
 
         {/* Scene 4: 反复跳过反思提示 */}
         {showReflection && (
           <div className="mt-3 pt-3 border-t border-surface-high">
             <p className="text-xs text-dawn mb-2">
-              这件事已经在这里好一阵子了，要聊聊吗？
+              {"\u8FD9\u4EF6\u4E8B\u5DF2\u7ECF\u5728\u8FD9\u91CC\u597D\u4E00\u9635\u5B50\u4E86\uFF0C\u8981\u804A\u804A\u5417\uFF1F"}
             </p>
             {onReflect && (
               <button
@@ -301,12 +300,57 @@ export function NowCard({ card, onComplete, onSkip, onTraverse, onReflect }: Now
                 className="flex items-center gap-1.5 text-xs text-deer hover:text-deer-dark transition-colors"
               >
                 <MessageCircle size={12} />
-                和路路聊聊
+                {"\u548C\u8DEF\u8DEF\u804A\u804A"}
               </button>
             )}
           </div>
         )}
-      </div>
+      </motion.div>
+
+      {/* Skip Action Sheet (底部弹出) */}
+      <AnimatePresence>
+        {showSkipSheet && (
+          <>
+            {/* Backdrop */}
+            <motion.div
+              className="fixed inset-0 bg-black/30 z-40"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={handleSkipCancel}
+            />
+            {/* Sheet */}
+            <motion.div
+              className="fixed inset-x-0 bottom-0 z-50 bg-surface-lowest rounded-t-2xl shadow-ambient px-5 pt-5 pb-8"
+              initial={{ y: "100%" }}
+              animate={{ y: 0 }}
+              exit={{ y: "100%" }}
+              transition={{ type: "spring", stiffness: 400, damping: 35 }}
+            >
+              <div className="flex flex-col gap-2">
+                {SKIP_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.reason}
+                    type="button"
+                    onClick={() => handleSkipReason(opt.reason)}
+                    className="flex items-center gap-3 w-full px-4 py-3.5 rounded-xl bg-surface-high/50 hover:bg-surface-high active:bg-surface-high transition-colors text-left"
+                  >
+                    <span className="text-lg">{opt.icon}</span>
+                    <span className="text-sm font-medium text-deer">{opt.label}</span>
+                  </button>
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={handleSkipCancel}
+                className="w-full mt-3 py-3 rounded-xl text-sm text-muted-accessible hover:bg-surface-high/30 transition-colors"
+              >
+                {"\u53D6\u6D88"}
+              </button>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

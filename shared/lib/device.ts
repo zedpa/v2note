@@ -2,6 +2,7 @@ import { registerDevice, lookupDevice } from "./api/device";
 import { setApiDeviceId } from "./api";
 
 let cachedDeviceId: string | null = null
+let pendingPromise: Promise<string> | null = null
 
 async function getDeviceIdentifier(): Promise<{ identifier: string; platform: string }> {
   try {
@@ -33,21 +34,30 @@ async function getDeviceIdentifier(): Promise<{ identifier: string; platform: st
 export async function getDeviceId(): Promise<string> {
   if (cachedDeviceId) return cachedDeviceId
 
-  const { identifier, platform } = await getDeviceIdentifier()
+  // 并发锁：多个组件同时调用时复用同一个 Promise，避免重复注册
+  if (pendingPromise) return pendingPromise
 
-  // Try to find existing device
-  const existing = await lookupDevice(identifier);
-  if (existing) {
-    cachedDeviceId = existing.id;
-    setApiDeviceId(existing.id);
-    return existing.id;
-  }
+  pendingPromise = (async () => {
+    const { identifier, platform } = await getDeviceIdentifier()
 
-  // Register new device (will be linked to user during auth)
-  const created = await registerDevice(identifier, platform);
-  cachedDeviceId = created.id;
-  setApiDeviceId(created.id);
-  return created.id;
+    // Try to find existing device
+    const existing = await lookupDevice(identifier);
+    if (existing) {
+      cachedDeviceId = existing.id;
+      setApiDeviceId(existing.id);
+      return existing.id;
+    }
+
+    // Register new device (will be linked to user during auth)
+    const created = await registerDevice(identifier, platform);
+    cachedDeviceId = created.id;
+    setApiDeviceId(created.id);
+    return created.id;
+  })().finally(() => {
+    pendingPromise = null;
+  });
+
+  return pendingPromise;
 }
 
 export function clearDeviceCache() {

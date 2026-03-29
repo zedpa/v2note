@@ -1,6 +1,7 @@
 import { sendJson, sendError, getDeviceId, getUserId, HttpError } from "../lib/http-helpers.js";
 import { generateMorningBriefing, generateEveningSummary } from "../handlers/daily-loop.js";
 import { todoRepo } from "../db/repositories/index.js";
+import { onTodoComplete } from "../cognitive/todo-projector.js";
 export function registerDailyLoopRoutes(router) {
     // Morning briefing
     router.get("/api/v1/daily/briefing", async (req, res) => {
@@ -49,6 +50,7 @@ export function registerDailyLoopRoutes(router) {
     router.patch("/api/v1/daily/relays/:id", async (req, res, params) => {
         try {
             await todoRepo.update(params.id, { done: true });
+            onTodoComplete(params.id).catch((e) => console.error("[daily-loop] onTodoComplete failed:", e));
             sendJson(res, { ok: true });
         }
         catch (err) {

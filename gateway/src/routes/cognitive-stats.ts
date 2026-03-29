@@ -2,6 +2,7 @@ import type { Router } from "../router.js";
 import { sendJson, sendError, getUserId } from "../lib/http-helpers.js";
 import { query, queryOne } from "../db/pool.js";
 import { digestRecords } from "../handlers/digest.js";
+import { runBatchAnalyze } from "../cognitive/batch-analyze.js";
 import { runDailyCognitiveCycle } from "../cognitive/daily-cycle.js";
 
 interface PolarityRow {
@@ -197,16 +198,29 @@ export function registerCognitiveStatsRoutes(router: Router) {
     })().catch(e => console.error("[redigest] Background task failed:", e));
   });
 
-  // ── POST /api/v1/cognitive/cycle — 手动触发认知循环（聚类+涌现+维护） ──
+  // ── POST /api/v1/cognitive/batch-analyze — 手动触发 Tier2 批量分析 ──
+  router.post("/api/v1/cognitive/batch-analyze", async (req, res) => {
+    const userId = getUserId(req);
+    if (!userId) { sendError(res, "Unauthorized", 401); return; }
+
+    sendJson(res, { message: "批量分析已启动" });
+
+    runBatchAnalyze(userId).then(result => {
+      console.log(`[cognitive/batch-analyze] Done:`, result);
+    }).catch(e => {
+      console.error("[cognitive/batch-analyze] Failed:", e);
+    });
+  });
+
+  // ── POST /api/v1/cognitive/cycle — 手动触发完整认知循环（批量分析+维护+报告） ──
   router.post("/api/v1/cognitive/cycle", async (req, res) => {
     const userId = getUserId(req);
     if (!userId) { sendError(res, "Unauthorized", 401); return; }
 
-    // 立即返回，后台执行
     sendJson(res, { message: "认知循环已启动" });
 
     runDailyCognitiveCycle(userId).then(result => {
-      console.log(`[cognitive/cycle] Done: clusters=${result.clustering?.newClusters ?? 0} contradictions=${result.contradictions.length}`);
+      console.log(`[cognitive/cycle] Done:`, result);
     }).catch(e => {
       console.error("[cognitive/cycle] Failed:", e);
     });

@@ -89,12 +89,20 @@ const config: Config = {
         md: 'calc(var(--radius) - 2px)',
         sm: 'calc(var(--radius) - 4px)',
       },
+      boxShadow: {
+        // Editorial Serenity 环境阴影 (on-surface 6% opacity)
+        ambient: '0 8px 24px rgba(28, 28, 24, 0.06)',
+        // Now Card 突出阴影
+        'ambient-lg': '0 12px 32px rgba(28, 28, 24, 0.08)',
+      },
       fontFamily: {
-        body: ['var(--font-body)', 'var(--font-display)', 'system-ui', 'sans-serif'],
-        display: ['var(--font-display)', 'var(--font-body)', 'system-ui', 'sans-serif'],
-        mono: ['SF Mono', 'Fira Code', 'JetBrains Mono', 'monospace'],
-        serif: ['Noto Serif SC', 'serif'],
-        'serif-display': ['var(--font-serif-display)', 'Georgia', 'serif'],
+        // Editorial Serenity 字体映射
+        body: ['var(--font-body)', 'var(--font-cjk)', 'system-ui', 'sans-serif'],
+        serif: ['var(--font-serif)', 'Noto Serif SC', 'Georgia', 'serif'],
+        mono: ['var(--font-mono)', 'SF Mono', 'Fira Code', 'monospace'],
+        // 向后兼容别名
+        display: ['var(--font-serif)', 'var(--font-body)', 'system-ui', 'sans-serif'],
+        'serif-display': ['var(--font-serif)', 'Georgia', 'serif'],
       },
       keyframes: {
         'card-enter': {

@@ -1,7 +1,17 @@
 # 领域词库 — 冷启动领域选择 + 语音修正 RAG
 
-> 状态：🟡 待开发 | 优先级：Phase 7.3 | 预计：4-5 天
+> 状态：🔄 实现中 | 优先级：Phase 7.3
 > 依赖：cold-start-onboarding（5 问流程），voice-action（语音指令）
+> 进度 2026-03-28：
+>   ✅ 场景 1 冷启动领域选择（DomainSelector + onboarding 集成）
+>   ✅ 场景 2 预设词库结构（3 领域×25 词，hardcoded 在 routes/vocabulary.ts）
+>   ✅ 场景 3 ASR 修正引擎（vocabulary.ts: alias 精确匹配，5分钟缓存）
+>   ✅ 场景 6 手动管理词库（vocabulary-page.tsx: 搜索+分组+增删+导入）
+>   ✅ 后端 5 个 API（CRUD + import-domain + correct）
+>   ✅ 数据库迁移 031
+>   🟡 场景 4 用户确认/拒绝修正（日记卡片高亮，需前端 UI）
+>   🟡 场景 5 自动收录新术语（需 daily-loop 集成）
+>   🟡 场景 7 自定义领域 AI 生成（需 AI 调用集成）
 
 ## 概述
 

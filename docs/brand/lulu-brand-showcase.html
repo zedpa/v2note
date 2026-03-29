@@ -1,0 +1,2707 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>念念有路 · Brand Identity</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+SC:wght@300;400;500;700&family=Noto+Serif+SC:wght@400;500;600;700;900&display=swap" rel="stylesheet">
+  <style>
+    /* =========================================================
+       RESET & BASE
+       ========================================================= */
+    *, *::before, *::after {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+      font-size: 16px;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    body {
+      font-family: 'Inter', 'Noto Sans SC', sans-serif;
+      background-color: #FDF9F3;
+      color: #1C1C18;
+      line-height: 1.7;
+      overflow-x: hidden;
+    }
+
+    ::selection {
+      background: rgba(200, 132, 92, 0.2);
+      color: #1C1C18;
+    }
+
+    img {
+      max-width: 100%;
+      height: auto;
+      display: block;
+    }
+
+    /* =========================================================
+       CSS CUSTOM PROPERTIES (Design Tokens)
+       ========================================================= */
+    :root {
+      /* Surfaces */
+      --surface-high: #FFFFFF;
+      --surface: #FDF9F3;
+      --surface-low: #F5EFE5;
+      --surface-dark: #2C2A26;
+
+      /* Text */
+      --text-primary: #1C1C18;
+      --text-secondary: #6B6860;
+      --text-tertiary: #9C9788;
+
+      /* Brand */
+      --brand-primary: #C8845C;
+      --brand-primary-dark: #89502C;
+      --brand-antler: #A0693E;
+
+      /* Semantic */
+      --color-forest: #5C7A5E;
+      --color-sky: #7BA3C4;
+      --color-dawn: #E8A87C;
+      --color-maple: #C45C5C;
+
+      /* Deer palette */
+      --deer-outline: #5C3A1E;
+      --deer-dark: #89502C;
+      --deer-shadow: #A0693E;
+      --deer-body: #C8845C;
+      --deer-light: #D4A574;
+      --deer-cream: #E8C9A8;
+      --deer-spot: #F5E6D3;
+      --deer-eye: #3D2B1A;
+
+      /* Animation */
+      --anim-quick: 150ms;
+      --anim-normal: 200ms;
+      --anim-transition: 300ms;
+      --ease-out: cubic-bezier(0.25, 0.46, 0.45, 0.94);
+
+      /* Spacing */
+      --sp-1: 4px;
+      --sp-2: 8px;
+      --sp-3: 12px;
+      --sp-4: 16px;
+      --sp-5: 20px;
+      --sp-6: 24px;
+      --sp-8: 32px;
+      --sp-12: 48px;
+
+      /* Radius */
+      --radius-card: 12px;
+      --radius-sheet: 16px;
+      --radius-pill: 9999px;
+
+      /* Shadow */
+      --shadow-card: 0 8px 24px rgba(28, 28, 24, 0.06);
+      --shadow-hover: 0 12px 32px rgba(28, 28, 24, 0.10);
+      --shadow-nav: 0 4px 16px rgba(28, 28, 24, 0.04);
+    }
+
+    /* =========================================================
+       ANIMATIONS
+       ========================================================= */
+    @keyframes fadeInUp {
+      from {
+        opacity: 0;
+        transform: translateY(24px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-8px); }
+    }
+
+    @keyframes pulse-glow {
+      0%, 100% { filter: drop-shadow(0 0 4px rgba(200,132,92,0.2)); }
+      50% { filter: drop-shadow(0 0 12px rgba(200,132,92,0.4)); }
+    }
+
+    @keyframes bar-fill {
+      from { width: 0; }
+      to { width: var(--bar-width); }
+    }
+
+    .reveal {
+      opacity: 0;
+      transform: translateY(24px);
+      transition: opacity 0.6s var(--ease-out), transform 0.6s var(--ease-out);
+    }
+
+    .reveal.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .reveal-delay-1 { transition-delay: 0.1s; }
+    .reveal-delay-2 { transition-delay: 0.2s; }
+    .reveal-delay-3 { transition-delay: 0.3s; }
+    .reveal-delay-4 { transition-delay: 0.4s; }
+
+    /* =========================================================
+       NAVIGATION
+       ========================================================= */
+    .nav {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 100;
+      background: rgba(253, 249, 243, 0.85);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      box-shadow: var(--shadow-nav);
+      padding: 0 var(--sp-8);
+      height: 56px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .nav-brand {
+      font-family: 'Noto Serif SC', serif;
+      font-weight: 700;
+      font-size: 1.15rem;
+      color: var(--text-primary);
+      text-decoration: none;
+    }
+
+    .nav-links {
+      display: flex;
+      gap: var(--sp-5);
+      list-style: none;
+    }
+
+    .nav-links a {
+      font-size: 0.8rem;
+      font-weight: 500;
+      color: var(--text-secondary);
+      text-decoration: none;
+      letter-spacing: 0.02em;
+      transition: color var(--anim-normal) var(--ease-out);
+    }
+
+    .nav-links a:hover {
+      color: var(--brand-primary);
+    }
+
+    @media (max-width: 768px) {
+      .nav-links { display: none; }
+      .nav { padding: 0 var(--sp-4); }
+    }
+
+    /* =========================================================
+       LAYOUT
+       ========================================================= */
+    .section {
+      padding: 100px var(--sp-8);
+      max-width: 1080px;
+      margin: 0 auto;
+    }
+
+    .section-title {
+      font-family: 'Noto Serif SC', serif;
+      font-weight: 700;
+      font-size: 1.75rem;
+      color: var(--text-primary);
+      margin-bottom: var(--sp-2);
+    }
+
+    .section-subtitle {
+      font-size: 0.9rem;
+      color: var(--text-secondary);
+      margin-bottom: var(--sp-12);
+      letter-spacing: 0.03em;
+    }
+
+    .section-label {
+      font-size: 0.7rem;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--text-tertiary);
+      margin-bottom: var(--sp-3);
+    }
+
+    /* =========================================================
+       HERO SECTION
+       ========================================================= */
+    .hero {
+      padding-top: 140px;
+      padding-bottom: 100px;
+      text-align: center;
+      background: linear-gradient(180deg, #F5EAD8 0%, #FDF9F3 60%);
+    }
+
+    .hero-title {
+      font-family: 'Noto Serif SC', serif;
+      font-weight: 900;
+      font-size: 4rem;
+      color: var(--text-primary);
+      margin-bottom: var(--sp-3);
+      letter-spacing: 0.06em;
+    }
+
+    .hero-tagline {
+      font-size: 1rem;
+      font-weight: 400;
+      color: var(--text-secondary);
+      letter-spacing: 0.15em;
+      margin-bottom: var(--sp-12);
+    }
+
+    .hero-deer {
+      margin: var(--sp-12) auto;
+      animation: float 4s ease-in-out infinite, pulse-glow 3s ease-in-out infinite;
+    }
+
+    .hero-description {
+      max-width: 520px;
+      margin: 0 auto;
+      font-size: 1rem;
+      line-height: 1.8;
+      color: var(--text-secondary);
+    }
+
+    @media (max-width: 768px) {
+      .hero-title { font-size: 2.5rem; }
+      .hero { padding-top: 100px; padding-bottom: 60px; }
+    }
+
+    /* =========================================================
+       CARDS
+       ========================================================= */
+    .card {
+      background: var(--surface-high);
+      border-radius: var(--radius-card);
+      box-shadow: var(--shadow-card);
+      padding: var(--sp-6);
+      transition: transform var(--anim-transition) var(--ease-out),
+                  box-shadow var(--anim-transition) var(--ease-out);
+    }
+
+    .card:hover {
+      transform: translateY(-4px);
+      box-shadow: var(--shadow-hover);
+    }
+
+    /* =========================================================
+       LOGO SECTION
+       ========================================================= */
+    .logo-sizes {
+      display: flex;
+      align-items: flex-end;
+      gap: var(--sp-8);
+      flex-wrap: wrap;
+      margin-bottom: var(--sp-12);
+    }
+
+    .logo-size-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: var(--sp-2);
+    }
+
+    .logo-size-label {
+      font-size: 0.75rem;
+      color: var(--text-tertiary);
+      font-weight: 500;
+    }
+
+    .logo-lockup {
+      display: flex;
+      align-items: center;
+      gap: var(--sp-4);
+      margin-bottom: var(--sp-12);
+    }
+
+    .logo-lockup-text {
+      font-family: 'Noto Serif SC', serif;
+      font-weight: 700;
+      font-size: 1.75rem;
+      color: var(--text-primary);
+    }
+
+    .logo-bg-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: var(--sp-6);
+      margin-bottom: var(--sp-12);
+    }
+
+    .logo-bg-card {
+      padding: var(--sp-8) var(--sp-6);
+      border-radius: var(--radius-card);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: var(--sp-4);
+      min-height: 180px;
+    }
+
+    .logo-bg-label {
+      font-size: 0.75rem;
+      font-weight: 500;
+    }
+
+    .app-icon-mock {
+      width: 80px;
+      height: 80px;
+      border-radius: 18px;
+      background: linear-gradient(135deg, #D4A574, #C8845C, #A0693E);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: var(--shadow-card);
+    }
+
+    @media (max-width: 600px) {
+      .logo-bg-row { grid-template-columns: 1fr; }
+      .logo-sizes { justify-content: center; }
+    }
+
+    /* =========================================================
+       CHARACTER STATES
+       ========================================================= */
+    .states-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: var(--sp-6);
+    }
+
+    .state-card {
+      background: var(--surface-high);
+      border-radius: var(--radius-card);
+      box-shadow: var(--shadow-card);
+      padding: var(--sp-6) var(--sp-4);
+      text-align: center;
+      transition: transform var(--anim-transition) var(--ease-out),
+                  box-shadow var(--anim-transition) var(--ease-out);
+      cursor: default;
+    }
+
+    .state-card:hover {
+      transform: translateY(-4px) scale(1.02);
+      box-shadow: var(--shadow-hover);
+    }
+
+    .state-deer {
+      margin: 0 auto var(--sp-3);
+    }
+
+    .state-name {
+      font-family: 'Noto Serif SC', serif;
+      font-weight: 600;
+      font-size: 1rem;
+      color: var(--text-primary);
+      margin-bottom: 2px;
+    }
+
+    .state-name-en {
+      font-size: 0.7rem;
+      color: var(--text-tertiary);
+      letter-spacing: 0.04em;
+      margin-bottom: var(--sp-2);
+    }
+
+    .state-trigger {
+      font-size: 0.72rem;
+      color: var(--text-secondary);
+      line-height: 1.5;
+    }
+
+    @media (max-width: 900px) {
+      .states-grid { grid-template-columns: repeat(3, 1fr); }
+    }
+    @media (max-width: 560px) {
+      .states-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+
+    /* =========================================================
+       COLOR SYSTEM
+       ========================================================= */
+    .color-group {
+      margin-bottom: var(--sp-12);
+    }
+
+    .color-group-title {
+      font-family: 'Noto Serif SC', serif;
+      font-weight: 600;
+      font-size: 1.1rem;
+      color: var(--text-primary);
+      margin-bottom: var(--sp-4);
+    }
+
+    .color-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: var(--sp-4);
+    }
+
+    .color-chip {
+      background: var(--surface-high);
+      border-radius: var(--radius-card);
+      box-shadow: var(--shadow-card);
+      overflow: hidden;
+    }
+
+    .color-swatch {
+      height: 72px;
+      width: 100%;
+    }
+
+    .color-info {
+      padding: var(--sp-3) var(--sp-4);
+    }
+
+    .color-name {
+      font-weight: 600;
+      font-size: 0.82rem;
+      color: var(--text-primary);
+    }
+
+    .color-hex {
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 0.72rem;
+      color: var(--text-tertiary);
+    }
+
+    .color-token {
+      font-size: 0.68rem;
+      color: var(--text-tertiary);
+      margin-top: 2px;
+    }
+
+    .color-usage {
+      font-size: 0.68rem;
+      color: var(--text-secondary);
+      margin-top: 2px;
+    }
+
+    /* Dark mode comparison */
+    .dark-compare {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--sp-6);
+      margin-top: var(--sp-8);
+    }
+
+    .dark-compare-panel {
+      border-radius: var(--radius-card);
+      padding: var(--sp-6);
+    }
+
+    .dark-compare-panel.light {
+      background: var(--surface-high);
+      box-shadow: var(--shadow-card);
+    }
+
+    .dark-compare-panel.dark {
+      background: #2C2A26;
+      color: #E8E4DC;
+      box-shadow: var(--shadow-card);
+    }
+
+    .dark-compare-title {
+      font-weight: 600;
+      font-size: 0.85rem;
+      margin-bottom: var(--sp-3);
+    }
+
+    .dark-compare-panel.dark .dark-compare-title {
+      color: #E8E4DC;
+    }
+
+    .dark-sample-row {
+      display: flex;
+      align-items: center;
+      gap: var(--sp-3);
+      margin-bottom: var(--sp-2);
+    }
+
+    .dark-sample-dot {
+      width: 24px;
+      height: 24px;
+      border-radius: 6px;
+      flex-shrink: 0;
+    }
+
+    .dark-sample-label {
+      font-size: 0.72rem;
+    }
+
+    @media (max-width: 600px) {
+      .dark-compare { grid-template-columns: 1fr; }
+    }
+
+    /* =========================================================
+       TYPOGRAPHY
+       ========================================================= */
+    .type-scale {
+      display: flex;
+      flex-direction: column;
+      gap: var(--sp-6);
+      margin-bottom: var(--sp-12);
+    }
+
+    .type-row {
+      display: flex;
+      align-items: baseline;
+      gap: var(--sp-6);
+      padding: var(--sp-4) 0;
+    }
+
+    .type-meta {
+      min-width: 120px;
+      flex-shrink: 0;
+    }
+
+    .type-label {
+      font-weight: 600;
+      font-size: 0.72rem;
+      color: var(--text-tertiary);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .type-spec {
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 0.68rem;
+      color: var(--text-tertiary);
+      margin-top: 2px;
+    }
+
+    .type-sample {
+      color: var(--text-primary);
+      line-height: 1.3;
+    }
+
+    .type-display {
+      font-family: 'Noto Serif SC', serif;
+      font-weight: 900;
+      font-size: 3.5rem;
+    }
+
+    .type-h1 {
+      font-family: 'Noto Serif SC', serif;
+      font-weight: 700;
+      font-size: 2.5rem;
+    }
+
+    .type-h2 {
+      font-family: 'Noto Serif SC', serif;
+      font-weight: 600;
+      font-size: 1.75rem;
+    }
+
+    .type-body {
+      font-family: 'Inter', 'Noto Sans SC', sans-serif;
+      font-size: 15px;
+      line-height: 1.6;
+    }
+
+    .type-sub {
+      font-family: 'Inter', 'Noto Sans SC', sans-serif;
+      font-size: 13px;
+      color: var(--text-secondary);
+    }
+
+    .type-caption {
+      font-family: 'Inter', 'Noto Sans SC', sans-serif;
+      font-size: 12px;
+      color: var(--text-tertiary);
+    }
+
+    .type-mono {
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 12px;
+      color: var(--color-forest);
+    }
+
+    .type-pairing {
+      background: var(--surface-high);
+      border-radius: var(--radius-card);
+      box-shadow: var(--shadow-card);
+      padding: var(--sp-8);
+    }
+
+    .type-pairing h3 {
+      font-family: 'Noto Serif SC', serif;
+      font-weight: 600;
+      font-size: 1.25rem;
+      margin-bottom: var(--sp-3);
+    }
+
+    .type-pairing p {
+      font-size: 0.95rem;
+      line-height: 1.8;
+      color: var(--text-secondary);
+    }
+
+    @media (max-width: 768px) {
+      .type-row { flex-direction: column; gap: var(--sp-2); }
+      .type-display { font-size: 2.2rem; }
+      .type-h1 { font-size: 1.8rem; }
+    }
+
+    /* =========================================================
+       DESIGN TOKENS
+       ========================================================= */
+    .token-group {
+      margin-bottom: var(--sp-12);
+    }
+
+    .token-group-title {
+      font-family: 'Noto Serif SC', serif;
+      font-weight: 600;
+      font-size: 1.1rem;
+      color: var(--text-primary);
+      margin-bottom: var(--sp-4);
+    }
+
+    .anim-bars {
+      display: flex;
+      flex-direction: column;
+      gap: var(--sp-3);
+    }
+
+    .anim-bar-row {
+      display: flex;
+      align-items: center;
+      gap: var(--sp-4);
+    }
+
+    .anim-bar-label {
+      min-width: 100px;
+      font-size: 0.78rem;
+      font-weight: 500;
+      color: var(--text-secondary);
+    }
+
+    .anim-bar-track {
+      flex: 1;
+      height: 8px;
+      background: var(--surface-low);
+      border-radius: var(--radius-pill);
+      overflow: hidden;
+    }
+
+    .anim-bar-fill {
+      height: 100%;
+      background: var(--brand-primary);
+      border-radius: var(--radius-pill);
+      animation: bar-fill 1.5s var(--ease-out) forwards;
+    }
+
+    .anim-bar-value {
+      min-width: 50px;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 0.72rem;
+      color: var(--text-tertiary);
+    }
+
+    .spacing-row {
+      display: flex;
+      align-items: flex-end;
+      gap: var(--sp-3);
+      flex-wrap: wrap;
+    }
+
+    .spacing-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: var(--sp-1);
+    }
+
+    .spacing-block {
+      background: var(--brand-primary);
+      border-radius: 4px;
+      opacity: 0.7;
+    }
+
+    .spacing-label {
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 0.65rem;
+      color: var(--text-tertiary);
+    }
+
+    .radius-row {
+      display: flex;
+      gap: var(--sp-6);
+      flex-wrap: wrap;
+    }
+
+    .radius-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: var(--sp-2);
+    }
+
+    .radius-box {
+      width: 64px;
+      height: 64px;
+      background: var(--surface-high);
+      box-shadow: var(--shadow-card);
+    }
+
+    .radius-label {
+      font-size: 0.72rem;
+      color: var(--text-secondary);
+      font-weight: 500;
+    }
+
+    .radius-value {
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 0.65rem;
+      color: var(--text-tertiary);
+    }
+
+    .shadow-demo {
+      display: flex;
+      gap: var(--sp-8);
+      flex-wrap: wrap;
+    }
+
+    .shadow-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: var(--sp-3);
+    }
+
+    .shadow-box {
+      width: 120px;
+      height: 80px;
+      background: var(--surface-high);
+      border-radius: var(--radius-card);
+    }
+
+    .shadow-label {
+      font-size: 0.72rem;
+      color: var(--text-secondary);
+    }
+
+    /* =========================================================
+       APPLICATIONS
+       ========================================================= */
+    .app-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: var(--sp-6);
+      margin-bottom: var(--sp-8);
+    }
+
+    .app-card {
+      background: var(--surface-high);
+      border-radius: var(--radius-card);
+      box-shadow: var(--shadow-card);
+      overflow: hidden;
+    }
+
+    .app-card-body {
+      padding: var(--sp-6);
+    }
+
+    .app-card-title {
+      font-weight: 600;
+      font-size: 0.9rem;
+      color: var(--text-primary);
+      margin-bottom: var(--sp-2);
+    }
+
+    .app-card-desc {
+      font-size: 0.78rem;
+      color: var(--text-tertiary);
+    }
+
+    .app-mock {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 200px;
+      padding: var(--sp-6);
+    }
+
+    .phone-frame {
+      width: 180px;
+      height: 340px;
+      background: #1C1C18;
+      border-radius: 24px;
+      padding: 12px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+    }
+
+    .phone-screen {
+      width: 100%;
+      height: 100%;
+      border-radius: 14px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .phone-screen.splash {
+      background: linear-gradient(180deg, #F5EAD8, #FDF9F3);
+    }
+
+    .phone-screen.splash .splash-title {
+      font-family: 'Noto Serif SC', serif;
+      font-weight: 700;
+      font-size: 0.85rem;
+      color: var(--text-primary);
+      margin-top: var(--sp-3);
+    }
+
+    .notification-mock {
+      background: var(--surface-high);
+      border-radius: var(--radius-card);
+      box-shadow: var(--shadow-card);
+      padding: var(--sp-4);
+      max-width: 280px;
+      width: 100%;
+    }
+
+    .notif-header {
+      display: flex;
+      align-items: center;
+      gap: var(--sp-2);
+      margin-bottom: var(--sp-2);
+    }
+
+    .notif-icon {
+      width: 20px;
+      height: 20px;
+      border-radius: 5px;
+      background: linear-gradient(135deg, #D4A574, #C8845C);
+    }
+
+    .notif-app {
+      font-size: 0.68rem;
+      font-weight: 600;
+      color: var(--text-tertiary);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .notif-time {
+      font-size: 0.62rem;
+      color: var(--text-tertiary);
+      margin-left: auto;
+    }
+
+    .notif-title {
+      font-weight: 600;
+      font-size: 0.82rem;
+      color: var(--text-primary);
+      margin-bottom: 2px;
+    }
+
+    .notif-body {
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+      line-height: 1.5;
+    }
+
+    .biz-card {
+      width: 300px;
+      height: 180px;
+      background: var(--surface-high);
+      border-radius: var(--radius-card);
+      box-shadow: var(--shadow-card);
+      padding: var(--sp-6);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .biz-card-top {
+      display: flex;
+      align-items: center;
+      gap: var(--sp-3);
+    }
+
+    .biz-card-name {
+      font-family: 'Noto Serif SC', serif;
+      font-weight: 600;
+      font-size: 1.1rem;
+      color: var(--text-primary);
+    }
+
+    .biz-card-bottom {
+      font-size: 0.7rem;
+      color: var(--text-tertiary);
+      line-height: 1.6;
+    }
+
+    .ref-images {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+      gap: var(--sp-6);
+      margin-top: var(--sp-8);
+    }
+
+    .ref-img-card {
+      background: var(--surface-high);
+      border-radius: var(--radius-card);
+      box-shadow: var(--shadow-card);
+      overflow: hidden;
+    }
+
+    .ref-img-card img {
+      width: 100%;
+      height: 200px;
+      object-fit: contain;
+      background: var(--surface-low);
+      padding: var(--sp-4);
+    }
+
+    .ref-img-label {
+      padding: var(--sp-3) var(--sp-4);
+      font-size: 0.78rem;
+      color: var(--text-secondary);
+    }
+
+    @media (max-width: 600px) {
+      .app-grid { grid-template-columns: 1fr; }
+    }
+
+    /* =========================================================
+       DESIGN RULES
+       ========================================================= */
+    .rules-list {
+      display: flex;
+      flex-direction: column;
+      gap: var(--sp-8);
+    }
+
+    .rule-card {
+      background: var(--surface-high);
+      border-radius: var(--radius-card);
+      box-shadow: var(--shadow-card);
+      padding: var(--sp-8);
+    }
+
+    .rule-header {
+      display: flex;
+      align-items: center;
+      gap: var(--sp-3);
+      margin-bottom: var(--sp-4);
+    }
+
+    .rule-number {
+      width: 28px;
+      height: 28px;
+      background: var(--brand-primary);
+      color: white;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.78rem;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+
+    .rule-title {
+      font-family: 'Noto Serif SC', serif;
+      font-weight: 600;
+      font-size: 1.05rem;
+      color: var(--text-primary);
+    }
+
+    .rule-desc {
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+      margin-bottom: var(--sp-6);
+      line-height: 1.6;
+    }
+
+    .rule-demo {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--sp-4);
+    }
+
+    .rule-demo-box {
+      border-radius: var(--radius-card);
+      padding: var(--sp-4);
+      min-height: 80px;
+    }
+
+    .rule-demo-label {
+      font-size: 0.68rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      margin-bottom: var(--sp-2);
+    }
+
+    .rule-demo-bad .rule-demo-label { color: var(--color-maple); }
+    .rule-demo-good .rule-demo-label { color: var(--color-forest); }
+
+    .rule-demo-bad {
+      background: #FEF2F0;
+    }
+
+    .rule-demo-good {
+      background: #F0F7F1;
+    }
+
+    .demo-bordered-card {
+      background: white;
+      padding: var(--sp-3);
+      border-radius: 8px;
+      font-size: 0.78rem;
+      color: var(--text-secondary);
+    }
+
+    .demo-bordered-card.with-border {
+      border: 1px solid #E0DCD4;
+    }
+
+    .demo-bordered-card.with-shadow {
+      box-shadow: 0 4px 12px rgba(28,28,24,0.06);
+    }
+
+    .demo-ghost-box {
+      background: white;
+      padding: var(--sp-3);
+      border-radius: 8px;
+      font-size: 0.78rem;
+      color: var(--text-secondary);
+    }
+
+    .demo-ghost-box.solid-border {
+      border: 1px solid #CCC;
+    }
+
+    .demo-ghost-box.ghost-border {
+      border: 1px solid rgba(28,28,24,0.08);
+    }
+
+    .demo-spacing-tight {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .demo-spacing-breath {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .demo-spacing-bar {
+      height: 8px;
+      background: var(--brand-primary);
+      opacity: 0.4;
+      border-radius: 4px;
+    }
+
+    .demo-margins-sym, .demo-margins-asym {
+      background: white;
+      padding: var(--sp-3);
+      border-radius: 8px;
+      font-size: 0.72rem;
+      color: var(--text-secondary);
+    }
+
+    .demo-margins-sym {
+      margin: 0 16px;
+    }
+
+    .demo-margins-asym {
+      margin-left: 16px;
+      margin-right: 32px;
+    }
+
+    .demo-glass {
+      padding: var(--sp-3);
+      border-radius: 8px;
+      font-size: 0.78rem;
+    }
+
+    .demo-glass.no-glass {
+      background: white;
+      color: var(--text-secondary);
+    }
+
+    .demo-glass.with-glass {
+      background: rgba(255,255,255,0.7);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      color: var(--text-secondary);
+    }
+
+    @media (max-width: 600px) {
+      .rule-demo { grid-template-columns: 1fr; }
+    }
+
+    /* =========================================================
+       FOOTER
+       ========================================================= */
+    .footer {
+      text-align: center;
+      padding: var(--sp-12) var(--sp-8) var(--sp-8);
+      color: var(--text-tertiary);
+    }
+
+    .footer-brand {
+      font-family: 'Noto Serif SC', serif;
+      font-weight: 600;
+      font-size: 1rem;
+      color: var(--text-secondary);
+      margin-bottom: var(--sp-2);
+    }
+
+    .footer-sub {
+      font-size: 0.78rem;
+      letter-spacing: 0.06em;
+      margin-bottom: var(--sp-1);
+    }
+
+    .footer-date {
+      font-size: 0.68rem;
+    }
+
+    /* =========================================================
+       UTILITY
+       ========================================================= */
+    .mt-8 { margin-top: var(--sp-8); }
+    .mt-12 { margin-top: var(--sp-12); }
+    .mb-4 { margin-bottom: var(--sp-4); }
+    .mb-6 { margin-bottom: var(--sp-6); }
+    .mb-8 { margin-bottom: var(--sp-8); }
+    .text-center { text-align: center; }
+    .flex-center { display: flex; align-items: center; justify-content: center; }
+  </style>
+</head>
+<body>
+
+<!-- ============================================================
+     NAVIGATION
+     ============================================================ -->
+<nav class="nav">
+  <a href="#hero" class="nav-brand">念念有路</a>
+  <ul class="nav-links">
+    <li><a href="#logo">Logo</a></li>
+    <li><a href="#states">路路</a></li>
+    <li><a href="#colors">Colors</a></li>
+    <li><a href="#typography">Typography</a></li>
+    <li><a href="#tokens">Tokens</a></li>
+    <li><a href="#applications">Applications</a></li>
+    <li><a href="#rules">Rules</a></li>
+  </ul>
+</nav>
+
+<!-- ============================================================
+     HERO
+     ============================================================ -->
+<section id="hero" class="hero section">
+  <div class="section-label reveal">BRAND IDENTITY</div>
+  <h1 class="hero-title reveal reveal-delay-1">念念有路</h1>
+  <p class="hero-tagline reveal reveal-delay-2">Brand Identity &middot; Editorial Serenity</p>
+  <div class="hero-deer reveal reveal-delay-3" id="hero-deer-container"></div>
+  <p class="hero-description reveal reveal-delay-4">
+    念念有路是一个 AI 驱动的个人认知操作系统。<br>
+    将散乱的思绪、灵感与行动自然编织，<br>
+    让想法在温暖陪伴中找到自己的路。
+  </p>
+</section>
+
+<!-- ============================================================
+     LOGO SYSTEM
+     ============================================================ -->
+<section id="logo" class="section">
+  <div class="section-label reveal">SECTION 2</div>
+  <h2 class="section-title reveal">Logo System</h2>
+  <p class="section-subtitle reveal">标识规范 &middot; 尺寸与场景</p>
+
+  <div class="reveal">
+    <h3 class="color-group-title mb-4">Size Scale</h3>
+    <div class="logo-sizes" id="logo-sizes-container"></div>
+  </div>
+
+  <div class="reveal mt-8">
+    <h3 class="color-group-title mb-4">Text Lockup</h3>
+    <div class="logo-lockup" id="logo-lockup-container">
+      <span class="logo-lockup-text">念念有路</span>
+    </div>
+  </div>
+
+  <div class="reveal mt-8">
+    <h3 class="color-group-title mb-4">App Icon</h3>
+    <div style="display:flex;align-items:center;gap:24px;flex-wrap:wrap;">
+      <div class="app-icon-mock" id="app-icon-container"></div>
+      <div>
+        <div style="font-size:0.85rem;font-weight:600;color:var(--text-primary);">App Icon</div>
+        <div style="font-size:0.75rem;color:var(--text-tertiary);">80 &times; 80dp, rounded-square, gradient background</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="reveal mt-8">
+    <h3 class="color-group-title mb-4">Background Contexts</h3>
+    <div class="logo-bg-row" id="logo-bg-container"></div>
+  </div>
+
+  <div class="reveal mt-8">
+    <h3 class="color-group-title mb-4">Clear Space &amp; Minimum Size</h3>
+    <div style="display:flex;align-items:center;gap:32px;flex-wrap:wrap;">
+      <div id="clearspace-demo" style="position:relative;display:inline-block;"></div>
+      <div>
+        <p style="font-size:0.85rem;color:var(--text-secondary);line-height:1.6;">
+          Clear space = 1&times; deer width on all sides<br>
+          Minimum size: <strong>16px</strong> height
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     CHARACTER STATES
+     ============================================================ -->
+<section id="states" class="section" style="background:var(--surface-low);border-radius:0;max-width:100%;padding-left:calc((100% - 1080px)/2 + 32px);padding-right:calc((100% - 1080px)/2 + 32px);">
+  <div style="max-width:1080px;margin:0 auto;">
+    <div class="section-label reveal">SECTION 3</div>
+    <h2 class="section-title reveal">路路系列形象</h2>
+    <p class="section-subtitle reveal">Character States &middot; 10 种情绪与动作</p>
+    <div class="states-grid" id="states-grid-container"></div>
+  </div>
+</section>
+
+<!-- ============================================================
+     COLOR SYSTEM
+     ============================================================ -->
+<section id="colors" class="section">
+  <div class="section-label reveal">SECTION 4</div>
+  <h2 class="section-title reveal">Color System</h2>
+  <p class="section-subtitle reveal">色彩体系 &middot; 温暖编辑风</p>
+
+  <div class="color-group reveal">
+    <h3 class="color-group-title">Surface Palette</h3>
+    <div class="color-row">
+      <div class="color-chip"><div class="color-swatch" style="background:#FFFFFF;"></div><div class="color-info"><div class="color-name">Surface High</div><div class="color-hex">#FFFFFF</div><div class="color-token">--surface-high</div><div class="color-usage">Cards, inputs, elevated elements</div></div></div>
+      <div class="color-chip"><div class="color-swatch" style="background:#FDF9F3;"></div><div class="color-info"><div class="color-name">Surface</div><div class="color-hex">#FDF9F3</div><div class="color-token">--surface</div><div class="color-usage">Page background</div></div></div>
+      <div class="color-chip"><div class="color-swatch" style="background:#F5EFE5;"></div><div class="color-info"><div class="color-name">Surface Low</div><div class="color-hex">#F5EFE5</div><div class="color-token">--surface-low</div><div class="color-usage">Section backgrounds, dividers</div></div></div>
+      <div class="color-chip"><div class="color-swatch" style="background:#2C2A26;"></div><div class="color-info"><div class="color-name">Surface Dark</div><div class="color-hex">#2C2A26</div><div class="color-token">--surface-dark</div><div class="color-usage">Dark mode background</div></div></div>
+    </div>
+  </div>
+
+  <div class="color-group reveal">
+    <h3 class="color-group-title">Text Palette</h3>
+    <div class="color-row">
+      <div class="color-chip"><div class="color-swatch" style="background:#1C1C18;"></div><div class="color-info"><div class="color-name">Primary Text</div><div class="color-hex">#1C1C18</div><div class="color-token">--text-primary</div><div class="color-usage">Headings, important text</div></div></div>
+      <div class="color-chip"><div class="color-swatch" style="background:#6B6860;"></div><div class="color-info"><div class="color-name">Secondary Text</div><div class="color-hex">#6B6860</div><div class="color-token">--text-secondary</div><div class="color-usage">Body text, descriptions</div></div></div>
+      <div class="color-chip"><div class="color-swatch" style="background:#9C9788;"></div><div class="color-info"><div class="color-name">Tertiary Text</div><div class="color-hex">#9C9788</div><div class="color-token">--text-tertiary</div><div class="color-usage">Captions, timestamps, hints</div></div></div>
+    </div>
+  </div>
+
+  <div class="color-group reveal">
+    <h3 class="color-group-title">Brand Colors</h3>
+    <div class="color-row">
+      <div class="color-chip"><div class="color-swatch" style="background:#C8845C;"></div><div class="color-info"><div class="color-name">Primary</div><div class="color-hex">#C8845C</div><div class="color-token">--brand-primary</div><div class="color-usage">Buttons, links, accents</div></div></div>
+      <div class="color-chip"><div class="color-swatch" style="background:#89502C;"></div><div class="color-info"><div class="color-name">Primary Dark</div><div class="color-hex">#89502C</div><div class="color-token">--brand-primary-dark</div><div class="color-usage">Pressed states, dark accents</div></div></div>
+      <div class="color-chip"><div class="color-swatch" style="background:#A0693E;"></div><div class="color-info"><div class="color-name">Antler</div><div class="color-hex">#A0693E</div><div class="color-token">--brand-antler</div><div class="color-usage">Secondary brand accent</div></div></div>
+    </div>
+  </div>
+
+  <div class="color-group reveal">
+    <h3 class="color-group-title">Semantic Colors</h3>
+    <div class="color-row">
+      <div class="color-chip"><div class="color-swatch" style="background:#5C7A5E;"></div><div class="color-info"><div class="color-name">Forest</div><div class="color-hex">#5C7A5E</div><div class="color-token">--color-forest</div><div class="color-usage">Success, completed, nature</div></div></div>
+      <div class="color-chip"><div class="color-swatch" style="background:#7BA3C4;"></div><div class="color-info"><div class="color-name">Sky</div><div class="color-hex">#7BA3C4</div><div class="color-token">--color-sky</div><div class="color-usage">Info, links, calm states</div></div></div>
+      <div class="color-chip"><div class="color-swatch" style="background:#E8A87C;"></div><div class="color-info"><div class="color-name">Dawn</div><div class="color-hex">#E8A87C</div><div class="color-token">--color-dawn</div><div class="color-usage">Warnings, morning context</div></div></div>
+      <div class="color-chip"><div class="color-swatch" style="background:#C45C5C;"></div><div class="color-info"><div class="color-name">Maple Red</div><div class="color-hex">#C45C5C</div><div class="color-token">--color-maple</div><div class="color-usage">Error, destructive, urgent</div></div></div>
+    </div>
+  </div>
+
+  <div class="reveal">
+    <h3 class="color-group-title">Auto-Dim Dark Mode Comparison</h3>
+    <div class="dark-compare">
+      <div class="dark-compare-panel light">
+        <div class="dark-compare-title">Light Mode</div>
+        <div class="dark-sample-row"><div class="dark-sample-dot" style="background:#FDF9F3;box-shadow:inset 0 0 0 1px rgba(0,0,0,0.06);"></div><div class="dark-sample-label" style="color:var(--text-secondary);">Surface #FDF9F3</div></div>
+        <div class="dark-sample-row"><div class="dark-sample-dot" style="background:#C8845C;"></div><div class="dark-sample-label" style="color:var(--text-secondary);">Primary #C8845C</div></div>
+        <div class="dark-sample-row"><div class="dark-sample-dot" style="background:#1C1C18;"></div><div class="dark-sample-label" style="color:var(--text-secondary);">Text #1C1C18</div></div>
+        <div class="dark-sample-row"><div class="dark-sample-dot" style="background:#5C7A5E;"></div><div class="dark-sample-label" style="color:var(--text-secondary);">Forest #5C7A5E</div></div>
+      </div>
+      <div class="dark-compare-panel dark">
+        <div class="dark-compare-title">Dark Mode (Auto-Dim)</div>
+        <div class="dark-sample-row"><div class="dark-sample-dot" style="background:#2C2A26;"></div><div class="dark-sample-label">Surface #2C2A26</div></div>
+        <div class="dark-sample-row"><div class="dark-sample-dot" style="background:#D4A574;"></div><div class="dark-sample-label">Primary #D4A574</div></div>
+        <div class="dark-sample-row"><div class="dark-sample-dot" style="background:#E8E4DC;"></div><div class="dark-sample-label">Text #E8E4DC</div></div>
+        <div class="dark-sample-row"><div class="dark-sample-dot" style="background:#7A9E7C;"></div><div class="dark-sample-label">Forest #7A9E7C</div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     TYPOGRAPHY
+     ============================================================ -->
+<section id="typography" class="section">
+  <div class="section-label reveal">SECTION 5</div>
+  <h2 class="section-title reveal">Typography</h2>
+  <p class="section-subtitle reveal">字体排版 &middot; 中英混排</p>
+
+  <div class="type-scale reveal">
+    <div class="type-row">
+      <div class="type-meta"><div class="type-label">Display</div><div class="type-spec">Noto Serif SC 900<br>3.5rem / 56px</div></div>
+      <div class="type-sample type-display">念念有路 V2Note</div>
+    </div>
+    <div class="type-row">
+      <div class="type-meta"><div class="type-label">H1</div><div class="type-spec">Noto Serif SC 700<br>2.5rem / 40px</div></div>
+      <div class="type-sample type-h1">每一个念头都有归处</div>
+    </div>
+    <div class="type-row">
+      <div class="type-meta"><div class="type-label">H2</div><div class="type-spec">Noto Serif SC 600<br>1.75rem / 28px</div></div>
+      <div class="type-sample type-h2">认知触动 &middot; Strike</div>
+    </div>
+    <div class="type-row">
+      <div class="type-meta"><div class="type-label">Body</div><div class="type-spec">Inter / Noto Sans SC<br>15px / lh 1.6</div></div>
+      <div class="type-sample type-body">将散乱的思绪、灵感与行动自然编织。Weaving scattered thoughts, inspirations and actions naturally together.</div>
+    </div>
+    <div class="type-row">
+      <div class="type-meta"><div class="type-label">Sub</div><div class="type-spec">13px</div></div>
+      <div class="type-sample type-sub">次要信息和补充说明 Secondary descriptions and supplementary text</div>
+    </div>
+    <div class="type-row">
+      <div class="type-meta"><div class="type-label">Caption</div><div class="type-spec">12px</div></div>
+      <div class="type-sample type-caption">时间戳 · 标签 · 辅助文字 Timestamps · Tags · Helper text</div>
+    </div>
+    <div class="type-row">
+      <div class="type-meta"><div class="type-label">Mono</div><div class="type-spec">SF Mono / Fira Code<br>12px</div></div>
+      <div class="type-sample type-mono">const strike = await cognitive.process(input)</div>
+    </div>
+  </div>
+
+  <div class="reveal">
+    <h3 class="color-group-title mb-4">Font Pairing</h3>
+    <div class="type-pairing">
+      <h3>想法从混沌中生长 Ideas Emerge from Chaos</h3>
+      <p>
+        念念有路相信，最好的想法不是被整理出来的，而是自然涌现的。
+        通过 AI 的温暖陪伴，你的每一个念头都会找到属于自己的道路。
+        We believe the best ideas are not organized — they emerge naturally.
+        With AI's gentle companionship, every thought finds its own path.
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     DESIGN TOKENS
+     ============================================================ -->
+<section id="tokens" class="section" style="background:var(--surface-low);border-radius:0;max-width:100%;padding-left:calc((100% - 1080px)/2 + 32px);padding-right:calc((100% - 1080px)/2 + 32px);">
+  <div style="max-width:1080px;margin:0 auto;">
+    <div class="section-label reveal">SECTION 6</div>
+    <h2 class="section-title reveal">Design Tokens</h2>
+    <p class="section-subtitle reveal">设计令牌 &middot; 动效 · 间距 · 圆角 · 阴影</p>
+
+    <div class="token-group reveal">
+      <h3 class="token-group-title">Animation Durations</h3>
+      <div class="anim-bars">
+        <div class="anim-bar-row">
+          <div class="anim-bar-label">Quick</div>
+          <div class="anim-bar-track"><div class="anim-bar-fill" style="--bar-width:25%;"></div></div>
+          <div class="anim-bar-value">150ms</div>
+        </div>
+        <div class="anim-bar-row">
+          <div class="anim-bar-label">Normal</div>
+          <div class="anim-bar-track"><div class="anim-bar-fill" style="--bar-width:40%;"></div></div>
+          <div class="anim-bar-value">200ms</div>
+        </div>
+        <div class="anim-bar-row">
+          <div class="anim-bar-label">Transition</div>
+          <div class="anim-bar-track"><div class="anim-bar-fill" style="--bar-width:60%;"></div></div>
+          <div class="anim-bar-value">300ms</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="token-group reveal">
+      <h3 class="token-group-title">Spacing Scale</h3>
+      <div class="spacing-row">
+        <div class="spacing-item"><div class="spacing-block" style="width:4px;height:32px;"></div><div class="spacing-label">4</div></div>
+        <div class="spacing-item"><div class="spacing-block" style="width:8px;height:32px;"></div><div class="spacing-label">8</div></div>
+        <div class="spacing-item"><div class="spacing-block" style="width:12px;height:32px;"></div><div class="spacing-label">12</div></div>
+        <div class="spacing-item"><div class="spacing-block" style="width:16px;height:32px;"></div><div class="spacing-label">16</div></div>
+        <div class="spacing-item"><div class="spacing-block" style="width:20px;height:32px;"></div><div class="spacing-label">20</div></div>
+        <div class="spacing-item"><div class="spacing-block" style="width:24px;height:32px;"></div><div class="spacing-label">24</div></div>
+        <div class="spacing-item"><div class="spacing-block" style="width:32px;height:32px;"></div><div class="spacing-label">32</div></div>
+        <div class="spacing-item"><div class="spacing-block" style="width:48px;height:32px;"></div><div class="spacing-label">48</div></div>
+      </div>
+    </div>
+
+    <div class="token-group reveal">
+      <h3 class="token-group-title">Border Radius</h3>
+      <div class="radius-row">
+        <div class="radius-item"><div class="radius-box" style="border-radius:12px;"></div><div class="radius-label">Card</div><div class="radius-value">12px</div></div>
+        <div class="radius-item"><div class="radius-box" style="border-radius:16px;"></div><div class="radius-label">Sheet</div><div class="radius-value">16px</div></div>
+        <div class="radius-item"><div class="radius-box" style="border-radius:9999px;"></div><div class="radius-label">Pill</div><div class="radius-value">9999px</div></div>
+      </div>
+    </div>
+
+    <div class="token-group reveal">
+      <h3 class="token-group-title">Shadows</h3>
+      <div class="shadow-demo">
+        <div class="shadow-item">
+          <div class="shadow-box" style="box-shadow:0 4px 16px rgba(28,28,24,0.04);"></div>
+          <div class="shadow-label">Navigation</div>
+        </div>
+        <div class="shadow-item">
+          <div class="shadow-box" style="box-shadow:0 8px 24px rgba(28,28,24,0.06);"></div>
+          <div class="shadow-label">Card (default)</div>
+        </div>
+        <div class="shadow-item">
+          <div class="shadow-box" style="box-shadow:0 12px 32px rgba(28,28,24,0.10);"></div>
+          <div class="shadow-label">Hover / Elevated</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     APPLICATIONS
+     ============================================================ -->
+<section id="applications" class="section">
+  <div class="section-label reveal">SECTION 7</div>
+  <h2 class="section-title reveal">Brand Applications</h2>
+  <p class="section-subtitle reveal">品牌应用 &middot; 图标 · 启动屏 · 通知 · 名片</p>
+
+  <div class="app-grid">
+    <div class="app-card reveal">
+      <div class="app-mock" style="background:var(--surface-low);">
+        <div class="app-icon-mock" id="app-icon-large" style="width:120px;height:120px;border-radius:26px;"></div>
+      </div>
+      <div class="app-card-body">
+        <div class="app-card-title">App Icon</div>
+        <div class="app-card-desc">Gradient background with deer face, rounded-square mask</div>
+      </div>
+    </div>
+
+    <div class="app-card reveal">
+      <div class="app-mock" style="background:var(--surface-low);">
+        <div class="phone-frame">
+          <div class="phone-screen splash" id="splash-screen">
+            <div class="splash-title">念念有路</div>
+          </div>
+        </div>
+      </div>
+      <div class="app-card-body">
+        <div class="app-card-title">Splash Screen</div>
+        <div class="app-card-desc">Centered deer + brand name on warm gradient</div>
+      </div>
+    </div>
+
+    <div class="app-card reveal">
+      <div class="app-mock" style="background:var(--surface-low);">
+        <div class="notification-mock">
+          <div class="notif-header">
+            <div class="notif-icon"></div>
+            <div class="notif-app">念念有路</div>
+            <div class="notif-time">2 min ago</div>
+          </div>
+          <div class="notif-title">晚间回顾准备好了</div>
+          <div class="notif-body">今天记录了 5 条想法，其中 2 条与「产品规划」相关。路路帮你整理好了。</div>
+        </div>
+      </div>
+      <div class="app-card-body">
+        <div class="app-card-title">Notification Card</div>
+        <div class="app-card-desc">Minimal card with app icon, title, and body text</div>
+      </div>
+    </div>
+
+    <div class="app-card reveal">
+      <div class="app-mock" style="background:var(--surface-low);">
+        <div class="biz-card">
+          <div class="biz-card-top">
+            <div id="biz-card-deer"></div>
+            <div class="biz-card-name">念念有路</div>
+          </div>
+          <div class="biz-card-bottom">
+            AI-Powered Cognitive OS<br>
+            v2note.app &middot; hello@v2note.app
+          </div>
+        </div>
+      </div>
+      <div class="app-card-body">
+        <div class="app-card-title">Business Card</div>
+        <div class="app-card-desc">Minimal editorial style with deer mark</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="reveal mt-8">
+    <h3 class="color-group-title mb-4">Brand Assets Reference</h3>
+    <div class="ref-images">
+      <div class="ref-img-card">
+        <img src="lulu-base.png" alt="Lulu standing deer">
+        <div class="ref-img-label">lulu-base.png — Standing deer logo</div>
+      </div>
+      <div class="ref-img-card">
+        <img src="lulu-sideview.png" alt="Lulu side view">
+        <div class="ref-img-label">lulu-sideview.png — Clean vector deer</div>
+      </div>
+      <div class="ref-img-card">
+        <img src="lulu-brand-tags.png" alt="Brand color tags">
+        <div class="ref-img-label">lulu-brand-tags.png — 6-color brand tags</div>
+      </div>
+      <div class="ref-img-card">
+        <img src="lulu-face-icon.png" alt="Deer face icon">
+        <div class="ref-img-label">lulu-face-icon.png — Front-facing deer head</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     DESIGN RULES
+     ============================================================ -->
+<section id="rules" class="section">
+  <div class="section-label reveal">SECTION 8</div>
+  <h2 class="section-title reveal">Core Design Rules</h2>
+  <p class="section-subtitle reveal">五大设计原则 &middot; Editorial Serenity</p>
+
+  <div class="rules-list">
+    <div class="rule-card reveal">
+      <div class="rule-header">
+        <div class="rule-number">1</div>
+        <div class="rule-title">No-Line Rule 无线原则</div>
+      </div>
+      <div class="rule-desc">永远不使用可见边框分隔内容。用背景色层级、阴影和间距来创造视觉层次。</div>
+      <div class="rule-demo">
+        <div class="rule-demo-box rule-demo-bad">
+          <div class="rule-demo-label">AVOID</div>
+          <div class="demo-bordered-card with-border">Card with visible border</div>
+        </div>
+        <div class="rule-demo-box rule-demo-good">
+          <div class="rule-demo-label">PREFERRED</div>
+          <div class="demo-bordered-card with-shadow">Card with shadow only</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="rule-card reveal">
+      <div class="rule-header">
+        <div class="rule-number">2</div>
+        <div class="rule-title">Ghost Border 幽灵边框</div>
+      </div>
+      <div class="rule-desc">当确实需要边界感时，使用 15% 或更低透明度的边框，若隐若现。</div>
+      <div class="rule-demo">
+        <div class="rule-demo-box rule-demo-bad">
+          <div class="rule-demo-label">AVOID</div>
+          <div class="demo-ghost-box solid-border">border: 1px solid #CCC</div>
+        </div>
+        <div class="rule-demo-box rule-demo-good">
+          <div class="rule-demo-label">PREFERRED</div>
+          <div class="demo-ghost-box ghost-border">border: 1px solid rgba(…, 0.08)</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="rule-card reveal">
+      <div class="rule-header">
+        <div class="rule-number">3</div>
+        <div class="rule-title">Breath Principle 呼吸感</div>
+      </div>
+      <div class="rule-desc">内容之间保持充足的留白，让页面有呼吸的空间。宁可多留白，不要拥挤。</div>
+      <div class="rule-demo">
+        <div class="rule-demo-box rule-demo-bad">
+          <div class="rule-demo-label">AVOID</div>
+          <div class="demo-spacing-tight">
+            <div class="demo-spacing-bar" style="width:80%;"></div>
+            <div class="demo-spacing-bar" style="width:60%;"></div>
+            <div class="demo-spacing-bar" style="width:90%;"></div>
+            <div class="demo-spacing-bar" style="width:70%;"></div>
+          </div>
+        </div>
+        <div class="rule-demo-box rule-demo-good">
+          <div class="rule-demo-label">PREFERRED</div>
+          <div class="demo-spacing-breath">
+            <div class="demo-spacing-bar" style="width:80%;"></div>
+            <div class="demo-spacing-bar" style="width:60%;"></div>
+            <div class="demo-spacing-bar" style="width:90%;"></div>
+            <div class="demo-spacing-bar" style="width:70%;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="rule-card reveal">
+      <div class="rule-header">
+        <div class="rule-number">4</div>
+        <div class="rule-title">Asymmetric Margins 不对称留白</div>
+      </div>
+      <div class="rule-desc">左右留白不对称（left-4 / right-8），创造自然的编辑感和阅读韵律。</div>
+      <div class="rule-demo">
+        <div class="rule-demo-box rule-demo-bad">
+          <div class="rule-demo-label">SYMMETRIC</div>
+          <div class="demo-margins-sym">margin: 0 16px (equal both sides)</div>
+        </div>
+        <div class="rule-demo-box rule-demo-good">
+          <div class="rule-demo-label">ASYMMETRIC</div>
+          <div class="demo-margins-asym">margin-left: 16px, margin-right: 32px</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="rule-card reveal">
+      <div class="rule-header">
+        <div class="rule-number">5</div>
+        <div class="rule-title">Glass &amp; Soul 毛玻璃与灵魂</div>
+      </div>
+      <div class="rule-desc">导航栏和浮动元素使用毛玻璃效果（backdrop-filter: blur），增添层次感和灵动感。</div>
+      <div class="rule-demo">
+        <div class="rule-demo-box rule-demo-bad" style="background:linear-gradient(135deg, #F5EAD8, #E8C9A8);">
+          <div class="rule-demo-label">FLAT</div>
+          <div class="demo-glass no-glass">Solid white background</div>
+        </div>
+        <div class="rule-demo-box rule-demo-good" style="background:linear-gradient(135deg, #F5EAD8, #E8C9A8);">
+          <div class="rule-demo-label">GLASS</div>
+          <div class="demo-glass with-glass">Frosted glass effect</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     FOOTER
+     ============================================================ -->
+<!-- ============================================================
+     SECTION 9: BRAND PHILOSOPHY (additional content)
+     ============================================================ -->
+<section class="section">
+  <div class="section-label reveal">BRAND PHILOSOPHY</div>
+  <h2 class="section-title reveal">设计哲学</h2>
+  <p class="section-subtitle reveal">Design Philosophy &middot; Editorial Serenity</p>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--sp-6);margin-bottom:var(--sp-8);">
+    <div class="card reveal">
+      <h3 style="font-family:'Noto Serif SC',serif;font-weight:600;font-size:1.05rem;margin-bottom:var(--sp-3);color:var(--text-primary);">混沌输入</h3>
+      <p style="font-size:0.85rem;color:var(--text-secondary);line-height:1.7;">
+        用户可以将任何东西丢进来——散乱的感想、项目规划、文章、读书笔记、账单、行程。
+        我们不强迫用户做任何分类或整理工作。
+      </p>
+    </div>
+    <div class="card reveal reveal-delay-1">
+      <h3 style="font-family:'Noto Serif SC',serif;font-weight:600;font-size:1.05rem;margin-bottom:var(--sp-3);color:var(--text-primary);">结构涌现</h3>
+      <p style="font-size:0.85rem;color:var(--text-secondary);line-height:1.7;">
+        不做用户手动分类。主题和目标从 Strike（认知触动）的密度中自然生长出来，
+        如同森林中的小径，走的人多了就成了路。
+      </p>
+    </div>
+    <div class="card reveal reveal-delay-2">
+      <h3 style="font-family:'Noto Serif SC',serif;font-weight:600;font-size:1.05rem;margin-bottom:var(--sp-3);color:var(--text-primary);">AI 沉默为主</h3>
+      <p style="font-size:0.85rem;color:var(--text-secondary);line-height:1.7;">
+        路路只在每日回顾中主动出现，其余时间安静陪伴。
+        不打扰、不推送、不焦虑——温暖但不侵入。
+      </p>
+    </div>
+    <div class="card reveal reveal-delay-3">
+      <h3 style="font-family:'Noto Serif SC',serif;font-weight:600;font-size:1.05rem;margin-bottom:var(--sp-3);color:var(--text-primary);">感受尊重</h3>
+      <p style="font-size:0.85rem;color:var(--text-secondary);line-height:1.7;">
+        情感类 Strike 只记录不分析，尊重用户感受的自主权。
+        路路会在乎你的心情，但不会试图"解读"你。
+      </p>
+    </div>
+  </div>
+
+  <div class="card reveal" style="text-align:center;padding:var(--sp-8);">
+    <div id="philosophy-deer" style="margin:0 auto var(--sp-4);"></div>
+    <p style="font-family:'Noto Serif SC',serif;font-size:1.1rem;color:var(--text-primary);line-height:1.8;">
+      "每一个念头都值得被温柔对待，<br>
+      每一条路都值得被认真走过。"
+    </p>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 10: CHARACTER USAGE GUIDELINES
+     ============================================================ -->
+<section class="section" style="background:var(--surface-low);border-radius:0;max-width:100%;padding-left:calc((100% - 1080px)/2 + 32px);padding-right:calc((100% - 1080px)/2 + 32px);">
+  <div style="max-width:1080px;margin:0 auto;">
+    <div class="section-label reveal">CHARACTER GUIDELINES</div>
+    <h2 class="section-title reveal">路路使用规范</h2>
+    <p class="section-subtitle reveal">Character Usage Guidelines &middot; 何时使用哪种状态</p>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--sp-6);">
+      <div class="card reveal">
+        <h3 style="font-family:'Noto Serif SC',serif;font-weight:600;font-size:1rem;margin-bottom:var(--sp-3);color:var(--text-primary);">App 首页 / 主界面</h3>
+        <div style="display:flex;gap:var(--sp-3);align-items:center;margin-bottom:var(--sp-2);">
+          <div id="guide-idle-mini" style="flex-shrink:0;"></div>
+          <div>
+            <div style="font-size:0.82rem;font-weight:600;color:var(--brand-primary);">吃草 (Idle)</div>
+            <div style="font-size:0.72rem;color:var(--text-secondary);">默认状态，用户打开 app 时看到</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:var(--sp-3);align-items:center;">
+          <div id="guide-daze-mini" style="flex-shrink:0;"></div>
+          <div>
+            <div style="font-size:0.82rem;font-weight:600;color:var(--brand-primary);">发呆 (Spacing Out)</div>
+            <div style="font-size:0.72rem;color:var(--text-secondary);">长时间无操作时自动切换</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card reveal reveal-delay-1">
+        <h3 style="font-family:'Noto Serif SC',serif;font-weight:600;font-size:1rem;margin-bottom:var(--sp-3);color:var(--text-primary);">AI 处理中</h3>
+        <div style="display:flex;gap:var(--sp-3);align-items:center;margin-bottom:var(--sp-2);">
+          <div id="guide-drink-mini" style="flex-shrink:0;"></div>
+          <div>
+            <div style="font-size:0.82rem;font-weight:600;color:var(--brand-primary);">喝饮料 (Drinking)</div>
+            <div style="font-size:0.72rem;color:var(--text-secondary);">轻量处理：录音转写、标签提取</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:var(--sp-3);align-items:center;">
+          <div id="guide-think-mini" style="flex-shrink:0;"></div>
+          <div>
+            <div style="font-size:0.82rem;font-weight:600;color:var(--brand-primary);">思考 (Thinking)</div>
+            <div style="font-size:0.72rem;color:var(--text-secondary);">深度分析：认知聚类、矛盾检测</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card reveal reveal-delay-2">
+        <h3 style="font-family:'Noto Serif SC',serif;font-weight:600;font-size:1rem;margin-bottom:var(--sp-3);color:var(--text-primary);">每日回顾</h3>
+        <div style="display:flex;gap:var(--sp-3);align-items:center;margin-bottom:var(--sp-2);">
+          <div id="guide-notes-mini" style="flex-shrink:0;"></div>
+          <div>
+            <div style="font-size:0.82rem;font-weight:600;color:var(--brand-primary);">整理笔记 (Taking Notes)</div>
+            <div style="font-size:0.72rem;color:var(--text-secondary);">晚间回顾生成中</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:var(--sp-3);align-items:center;">
+          <div id="guide-speak-mini" style="flex-shrink:0;"></div>
+          <div>
+            <div style="font-size:0.82rem;font-weight:600;color:var(--brand-primary);">说话 (Speaking)</div>
+            <div style="font-size:0.72rem;color:var(--text-secondary);">AI 正在回复用户的追问</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card reveal reveal-delay-3">
+        <h3 style="font-family:'Noto Serif SC',serif;font-weight:600;font-size:1rem;margin-bottom:var(--sp-3);color:var(--text-primary);">情绪响应</h3>
+        <div style="display:flex;gap:var(--sp-3);align-items:center;margin-bottom:var(--sp-2);">
+          <div id="guide-care-mini" style="flex-shrink:0;"></div>
+          <div>
+            <div style="font-size:0.82rem;font-weight:600;color:var(--brand-primary);">心疼 (Caring)</div>
+            <div style="font-size:0.72rem;color:var(--text-secondary);">检测到负面情绪时</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:var(--sp-3);align-items:center;">
+          <div id="guide-sun-mini" style="flex-shrink:0;"></div>
+          <div>
+            <div style="font-size:0.82rem;font-weight:600;color:var(--brand-primary);">晒太阳 (Sunbathing)</div>
+            <div style="font-size:0.72rem;color:var(--text-secondary);">用户完成重要目标时</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card reveal mt-8" style="padding:var(--sp-6);">
+      <h3 style="font-family:'Noto Serif SC',serif;font-weight:600;font-size:1rem;margin-bottom:var(--sp-3);color:var(--text-primary);">状态转换时序</h3>
+      <div style="font-size:0.82rem;color:var(--text-secondary);line-height:2;">
+        <div style="display:flex;align-items:center;gap:var(--sp-2);flex-wrap:wrap;">
+          <span style="background:var(--brand-primary);color:white;padding:2px 10px;border-radius:var(--radius-pill);font-size:0.72rem;">打开 App</span>
+          <span style="color:var(--text-tertiary);">&rarr;</span>
+          <span style="font-weight:600;">吃草</span>
+          <span style="color:var(--text-tertiary);">&rarr;</span>
+          <span style="background:var(--surface-low);padding:2px 10px;border-radius:var(--radius-pill);font-size:0.72rem;">用户录音</span>
+          <span style="color:var(--text-tertiary);">&rarr;</span>
+          <span style="font-weight:600;">喝饮料</span>
+          <span style="color:var(--text-tertiary);">&rarr;</span>
+          <span style="background:var(--surface-low);padding:2px 10px;border-radius:var(--radius-pill);font-size:0.72rem;">处理完成</span>
+          <span style="color:var(--text-tertiary);">&rarr;</span>
+          <span style="font-weight:600;">吃草</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:var(--sp-2);flex-wrap:wrap;margin-top:var(--sp-2);">
+          <span style="background:var(--brand-primary);color:white;padding:2px 10px;border-radius:var(--radius-pill);font-size:0.72rem;">晚间回顾</span>
+          <span style="color:var(--text-tertiary);">&rarr;</span>
+          <span style="font-weight:600;">整理笔记</span>
+          <span style="color:var(--text-tertiary);">&rarr;</span>
+          <span style="font-weight:600;">说话</span>
+          <span style="color:var(--text-tertiary);">&rarr;</span>
+          <span style="font-weight:600;">思考</span>
+          <span style="color:var(--text-tertiary);">&rarr;</span>
+          <span style="font-weight:600;">说话</span>
+          <span style="color:var(--text-tertiary);">&rarr;</span>
+          <span style="font-weight:600;">晒太阳</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:var(--sp-2);flex-wrap:wrap;margin-top:var(--sp-2);">
+          <span style="background:var(--color-maple);color:white;padding:2px 10px;border-radius:var(--radius-pill);font-size:0.72rem;">网络错误</span>
+          <span style="color:var(--text-tertiary);">&rarr;</span>
+          <span style="font-weight:600;">生气</span>
+          <span style="color:var(--text-tertiary);">&rarr;</span>
+          <span style="background:var(--surface-low);padding:2px 10px;border-radius:var(--radius-pill);font-size:0.72rem;">恢复正常</span>
+          <span style="color:var(--text-tertiary);">&rarr;</span>
+          <span style="font-weight:600;">吃草</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:var(--sp-2);flex-wrap:wrap;margin-top:var(--sp-2);">
+          <span style="background:var(--color-sky);color:white;padding:2px 10px;border-radius:var(--radius-pill);font-size:0.72rem;">频繁输入</span>
+          <span style="color:var(--text-tertiary);">&rarr;</span>
+          <span style="font-weight:600;">跑来跑去</span>
+          <span style="color:var(--text-tertiary);">&rarr;</span>
+          <span style="background:var(--surface-low);padding:2px 10px;border-radius:var(--radius-pill);font-size:0.72rem;">输入停止</span>
+          <span style="color:var(--text-tertiary);">&rarr;</span>
+          <span style="font-weight:600;">吃草</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 11: DEER COLOR PALETTE DETAILS
+     ============================================================ -->
+<section class="section">
+  <div class="section-label reveal">DEER PALETTE</div>
+  <h2 class="section-title reveal">路路色彩解析</h2>
+  <p class="section-subtitle reveal">Deer Pixel Art Color Palette &middot; 9 色构成</p>
+
+  <div class="color-group reveal">
+    <h3 class="color-group-title">Deer Body Colors</h3>
+    <div class="color-row">
+      <div class="color-chip"><div class="color-swatch" style="background:#5C3A1E;"></div><div class="color-info"><div class="color-name">Outline</div><div class="color-hex">#5C3A1E</div><div class="color-token">O — outline</div><div class="color-usage">轮廓线、鹿角末端</div></div></div>
+      <div class="color-chip"><div class="color-swatch" style="background:#89502C;"></div><div class="color-info"><div class="color-name">Dark Brown</div><div class="color-hex">#89502C</div><div class="color-token">D — dark</div><div class="color-usage">鹿角、蹄子、腿部</div></div></div>
+      <div class="color-chip"><div class="color-swatch" style="background:#A0693E;"></div><div class="color-info"><div class="color-name">Shadow</div><div class="color-hex">#A0693E</div><div class="color-token">M — medium</div><div class="color-usage">身体阴影、暗面</div></div></div>
+      <div class="color-chip"><div class="color-swatch" style="background:#C8845C;"></div><div class="color-info"><div class="color-name">Body</div><div class="color-hex">#C8845C</div><div class="color-token">B — body</div><div class="color-usage">主体色、身体填充</div></div></div>
+    </div>
+  </div>
+
+  <div class="color-group reveal">
+    <h3 class="color-group-title">Deer Highlight Colors</h3>
+    <div class="color-row">
+      <div class="color-chip"><div class="color-swatch" style="background:#D4A574;"></div><div class="color-info"><div class="color-name">Light</div><div class="color-hex">#D4A574</div><div class="color-token">L — light</div><div class="color-usage">身体高光、受光面</div></div></div>
+      <div class="color-chip"><div class="color-swatch" style="background:#E8C9A8;"></div><div class="color-info"><div class="color-name">Cream</div><div class="color-hex">#E8C9A8</div><div class="color-token">C — cream</div><div class="color-usage">腹部、面部前侧、内耳</div></div></div>
+      <div class="color-chip"><div class="color-swatch" style="background:#F5E6D3;"></div><div class="color-info"><div class="color-name">Spots</div><div class="color-hex">#F5E6D3</div><div class="color-token">S — spots</div><div class="color-usage">背部斑点（梅花鹿特征）</div></div></div>
+    </div>
+  </div>
+
+  <div class="color-group reveal">
+    <h3 class="color-group-title">Deer Detail Colors</h3>
+    <div class="color-row">
+      <div class="color-chip"><div class="color-swatch" style="background:#3D2B1A;"></div><div class="color-info"><div class="color-name">Eye / Nose</div><div class="color-hex">#3D2B1A</div><div class="color-token">E — eye</div><div class="color-usage">瞳孔、鼻尖</div></div></div>
+      <div class="color-chip"><div class="color-swatch" style="background:#FFFFFF;border:1px solid rgba(0,0,0,0.06);"></div><div class="color-info"><div class="color-name">White</div><div class="color-hex">#FFFFFF</div><div class="color-token">W — white</div><div class="color-usage">眼睛高光、反光点</div></div></div>
+      <div class="color-chip"><div class="color-swatch" style="background:#E8A87C;"></div><div class="color-info"><div class="color-name">Pink</div><div class="color-hex">#E8A87C</div><div class="color-token">P — pink</div><div class="color-usage">腮红（开心状态）</div></div></div>
+    </div>
+  </div>
+
+  <div class="reveal mt-8">
+    <h3 class="color-group-title mb-4">Accessory / Effect Colors</h3>
+    <div class="color-row">
+      <div class="color-chip"><div class="color-swatch" style="background:#C45C5C;"></div><div class="color-info"><div class="color-name">Red</div><div class="color-hex">#C45C5C</div><div class="color-token">R — red</div><div class="color-usage">生气时的蒸汽</div></div></div>
+      <div class="color-chip"><div class="color-swatch" style="background:#7BA3C4;"></div><div class="color-info"><div class="color-name">Blue</div><div class="color-hex">#7BA3C4</div><div class="color-token">K — blue</div><div class="color-usage">心疼时的爱心</div></div></div>
+      <div class="color-chip"><div class="color-swatch" style="background:#E8D44D;"></div><div class="color-info"><div class="color-name">Yellow</div><div class="color-hex">#E8D44D</div><div class="color-token">Y — yellow</div><div class="color-usage">阳光（晒太阳状态）</div></div></div>
+      <div class="color-chip"><div class="color-swatch" style="background:#B8B0A0;"></div><div class="color-info"><div class="color-name">Gray</div><div class="color-hex">#B8B0A0</div><div class="color-token">T — gray</div><div class="color-usage">蒸汽、汗滴、省略号</div></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 12: ANIMATION SPECS
+     ============================================================ -->
+<section class="section" style="background:var(--surface-low);border-radius:0;max-width:100%;padding-left:calc((100% - 1080px)/2 + 32px);padding-right:calc((100% - 1080px)/2 + 32px);">
+  <div style="max-width:1080px;margin:0 auto;">
+    <div class="section-label reveal">MOTION</div>
+    <h2 class="section-title reveal">路路动画规范</h2>
+    <p class="section-subtitle reveal">Character Animation Specs &middot; 柔和有灵气</p>
+
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:var(--sp-6);">
+      <div class="card reveal">
+        <h3 style="font-family:'Noto Serif SC',serif;font-weight:600;font-size:0.95rem;margin-bottom:var(--sp-3);color:var(--text-primary);">Idle 呼吸</h3>
+        <div style="font-size:0.78rem;color:var(--text-secondary);line-height:1.7;">
+          <div><strong>动画：</strong>轻微上下浮动</div>
+          <div><strong>振幅：</strong>2-4px</div>
+          <div><strong>周期：</strong>3-4 秒</div>
+          <div><strong>曲线：</strong>ease-in-out</div>
+          <div style="margin-top:var(--sp-2);font-size:0.72rem;color:var(--text-tertiary);">CSS: animation: float 4s ease-in-out infinite</div>
+        </div>
+      </div>
+
+      <div class="card reveal reveal-delay-1">
+        <h3 style="font-family:'Noto Serif SC',serif;font-weight:600;font-size:0.95rem;margin-bottom:var(--sp-3);color:var(--text-primary);">状态切换</h3>
+        <div style="font-size:0.78rem;color:var(--text-secondary);line-height:1.7;">
+          <div><strong>动画：</strong>淡入淡出 + 轻微缩放</div>
+          <div><strong>时长：</strong>300ms</div>
+          <div><strong>曲线：</strong>cubic-bezier(0.25, 0.46, 0.45, 0.94)</div>
+          <div><strong>序列：</strong>当前态淡出 → 新态淡入</div>
+          <div style="margin-top:var(--sp-2);font-size:0.72rem;color:var(--text-tertiary);">避免硬切换，保持柔和过渡</div>
+        </div>
+      </div>
+
+      <div class="card reveal reveal-delay-2">
+        <h3 style="font-family:'Noto Serif SC',serif;font-weight:600;font-size:0.95rem;margin-bottom:var(--sp-3);color:var(--text-primary);">交互反馈</h3>
+        <div style="font-size:0.78rem;color:var(--text-secondary);line-height:1.7;">
+          <div><strong>点击鹿：</strong>轻弹 + 眨眼</div>
+          <div><strong>时长：</strong>200ms</div>
+          <div><strong>效果：</strong>scale(1.1) → scale(0.95) → scale(1)</div>
+          <div><strong>附加：</strong>随机切换到"说话"状态 2 秒</div>
+          <div style="margin-top:var(--sp-2);font-size:0.72rem;color:var(--text-tertiary);">让路路感觉是活的、有回应的</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card reveal mt-8" style="padding:var(--sp-6);">
+      <h3 style="font-family:'Noto Serif SC',serif;font-weight:600;font-size:1rem;margin-bottom:var(--sp-4);color:var(--text-primary);">动画禁止事项</h3>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--sp-4);">
+        <div style="font-size:0.82rem;color:var(--color-maple);">
+          <div style="font-weight:600;margin-bottom:var(--sp-1);">AVOID</div>
+          <ul style="padding-left:var(--sp-4);line-height:1.8;">
+            <li>快速闪烁或跳跃</li>
+            <li>旋转、翻转等夸张动画</li>
+            <li>突然出现 / 消失</li>
+            <li>与用户输入抢注意力</li>
+            <li>循环播放复杂动画</li>
+          </ul>
+        </div>
+        <div style="font-size:0.82rem;color:var(--color-forest);">
+          <div style="font-weight:600;margin-bottom:var(--sp-1);">PREFERRED</div>
+          <ul style="padding-left:var(--sp-4);line-height:1.8;">
+            <li>柔和的呼吸浮动</li>
+            <li>平滑的状态过渡</li>
+            <li>微妙的阴影变化</li>
+            <li>自然的位移和缩放</li>
+            <li>respond to user, 不主动打扰</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer class="footer">
+  <div id="footer-deer" style="margin:0 auto var(--sp-4);"></div>
+  <div class="footer-brand">念念有路 &middot; Brand Guidelines v1.0</div>
+  <div class="footer-sub">Editorial Serenity Design Language</div>
+  <div class="footer-date">March 2026</div>
+</footer>
+
+<!-- ============================================================
+     PIXEL ART DEER RENDERER + ALL 10 STATES
+     ============================================================ -->
+<script>
+(function() {
+  'use strict';
+
+  // ===========================================================
+  // COLOR PALETTE
+  // ===========================================================
+  const COLORS = {
+    '.': 'transparent',
+    'O': '#5C3A1E',   // outline / very dark brown
+    'D': '#89502C',   // dark brown (antlers, legs, hooves)
+    'M': '#A0693E',   // medium shadow
+    'B': '#C8845C',   // main body brown
+    'L': '#D4A574',   // light highlight
+    'C': '#E8C9A8',   // cream (belly, face front)
+    'S': '#F5E6D3',   // spots on back
+    'E': '#3D2B1A',   // eye/nose (near-black)
+    'W': '#FFFFFF',   // white (eye highlight)
+    'P': '#E8A87C',   // pink/blush
+    'R': '#C45C5C',   // red (angry)
+    'G': '#5C7A5E',   // green (nature)
+    'K': '#7BA3C4',   // blue (sky/calm)
+    'Y': '#E8D44D',   // yellow (sun)
+    'T': '#B8B0A0',   // gray (steam/misc)
+  };
+
+  // ===========================================================
+  // 10 DEER PIXEL ART STATES
+  // Each is an array of strings; each char = 1 pixel
+  // Canvas: ~24w x 32h (varies per state)
+  // ===========================================================
+
+  // 1. IDLE / GRAZING - Standing calmly, peaceful, side-facing right
+  //    Classic standing pose with gentle head angle
+  //    Antlers: 2-branch, symmetric
+  //    Expression: neutral, calm
+  //    Legs: all four visible, standing straight
+  //    Tail: small, relaxed
+  const DEER_IDLE = [
+    '........DD.....DD...............',
+    '........D.D...D.D...............',
+    '.........D.D.D.D................',
+    '.........D..D..D................',
+    '..........DDDDD.................',
+    '..........OBBBO.................',
+    '.........OBBBCBO................',
+    '........OBBCWCBO................',
+    '........OBECBCEO................',
+    '.........OOCECO.................',
+    '.........OBBCBO.................',
+    '.........OBBBBO.................',
+    '........OBBBBBBOD...............',
+    '.......OBBSBSBBOD...............',
+    '.......OBBLBBBBLOD..............',
+    '......OBBBBBBBBBO...............',
+    '......OBBLSBBSLBO...............',
+    '......OBBBBBBBBBO...............',
+    '......OBLBBBBBBLBO..............',
+    '.....OBBBBBBBBBBBO..............',
+    '.....OBLBBBBBBBLBO..............',
+    '.....OBBBBBBBBBBBO..............',
+    '.....OCBBBBBBBBCBO..............',
+    '......OCCBBBBBCCO...............',
+    '......OBBBO.OBBBO...............',
+    '......OBBO..OBBBO...............',
+    '......ODDO..ODDDO...............',
+    '......ODDO..ODDDO...............',
+    '.....OODO....ODDOO..............',
+    '.....OO.......OOO...............',
+  ];
+
+  // 2. TAKING NOTES / DIGEST - Sitting position, holding notebook
+  //    Head angled down looking at a small brown notebook
+  //    Legs tucked underneath (sitting)
+  //    Notebook is a small rectangle held by front hooves
+  //    Pencil next to notebook
+  const DEER_NOTES = [
+    '........DD.....DD...............',
+    '........D.D...D.D...............',
+    '.........D.D.D.D................',
+    '.........D..D..D................',
+    '..........DDDDD.................',
+    '...........OBBO.................',
+    '..........OBBBCBO...............',
+    '..........OBBEWCBO..............',
+    '..........OBECBCEO..............',
+    '...........OOCCCO...............',
+    '...........OBBCBO...............',
+    '..........OBBBBBO...............',
+    '.........OBBBBBBBO..............',
+    '........OBBSBBSBBO..............',
+    '........OBBLBBBBLBO.............',
+    '........OBBBBBBBBBO.............',
+    '........OBLBBBBBBLBO............',
+    '.......OBBBBMMMMMBBO............',
+    '.......OBLBBMEEEEMBO............',
+    '.......OBBBBMCSSEMBO............',
+    '.......OBLBBMEEEEMBO............',
+    '.......OBBBBMCSSEMBO............',
+    '.......OCBBBMEEEEMOD............',
+    '........OCCBMMMMMMOO............',
+    '........OBBBBBBBBBO.............',
+    '........OCCCCCCCCCO.............',
+    '.........OOOOOOOOO..............',
+  ];
+
+  // 3. SUNBATHING / HAPPY - Lying down relaxed, eyes as happy crescents ^_^
+  //    Legs tucked under body (lying down)
+  //    Eyes: upward crescents (happy closed eyes)
+  //    Small sun with rays in upper right
+  //    Peaceful, contented expression
+  const DEER_SUN = [
+    '..........................Y.Y...',
+    '.........................Y.Y.Y..',
+    '......................YY..YYY...',
+    '.....................YYYY.Y.Y...',
+    '......................YY........',
+    '..DD.....DD.....................',
+    '..D.D...D.D.....................',
+    '...D.D.D.D.....................',
+    '...D..D..D......................',
+    '....DDDDD.......................',
+    '....OBBBO.......................',
+    '...OBBBCBO.....................',
+    '...OBBCWCBO....................',
+    '...OBMMCMMBO...................',
+    '....OOPCCPO....................',
+    '....OBBCBBO....................',
+    '...OBBBBBBO....................',
+    '..OBBSBSBBBBO..................',
+    '..OBLBBBBBBLO..................',
+    '..OBBBBBBBBBO..................',
+    '..OBLBBBBBBLBO.................',
+    '..OBBBBBBBBBBBO................',
+    '..OBBLBBBBLBBODDO..............',
+    '..OCBBBBBBCBOODDO..............',
+    '...OCCCCCCCCOOOOO..............',
+    '....OOOOOOOOOOO................',
+  ];
+
+  // 4. DRINKING - Standing, head tilted toward a steaming cup
+  //    Head lowered toward a small cup on the right
+  //    Steam wisps (2-3 dots rising) above the cup
+  //    Body slightly leaning forward
+  //    Cup is small rectangle with steam
+  const DEER_DRINK = [
+    '........DD.....DD...............',
+    '........D.D...D.D...............',
+    '.........D.D.D.D......T........',
+    '.........D..D..D.....T.T.......',
+    '..........DDDDD.......T........',
+    '...........OBBBO...............',
+    '..........OBBCBBO..............',
+    '..........OBBCWCBO.............',
+    '..........OBECBCEO.............',
+    '...........OOCCCO..............',
+    '...........OBBCBO..............',
+    '..........OBBBBBO..TTTT........',
+    '.........OBBBBBBBOTCEECT.......',
+    '........OBBSBSBBBOTCEECT.......',
+    '........OBBLBBBBLOTCEECT.......',
+    '........OBBBBBBBBOTTTTTT.......',
+    '........OBLBBBBBBLBO...........',
+    '.......OBBBBBBBBBBBO...........',
+    '.......OBLBBBBBBBLBO...........',
+    '.......OBBBBBBBBBBBO...........',
+    '.......OCBBBBBBBBCBO...........',
+    '........OCCBBBBBCCO............',
+    '........OBBBO.OBBBO............',
+    '........OBBO..OBBBO............',
+    '........ODDO..ODDDO............',
+    '........ODDO..ODDDO............',
+    '.......OODO....ODDOO...........',
+    '.......OO.......OOO............',
+  ];
+
+  // 5. SPACING OUT - Standing still, half-closed droopy eyes (--_--)
+  //    "..." dots floating above head
+  //    Eyes: horizontal lines (half-closed, sleepy)
+  //    Small sweat drop on right side
+  //    Body slightly slouched
+  const DEER_DAZE = [
+    '.........T...T...T..............',
+    '........DD.....DD...............',
+    '........D.D...D.D...............',
+    '.........D.D.D.D................',
+    '.........D..D..D................',
+    '..........DDDDD.................',
+    '..........OBBBO........T.......',
+    '.........OBBBCBO.......TT......',
+    '.........OBBCWCBO......T.......',
+    '.........OBMMCMMBO.............',
+    '..........OOCECO...............',
+    '..........OBBCBO...............',
+    '..........OBBBBO...............',
+    '.........OBBBBBBOD..............',
+    '........OBBSBSBBOD..............',
+    '........OBBLBBBBLOD.............',
+    '........OBBBBBBBBBO.............',
+    '........OBLBBBBBBLBO............',
+    '.......OBBBBBBBBBBBO............',
+    '.......OBLBBBBBBBLBO............',
+    '.......OBBBBBBBBBBBO............',
+    '.......OCBBBBBBBBCBO............',
+    '........OCCBBBBBCCO.............',
+    '........OBBBO.OBBBO.............',
+    '........OBBO..OBBBO.............',
+    '........ODDO..ODDDO.............',
+    '........ODDO..ODDDO.............',
+    '.......OODO....ODDOO............',
+    '.......OO.......OOO.............',
+  ];
+
+  // 6. ANGRY - Puffed up body (wider), V-shaped angry eyebrows
+  //    Red steam puffs above head (R pixels)
+  //    Tail raised high and stiff
+  //    Body slightly wider than normal (puffed)
+  //    Angry V-brow marks above eyes
+  const DEER_ANGRY = [
+    '......R..R..................',
+    '.......RR...DD.....DD......',
+    '.......R...D.D...D.D.......',
+    '...........D.D.D.D.........',
+    '...........D..D..D..........',
+    '............DDDDD...........',
+    '............OBBBO...........',
+    '...........OBBBCBO..........',
+    '..........EOBBCWCBOE........',
+    '..........OOBECBCEOO........',
+    '...........OOOCECOO.........',
+    '...........OBBCBBO..........',
+    '..........OBBBBBBBO.........',
+    '.........OBBBBBBBBBO...OD...',
+    '........OBBSBSBBBBBBO..OD...',
+    '........OBBLBBBBBBLBO.OD....',
+    '........OBBBBBBBBBBBOOD.....',
+    '........OBLBBBBBBBBLOOO.....',
+    '.......OBBBBBBBBBBBBBO......',
+    '.......OBLBBBBBBBBLBBO......',
+    '.......OBBBBBBBBBBBBO.......',
+    '.......OBBBBBBBBBBBBO.......',
+    '.......OCBBBBBBBBBBCBO......',
+    '........OCCBBBBBBCCO........',
+    '........OBBBO..OBBBO........',
+    '........OBBO...OBBBO........',
+    '........ODDO...ODDDO........',
+    '........ODDO...ODDDO........',
+    '.......OODO.....ODDOO.......',
+    '.......OO........OOO........',
+  ];
+
+  // 7. CARING / CONCERNED - Head tilted to side, worried eyes
+  //    Small blue heart floating nearby
+  //    Eyes: slightly angled (worried look)
+  //    One front hoof raised slightly off ground
+  //    Head tilted left showing concern
+  const DEER_CARE = [
+    '........DD.....DD...............',
+    '........D.D...D.D...............',
+    '.........D.D.D.D................',
+    '.........D..D..D................',
+    '..........DDDDD.................',
+    '.........OBBBO......KK..KK.....',
+    '........OBBBCBO....KKKKKK......',
+    '........OBBCWCBO....KKKK.......',
+    '........OBECBCEO.....KK........',
+    '.........OOCECO.................',
+    '.........OBBCBO.................',
+    '.........OBBBBO.................',
+    '........OBBBBBBOD...............',
+    '.......OBBSBSBBOD...............',
+    '.......OBBLBBBBLOD..............',
+    '......OBBBBBBBBBO...............',
+    '......OBBLSBBSLBO...............',
+    '......OBBBBBBBBBO...............',
+    '......OBLBBBBBBLBO..............',
+    '.....OBBBBBBBBBBBO..............',
+    '.....OBLBBBBBBBLBO..............',
+    '.....OBBBBBBBBBBBO..............',
+    '.....OCBBBBBBBBCBO..............',
+    '......OCCBBBBBCCO...............',
+    '......ODBO..OBBBO...............',
+    '.....ODBO...OBBBO...............',
+    '....ODO.....ODDDO...............',
+    '...OO.......ODDDO...............',
+    '............ODDOO...............',
+    '.............OOO................',
+  ];
+
+  // 8. SPEAKING / CHATTING - Mouth open, speech lines emanating
+  //    Mouth open (cream pixel gap showing)
+  //    Small speech lines (dots/dashes) coming from mouth
+  //    Alert posture, slightly forward-leaning
+  //    Ears perked up
+  const DEER_SPEAK = [
+    '........DD.....DD...............',
+    '........D.D...D.D...............',
+    '.........D.D.D.D................',
+    '.........D..D..D................',
+    '..........DDDDD.................',
+    '..........OBBBO.................',
+    '.........OBBBCBO................',
+    '........OBBCWCBO................',
+    '........OBECBCEO................',
+    '.........OOCECO.................',
+    '.........OBBCCO....O..O..O.....',
+    '.........OBCCBO.................',
+    '.........OBBBBO.................',
+    '........OBBBBBBOD...............',
+    '.......OBBSBSBBOD...............',
+    '.......OBBLBBBBLOD..............',
+    '......OBBBBBBBBBO...............',
+    '......OBBLSBBSLBO...............',
+    '......OBBBBBBBBBO...............',
+    '......OBLBBBBBBLBO..............',
+    '.....OBBBBBBBBBBBO..............',
+    '.....OBLBBBBBBBLBO..............',
+    '.....OBBBBBBBBBBBO..............',
+    '.....OCBBBBBBBBCBO..............',
+    '......OCCBBBBBCCO...............',
+    '......OBBBO.OBBBO...............',
+    '......OBBO..OBBBO...............',
+    '......ODDO..ODDDO...............',
+    '......ODDO..ODDDO...............',
+    '.....OODO....ODDOO..............',
+    '.....OO.......OOO...............',
+  ];
+
+  // 9. THINKING - One hoof raised to chin, looking upward
+  //    Thought bubble above: small circle → medium circle → large circle
+  //    Eyes looking upward
+  //    One front leg raised toward chin/face area
+  //    Slightly tilted head
+  const DEER_THINK = [
+    '.....................OOOOO......',
+    '....................OWWWWWO.....',
+    '....................OWWWWWO.....',
+    '.....................OOOOO......',
+    '..................OO............',
+    '.................O..............',
+    '................O...............',
+    '........DD.....DD...............',
+    '........D.D...D.D...............',
+    '.........D.D.D.D................',
+    '.........D..D..D................',
+    '..........DDDDD.................',
+    '..........OBBBO.................',
+    '.........OBBBCBO................',
+    '........OBBCWWCBO...............',
+    '........OBECBBCEO...............',
+    '.........OOCECO.................',
+    '.........OBBCBO.................',
+    '.........OBBBBO.................',
+    '........OBBBBBBOD...............',
+    '.......OBBSBSBBOD...............',
+    '.......OBBLBBBBLOD..............',
+    '......OBBBBBBBBBO...............',
+    '......OBBLSBBSLBO...............',
+    '......OBBBBBBBBBO...............',
+    '......OBLBBBBBBLBO..............',
+    '.....OBBBBBBBBBBBO..............',
+    '.....OBLBBBBBBBLBO..............',
+    '.....OBBBBBBBBBBBO..............',
+    '.....OCBBBBBBBBCBO..............',
+    '......OCDBBBBBCCO...............',
+    '......ODDO..OBBBO...............',
+    '.......OO...ODDDO...............',
+    '.............ODDOO..............',
+    '..............OOO...............',
+  ];
+
+  // 10. RUNNING - Legs stretched in gallop, forward lean
+  //    Motion lines behind the deer (3 horizontal dashes)
+  //    Front legs extended forward, back legs extended backward
+  //    Body leaning forward with momentum
+  //    Energetic, dynamic posture
+  //    Tail streaming behind
+  const DEER_RUN = [
+    '..............DD.....DD.........',
+    '..............D.D...D.D.........',
+    '...............D.D.D.D..........',
+    '...............D..D..D..........',
+    '................DDDDD...........',
+    '................OBBBO...........',
+    '...............OBBBCBO..........',
+    '..............OBBCWCBO..........',
+    '..............OBECBCEO..........',
+    '...............OOCECO...........',
+    '...............OBBCBO...........',
+    '..O............OBBBBO...........',
+    '..O...........OBBBBBBOD.........',
+    '..O..........OBBSBSBBOD.........',
+    '..O..........OBBLBBBBLOD........',
+    '.............OBBBBBBBBBO........',
+    '.............OBBLSBBSLBO........',
+    '............OBBBBBBBBBBOD.......',
+    '............OBLBBBBBBLBOOD......',
+    '............OBBBBBBBBBBBOOO.....',
+    '............OCBBBBBBBBCBO.......',
+    '.............OCCBBBBBCCO........',
+    '...........ODBO......OBDO......',
+    '..........ODBO........OBDO.....',
+    '.........ODO............ODO.....',
+    '........OO...............OO....',
+  ];
+
+  // ===========================================================
+  // DEER FACE (front-facing for app icon)
+  // ===========================================================
+  // Front-facing deer head for app icon
+  // Symmetric face with antlers, cream muzzle, visible eyes
+  const DEER_FACE = [
+    '...DD........DD...',
+    '...D.D......D.D...',
+    '....D.D....D.D....',
+    '....D..DDDD..D....',
+    '.....DBBBBBD......',
+    '....DBBBBBBBD.....',
+    '...DBBBBBBBBBD....',
+    '..DBBBCBBBBCBBD...',
+    '..DBBCWBBBBWCBD...',
+    '..DBECBBBBBBCEBD..',
+    '...DBBCCCCCCBBD...',
+    '...DBBBECEECBBD...',
+    '....DBBBCCBBBD....',
+    '....DBBBBBBBD.....',
+    '.....DBCCCCBD.....',
+    '.....DBBBBBD......',
+    '......DCCCD.......',
+    '......DBBBD.......',
+    '.......DDD........',
+  ];
+
+  // ===========================================================
+  // RENDERER: Pixel array → SVG string
+  // ===========================================================
+  function renderPixelArt(pixelRows, pixelSize) {
+    pixelSize = pixelSize || 4;
+    const height = pixelRows.length;
+    const width = Math.max(...pixelRows.map(r => r.length));
+    const svgW = width * pixelSize;
+    const svgH = height * pixelSize;
+
+    let rects = '';
+    for (let y = 0; y < height; y++) {
+      const row = pixelRows[y];
+      for (let x = 0; x < row.length; x++) {
+        const ch = row[x];
+        if (ch === '.' || !COLORS[ch]) continue;
+        rects += '<rect x="' + (x * pixelSize) + '" y="' + (y * pixelSize) +
+                 '" width="' + pixelSize + '" height="' + pixelSize +
+                 '" fill="' + COLORS[ch] + '"/>';
+      }
+    }
+
+    return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + svgW + ' ' + svgH +
+           '" width="' + svgW + '" height="' + svgH + '" shape-rendering="crispEdges">' +
+           rects + '</svg>';
+  }
+
+  // ===========================================================
+  // STATE METADATA
+  // ===========================================================
+  const STATES = [
+    { id: 'idle',    name: '吃草',     en: 'Idle / Grazing',   data: DEER_IDLE,   trigger: '默认状态', usage: '无特定活动时的静息态' },
+    { id: 'notes',   name: '整理笔记', en: 'Taking Notes',     data: DEER_NOTES,  trigger: '消化整理时', usage: '每日回顾、认知聚类进行中' },
+    { id: 'sun',     name: '晒太阳',   en: 'Sunbathing',       data: DEER_SUN,    trigger: '一切顺利时', usage: '任务完成、目标达成时展示' },
+    { id: 'drink',   name: '喝饮料',   en: 'Drinking',         data: DEER_DRINK,  trigger: '处理中',    usage: 'AI 正在分析或酝酿结果' },
+    { id: 'daze',    name: '发呆',     en: 'Spacing Out',      data: DEER_DAZE,   trigger: '无新输入时', usage: '长时间无操作的空闲状态' },
+    { id: 'angry',   name: '生气',     en: 'Frustrated',       data: DEER_ANGRY,  trigger: '遇到问题时', usage: '错误提示、网络中断' },
+    { id: 'care',    name: '心疼',     en: 'Caring',           data: DEER_CARE,   trigger: '用户情绪低落', usage: '感知到负面情绪时的关怀' },
+    { id: 'speak',   name: '说话',     en: 'Speaking',         data: DEER_SPEAK,  trigger: '对话交流中', usage: 'AI 正在回复用户消息' },
+    { id: 'think',   name: '思考',     en: 'Thinking',         data: DEER_THINK,  trigger: '深度处理时', usage: '复杂分析、多步推理进行中' },
+    { id: 'run',     name: '跑来跑去', en: 'Running',          data: DEER_RUN,    trigger: '活跃操作时', usage: '快速录入、频繁交互场景' },
+  ];
+
+  // ===========================================================
+  // RENDER HERO DEER (large, idle)
+  // ===========================================================
+  const heroContainer = document.getElementById('hero-deer-container');
+  if (heroContainer) {
+    heroContainer.innerHTML = renderPixelArt(DEER_IDLE, 10);
+    heroContainer.querySelector('svg').style.display = 'block';
+    heroContainer.querySelector('svg').style.margin = '0 auto';
+  }
+
+  // ===========================================================
+  // RENDER LOGO SIZES
+  // ===========================================================
+  const logoSizesContainer = document.getElementById('logo-sizes-container');
+  if (logoSizesContainer) {
+    [256, 128, 64, 32, 16].forEach(function(size) {
+      const item = document.createElement('div');
+      item.className = 'logo-size-item';
+      const pxSize = Math.max(1, Math.round(size / 27));
+      item.innerHTML = renderPixelArt(DEER_IDLE, pxSize) +
+                       '<div class="logo-size-label">' + size + 'px</div>';
+      const svg = item.querySelector('svg');
+      svg.style.width = size + 'px';
+      svg.style.height = 'auto';
+      logoSizesContainer.appendChild(item);
+    });
+  }
+
+  // ===========================================================
+  // RENDER LOGO LOCKUP (add deer before text)
+  // ===========================================================
+  const lockupContainer = document.getElementById('logo-lockup-container');
+  if (lockupContainer) {
+    const deerEl = document.createElement('span');
+    deerEl.innerHTML = renderPixelArt(DEER_IDLE, 2);
+    const svg = deerEl.querySelector('svg');
+    svg.style.width = '40px';
+    svg.style.height = 'auto';
+    svg.style.display = 'inline-block';
+    svg.style.verticalAlign = 'middle';
+    lockupContainer.insertBefore(deerEl, lockupContainer.firstChild);
+  }
+
+  // ===========================================================
+  // RENDER APP ICON (deer face)
+  // ===========================================================
+  function renderAppIcon(container, faceSize) {
+    if (!container) return;
+    const faceHtml = renderPixelArt(DEER_FACE, faceSize || 4);
+    container.innerHTML = faceHtml;
+    const svg = container.querySelector('svg');
+    svg.style.display = 'block';
+    svg.style.margin = '0 auto';
+  }
+
+  renderAppIcon(document.getElementById('app-icon-container'), 3);
+  renderAppIcon(document.getElementById('app-icon-large'), 5);
+
+  // ===========================================================
+  // RENDER LOGO BACKGROUNDS
+  // ===========================================================
+  const logoBgContainer = document.getElementById('logo-bg-container');
+  if (logoBgContainer) {
+    var bgs = [
+      { bg: '#FFFFFF', label: 'White', labelColor: 'var(--text-secondary)', shadow: 'var(--shadow-card)' },
+      { bg: '#FDF9F3', label: 'Surface', labelColor: 'var(--text-secondary)', shadow: 'var(--shadow-card)' },
+      { bg: '#2C2A26', label: 'Dark', labelColor: '#9C9788', shadow: 'none' },
+    ];
+    bgs.forEach(function(item) {
+      var card = document.createElement('div');
+      card.className = 'logo-bg-card';
+      card.style.background = item.bg;
+      card.style.boxShadow = item.shadow;
+      card.innerHTML = renderPixelArt(DEER_IDLE, 3) +
+                       '<div class="logo-bg-label" style="color:' + item.labelColor + ';">' + item.label + '</div>';
+      var svg = card.querySelector('svg');
+      svg.style.width = '80px';
+      svg.style.height = 'auto';
+      svg.style.display = 'block';
+      logoBgContainer.appendChild(card);
+    });
+  }
+
+  // ===========================================================
+  // RENDER CLEAR SPACE DEMO
+  // ===========================================================
+  var clearSpaceDemo = document.getElementById('clearspace-demo');
+  if (clearSpaceDemo) {
+    clearSpaceDemo.innerHTML = renderPixelArt(DEER_IDLE, 3);
+    var svg = clearSpaceDemo.querySelector('svg');
+    svg.style.display = 'block';
+    svg.style.width = '80px';
+    svg.style.height = 'auto';
+    clearSpaceDemo.style.padding = '80px';
+    clearSpaceDemo.style.background = 'var(--surface-high)';
+    clearSpaceDemo.style.borderRadius = 'var(--radius-card)';
+    clearSpaceDemo.style.boxShadow = 'var(--shadow-card)';
+    clearSpaceDemo.style.border = '1px dashed rgba(200,132,92,0.3)';
+  }
+
+  // ===========================================================
+  // RENDER SPLASH SCREEN (deer in phone)
+  // ===========================================================
+  var splashScreen = document.getElementById('splash-screen');
+  if (splashScreen) {
+    var splashDeer = document.createElement('div');
+    splashDeer.innerHTML = renderPixelArt(DEER_IDLE, 3);
+    var svg = splashDeer.querySelector('svg');
+    svg.style.width = '64px';
+    svg.style.height = 'auto';
+    svg.style.display = 'block';
+    splashScreen.insertBefore(splashDeer, splashScreen.firstChild);
+  }
+
+  // ===========================================================
+  // RENDER BUSINESS CARD DEER
+  // ===========================================================
+  var bizCardDeer = document.getElementById('biz-card-deer');
+  if (bizCardDeer) {
+    bizCardDeer.innerHTML = renderPixelArt(DEER_IDLE, 1.5);
+    var svg = bizCardDeer.querySelector('svg');
+    svg.style.width = '28px';
+    svg.style.height = 'auto';
+    svg.style.display = 'block';
+  }
+
+  // ===========================================================
+  // RENDER CHARACTER STATES GRID
+  // ===========================================================
+  var statesGrid = document.getElementById('states-grid-container');
+  if (statesGrid) {
+    STATES.forEach(function(state, i) {
+      var card = document.createElement('div');
+      card.className = 'state-card reveal' + (i < 5 ? '' : ' reveal-delay-' + Math.min(i - 4, 4));
+      var deerHtml = renderPixelArt(state.data, 3);
+
+      card.innerHTML =
+        '<div class="state-deer">' + deerHtml + '</div>' +
+        '<div class="state-name">' + state.name + '</div>' +
+        '<div class="state-name-en">' + state.en + '</div>' +
+        '<div class="state-trigger">' + state.trigger + '<br>' + state.usage + '</div>';
+
+      var svg = card.querySelector('svg');
+      svg.style.width = '128px';
+      svg.style.height = 'auto';
+      svg.style.display = 'block';
+      svg.style.margin = '0 auto';
+
+      statesGrid.appendChild(card);
+    });
+  }
+
+  // ===========================================================
+  // RENDER PHILOSOPHY DEER
+  // ===========================================================
+  var philDeer = document.getElementById('philosophy-deer');
+  if (philDeer) {
+    philDeer.innerHTML = renderPixelArt(DEER_SUN, 5);
+    var svg = philDeer.querySelector('svg');
+    svg.style.width = '160px';
+    svg.style.height = 'auto';
+    svg.style.display = 'block';
+    svg.style.margin = '0 auto';
+  }
+
+  // ===========================================================
+  // RENDER FOOTER DEER
+  // ===========================================================
+  var footerDeer = document.getElementById('footer-deer');
+  if (footerDeer) {
+    footerDeer.innerHTML = renderPixelArt(DEER_IDLE, 2);
+    var svg = footerDeer.querySelector('svg');
+    svg.style.width = '48px';
+    svg.style.height = 'auto';
+    svg.style.display = 'block';
+    svg.style.margin = '0 auto';
+    svg.style.opacity = '0.5';
+  }
+
+  // ===========================================================
+  // RENDER GUIDE MINI DEER (character usage section)
+  // ===========================================================
+  var guideDeers = {
+    'guide-idle-mini': DEER_IDLE,
+    'guide-daze-mini': DEER_DAZE,
+    'guide-drink-mini': DEER_DRINK,
+    'guide-think-mini': DEER_THINK,
+    'guide-notes-mini': DEER_NOTES,
+    'guide-speak-mini': DEER_SPEAK,
+    'guide-care-mini': DEER_CARE,
+    'guide-sun-mini': DEER_SUN,
+  };
+  Object.keys(guideDeers).forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) {
+      el.innerHTML = renderPixelArt(guideDeers[id], 1.5);
+      var svg = el.querySelector('svg');
+      svg.style.width = '36px';
+      svg.style.height = 'auto';
+      svg.style.display = 'block';
+    }
+  });
+
+  // ===========================================================
+  // INTERSECTION OBSERVER FOR REVEAL ANIMATIONS
+  // ===========================================================
+  var observer = new IntersectionObserver(function(entries) {
+    entries.forEach(function(entry) {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('visible');
+      }
+    });
+  }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+  document.querySelectorAll('.reveal').forEach(function(el) {
+    observer.observe(el);
+  });
+
+})();
+</script>
+</body>
+</html>

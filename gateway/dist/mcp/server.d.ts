@@ -1,8 +1,7 @@
 /**
- * MCP Server — exposes v2note built-in tools as standard MCP protocol.
+ * MCP Server — exposes v2note tools as standard MCP protocol.
  *
- * This allows external AI agents (Claude, ChatGPT, etc.) to discover
- * and use v2note's capabilities via the Model Context Protocol.
+ * Now uses ToolRegistry instead of legacy BUILTIN_TOOLS.
  *
  * Endpoint: POST /mcp (JSON-RPC 2.0)
  */

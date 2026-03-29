@@ -53,16 +53,15 @@ async function createInitialDiaryForDevice(deviceId) {
     });
 }
 export function registerDeviceRoutes(router) {
-    // Register device
+    // Register device（原子操作：防止并发重复创建欢迎日记）
     router.post("/api/v1/devices/register", async (req, res) => {
         const { identifier, platform } = await readBody(req);
         if (!identifier) {
             sendJson(res, { error: "identifier is required" }, 400);
             return;
         }
-        let device = await deviceRepo.findByIdentifier(identifier);
-        if (!device) {
-            device = await deviceRepo.create(identifier, platform ?? "unknown");
+        const { device, isNew } = await deviceRepo.findOrCreate(identifier, platform ?? "unknown");
+        if (isNew) {
             try {
                 await createInitialDiaryForDevice(device.id);
             }

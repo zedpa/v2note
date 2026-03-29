@@ -12,3 +12,4 @@ export * from "./memory";
 export * from "./soul";
 export * from "./strikes";
 export * from "./action-panel";
+export * from "./vocabulary";

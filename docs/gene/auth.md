@@ -106,6 +106,15 @@ soul/user-profile 额外新增 `upsertByUser(userId, content)`。
 2. 批量 `UPDATE` 10 张表: `SET user_id = ? WHERE device_id = ? AND user_id IS NULL`
 3. soul/user_profile 单独处理（singleton per user）
 
+## 设备注册防重（2026-03）
+
+新设备注册存在并发重复问题：app 启动时多个组件同时调用 `getDeviceId()`，导致重复请求 + 重复创建欢迎日记。
+
+### 修复
+- **前端** `shared/lib/device.ts`：`pendingPromise` 并发锁，多组件同时调用复用同一个 Promise
+- **后端** `gateway/src/db/repositories/device.ts`：`findOrCreate()` 用 `ON CONFLICT DO NOTHING` 原子操作 + `isNew` 标记
+- **后端** `gateway/src/routes/devices.ts`：仅 `isNew=true` 时创建欢迎日记
+
 ## 环境变量
 
 - `JWT_SECRET` — 必须设置，否则使用不安全的默认值 `dev-jwt-secret-change-me`

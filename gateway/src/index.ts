@@ -36,6 +36,10 @@ import { registerCognitiveClusterRoutes } from "./routes/cognitive-clusters.js";
 import { registerIngestRoutes } from "./routes/ingest.js";
 import { registerCognitiveRelationRoutes } from "./routes/cognitive-relations.js";
 import { registerOnboardingRoutes } from "./routes/onboarding.js";
+import { registerTopicRoutes } from "./routes/topics.js";
+import { registerCompanionRoutes } from "./routes/companion.js";
+import { registerVocabularyRoutes } from "./routes/vocabulary.js";
+import { registerNotificationRoutes } from "./routes/notifications.js";
 import { getProactiveEngine } from "./proactive/engine.js";
 import { verifyAccessToken } from "./auth/jwt.js";
 import { generateAiStatus } from "./handlers/reflect.js";
@@ -76,6 +80,7 @@ type GatewayResponse =
   | { type: "proactive.evening_summary"; payload: { text: string } }
   | { type: "reflect.question"; payload: { question: string } }
   | { type: "ai.status"; payload: { text: string } }
+  | { type: "tool.status"; payload: { toolName: string; label: string } }
   | { type: "auth.ok"; payload: { userId: string } }
   | { type: "error"; payload: { message: string } };
 
@@ -111,6 +116,10 @@ registerCognitiveClusterRoutes(router);
 registerIngestRoutes(router);
 registerCognitiveRelationRoutes(router);
 registerOnboardingRoutes(router);
+registerTopicRoutes(router);
+registerCompanionRoutes(router);
+registerVocabularyRoutes(router);
+registerNotificationRoutes(router);
 
 // ── HTTP Server ──
 
@@ -232,6 +241,12 @@ wss.on("connection", (ws) => {
           const stream = await startChat(msg.payload);
           let fullText = "";
           for await (const chunk of stream) {
+            // 工具状态标记：转为独立消息类型，不混入聊天内容
+            if (chunk.startsWith("\x00TOOL_STATUS:")) {
+              const parts = chunk.slice(13).split(":", 2);
+              send(ws, { type: "tool.status", payload: { toolName: parts[0], label: parts[1] } });
+              continue;
+            }
             fullText += chunk;
             send(ws, { type: "chat.chunk", payload: { text: chunk } });
           }
@@ -249,6 +264,11 @@ wss.on("connection", (ws) => {
           );
           let fullText = "";
           for await (const chunk of stream) {
+            if (chunk.startsWith("\x00TOOL_STATUS:")) {
+              const parts = chunk.slice(13).split(":", 2);
+              send(ws, { type: "tool.status", payload: { toolName: parts[0], label: parts[1] } });
+              continue;
+            }
             fullText += chunk;
             send(ws, { type: "chat.chunk", payload: { text: chunk } });
           }

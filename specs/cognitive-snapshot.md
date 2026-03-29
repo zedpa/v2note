@@ -1,6 +1,7 @@
 # 认知快照 — 增量分析基础设施
 
-> 状态：🟡 待开发 | 优先级：Phase 0（最高优先，cognitive-engine-v2 前置）
+> 状态：✅ completed | 优先级：Phase 0（最高优先，cognitive-engine-v2 前置）
+> 完成日期: 2026-03-27 — snapshot.ts + migration 029 已创建
 > 依赖：无
 > 被依赖：cognitive-engine-v2
 

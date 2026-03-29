@@ -1,5 +1,5 @@
 -- 目标树
-CREATE TABLE goal (
+CREATE TABLE IF NOT EXISTS goal (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   device_id TEXT NOT NULL REFERENCES device(id) ON DELETE CASCADE,
   title TEXT NOT NULL,
@@ -9,11 +9,11 @@ CREATE TABLE goal (
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()
 );
-CREATE INDEX idx_goal_device ON goal(device_id);
-CREATE INDEX idx_goal_active ON goal(device_id, status) WHERE status = 'active';
+CREATE INDEX IF NOT EXISTS idx_goal_device ON goal(device_id);
+CREATE INDEX IF NOT EXISTS idx_goal_active ON goal(device_id, status) WHERE status = 'active';
 
 -- 待确认意图（wish/goal 暂存区）
-CREATE TABLE pending_intent (
+CREATE TABLE IF NOT EXISTS pending_intent (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   device_id TEXT NOT NULL REFERENCES device(id) ON DELETE CASCADE,
   record_id UUID REFERENCES record(id) ON DELETE CASCADE,
@@ -24,7 +24,7 @@ CREATE TABLE pending_intent (
   promoted_to UUID,  -- goal_id or todo_id
   created_at TIMESTAMPTZ DEFAULT now()
 );
-CREATE INDEX idx_pending_device ON pending_intent(device_id, status) WHERE status = 'pending';
+CREATE INDEX IF NOT EXISTS idx_pending_device ON pending_intent(device_id, status) WHERE status = 'pending';
 
 -- todo 关联目标
 ALTER TABLE todo ADD COLUMN IF NOT EXISTS goal_id UUID REFERENCES goal(id) ON DELETE SET NULL;

@@ -12,16 +12,18 @@
  * - Multi-process safe (multiple gateways share one queue)
  */
 import { WebSocket } from "ws";
-import { todoRepo, recordRepo } from "../db/repositories/index.js";
+import { todoRepo, recordRepo, notificationRepo } from "../db/repositories/index.js";
 import * as dailyBriefingRepo from "../db/repositories/daily-briefing.js";
 import { regenerateSummary, extractToMemory } from "../diary/manager.js";
 import { digestRecords } from "../handlers/digest.js";
 import { runDailyCognitiveCycle } from "../cognitive/daily-cycle.js";
-import { runEmergence } from "../cognitive/emergence.js";
+import { runBatchAnalyze } from "../cognitive/batch-analyze.js";
+import { ChatRateLimiter, generateCompanionChat, getRewardPhrase } from "../companion/chat-generator.js";
 export class ProactiveEngine {
     devices = new Map();
     intervalMs = 30 * 60 * 1000; // 30 minutes
     dailyPushSent = new Set();
+    chatRateLimiter = new ChatRateLimiter();
     // Fallback timer (used when Redis unavailable)
     fallbackTimer = null;
     digestTimer = null;
@@ -194,32 +196,39 @@ export class ProactiveEngine {
             if (device.ws.readyState !== WebSocket.OPEN)
                 continue;
             switch (type) {
-                case "morning":
+                case "morning": {
+                    const mText = "新的一天开始了，查看今日简报";
                     this.sendMessage(device, {
                         type: "proactive.morning_briefing",
-                        payload: { text: "新的一天开始了，查看今日简报" },
+                        payload: { text: mText },
                     });
+                    this.persistNotification(device, "proactive.morning_briefing", "晨间简报", mText);
                     break;
+                }
                 case "relay": {
                     try {
                         const relays = device.userId
                             ? await todoRepo.findRelayByUser(device.userId)
                             : await todoRepo.findRelayByDevice(device.deviceId);
                         if (relays.length > 0) {
+                            const rText = `你有 ${relays.length} 条信息还需要转达`;
                             this.sendMessage(device, {
                                 type: "proactive.relay_reminder",
-                                payload: { text: `你有 ${relays.length} 条信息还需要转达`, count: relays.length },
+                                payload: { text: rText, count: relays.length },
                             });
+                            this.persistNotification(device, "proactive.relay_reminder", "转达提醒", rText);
                         }
                     }
                     catch { /* table may not exist */ }
                     break;
                 }
-                case "evening":
+                case "evening": {
+                    const eText = "今天辛苦了，看看日终总结";
                     this.sendMessage(device, {
                         type: "proactive.evening_summary",
-                        payload: { text: "今天辛苦了，看看日终总结" },
+                        payload: { text: eText },
                     });
+                    this.persistNotification(device, "proactive.evening_summary", "日终总结", eText);
                     // Regenerate diary summaries for today
                     const today = new Date().toISOString().split("T")[0];
                     regenerateSummary(device.deviceId, "default", today).catch(() => { });
@@ -230,6 +239,7 @@ export class ProactiveEngine {
                         extractToMemory(device.deviceId, { start: weekAgo, end: today }).catch(() => { });
                     }
                     break;
+                }
             }
         }
     }
@@ -307,11 +317,12 @@ export class ProactiveEngine {
             }
             console.log(`[proactive:digest] Processing ${userIds.size} users with undigested records`);
             for (const userId of userIds) {
+                let recordIds = [];
                 try {
                     const records = await recordRepo.findUndigested(userId);
                     if (records.length === 0)
                         continue;
-                    const recordIds = records.map((r) => r.id);
+                    recordIds = records.map((r) => r.id);
                     console.log(`[proactive:digest] User ${userId}: ${recordIds.length} undigested records`);
                     // Find deviceId from connected devices or use userId as fallback
                     let deviceId = userId;
@@ -325,6 +336,15 @@ export class ProactiveEngine {
                 }
                 catch (err) {
                     console.error(`[proactive:digest] Failed for user ${userId}:`, err.message);
+                    // 失败时增加重试计数
+                    for (const id of recordIds) {
+                        try {
+                            await recordRepo.incrementDigestAttempts(id);
+                        }
+                        catch {
+                            // 忽略
+                        }
+                    }
                 }
             }
         }
@@ -371,8 +391,8 @@ export class ProactiveEngine {
             console.log(`[proactive:emergence] Processing ${rows.length} user(s)`);
             for (const row of rows) {
                 try {
-                    const result = await runEmergence(row.user_id);
-                    console.log(`[proactive:emergence] User ${row.user_id}:`, result);
+                    const result = await runBatchAnalyze(row.user_id);
+                    console.log(`[proactive:batch-analyze] User ${row.user_id}:`, result);
                 }
                 catch (err) {
                     console.error(`[proactive:emergence] Failed for user ${row.user_id}:`, err.message);
@@ -396,10 +416,12 @@ export class ProactiveEngine {
                     try {
                         const cached = await dailyBriefingRepo.findByDeviceAndDate(device.deviceId, today, "morning");
                         if (!cached) {
+                            const briefingText = "新的一天开始了，查看今日简报";
                             this.sendMessage(device, {
                                 type: "proactive.morning_briefing",
-                                payload: { text: "新的一天开始了，查看今日简报" },
+                                payload: { text: briefingText },
                             });
+                            this.persistNotification(device, "proactive.morning_briefing", "晨间简报", briefingText);
                             this.dailyPushSent.add(briefingKey);
                             device.lastNudge = Date.now();
                             return;
@@ -416,10 +438,12 @@ export class ProactiveEngine {
                             ? await todoRepo.findRelayByUser(device.userId)
                             : await todoRepo.findRelayByDevice(device.deviceId);
                         if (relays.length > 0) {
+                            const relayText = `你有 ${relays.length} 条信息还需要转达`;
                             this.sendMessage(device, {
                                 type: "proactive.relay_reminder",
-                                payload: { text: `你有 ${relays.length} 条信息还需要转达`, count: relays.length },
+                                payload: { text: relayText, count: relays.length },
                             });
+                            this.persistNotification(device, "proactive.relay_reminder", "转达提醒", relayText);
                             this.dailyPushSent.add(relayKey);
                             device.lastNudge = Date.now();
                             return;
@@ -431,14 +455,61 @@ export class ProactiveEngine {
             if (hour >= 20 && hour < 22) {
                 const eveningKey = `evening:${nudgeKey}`;
                 if (!this.dailyPushSent.has(eveningKey)) {
+                    const eveningText = "今天辛苦了，看看日终总结";
                     this.sendMessage(device, {
                         type: "proactive.evening_summary",
-                        payload: { text: "今天辛苦了，看看日终总结" },
+                        payload: { text: eveningText },
                     });
+                    this.persistNotification(device, "proactive.evening_summary", "日终总结", eveningText);
                     this.dailyPushSent.add(eveningKey);
                     device.lastNudge = Date.now();
                     return;
                 }
+            }
+        }
+        // ── Companion chat: daily first open greeting (场景 5.1-5.2) ──
+        const firstOpenKey = `companion:firstopen:${nudgeKey}`;
+        if (!this.dailyPushSent.has(firstOpenKey) && this.chatRateLimiter.canSend()) {
+            try {
+                const timeOfDay = hour < 12 ? "morning" : hour < 17 ? "afternoon" : hour < 21 ? "evening" : "night";
+                const chat = await generateCompanionChat("daily_open", {
+                    mood: "calm",
+                    recentStrikes: [],
+                    timeOfDay,
+                });
+                this.sendMessage(device, { type: "companion.chat", payload: { text: chat } });
+                this.persistNotification(device, "companion.chat", "每日问候", chat);
+                this.dailyPushSent.add(firstOpenKey);
+                this.chatRateLimiter.record();
+            }
+            catch (err) {
+                console.warn(`[proactive] Companion chat failed: ${err.message}`);
+            }
+        }
+        // ── Goal harvest follow-up: 完成 7+ 天未跟进的目标 (topic-lifecycle 场景 6) ──
+        const harvestKey = `harvest:${nudgeKey}`;
+        if (!this.dailyPushSent.has(harvestKey)) {
+            try {
+                const uid = device.userId ?? device.deviceId;
+                const completedGoals = await import("../db/pool.js").then(({ query: q }) => q(`SELECT id, title FROM goal
+             WHERE ${device.userId ? "user_id" : "device_id"} = $1
+               AND status = 'completed'
+               AND updated_at < NOW() - INTERVAL '7 days'
+             ORDER BY updated_at ASC LIMIT 1`, [uid]));
+                if (completedGoals.length > 0) {
+                    const goal = completedGoals[0];
+                    const text = `"${goal.title}" 完成一周了，结果怎样？`;
+                    this.sendMessage(device, {
+                        type: "proactive.message",
+                        payload: { text, action: "chat" },
+                    });
+                    this.persistNotification(device, "proactive.goal_harvest", goal.title, text);
+                    this.dailyPushSent.add(harvestKey);
+                    device.lastNudge = Date.now();
+                }
+            }
+            catch {
+                // goal table may not exist yet
             }
         }
         // Standard todo checks
@@ -466,14 +537,41 @@ export class ProactiveEngine {
                 type: "proactive.todo_nudge",
                 payload: { todoId: todo.id, text: todo.text, suggestion, ai_actionable: isAiActionable },
             });
+            this.persistNotification(device, "proactive.todo_nudge", "待办提醒", suggestion);
             device.lastNudge = Date.now();
         }
         else if (unscheduled.length > 0) {
+            const scheduleText = `你有 ${unscheduled.length} 项待办还没有安排时间，要现在安排吗？`;
             this.sendMessage(device, {
                 type: "proactive.message",
-                payload: { text: `你有 ${unscheduled.length} 项待办还没有安排时间，要现在安排吗？`, action: "schedule" },
+                payload: { text: scheduleText, action: "schedule" },
             });
+            this.persistNotification(device, "proactive.schedule_reminder", "排期提醒", scheduleText);
             device.lastNudge = Date.now();
+        }
+    }
+    /** 待办完成时发送奖励语（场景 5.3） */
+    onTodoCompleted(deviceId) {
+        const device = this.devices.get(deviceId);
+        if (!device)
+            return;
+        const phrase = getRewardPhrase();
+        this.sendMessage(device, { type: "companion.chat", payload: { text: phrase } });
+        this.persistNotification(device, "companion.chat", "完成奖励", phrase);
+    }
+    /** 持久化通知到数据库 */
+    async persistNotification(device, type, title, body) {
+        try {
+            await notificationRepo.create({
+                deviceId: device.deviceId,
+                userId: device.userId ?? null,
+                type,
+                title,
+                body,
+            });
+        }
+        catch (err) {
+            console.warn(`[proactive] Failed to persist notification: ${err.message}`);
         }
     }
     sendNudge(device, msg) {

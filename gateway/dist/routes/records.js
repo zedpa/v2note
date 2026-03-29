@@ -42,17 +42,21 @@ export function registerRecordRoutes(router) {
                 offset,
                 notebook: notebook !== undefined ? notebook : undefined,
             });
-        // Batch load summaries and tags
+        // 批量加载关联数据（3 次查询，替代 N+1）
         const ids = records.map((r) => r.id);
-        const [summaries, transcripts] = await Promise.all([
-            ids.length > 0 ? Promise.all(ids.map((id) => summaryRepo.findByRecordId(id))) : [],
+        const [summaries, transcripts, tagRows] = await Promise.all([
+            ids.length > 0 ? summaryRepo.findByRecordIds(ids) : [],
             ids.length > 0 ? transcriptRepo.findByRecordIds(ids) : [],
+            ids.length > 0 ? tagRepo.findByRecordIds(ids) : [],
         ]);
-        const tagsByRecord = ids.length > 0
-            ? await Promise.all(ids.map((id) => tagRepo.findByRecordId(id).then((tags) => ({ id, tags }))))
-            : [];
-        const tagMap = Object.fromEntries(tagsByRecord.map((t) => [t.id, t.tags]));
-        const summaryMap = Object.fromEntries(summaries.filter(Boolean).map((s) => [s.record_id, s]));
+        // 按 record_id 分组 tags
+        const tagMap = {};
+        for (const row of tagRows) {
+            if (!tagMap[row.record_id])
+                tagMap[row.record_id] = [];
+            tagMap[row.record_id].push({ id: row.id, name: row.name });
+        }
+        const summaryMap = Object.fromEntries(summaries.map((s) => [s.record_id, s]));
         const transcriptMap = Object.fromEntries(transcripts.map((t) => [t.record_id, t]));
         const items = records.map((r) => ({
             ...r,

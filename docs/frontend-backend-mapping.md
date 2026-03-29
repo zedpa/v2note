@@ -211,3 +211,186 @@
 | 023 | strike_level | strike.level + strike.origin |
 | 024 | todo_strike_bridge | (待实现) todo.strike_id + goal.cluster_id |
 | 025 | goal_lifecycle | (待实现) goal 字段扩展 |
+
+
+
+## 页面层级与导航结构
+
+### 平台分流
+
+```
+访问 / (根路径)
+├── viewport ≥ 768px → router.replace("/write") → PC 端
+└── viewport < 768px → 移动端主页
+```
+
+### 移动端：状态驱动 overlay 模型
+
+移动端不使用路由跳转，所有页面切换通过 `activeOverlay` 状态控制条件渲染。
+
+```
+app/page.tsx (移动端入口，唯一路由)
+│
+├── [门控层] 按优先级短路渲染，不进入主界面
+│   ├── authLoading    → 全屏 Loading（鹿 Logo）
+│   ├── !loggedIn      → LoginPage / RegisterPage（authMode 切换）
+│   └── isFirstTime    → OnboardingSeed（冷启动 5 问）
+│
+├── [常驻层] 始终渲染，不受 overlay 影响
+│   ├── SidebarDrawer        左滑侧边栏（75vw, max 320px）
+│   │   └── 菜单项 → openOverlay() 触发各 overlay
+│   ├── OfflineBanner        离线提示横幅
+│   ├── UpdateDialog         版本更新弹窗
+│   └── FAB                  录音悬浮按钮（底部常驻）
+│
+├── [工作区层] 主内容，tab 切换
+│   ├── WorkspaceHeader      头像 | Segment(日记/待办) | 搜索 | 通知
+│   └── main (左右滑动切换，80px 阈值)
+│       ├── activeTab="diary" → NotesTimeline（语音日记流）
+│       └── activeTab="todo"  → TodoWorkspaceView（待办 + NowCard）
+│
+├── [认知地图层] 独立状态控制（cognitiveMapOpen / selectedClusterId / decisionQuestion）
+│   ├── LifeMap              认知地图（全屏力导向图）
+│   ├── ClusterDetailView    聚类详情（从地图点选进入）
+│   └── DecisionWorkspace    决策工作台（从聚类详情进入）
+│
+└── [Overlay 层] activeOverlay 状态驱动，同时只显示一个
+    │
+    ├── 信息类（全屏覆盖 + SwipeBack 右滑返回）
+    │   ├── "search"            SearchView          搜索
+    │   ├── "chat"              ChatView            AI 对话（review/command/insight 三模式）
+    │   ├── "stats"             StatsDashboard      数据统计
+    │   ├── "memory"            MemorySoulOverlay   记忆与灵魂
+    │   ├── "review"            ReviewOverlay       回顾入口
+    │   ├── "skills"            SkillsPage          技能管理
+    │   ├── "profile"           ProfileEditor       用户画像编辑
+    │   ├── "settings"          SettingsEditor      设置
+    │   └── "notebooks"         NotebookList        笔记本列表
+    │
+    ├── 日报类（全屏覆盖 + SwipeBack）
+    │   ├── "morning-briefing"  MorningBriefing     今日简报（7-10am 自动弹出）
+    │   └── "evening-summary"   EveningSummary      日终总结
+    │
+    ├── 目标类（全屏覆盖，支持层级跳转）
+    │   ├── "goals"             GoalList            目标列表
+    │   │   ├── → "goal-detail"                      点击目标 → 目标详情
+    │   │   └── → "project-detail"                   点击项目 → 项目详情
+    │   ├── "goal-detail"       GoalDetailOverlay   目标详情
+    │   └── "project-detail"    ProjectDetailOverlay 项目详情
+    │       └── → "goal-detail"                      点击子目标 → 目标详情
+    │
+    ├── 待办类
+    │   ├── "todos"             TodoPanel           待办面板（底部弹出）
+    │   └── "today-todo"        TodayGantt          今日甘特图
+    │
+    └── "notifications"         NotificationCenter  通知中心
+        └── 点击通知 → 跳转对应 overlay 或切换 tab
+```
+
+### PC 端：文件路由 + MenuBar
+
+PC 端使用 Next.js App Router 文件路由，顶部 MenuBar 悬浮导航。
+
+```
+PCLayout (所有 PC 页面的公共外壳)
+├── MenuBar (fixed top, hover 显示)
+│   ├── 左侧: Logo + 场景切换按钮
+│   │   ├── /write     "写作"    默认场景，纯输入
+│   │   ├── /timeline  "时间线"  三列布局浏览
+│   │   ├── /map       "地图"    认知网络可视化
+│   │   └── /goals     "目标"    目标/项目管理
+│   └── 右侧: 功能按钮
+│       ├── 🔍 搜索
+│       ├── 🎙 语音输入
+│       ├── ⚡ 行动（右侧边栏 320px）
+│       ├── 📋 回顾（中心弹窗）
+│       └── ⚙️ 设置
+└── children (当前场景页面内容)
+```
+
+### 导航入口汇总
+
+| 入口 | 触发方式 | 目标 |
+|------|----------|------|
+| 头像 | 点击 | SidebarDrawer |
+| Segment | 仅点击（spec 1.2 禁用手势滑动，避免与 NowCard/待办行水平手势冲突） | diary ↔ todo tab 切换 |
+| 搜索图标 | 点击 | search overlay |
+| 通知铃铛 | 点击 | notifications overlay |
+| FAB | 点击/长按 | 录音 / 命令对话 |
+| 侧边栏菜单 | 点击各项 | 对应 overlay |
+| 通知项 | 点击 | morning-briefing / evening-summary / todo tab / 认知地图 |
+| 目标列表项 | 点击 | goal-detail / project-detail overlay |
+| 自动触发 | 7-10am 首次打开 | morning-briefing overlay |
+| 返回键/右滑 | 手势/系统键 | 关闭当前 overlay |
+
+### 转场动画
+
+| 场景 | 动画 | 参数 |
+|------|------|------|
+| Overlay 进入 | SwipeBack 包裹，fixed 全屏覆盖 | z-50, bg-background |
+| Overlay 返回 | 左边缘右滑（30px 激活，100px 触发） | translateX → 100%, 200ms ease-out |
+| Tab 切换 | 仅点击（spec 1.2 明确禁用手势） | Segment 点击切换 diary ↔ todo |
+| 侧边栏 | 左侧滑入 | 75vw / max 320px |
+| TodoPanel | 底部弹出 | sheet 模式 |
+| PC MenuBar | hover 显示/隐藏 | 鼠标 Y≤48px 触发，离开 400ms 后隐藏，fade 300ms |
+| NowCard 滑动 | 右滑完成(森林色) / 左滑跳过(晨光色) | 40px 激活，80px 触发，300ms ease-out |
+| 认知地图 | LifeMap isOpen 控制 | 独立状态，非 overlay |
+
+### 设计稿 × 代码实现状态（2026-03-28 审计，代码验证）
+
+| 设计稿 | 功能 | 视觉 | 说明 |
+|--------|------|------|------|
+| 01 Journal View | ✅ | ❌ | 日记流+日期分组+展开+多选删除有，缺 AI 洞察插入卡片(3.6)、No-Line 样式 |
+| 02 Todo View | ✅ | ⚠️ | NowCard+GoalIndicator+Today/Tomorrow/Later分组+进度条+PendingIntents 全有，已用 Editorial Serenity 色系 |
+| 03-04 NowCard 滑动 | ✅ | ⚠️ | 原生 pointer 事件完整状态机(idle/swiping/forking/dropping)，森林色/晨光色露出+40px激活阈值+flyOut+API上报 全有。注意：当前实现是 forking/dropping 分叉式，spec 4.9 改为单步滑动+Action Sheet（需对齐）。缺 spring 物理+粒子（锦上添花） |
+| 05 Sidebar | ✅ | ⚠️ | 头像+用户名+目标列表(展开/折叠)+三组分区+退出登录 全有，已用 Editorial Serenity 色系。缺 spec 6.2 的「方向区」Cluster 分类（依赖 /topics API） |
+| 06 FAB 文字态 | ✅ | ⚠️ | TextBottomSheet: 命令建议+附件(拍照/相册/文件)+URL检测导入+Mic/Send切换 全有 |
+| 07 FAB 语音态 | ✅ | ⚠️ | 双模式：手持录音(全屏沉浸+方向标签：取消/常驻/指令) + 锁定录音(RecordingImmersive: 大波形+计时器+转写+暂停) |
+| 08 FAB 处理态 | ✅ | ✅ | deer 渐变胶囊 + Sparkles 旋转 + 趣味文案 + 30s 安全超时 |
+| 09 Journal 展开 | ✅ | ⚠️ | 就地展开+音频播放器+Strike列表+待办+关联记录+source_type切换 有 |
+| 10 Todo Detail | ⚠️ | ❌ | 日期/时间/AI plan/目标关联 有，缺 sub-task 树(需 todo.parent_id)、comment/语音备注 |
+| 11 Goal Detail | ✅ | ⚠️ | 四维健康条+进度百分比+待办列表+认知叙事时间线+「和路路讨论」全有。缺雷达图可视化（当前为四条水平条） |
+| 12 Project Detail | ✅ | ⚠️ | Stitch 风格排版+子目标分组+待办+总进度统计 有。缺 momentum/attention 指标 |
+| 13 Discovery | ❌ | ❌ | 侧边栏入口有但 onClick 为 TODO 注释，无内容页（依赖 topic-lifecycle /topics API） |
+| 14 Daily Review | ⚠️ | ❌ | `daily-review.tsx` 是硬编码 mock 旧壳；真正内容在 `morning-briefing.tsx`(229行) 和 `evening-summary.tsx`(215行)，已接真实 API。设计要求卡片横滑式（当前为纵向滚动列表） |
+| 15 Cognitive Stats | ⚠️ | ❌ | recharts Bar/Line/标签分布图 有，缺极性环形图、认知地图可视化 |
+| 16 Chat Advisor | ✅ | ⚠️ | 流式+气泡+三模式(review/command/insight)+命令芯片+Glass header 全有 |
+| 17-18 Onboarding | ⚠️ | ⚠️ | 5步对话式引导+AI气泡+跳过 有，缺独立欢迎页(spec 10.1 页面1)+语音输入选项 |
+| 19-20 Login/Register | ✅ | ⚠️ | LuluLogo+品牌色+surface背景+deer渐变按钮+rounded-xl输入框 有。缺像素小鹿替换 LuluLogo |
+| 21 Notifications | ✅ | ⚠️ | 分类图标(dawn/deer/sky/forest/maple)+时间格式+未读标点+全部已读+Glass header 全有，已用 Editorial Serenity 色系。缺后端持久化（仅内存存储） |
+
+总结: **功能完成度 ~85%**，**视觉完成度 ~25%**（部分组件已用 Editorial Serenity 色系，但字体/No-Line/间距未对齐）。
+
+视觉已部分到位的组件（使用了 surface/deer/forest/dawn/muted-accessible 等色系）：
+  WorkspaceHeader、NowCard、TodoWorkspaceView、GoalDetailOverlay、ProjectDetailOverlay、
+  ChatView、NotificationCenter、LoginPage、SidebarDrawer、OnboardingSeed
+
+视觉完全未到位的组件（仍用 bg-background/border-border/shadow-md 等旧色系）：
+  NotesTimeline(部分)、StatsDashboard、DailyReview、MorningBriefing、EveningSummary
+
+详见 `specs/design-visual-alignment.md`（视觉对齐 spec）和 `specs/app-mobile-redesign.md`（实现进度审计章节）。
+
+### 已知问题与待改进
+
+**前端架构：**
+1. **overlay 无堆栈**：当前 `activeOverlay` 是单一状态，goals → goal-detail 通过替换实现，无法"返回上一层"。建议升级为 overlay 栈（数组）支持 push/pop
+2. **认知地图独立于 overlay 系统**：cognitiveMapOpen 是单独状态，与 activeOverlay 并行但无统一管理
+3. **无转场动画统一层**：各 overlay 各自处理动画，无统一的 AnimatePresence / transition 管理（见 design-visual-alignment 场景 7.1）
+4. **Glass & Soul 部分已实现**：WorkspaceHeader/ChatView/NotificationCenter 已有 `bg-surface/80 backdrop-blur-[12px]`，但 MorningBriefing/EveningSummary/StatsDashboard/NotesTimeline 的 header 仍用 `border-b border-border/60` 旧样式
+
+**Spec 与代码不一致：**
+5. **NowCard 左滑交互不一致**：spec 4.9 改为「单步滑动+弹出 Action Sheet 选原因」，但代码仍是 forking/dropping 分叉式（滑到 30-40% 进入 fork zone，下拉选原因）。两种方案都能工作，需决定统一哪种
+6. **字体 spec 不一致**：`app-mobile-redesign.md` 写 Noto Serif SC + Inter，`design-visual-alignment.md` 和 Pencil 设计稿写 Newsreader + Inter。需统一（建议：Newsreader 标题 + Noto Serif SC 中文回退 + Inter 正文）
+7. **侧边栏标题不一致**：spec 6.2 要求「我的方向」（Cluster 分类），代码用「我的目标」（Goal 列表）。前者依赖 /topics API
+
+**后端缺口：**
+8. **发现页无后端**：侧边栏入口存在但 overlay 无实现，需 `GET /api/v1/topics` + `GET /api/v1/topics/:id/lifecycle`（定义在 topic-lifecycle spec）
+9. **AI Window 无后端**：需 `GET /api/v1/companion/status`（定义在 ai-companion-window spec）
+10. **通知无持久化**：仅 WS 推送 + 内存存储，刷新即丢失。需新建 notification 表 + CRUD API
+11. **Todo sub-task 无支持**：spec 4.4 要求子任务树，需 todo.parent_id 字段（migration 待建）
+12. **项目 momentum/attention 无 API**：spec 7.2 要求，当前 project detail 只有完成百分比
+
+**PC 端（低优先级）：**
+13. **PC 端功能按钮未接线**：MenuBar 右侧按钮的 onAction 只有 console.log
+14. **PC 端无 overlay 系统**：搜索、对话、设置等在 PC 端尚未实现
+

@@ -1,3 +1,4 @@
+import { type ActionExecResult } from "./voice-action.js";
 export interface LocalConfigPayload {
     soul?: {
         content: string;
@@ -46,6 +47,10 @@ export interface ProcessResult {
     relays?: RelayExtract[];
     summary?: string;
     error?: string;
+    /** voice-action: 执行结果（指令型/混合型时存在） */
+    action_results?: ActionExecResult[];
+    /** voice-action: 意图类型 (record/action/mixed) */
+    voice_intent_type?: "record" | "action" | "mixed";
 }
 /**
  * Process a single diary entry: clean transcript text, save summary, trigger digest.

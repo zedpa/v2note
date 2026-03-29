@@ -19,6 +19,7 @@ import { shouldUpdateSoulStrict } from "../cognitive/self-evolution.js";
 import { gatherDecisionContext, buildDecisionPrompt } from "../cognitive/decision.js";
 import { generateAlerts } from "../cognitive/alerts.js";
 import { detectCognitiveQuery, loadChatCognitive, buildGoalDiscussionContext, buildInsightDiscussionContext, saveConversationAsRecord } from "../cognitive/advisor-context.js";
+import { computeMood, buildMoodPromptSection } from "../companion/mood.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const INSIGHTS_DIR = join(__dirname, "../../insights");
@@ -163,8 +164,25 @@ export async function startChat(
     cognitiveContext,
   });
 
+  // 注入路路心情（场景 6.2）
+  let moodSection = "";
+  try {
+    const hour = new Date().getHours();
+    const moodResult = computeMood({
+      completedTodayCount: 0, // 简化：后续可从 todoRepo 查
+      hasNewCluster: false,
+      hasSkippedTodo: false,
+      hoursSinceLastRecord: 0,
+      currentHour: hour,
+      isDigestRunning: false,
+    });
+    moodSection = buildMoodPromptSection(moodResult);
+  } catch { /* non-critical */ }
+
   // Set up session context
-  session.context.setSystemPrompt(systemPrompt);
+  session.context.setSystemPrompt(
+    moodSection ? `${systemPrompt}\n\n${moodSection}` : systemPrompt,
+  );
 
   if (payload.mode === "decision") {
     // Decision mode: deep cognitive graph traversal for decision support

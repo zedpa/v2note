@@ -91,6 +91,21 @@ export async function findBySource(sourceId: string): Promise<StrikeEntry[]> {
   );
 }
 
+/** 检查同一 source_id 下是否已有相同 nucleus 的 active Strike */
+export async function existsBySourceAndNucleus(
+  sourceId: string,
+  nucleus: string,
+): Promise<boolean> {
+  const row = await queryOne<{ exists: boolean }>(
+    `SELECT EXISTS(
+       SELECT 1 FROM strike
+       WHERE source_id = $1 AND nucleus = $2 AND status = 'active'
+     ) as exists`,
+    [sourceId, nucleus],
+  );
+  return row?.exists ?? false;
+}
+
 export async function findActive(
   userId: string,
   limit?: number,

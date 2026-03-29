@@ -39,6 +39,10 @@ export async function refreshToken(token: string): Promise<{
   return api.post("/api/v1/auth/refresh", { refreshToken: token });
 }
 
+export async function logoutUser(refreshToken: string): Promise<{ ok: boolean }> {
+  return api.post("/api/v1/auth/logout", { refreshToken });
+}
+
 export async function getMe(): Promise<{
   user: { id: string; phone: string; displayName: string | null; createdAt: string };
   devices: Array<{ id: string; device_identifier: string; platform: string }>;

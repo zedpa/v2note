@@ -14,14 +14,39 @@ export function registerTodoRoutes(router: Router) {
     sendJson(res, todos);
   });
 
-  // Create todo
+  // Create todo（支持无 record_id 的手动创建）
   router.post("/api/v1/todos", async (_req, res) => {
-    const { record_id, text } = await readBody<{
-      record_id: string;
+    const body = await readBody<{
+      record_id?: string;
       text: string;
+      domain?: string;
+      impact?: number;
+      goal_id?: string;
+      scheduled_start?: string;
+      estimated_minutes?: number;
+      parent_id?: string;
     }>(_req);
-    const todo = await todoRepo.create({ record_id, text });
+    const userId = getUserId(_req) ?? undefined;
+    const deviceId = getDeviceId(_req);
+    const todo = await todoRepo.create({
+      record_id: body.record_id || null,
+      text: body.text,
+      domain: body.domain,
+      impact: body.impact,
+      goal_id: body.goal_id,
+      scheduled_start: body.scheduled_start,
+      estimated_minutes: body.estimated_minutes,
+      parent_id: body.parent_id,
+      user_id: userId,
+      device_id: deviceId,
+    });
     sendJson(res, { id: todo.id }, 201);
+  });
+
+  // Get subtasks of a todo
+  router.get("/api/v1/todos/:id/subtasks", async (_req, res, params) => {
+    const subtasks = await todoRepo.findSubtasks(params.id);
+    sendJson(res, subtasks);
   });
 
   // Update todo

@@ -1,34 +1,59 @@
 ## gene_builtin_tools
 ### 功能描述
-AI 内置工具系统。AI 在处理录音和对话中可直接调用内置工具执行操作（创建/删除日记、创建复盘视角技能），无需 MCP 外部服务器。
+AI 工具系统（Vercel AI SDK v6 原生 function calling）。工具通过 ToolRegistry 统一注册，导出为 AI SDK tools 格式，由 `streamText({ tools, maxSteps })` 自动处理调用循环。
 
-### 详细功能
-- 功能1：create_diary — AI 调用后直接创建 record + transcript + summary，source="manual", status="completed"
-- 功能2：delete_diary — AI 调用后验证记录归属后删除，防止跨设备越权
-- 功能3：create_skill — AI 发现用户总结出有价值的思考框架时，自动创建 review 类型复盘视角技能（created_by=ai）
-- 功能4：create_goal — 创建用户确认的目标，source="chat"，支持 parent_id 构建目标树
-- 功能5：confirm_intent — 处理待确认意图（promote_goal/promote_todo/dismiss），支持 wish/goal 晋升为正式目标或待办
-- 功能6：update_todo — 更新待办的调度信息（scheduled_start/end、estimated_minutes、priority、text），支持清空（空字符串→null）
-- 功能7：create_notebook — 创建项目笔记本（name + 可选 description），AI 日记本系统入口
-- 功能8：工具描述自动注入 system prompt（与 MCP 工具合并展示）
-- 功能9：process.ts 工具调用循环中优先匹配内置工具，未命中则回退 MCP
-- 功能10：chat.ts 命令模式支持工具调用（非流式中间轮 + 流式最终回复）
+### 架构
+- **ToolRegistry**：中心注册表，Zod 参数验证 + 错误兜底 + `toAISDKTools()` 导出
+- **AI SDK 原生工具调用**：`streamText` + `maxSteps=5` 自动处理 AI→工具→结果→继续生成
+- **fullStream 状态推送**：工具执行期间向前端推送中文提示（"🔍 正在联网搜索…"），避免无反馈卡顿感
+- **自主度分级**：silent（静默执行）/ confirm（需用户确认）/ manual（手动触发）
+
+### 已注册工具
+| 工具 | 自主度 | 说明 |
+|------|--------|------|
+| create_record | silent | 创建日记 |
+| delete_record | confirm | 删除日记（需确认） |
+| create_todo | silent | 创建待办 |
+| update_todo | silent | 更新待办调度 |
+| create_goal | confirm | 创建目标 |
+| update_goal | silent | 更新目标状态 |
+| update_record | silent | 更新日记 |
+| create_project | confirm | 创建项目 |
+| create_link | silent | 创建关联 |
+| search | silent | 搜索系统内记录 |
+| confirm | silent | 确认操作 |
+| web_search | silent | 联网搜索（需 TAVILY_API_KEY/SERPAPI_KEY） |
+| fetch_url | silent | 获取网页内容 |
+
+### 工具调用流程
+1. Chat handler 构建 `ToolContext`（deviceId, userId, sessionId）
+2. `toolRegistry.toAISDKTools(ctx)` 导出为 AI SDK 格式
+3. `streamWithTools()` 调用 `streamText({ tools, maxSteps: 5 })`
+4. 消费 `result.fullStream`：
+   - `text-delta` → yield 文本给前端
+   - `tool-call` → yield 中文状态提示（"🔍 正在联网搜索…"）
+   - 工具执行 → Registry.execute() → Zod 验证 → handler → ToolCallResult
+5. 结果自动返回 AI，循环直到 maxSteps 或 AI 停止调用工具
+
+### 联网工具
+- **web_search**：Tavily/SerpAPI 双后端，10s 超时，无 API key 时不注册
+- **fetch_url**：抓取网页内容（Readability 提取），10s 超时，50K 字截断
+- URL 安全检查：禁止内网地址和非 HTTP 协议
 
 ### 关键文件
-- `gateway/src/tools/builtin.ts` — 内置工具定义 + 调度 + 执行（含 create_skill）
-- `gateway/src/skills/prompt-builder.ts` — 合并注入内置工具 + MCP 工具描述
-- `gateway/src/handlers/process.ts` — 处理管道工具调用循环（isBuiltinTool 优先）
-- `gateway/src/handlers/chat.ts` — 对话模式工具调用（streamWithToolCalls）
-- `gateway/src/db/repositories/custom-skill.ts` — create_skill 的持久化目标
+- `gateway/src/tools/registry.ts` — ToolRegistry（注册 + 验证 + 执行 + AI SDK 导出）
+- `gateway/src/tools/definitions/index.ts` — 全量工具注册（含条件注册 web_search）
+- `gateway/src/tools/types.ts` — ToolDefinition / ToolCallResult / ToolContext 类型
+- `gateway/src/web/web-search-tool.ts` — web_search 工具定义
+- `gateway/src/web/fetch-url-tool.ts` — fetch_url 工具定义
+- `gateway/src/web/search-provider.ts` — Tavily/SerpAPI 搜索服务抽象
+- `gateway/src/ai/provider.ts` — streamWithTools()（fullStream + 工具状态提示）
+- `gateway/src/handlers/chat.ts` — 对话模式工具调用集成
 
 ### 测试描述
+- 输入：对话中说"帮我搜一下最新铝价"
+- 输出：前端显示"🔍 正在联网搜索…"→ AI 返回搜索结果摘要
 - 输入：对话中说"帮我记一条：明天下午开会"
-- 输出：AI 调用 create_diary 工具，创建日记，回复"已帮你记录"
-- 输入：对话中说"删除刚才那条记录 xxx"
-- 输出：AI 调用 delete_diary 工具，验证归属后删除，回复"已删除"
-- 输入：对话中讨论出"以后都从成本视角分析决策" → AI 识别为可复用思考框架
-- 输出：AI 调用 create_skill 工具，创建"成本视角"复盘技能，回复"已为你创建复盘视角"
-- 输入：对话中用户确认"学吉他确实是我的目标"
-- 输出：AI 调用 confirm_intent 工具（action=promote_goal），将 pending_intent 晋升为 goal
-- 输入：对话中用户说"我今年要学会游泳"
+- 输出：AI 调用 create_record 工具，创建日记，回复"已帮你记录"
+- 输入：对话中说"我今年要学会游泳"
 - 输出：AI 调用 create_goal 工具，创建目标"今年学会游泳"

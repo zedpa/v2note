@@ -27,6 +27,10 @@ export declare function update(id: string, deviceId: string, fields: {
     content?: string;
     importance?: number;
 }): Promise<void>;
+/** 统计用户记忆总条数 */
+export declare function countByUser(userId: string): Promise<number>;
+/** 删除用户最低重要性的 N 条记忆（为新记忆腾位置） */
+export declare function evictLeastImportant(userId: string, count: number): Promise<number>;
 export declare function updateByUser(id: string, userId: string, fields: {
     content?: string;
     importance?: number;

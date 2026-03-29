@@ -69,7 +69,7 @@ export async function processEntry(payload: ProcessPayload): Promise<ProcessResu
 
     // ── Step 0: Voice action — 意图分类（记录/指令/混合） ──────────
     // 文本长度 > 10 才做分类（太短的不判断）
-    if (payload.text.length > 10) {
+    if (payload.text.length > 4) {
       try {
         const intentResult = await classifyVoiceIntent(payload.text);
         result.voice_intent_type = intentResult.type;
@@ -433,9 +433,7 @@ export async function processEntry(payload: ProcessPayload): Promise<ProcessResu
   return result;
 }
 
-function shouldDigestImmediately(result: ProcessResult, textLength: number, isColdStart?: boolean): boolean {
-  // 冷启动期（record < 20）无论长度都立即 Digest
-  if (isColdStart) return true;
-  const isSubstantial = textLength > 80;
-  return isSubstantial;
+function shouldDigestImmediately(_result: ProcessResult, textLength: number, _isColdStart?: boolean): boolean {
+  // 所有有实质内容的输入都立即 Digest，确保待办/意图能被及时提取
+  return textLength > 2;
 }

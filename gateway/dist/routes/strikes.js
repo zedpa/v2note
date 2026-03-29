@@ -1,6 +1,7 @@
-import { readBody, sendJson, sendError } from "../lib/http-helpers.js";
+import { readBody, sendJson, sendError, getUserId } from "../lib/http-helpers.js";
 import { strikeRepo, strikeTagRepo, bondRepo, transcriptRepo, } from "../db/repositories/index.js";
 import { query } from "../db/pool.js";
+import { undoSupersede, getSupersedAlerts } from "../cognitive/knowledge-lifecycle.js";
 export function registerStrikeRoutes(router) {
     // GET /api/v1/records/:id/strikes — 获取某条记录的 Strike 列表
     router.get("/api/v1/records/:id/strikes", async (_req, _res, params) => {
@@ -77,6 +78,21 @@ export function registerStrikeRoutes(router) {
             clusters,
             supersededBy,
         });
+    });
+    // POST /api/v1/strikes/:id/undo-supersede — 撤销 supersede
+    router.post("/api/v1/strikes/:id/undo-supersede", async (_req, res, params) => {
+        await undoSupersede(params.id);
+        sendJson(res, { ok: true });
+    });
+    // GET /api/v1/strikes/supersede-alerts — 过期确认 alert
+    router.get("/api/v1/strikes/supersede-alerts", async (req, res) => {
+        const userId = getUserId(req);
+        if (!userId) {
+            sendError(res, "Unauthorized", 401);
+            return;
+        }
+        const alerts = await getSupersedAlerts(userId);
+        sendJson(res, alerts);
     });
     // PATCH /api/v1/strikes/:id — 修改 Strike（nucleus / polarity）
     router.patch("/api/v1/strikes/:id", async (req, res, params) => {

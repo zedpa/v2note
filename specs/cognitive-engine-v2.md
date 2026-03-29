@@ -1,6 +1,7 @@
 # 认知引擎 v2 — 单次批量分析
 
-> 状态：🟡 待开发 | 优先级：Phase 0（最高优先） | 预计：1 周
+> 状态：✅ completed | 优先级：Phase 0（最高优先）
+> 完成日期: 2026-03-27 — batch-analyze.ts + prompt + daily-cycle 重写 + 7个旧文件删除
 > 依赖：cognitive-snapshot
 > 替代：emergence-chain, cold-start-bonds, cluster-tag-sync, contradiction-detection（均并入本 spec）
 

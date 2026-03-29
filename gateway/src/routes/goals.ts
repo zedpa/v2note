@@ -1,21 +1,40 @@
 import type { Router } from "../router.js";
 import { readBody, sendJson, getDeviceId, getUserId } from "../lib/http-helpers.js";
-import { goalRepo, pendingIntentRepo } from "../db/repositories/index.js";
+import { todoRepo, pendingIntentRepo } from "../db/repositories/index.js";
+import { queryOne } from "../db/pool.js";
 import { computeGoalHealth, createActionEvent, updateGoalStatus, getGoalTimeline } from "../cognitive/goal-linker.js";
 import { goalAutoLink, getProjectProgress } from "../cognitive/goal-auto-link.js";
 
+/** 从 device 表查 user_id 作为 fallback */
+async function resolveUserId(req: any): Promise<string | null> {
+  const uid = getUserId(req);
+  if (uid) return uid;
+  const deviceId = getDeviceId(req);
+  if (!deviceId) return null;
+  const row = await queryOne<{ user_id: string | null }>(
+    "SELECT user_id FROM device WHERE id = $1",
+    [deviceId],
+  );
+  return row?.user_id ?? null;
+}
+
 export function registerGoalRoutes(router: Router) {
-  // List active goals
+  // List active goals（统一模型：todo.level>=1）
   router.get("/api/v1/goals", async (req, res) => {
-    const userId = getUserId(req);
+    const userId = await resolveUserId(req);
     const deviceId = getDeviceId(req);
     const goals = userId
-      ? await goalRepo.findActiveByUser(userId)
-      : await goalRepo.findActiveByDevice(deviceId);
-    sendJson(res, goals);
+      ? await todoRepo.findActiveGoalsByUser(userId)
+      : await todoRepo.findActiveGoalsByDevice(deviceId);
+    // 兼容前端：text → title 映射
+    const mapped = goals.map((g) => ({
+      ...g,
+      title: g.text,
+    }));
+    sendJson(res, mapped);
   });
 
-  // Create goal
+  // Create goal（统一模型：创建 level=1 的 todo）
   router.post("/api/v1/goals", async (req, res) => {
     const deviceId = getDeviceId(req);
     const userId = getUserId(req);
@@ -24,20 +43,41 @@ export function registerGoalRoutes(router: Router) {
       parent_id?: string;
       source?: string;
     }>(req);
-    const goal = await goalRepo.create({ device_id: deviceId, user_id: userId ?? undefined, title, parent_id, source });
-    sendJson(res, goal, 201);
+    if (!userId) {
+      sendJson(res, { error: "user_id required" }, 400);
+      return;
+    }
+    const goal = await todoRepo.createGoalAsTodo({
+      device_id: deviceId,
+      user_id: userId,
+      text: title,
+      level: 1,
+      source,
+      status: "active",
+      parent_id,
+    });
+    sendJson(res, { ...goal, title: goal.text }, 201);
   });
 
-  // Update goal
+  // Update goal（统一模型：更新 todo）
   router.patch("/api/v1/goals/:id", async (req, res, params) => {
     const body = await readBody<{ title?: string; status?: string; parent_id?: string | null }>(req);
-    await goalRepo.update(params.id, body);
+    const updates: Record<string, any> = {};
+    if (body.title !== undefined) updates.text = body.title;
+    if (body.parent_id !== undefined) updates.parent_id = body.parent_id;
+    if (body.status !== undefined) {
+      // 使用 updateStatus 保持 done 和 status 一致
+      await todoRepo.updateStatus(params.id, body.status);
+    }
+    if (Object.keys(updates).length > 0) {
+      await todoRepo.update(params.id, updates);
+    }
     sendJson(res, { ok: true });
   });
 
-  // Get goal with associated todos
+  // Get goal with associated todos（统一模型：查子 todo）
   router.get("/api/v1/goals/:id/todos", async (_req, res, params) => {
-    const todos = await goalRepo.findWithTodos(params.id);
+    const todos = await todoRepo.findChildTodos(params.id);
     sendJson(res, todos);
   });
 
@@ -65,27 +105,17 @@ export function registerGoalRoutes(router: Router) {
       reason?: string;
     }>(req);
     await createActionEvent(body);
-
-    // 如果跳过次数达 3 次，触发 goal 状态检查
-    if (body.type === "skip") {
-      // 异步更新 goal 状态
-      import("../db/repositories/todo.js").then(async (todoRepo) => {
-        const todos = await todoRepo.findByRecordId(body.todo_id).catch(() => []);
-        // 获取 todo 的 goal_id 并触发状态检查
-      }).catch(() => {});
-    }
-
     sendJson(res, { ok: true }, 201);
   });
 
-  // Confirm/dismiss suggested goal
+  // Confirm/dismiss suggested goal（统一模型）
   router.post("/api/v1/goals/:id/confirm", async (_req, res, params) => {
-    await updateGoalStatus(params.id, "user_confirm");
+    await todoRepo.updateStatus(params.id, "active");
     sendJson(res, { ok: true });
   });
 
   router.post("/api/v1/goals/:id/archive", async (_req, res, params) => {
-    await updateGoalStatus(params.id, "user_archive");
+    await todoRepo.updateStatus(params.id, "archived");
     sendJson(res, { ok: true });
   });
 
@@ -103,6 +133,14 @@ export function registerGoalRoutes(router: Router) {
     const deviceId = getDeviceId(req);
     const progress = await getProjectProgress(params.id, userId ?? deviceId);
     sendJson(res, progress);
+  });
+
+  // Dimension summary（侧边栏 L3 维度统计）
+  router.get("/api/v1/dimensions", async (req, res) => {
+    const userId = await resolveUserId(req);
+    const deviceId = getDeviceId(req);
+    const summary = await todoRepo.getDimensionSummary(userId, deviceId);
+    sendJson(res, summary);
   });
 
   // List pending intents

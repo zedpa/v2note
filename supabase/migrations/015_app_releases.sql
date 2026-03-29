@@ -17,5 +17,5 @@ CREATE TABLE IF NOT EXISTS app_release (
   UNIQUE(version, platform, release_type)
 );
 
-CREATE INDEX idx_app_release_lookup
+CREATE INDEX IF NOT EXISTS idx_app_release_lookup
   ON app_release(platform, release_type, is_active, version_code DESC);

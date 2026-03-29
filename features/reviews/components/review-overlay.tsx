@@ -153,7 +153,7 @@ export function ReviewOverlay({
     <SwipeBack onClose={onClose}>
       <div className="flex flex-col min-h-dvh pt-safe">
         {/* Header */}
-        <div className="flex items-center gap-3 px-4 py-3 border-b border-border/60">
+        <div className="flex items-center gap-3 px-4 py-3 bg-surface/80 backdrop-blur-[12px]">
           <button
             type="button"
             onClick={handleBack}

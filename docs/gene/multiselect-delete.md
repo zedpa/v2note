@@ -11,9 +11,15 @@
 - 功能6：选择模式下隐藏音频播放器避免误触
 - 功能7：语音/文字类型标识——根据 `duration_seconds` 判断，语音笔记显示 Mic图标+时长，文字笔记显示 Type图标+"文字"
 
+### 外键约束修复（2026-03）
+删除 record 时 `strike.source_id` 外键（017_cognitive_layer.sql）默认 RESTRICT 阻止删除。
+- Migration `030_strike_source_cascade.sql`：改为 `ON DELETE SET NULL`
+- Strike 保留（认知数据有独立价值），仅 source_id 置空
+
 ### 关键文件
 - `features/notes/components/notes-timeline.tsx` — 时间线组件（选择逻辑 + 工具栏 + 类型标识）
 - `features/notes/hooks/use-notes.ts` — deleteNotes 方法
+- `supabase/migrations/030_strike_source_cascade.sql` — strike.source_id ON DELETE SET NULL
 
 ### 测试描述
 - 输入：长按日记卡片 → 选中多条 → 点击删除

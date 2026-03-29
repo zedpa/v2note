@@ -1,7 +1,20 @@
 # 主题生命周期 — 统一视图 + 认知-实践飞轮
 
-> 状态：🟡 待开发 | 优先级：Phase 7.2 | 预计：6-7 天
+> 状态：🔄 实现中 | 优先级：Phase 7.2 | 预计：6-7 天
 > 依赖：app-mobile-redesign（侧边栏 + 工作区），emergence-chain（Cluster 涌现），goal-lifecycle（目标状态流转）
+> 进度 2026-03-28：
+>   ✅ 场景 1 侧边栏主题列表（活跃方向+沉默区+Cluster分类）
+>   ✅ 场景 2 选中主题→全局筛选（药丸+Tab文字联动）
+>   ✅ 场景 3 进展 Tab 四阶段视图（Now/Growing/Seeds/Harvest）
+>   ✅ 场景 5 收获沉淀（POST /goals/:id/harvest）
+>   ✅ 场景 7 种子晋升（Seeds 区可展开+聊聊按钮）
+>   ✅ 场景 8 沉默区唤醒（侧边栏沉默区→筛选态）
+>   ✅ 场景 10 筛选持久化（localStorage）
+>   ✅ 后端 GET /topics + GET /topics/:id/lifecycle + POST /goals/:id/harvest
+>   ✅ 场景 4 脉络Tab（NotesTimeline cluster_id 筛选参数已接入）
+>   ✅ 场景 9 新建方向（+ 按钮→参谋对话 overlay）
+>   ✅ 场景 11 酝酿期卡片（无主题+有目标时显示酝酿态）
+>   🟡 场景 6/12 依赖其他模块（proactive/onboarding）
 
 ## 概述
 
@@ -223,6 +236,44 @@
 那么 (Then)   恢复上次的筛选状态（localStorage 持久化）
 当   (When)   从通知/深度链接跳转到某个待办
 那么 (Then)   自动设置该待办所属 Goal 的 Cluster 为筛选主题
+```
+
+### 场景 11: Tier2 酝酿期 — 涌现前的等待态
+```
+假设 (Given)  用户已录入 1-4 条日记，Tier2 尚未首次运行（需累计 5 个 Strike）
+当   (When)   侧边栏打开 / 主题生命周期视图加载
+那么 (Then)   「我的方向」区域不显示空白，而是显示酝酿态：
+  ┌─────────────────────────────────┐
+  │  我的方向                   +   │
+  │                                 │
+  │  🌱 路路正在观察你的想法...      │  ← 酝酿态卡片
+  │     已收集 3/5 条，再多聊几条    │  ← 进度指示
+  │     路路就能帮你梳理方向了       │
+  └─────────────────────────────────┘
+并且 (And)    🌱 图标用 deer 色微呼吸动画（暗示正在生长）
+并且 (And)    "3/5" 实时更新（Strike 数 / Tier2 触发阈值 5）
+并且 (And)    如果有 cold-start-onboarding 产出的 suggested Goal，直接在下方显示
+当   (When)   Tier2 首次运行完成
+那么 (Then)   酝酿态消失，替换为正常的活跃方向 / 沉默区列表
+并且 (And)    过渡动画：酝酿卡片展开变形为主题列表（300ms spring）
+```
+
+### 场景 12: 冷启动种子数据 — 引导完成即有内容
+```
+假设 (Given)  用户完成冷启动 5 问引导
+当   (When)   进入工作区
+那么 (Then)   引导中的回答已作为种子数据：
+  - Q3 回答（"最近最花心思的事"）→ 至少产出 1 个 suggested Goal
+  - Q4 回答（"想过就忘还是拖着"）→ 可能产出首批 Todo（如 AI 识别出具体行动）
+  - Q2 回答 → 提取的关键词作为 seed Cluster 的 nucleus
+并且 (And)    侧边栏显示：
+  - 酝酿态（3/5 进度）+ 1 个 suggested Goal（来自 Q3）
+  - 或者如果引导回答足够具体，直接显示 1 个活跃方向
+并且 (And)    待办视图显示：
+  - Now Card 可能有内容（来自 Q3/Q4 产出的 Todo）
+  - 待确认区有 suggested Goal
+并且 (And)    用户不会面对完全空白的界面
+注意: 与 cold-start-onboarding.md 场景 2-3 协作，确保前 5 条即时 Digest 产出 Strike
 ```
 
 ---

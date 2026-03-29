@@ -1,11 +1,12 @@
 /**
- * Digest Level 1 — core pipeline.
- * Decomposes records into Strikes, creates internal Bonds,
- * then links new Strikes to historical ones via cross-record Bonds.
+ * Digest Tier1 — 实时 Strike 分解
+ *
+ * 每条记录 1 次 AI 调用：分解为 Strike + 内部 Bond。
+ * 跨 Strike 关系由 Tier2 批量分析统一处理。
  */
 /**
  * Main digest entry point.
- * Processes a batch of records through the full cognitive pipeline.
+ * Tier1: 1 次 AI 调用分解 Strike + 内部 Bond。
  */
 export declare function digestRecords(recordIds: string[], context: {
     deviceId: string;

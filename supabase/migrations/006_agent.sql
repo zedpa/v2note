@@ -12,10 +12,11 @@ CREATE TABLE IF NOT EXISTS memory (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
-CREATE INDEX idx_memory_device ON memory(device_id);
-CREATE INDEX idx_memory_date ON memory(device_id, source_date);
+CREATE INDEX IF NOT EXISTS idx_memory_device ON memory(device_id);
+CREATE INDEX IF NOT EXISTS idx_memory_date ON memory(device_id, source_date);
 
 ALTER TABLE memory ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS memory_device_policy ON memory;
 CREATE POLICY memory_device_policy ON memory
   USING (device_id = current_setting('app.device_id', true)::uuid);
 
@@ -28,6 +29,7 @@ CREATE TABLE IF NOT EXISTS soul (
 );
 
 ALTER TABLE soul ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS soul_device_policy ON soul;
 CREATE POLICY soul_device_policy ON soul
   USING (device_id = current_setting('app.device_id', true)::uuid);
 
@@ -42,6 +44,7 @@ CREATE TABLE IF NOT EXISTS skill_config (
 );
 
 ALTER TABLE skill_config ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS skill_config_device_policy ON skill_config;
 CREATE POLICY skill_config_device_policy ON skill_config
   USING (device_id = current_setting('app.device_id', true)::uuid);
 
@@ -54,9 +57,10 @@ CREATE TABLE IF NOT EXISTS customer_request (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
-CREATE INDEX idx_customer_request_record ON customer_request(record_id);
+CREATE INDEX IF NOT EXISTS idx_customer_request_record ON customer_request(record_id);
 
 ALTER TABLE customer_request ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS customer_request_device_policy ON customer_request;
 CREATE POLICY customer_request_device_policy ON customer_request
   USING (record_id IN (
     SELECT id FROM record WHERE device_id = current_setting('app.device_id', true)::uuid
@@ -71,9 +75,10 @@ CREATE TABLE IF NOT EXISTS setting_change (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
-CREATE INDEX idx_setting_change_record ON setting_change(record_id);
+CREATE INDEX IF NOT EXISTS idx_setting_change_record ON setting_change(record_id);
 
 ALTER TABLE setting_change ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS setting_change_device_policy ON setting_change;
 CREATE POLICY setting_change_device_policy ON setting_change
   USING (record_id IN (
     SELECT id FROM record WHERE device_id = current_setting('app.device_id', true)::uuid

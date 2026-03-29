@@ -17,6 +17,14 @@ export async function findByRecordId(recordId) {
      JOIN record_tag rt ON rt.tag_id = t.id
      WHERE rt.record_id = $1`, [recordId]);
 }
+/** 批量查询多条 record 的 tags */
+export async function findByRecordIds(recordIds) {
+    if (recordIds.length === 0)
+        return [];
+    return query(`SELECT rt.record_id, t.id, t.name FROM tag t
+     JOIN record_tag rt ON rt.tag_id = t.id
+     WHERE rt.record_id = ANY($1)`, [recordIds]);
+}
 export async function addToRecord(recordId, tagId) {
     await execute(`INSERT INTO record_tag (record_id, tag_id) VALUES ($1, $2)
      ON CONFLICT (record_id, tag_id) DO NOTHING`, [recordId, tagId]);

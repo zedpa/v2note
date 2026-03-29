@@ -38,7 +38,7 @@ export function LoginPage({ onLogin, onSwitchToRegister, error, loading }: Login
           <div className="w-20 h-20 mx-auto">
             <LuluLogo size={80} variant="color" className="animate-none" />
           </div>
-          <h1 className="font-serif text-2xl text-on-surface">念念有路</h1>
+          <h1 className="font-serif text-3xl text-on-surface">念念有路</h1>
           <p className="text-sm text-muted-accessible">你的每一个想法，我都帮你记住</p>
         </div>
 

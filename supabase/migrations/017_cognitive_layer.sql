@@ -66,13 +66,17 @@ ALTER TABLE record ADD COLUMN IF NOT EXISTS digested_at TIMESTAMPTZ;
 
 -- RLS policies
 ALTER TABLE strike ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "anon_strike_all" ON strike;
 CREATE POLICY "anon_strike_all" ON strike FOR ALL TO anon USING (true) WITH CHECK (true);
 
 ALTER TABLE bond ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "anon_bond_all" ON bond;
 CREATE POLICY "anon_bond_all" ON bond FOR ALL TO anon USING (true) WITH CHECK (true);
 
 ALTER TABLE strike_tag ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "anon_strike_tag_all" ON strike_tag;
 CREATE POLICY "anon_strike_tag_all" ON strike_tag FOR ALL TO anon USING (true) WITH CHECK (true);
 
 ALTER TABLE cluster_member ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "anon_cluster_member_all" ON cluster_member;
 CREATE POLICY "anon_cluster_member_all" ON cluster_member FOR ALL TO anon USING (true) WITH CHECK (true);

@@ -2,65 +2,95 @@
 
 import { useState, useEffect } from "react";
 import {
-  X, Search, Sun, Compass, BarChart3, Target,
-  FolderOpen, Lightbulb, Sparkles, Settings, LogOut, Plus, ChevronDown, ChevronRight,
+  X, Zap, Compass, Target, Settings, LogOut,
+  ChevronDown, ChevronRight, TreePine, CalendarDays,
+  Briefcase, Home, BookOpen, Heart, Users, Coins, Sparkles,
 } from "lucide-react";
-import { LuluLogo } from "@/components/brand/lulu-logo";
 import { cn } from "@/lib/utils";
-import { listGoals } from "@/shared/lib/api/goals";
+import { listGoals, listDimensions, type DimensionSummary } from "@/shared/lib/api/goals";
 import type { Goal } from "@/shared/lib/types";
+
+/** 维度 → 图标映射 */
+const DOMAIN_ICONS: Record<string, React.ReactNode> = {
+  "工作": <Briefcase size={18} />,
+  "生活": <Home size={18} />,
+  "学习": <BookOpen size={18} />,
+  "健康": <Heart size={18} />,
+  "社交": <Users size={18} />,
+  "投资": <Coins size={18} />,
+};
+
+function getDomainIcon(domain: string) {
+  return DOMAIN_ICONS[domain] ?? <Sparkles size={18} />;
+}
 
 interface SidebarDrawerProps {
   open: boolean;
   onClose: () => void;
-  onViewStats?: () => void;
-  onViewMemory?: () => void;
-  onViewProfile?: () => void;
   onViewBriefing?: () => void;
+  onViewEvening?: () => void;
   onViewSettings?: () => void;
-  onViewSkills?: () => void;
   onViewReview?: () => void;
   onViewSearch?: () => void;
   onViewGoal?: (goalId: string) => void;
   onViewGoals?: () => void;
+  onViewDiscovery?: () => void;
+  onSelectDimension?: (domain: string) => void;
+  onSelectToday?: () => void;
   onLogout?: () => void;
   userName?: string | null;
   userPhone?: string | null;
+  activeDimension?: string | null;
+  // 保留但不在设计图中显示的回调
+  onViewStats?: () => void;
+  onViewMemory?: () => void;
+  onViewProfile?: () => void;
+  onViewSkills?: () => void;
+  onSelectTopic?: (clusterId: string, title: string) => void;
+  onOpenChat?: (initialMsg: string) => void;
 }
 
 export function SidebarDrawer({
   open,
   onClose,
-  onViewStats,
-  onViewMemory,
-  onViewProfile,
   onViewBriefing,
+  onViewEvening,
   onViewSettings,
-  onViewSkills,
   onViewReview,
   onViewSearch,
   onViewGoal,
   onViewGoals,
+  onViewDiscovery,
+  onSelectDimension,
+  onSelectToday,
   onLogout,
   userName,
   userPhone,
+  activeDimension,
+  onViewStats,
+  onViewMemory,
+  onViewProfile,
+  onViewSkills,
+  onSelectTopic,
+  onOpenChat,
 }: SidebarDrawerProps) {
   const [goals, setGoals] = useState<Goal[]>([]);
+  const [dimensions, setDimensions] = useState<DimensionSummary[]>([]);
+  const [expandedDimensions, setExpandedDimensions] = useState<Set<string>>(new Set());
   const [goalsExpanded, setGoalsExpanded] = useState(true);
 
-  // 加载目标列表
+  // 加载目标列表 + 维度统计
   useEffect(() => {
     if (!open) return;
     listGoals()
       .then((g) => setGoals(g || []))
       .catch(() => {});
+    listDimensions()
+      .then((d) => setDimensions(d || []))
+      .catch(() => {});
   }, [open]);
 
   const initial = userName?.charAt(0)?.toUpperCase() || "U";
-
-  // 按 parent_id 分组: 有 parent_id 的是子目标，parent_id=null 的是顶层
-  const topGoals = goals.filter((g) => !g.parent_id && g.status === "active");
-  const projectGoals = goals.filter((g) => g.parent_id && g.status === "active");
 
   if (!open) return null;
 
@@ -113,160 +143,202 @@ export function SidebarDrawer({
         {/* 滚动内容 */}
         <div className="flex-1 overflow-y-auto px-5 pb-8">
 
-          {/* ── 第一组: 浏览 ── */}
-          <nav className="space-y-1">
-            {onViewSearch && (
-              <SidebarItem
-                icon={<Search size={18} />}
-                label="搜索"
-                onClick={() => { onClose(); onViewSearch(); }}
-              />
-            )}
-            {onViewReview && (
-              <SidebarItem
-                icon={<Sun size={18} />}
-                label="每日回顾"
-                onClick={() => { onClose(); onViewReview(); }}
-              />
-            )}
-            {onViewBriefing && (
-              <SidebarItem
-                icon={<Sun size={18} />}
-                label="今日简报"
-                onClick={() => { onClose(); onViewBriefing(); }}
-              />
-            )}
+          {/* ── 第一组: 导航 ── */}
+          <nav className="space-y-0.5">
+            <SidebarItem
+              icon={<Zap size={18} />}
+              label="今日"
+              onClick={() => {
+                onClose();
+                onSelectToday?.();
+              }}
+            />
             <SidebarItem
               icon={<Compass size={18} />}
               label="发现"
-              onClick={() => { onClose(); /* TODO: cognitive map overlay */ }}
+              onClick={() => { onClose(); onViewDiscovery?.(); }}
             />
-            {onViewStats && (
-              <SidebarItem
-                icon={<BarChart3 size={18} />}
-                label="认知统计"
-                onClick={() => { onClose(); onViewStats(); }}
-              />
-            )}
           </nav>
 
-          {/* ── spacing-6 分组间距 ── */}
-          <div className="h-8" />
-
-          {/* ── 第二组: 我的目标 ── */}
-          <div>
-            <div
-              role="button"
-              tabIndex={0}
-              onClick={() => setGoalsExpanded(!goalsExpanded)}
-              onKeyDown={(e) => e.key === "Enter" && setGoalsExpanded(!goalsExpanded)}
-              className="flex items-center justify-between w-full mb-2 cursor-pointer"
-            >
-              <span className="font-serif text-sm text-on-surface">我的目标</span>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onClose();
-                    onViewGoals?.();
-                  }}
-                  className="text-[10px] text-muted-accessible hover:text-deer transition-colors"
-                >
-                  查看全部
-                </button>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onClose();
-                    onViewGoals?.();
-                  }}
-                  className="w-6 h-6 flex items-center justify-center rounded-full text-muted-accessible hover:text-on-surface transition-colors"
-                  aria-label="新建目标"
-                >
-                  <Plus size={14} />
-                </button>
-                {goalsExpanded ? (
-                  <ChevronDown size={14} className="text-muted-accessible" />
-                ) : (
-                  <ChevronRight size={14} className="text-muted-accessible" />
-                )}
-              </div>
-            </div>
-
-            {goalsExpanded && (
-              <nav className="space-y-1">
-                {topGoals.length === 0 && projectGoals.length === 0 && (
-                  <p className="text-xs text-muted-accessible px-3 py-2">
-                    暂无目标，对路路说说你的想法
-                  </p>
-                )}
-                {topGoals.map((goal) => {
-                  const childCount = projectGoals.filter(
-                    (g) => g.parent_id === goal.id,
-                  ).length;
-                  return (
-                    <SidebarItem
-                      key={goal.id}
-                      icon={<FolderOpen size={18} />}
-                      label={goal.title}
-                      badge={childCount > 0 ? String(childCount) : undefined}
-                      onClick={() => {
-                        onClose();
-                        onViewGoal?.(goal.id);
-                      }}
-                    />
-                  );
-                })}
-                {/* 独立目标（无子目标，也无 parent） */}
-                {goals
-                  .filter(
-                    (g) =>
-                      !g.parent_id &&
-                      g.status === "active" &&
-                      !projectGoals.some((p) => p.parent_id === g.id),
-                  )
-                  .filter((g) => !topGoals.some((t) => t.id === g.id && projectGoals.some((p) => p.parent_id === t.id)))
-                  .map((goal) => (
-                    <SidebarItem
-                      key={`ind-${goal.id}`}
-                      icon={<Target size={18} />}
-                      label={goal.title}
-                      onClick={() => {
-                        onClose();
-                        onViewGoal?.(goal.id);
-                      }}
-                    />
-                  ))}
-              </nav>
-            )}
+          {/* ── 分隔 + 我的世界 ── */}
+          <div className="my-5 flex items-center gap-3">
+            <div className="flex-1 h-px bg-border/40" />
+            <span className="text-xs text-muted-accessible tracking-widest">我的世界</span>
+            <div className="flex-1 h-px bg-border/40" />
           </div>
 
-          {/* ── spacing-6 分组间距 ── */}
-          <div className="h-8" />
+          {/* ── 维度列表 ── */}
+          {dimensions.length > 0 ? (
+            <nav className="space-y-0.5">
+              {dimensions.map((dim) => {
+                const isExpanded = expandedDimensions.has(dim.domain);
+                const isActive = activeDimension === dim.domain;
+                // 该维度下的目标：按 domain 严格匹配
+                const dimGoals = goals.filter(
+                  (g) =>
+                    (g as any).domain === dim.domain &&
+                    (g.status === "active" || g.status === "progressing"),
+                );
+                const totalCount = dim.pending_count + dim.goal_count;
 
-          {/* ── 第三组: 配置 ── */}
-          <nav className="space-y-1">
-            {onViewSkills && (
+                return (
+                  <div key={dim.domain}>
+                    {/* 维度行 */}
+                    <div
+                      className={cn(
+                        "flex items-center gap-3 w-full px-3 py-2.5 rounded-xl transition-colors",
+                        isActive
+                          ? "bg-deer/10"
+                          : "hover:bg-surface/60 active:bg-surface/80",
+                      )}
+                    >
+                      {/* 图标 + 名称：点击 = 全局筛选 */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onClose();
+                          onSelectDimension?.(dim.domain);
+                        }}
+                        className="flex items-center gap-3 flex-1 min-w-0 text-left"
+                      >
+                        <span className={cn("shrink-0", isActive ? "text-deer" : "text-muted-accessible")}>
+                          {getDomainIcon(dim.domain)}
+                        </span>
+                        <span className={cn("text-sm flex-1 truncate", isActive ? "text-deer font-medium" : "text-on-surface")}>
+                          {dim.domain}
+                        </span>
+                      </button>
+
+                      {/* 计数 */}
+                      <span className="text-xs text-muted-accessible">
+                        ({totalCount})
+                      </span>
+
+                      {/* 展开/收起箭头 */}
+                      {dimGoals.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setExpandedDimensions((prev) => {
+                              const next = new Set(prev);
+                              next.has(dim.domain) ? next.delete(dim.domain) : next.add(dim.domain);
+                              return next;
+                            });
+                          }}
+                          className="p-1 rounded-md hover:bg-surface/80 transition-colors"
+                        >
+                          {isExpanded ? (
+                            <ChevronDown size={14} className="text-muted-accessible" />
+                          ) : (
+                            <ChevronRight size={14} className="text-muted-accessible" />
+                          )}
+                        </button>
+                      )}
+                    </div>
+
+                    {/* 展开后显示该维度下的目标 */}
+                    {isExpanded && dimGoals.length > 0 && (
+                      <nav className="pl-8 space-y-0.5">
+                        {dimGoals.slice(0, 8).map((goal) => (
+                          <SidebarItem
+                            key={goal.id}
+                            icon={goal.cluster_id ? <TreePine size={16} /> : <Target size={16} />}
+                            label={goal.title}
+                            badge={
+                              (goal as any).child_count > 0
+                                ? `(${(goal as any).child_count})`
+                                : undefined
+                            }
+                            onClick={() => {
+                              onClose();
+                              onViewGoal?.(goal.id);
+                            }}
+                          />
+                        ))}
+                      </nav>
+                    )}
+                  </div>
+                );
+              })}
+            </nav>
+          ) : (
+            /* 无维度时回退到原有的目标列表 */
+            <div>
+              <div
+                role="button"
+                tabIndex={0}
+                onClick={() => setGoalsExpanded(!goalsExpanded)}
+                onKeyDown={(e) => e.key === "Enter" && setGoalsExpanded(!goalsExpanded)}
+                className="flex items-center justify-between w-full mb-2 cursor-pointer"
+              >
+                <span className="font-serif text-sm text-on-surface">我的目标</span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onClose();
+                      onViewGoals?.();
+                    }}
+                    className="text-[10px] text-muted-accessible hover:text-deer transition-colors"
+                  >
+                    查看全部
+                  </button>
+                  {goalsExpanded ? (
+                    <ChevronDown size={14} className="text-muted-accessible" />
+                  ) : (
+                    <ChevronRight size={14} className="text-muted-accessible" />
+                  )}
+                </div>
+              </div>
+
+              {goalsExpanded && (
+                <nav className="space-y-1">
+                  {goals.length === 0 && (
+                    <p className="text-xs text-muted-accessible px-3 py-2">
+                      持续记录后，AI 会发现你的关注方向
+                    </p>
+                  )}
+                  {goals
+                    .filter((g) => g.status === "active" && !g.parent_id)
+                    .slice(0, 10)
+                    .map((goal) => (
+                      <SidebarItem
+                        key={goal.id}
+                        icon={<Target size={18} />}
+                        label={goal.title}
+                        onClick={() => {
+                          onClose();
+                          onViewGoal?.(goal.id);
+                        }}
+                      />
+                    ))}
+                </nav>
+              )}
+            </div>
+          )}
+
+          {/* ── 分隔线 ── */}
+          <div className="my-5 h-px bg-border/40" />
+
+          {/* ── 第三组: 每日回顾 + 设置 ── */}
+          <nav className="space-y-0.5">
+            {(onViewBriefing || onViewEvening) && (
               <SidebarItem
-                icon={<Sparkles size={18} />}
-                label="洞察视角"
-                onClick={() => { onClose(); onViewSkills(); }}
-              />
-            )}
-            {onViewProfile && (
-              <SidebarItem
-                icon={<LuluLogo size={18} variant="color" className="animate-none" />}
-                label="路路设置"
-                onClick={() => { onClose(); onViewProfile(); }}
-              />
-            )}
-            {onViewMemory && (
-              <SidebarItem
-                icon={<Lightbulb size={18} />}
-                label="AI 记忆"
-                onClick={() => { onClose(); onViewMemory(); }}
+                icon={<CalendarDays size={18} />}
+                label="每日回顾"
+                showDot
+                onClick={() => {
+                  onClose();
+                  const hour = new Date().getHours();
+                  if (hour >= 18 && onViewEvening) {
+                    onViewEvening();
+                  } else if (onViewBriefing) {
+                    onViewBriefing();
+                  } else {
+                    onViewEvening?.();
+                  }
+                }}
               />
             )}
             {onViewSettings && (
@@ -278,20 +350,19 @@ export function SidebarDrawer({
             )}
           </nav>
 
-          {/* ── spacing-6 分组间距 ── */}
-          <div className="h-8" />
-
-          {/* 退出登录 */}
-          {onLogout && (
-            <button
-              type="button"
-              onClick={() => { onClose(); onLogout(); }}
-              className="flex items-center gap-3 px-3 py-2.5 text-sm text-muted-accessible hover:text-maple transition-colors"
-            >
-              <LogOut size={16} />
-              退出登录
-            </button>
-          )}
+          {/* ── 退出登录 ── */}
+          <div className="mt-5">
+            {onLogout && (
+              <button
+                type="button"
+                onClick={() => { onClose(); onLogout(); }}
+                className="flex items-center gap-3 px-3 py-2.5 text-sm text-muted-accessible hover:text-maple transition-colors"
+              >
+                <LogOut size={16} />
+                退出登录
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </>
@@ -304,11 +375,15 @@ function SidebarItem({
   icon,
   label,
   badge,
+  sublabel,
+  showDot,
   onClick,
 }: {
   icon: React.ReactNode;
   label: string;
   badge?: string;
+  sublabel?: string;
+  showDot?: boolean;
   onClick?: () => void;
 }) {
   return (
@@ -318,9 +393,17 @@ function SidebarItem({
       className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-left hover:bg-surface/60 active:bg-surface/80 transition-colors"
     >
       <span className="text-muted-accessible shrink-0">{icon}</span>
-      <span className="flex-1 text-sm text-on-surface truncate">{label}</span>
+      <div className="flex-1 min-w-0">
+        <span className="text-sm text-on-surface truncate block">{label}</span>
+        {sublabel && (
+          <span className="text-[10px] text-muted-accessible truncate block">{sublabel}</span>
+        )}
+      </div>
       {badge && (
         <span className="text-xs font-mono text-muted-accessible">{badge}</span>
+      )}
+      {showDot && (
+        <span className="w-2 h-2 rounded-full bg-maple shrink-0" />
       )}
     </button>
   );

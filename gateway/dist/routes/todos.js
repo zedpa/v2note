@@ -1,5 +1,6 @@
 import { readBody, sendJson, getDeviceId, getUserId } from "../lib/http-helpers.js";
 import { todoRepo } from "../db/repositories/index.js";
+import { onTodoComplete } from "../cognitive/todo-projector.js";
 export function registerTodoRoutes(router) {
     // List todos
     router.get("/api/v1/todos", async (req, res) => {
@@ -10,16 +11,38 @@ export function registerTodoRoutes(router) {
             : await todoRepo.findByDevice(deviceId);
         sendJson(res, todos);
     });
-    // Create todo
+    // Create todo（支持无 record_id 的手动创建）
     router.post("/api/v1/todos", async (_req, res) => {
-        const { record_id, text } = await readBody(_req);
-        const todo = await todoRepo.create({ record_id, text });
+        const body = await readBody(_req);
+        const userId = getUserId(_req) ?? undefined;
+        const deviceId = getDeviceId(_req);
+        const todo = await todoRepo.create({
+            record_id: body.record_id || null,
+            text: body.text,
+            domain: body.domain,
+            impact: body.impact,
+            goal_id: body.goal_id,
+            scheduled_start: body.scheduled_start,
+            estimated_minutes: body.estimated_minutes,
+            parent_id: body.parent_id,
+            user_id: userId,
+            device_id: deviceId,
+        });
         sendJson(res, { id: todo.id }, 201);
+    });
+    // Get subtasks of a todo
+    router.get("/api/v1/todos/:id/subtasks", async (_req, res, params) => {
+        const subtasks = await todoRepo.findSubtasks(params.id);
+        sendJson(res, subtasks);
     });
     // Update todo
     router.patch("/api/v1/todos/:id", async (req, res, params) => {
         const body = await readBody(req);
         await todoRepo.update(params.id, body);
+        // todo 完成时触发双向一致性：降低 Strike salience
+        if (body.done === true) {
+            onTodoComplete(params.id).catch((e) => console.error("[todos] onTodoComplete failed:", e));
+        }
         sendJson(res, { ok: true });
     });
     // Delete todo

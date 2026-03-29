@@ -158,10 +158,10 @@ describe("ToolRegistry", () => {
 
       const aiTools = registry.toAISDKTools();
 
-      // Vercel AI SDK tools 格式：{ [name]: { description, parameters, execute } }
+      // Vercel AI SDK v6 tools 格式：{ [name]: { description, inputSchema, execute } }
       expect(aiTools).toHaveProperty("create_todo");
       expect(aiTools.create_todo).toHaveProperty("description", "创建待办");
-      expect(aiTools.create_todo).toHaveProperty("parameters");
+      expect(aiTools.create_todo).toHaveProperty("inputSchema");
       expect(aiTools.create_todo).toHaveProperty("execute");
     });
 

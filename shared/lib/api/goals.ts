@@ -76,3 +76,14 @@ export async function getProjectProgress(goalId: string) {
 export async function listPendingIntents(): Promise<PendingIntent[]> {
   return api.get("/api/v1/intents/pending");
 }
+
+/** L3 维度统计（侧边栏"我的世界"） */
+export interface DimensionSummary {
+  domain: string;
+  pending_count: number;
+  goal_count: number;
+}
+
+export async function listDimensions(): Promise<DimensionSummary[]> {
+  return api.get("/api/v1/dimensions");
+}

@@ -16,6 +16,7 @@ export declare class ProactiveEngine {
     private devices;
     private intervalMs;
     private dailyPushSent;
+    private chatRateLimiter;
     private fallbackTimer;
     private digestTimer;
     private cognitiveDailyTimer;
@@ -51,6 +52,10 @@ export declare class ProactiveEngine {
      */
     private runWeeklyEmergence;
     private checkDevice;
+    /** 待办完成时发送奖励语（场景 5.3） */
+    onTodoCompleted(deviceId: string): void;
+    /** 持久化通知到数据库 */
+    private persistNotification;
     private sendNudge;
     private sendMessage;
 }

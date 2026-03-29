@@ -11,6 +11,22 @@ interface ChatBubbleProps {
 
 export function ChatBubble({ message, streaming }: ChatBubbleProps) {
   const isUser = message.role === "user";
+  const isToolStatus = message.role === "tool-status";
+
+  // 工具状态：临时 loading 卡片（streaming 结束后自动消失）
+  if (isToolStatus) {
+    return (
+      <div className="flex gap-2.5 mb-4 flex-row">
+        <div className="w-7 h-7 rounded-full flex items-center justify-center shrink-0 text-sm mt-0.5">
+          🦌
+        </div>
+        <div className="flex items-center gap-2 rounded-2xl rounded-tl-sm bg-surface-low px-4 py-2.5">
+          <span className="w-1.5 h-1.5 rounded-full bg-deer animate-pulse" />
+          <span className="text-sm text-muted-foreground">{message.content}</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div

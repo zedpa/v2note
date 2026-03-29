@@ -45,12 +45,14 @@ export declare class MemoryManager {
         source_date: string | null;
     }>>;
     addShortTerm(content: string): void;
+    /** 每用户记忆上限。超出时自动淘汰最低重要性的记忆。 */
+    static readonly MAX_MEMORIES_PER_USER = 500;
     /**
      * Mem0 two-stage memory management:
      * 1. AI extracts candidate facts from content
      * 2. For each candidate, embedding-retrieve top-5 similar memories
      * 3. AI decides in one call: ADD / UPDATE(id) / DELETE(id) / NONE
-     * 4. Execute decisions
+     * 4. Execute decisions（含上限淘汰）
      */
     maybeCreateMemory(deviceId: string, content: string, date: string, userId?: string): Promise<void>;
     clearShortTerm(): void;

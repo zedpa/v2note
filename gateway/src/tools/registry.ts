@@ -84,10 +84,11 @@ export class ToolRegistry {
     const result: Record<string, ReturnType<typeof tool>> = {};
 
     for (const def of this.tools.values()) {
+      // AI SDK v6 使用 inputSchema 而非 parameters
       result[def.name] = tool({
         description: def.description,
-        parameters: def.parameters,
-        execute: async (args: any, extra: any) => {
+        inputSchema: def.parameters,
+        execute: async (args: any, _extra: any) => {
           const execCtx = ctx ?? {
             deviceId: "unknown",
             sessionId: "unknown",

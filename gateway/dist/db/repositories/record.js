@@ -123,6 +123,10 @@ export async function searchByUser(userId, q) {
      ORDER BY r.created_at DESC
      LIMIT 50`, [userId, `%${q}%`]);
 }
+export async function countByUser(userId) {
+    const row = await queryOne(`SELECT COUNT(*)::text AS count FROM record WHERE user_id = $1`, [userId]);
+    return parseInt(row?.count ?? "0", 10);
+}
 export async function countByDateRange(deviceId, start, end) {
     const row = await queryOne(`SELECT COUNT(*)::text AS count FROM record
      WHERE device_id = $1 AND created_at >= $2 AND created_at <= $3`, [deviceId, start, end]);
@@ -135,10 +139,30 @@ export async function countByUserDateRange(userId, start, end) {
 }
 export async function findUndigested(userId) {
     return query(`SELECT * FROM record WHERE user_id = $1 AND digested = FALSE AND status = 'completed'
+       AND COALESCE(digest_attempts, 0) < 3
      ORDER BY created_at ASC`, [userId]);
+}
+export async function incrementDigestAttempts(id) {
+    await execute(`UPDATE record SET digest_attempts = COALESCE(digest_attempts, 0) + 1, updated_at = now() WHERE id = $1`, [id]);
 }
 export async function markDigested(id) {
     await execute(`UPDATE record SET digested = true, digested_at = now(), updated_at = now() WHERE id = $1`, [id]);
+}
+/**
+ * 原子抢占：将 digested 从 false 改为 true，仅当当前为 false 时成功。
+ * 返回成功抢占的 record ID 列表（已被其他进程抢占的会被过滤掉）。
+ */
+export async function claimForDigest(ids) {
+    if (ids.length === 0)
+        return [];
+    const rows = await query(`UPDATE record SET digested = true, digested_at = now(), updated_at = now()
+     WHERE id = ANY($1) AND (digested = false OR digested IS NULL)
+     RETURNING id`, [ids]);
+    return rows.map((r) => r.id);
+}
+/** 回滚：digest 失败时恢复 digested=false，允许下次重试 */
+export async function unclaimDigest(id) {
+    await execute(`UPDATE record SET digested = false, digested_at = NULL, updated_at = now() WHERE id = $1`, [id]);
 }
 export async function findByDeviceAndDateRange(deviceId, start, end) {
     return query(`SELECT * FROM record WHERE device_id = $1

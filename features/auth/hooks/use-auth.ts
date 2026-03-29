@@ -7,8 +7,9 @@ import {
   getCurrentUser,
   saveAuthTokens,
   logout as doLogout,
+  getRefreshTokenValue,
 } from "@/shared/lib/auth";
-import { registerUser, loginUser } from "@/shared/lib/api/auth";
+import { registerUser, loginUser, logoutUser } from "@/shared/lib/api/auth";
 import { getDeviceId } from "@/shared/lib/device";
 import { setApiDeviceId } from "@/shared/lib/api";
 import type { AppUser } from "@/shared/lib/types";
@@ -74,6 +75,15 @@ export function useAuth() {
   }, []);
 
   const logout = useCallback(async () => {
+    // 场景 1 & 2: 调后端撤销 refresh token，失败也不阻塞本地清除
+    const rt = getRefreshTokenValue();
+    if (rt) {
+      try {
+        await logoutUser(rt);
+      } catch {
+        // 网络失败时静默忽略，refresh token 会自然过期（30天 TTL）
+      }
+    }
     await doLogout();
     setLoggedIn(false);
     setUser(null);

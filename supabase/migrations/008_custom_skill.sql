@@ -1,5 +1,5 @@
 -- Custom skills: user-created or AI-created skills
-CREATE TABLE custom_skill (
+CREATE TABLE IF NOT EXISTS custom_skill (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   device_id UUID REFERENCES device(id) ON DELETE CASCADE,
   name TEXT NOT NULL,

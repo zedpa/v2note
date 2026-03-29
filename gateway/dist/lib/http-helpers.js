@@ -17,12 +17,12 @@ export function readBody(req) {
 }
 /** Send a JSON response */
 export function sendJson(res, data, status = 200) {
-    res.writeHead(status, { "Content-Type": "application/json" });
+    res.writeHead(status, { "Content-Type": "application/json; charset=utf-8" });
     res.end(JSON.stringify(data));
 }
 /** Send an error response */
 export function sendError(res, message, status = 400) {
-    res.writeHead(status, { "Content-Type": "application/json" });
+    res.writeHead(status, { "Content-Type": "application/json; charset=utf-8" });
     res.end(JSON.stringify({ error: message }));
 }
 /** Extract device ID — prefers JWT auth context, falls back to X-Device-Id header */

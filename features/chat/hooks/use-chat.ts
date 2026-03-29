@@ -8,9 +8,11 @@ import { getCommandDefs } from "@/features/commands/lib/registry";
 
 export interface ChatMessage {
   id: string;
-  role: "user" | "assistant";
+  role: "user" | "assistant" | "tool-status";
   content: string;
   timestamp: Date;
+  /** 工具状态消息的工具名（用于图标显示） */
+  toolName?: string;
 }
 
 interface UseChatOptions {
@@ -94,10 +96,28 @@ export function useChat(
         });
         break;
       }
+      case "tool.status" as string: {
+        clearResponseTimeout();
+        const { toolName, label } = (msg as any).payload;
+        // 添加临时工具状态消息（streaming 结束时自动移除）
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `tool-${Date.now()}`,
+            role: "tool-status",
+            content: label,
+            toolName,
+            timestamp: new Date(),
+          },
+        ]);
+        break;
+      }
       case "chat.done": {
         clearResponseTimeout();
         setStreaming(false);
         streamingTextRef.current = "";
+        // 移除临时的 tool-status 消息
+        setMessages((prev) => prev.filter((m) => m.role !== "tool-status"));
         break;
       }
       case "error": {

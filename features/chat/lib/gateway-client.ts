@@ -58,6 +58,10 @@ export type GatewayResponse =
   | { type: "proactive.evening_summary"; payload: { text: string } }
   | { type: "reflect.question"; payload: { question: string } }
   | { type: "ai.status"; payload: { text: string } }
+  | { type: "companion.state"; payload: Record<string, unknown> }
+  | { type: "companion.mood"; payload: { mood: string; moodText: string } }
+  | { type: "companion.chat"; payload: { text: string } }
+  | { type: "tool.step"; payload: { stepIndex: number; totalSteps: number; toolName: string; status: string; result?: string } }
   | { type: "error"; payload: { message: string } };
 
 type MessageHandler = (msg: GatewayResponse) => void;

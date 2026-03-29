@@ -51,8 +51,17 @@ export declare function deleteByIds(ids: string[]): Promise<number>;
 export declare function archive(id: string): Promise<void>;
 export declare function search(deviceId: string, q: string): Promise<Record[]>;
 export declare function searchByUser(userId: string, q: string): Promise<Record[]>;
+export declare function countByUser(userId: string): Promise<number>;
 export declare function countByDateRange(deviceId: string, start: string, end: string): Promise<number>;
 export declare function countByUserDateRange(userId: string, start: string, end: string): Promise<number>;
 export declare function findUndigested(userId: string): Promise<Record[]>;
+export declare function incrementDigestAttempts(id: string): Promise<void>;
 export declare function markDigested(id: string): Promise<void>;
+/**
+ * 原子抢占：将 digested 从 false 改为 true，仅当当前为 false 时成功。
+ * 返回成功抢占的 record ID 列表（已被其他进程抢占的会被过滤掉）。
+ */
+export declare function claimForDigest(ids: string[]): Promise<string[]>;
+/** 回滚：digest 失败时恢复 digested=false，允许下次重试 */
+export declare function unclaimDigest(id: string): Promise<void>;
 export declare function findByDeviceAndDateRange(deviceId: string, start: string, end: string): Promise<Record[]>;

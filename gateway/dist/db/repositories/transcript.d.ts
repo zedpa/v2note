@@ -7,6 +7,10 @@ export interface Transcript {
 }
 export declare function findByRecordId(recordId: string): Promise<Transcript | null>;
 export declare function findByRecordIds(recordIds: string[]): Promise<Transcript[]>;
+export declare function update(recordId: string, fields: {
+    text?: string;
+    language?: string;
+}): Promise<void>;
 export declare function create(fields: {
     record_id: string;
     text: string;

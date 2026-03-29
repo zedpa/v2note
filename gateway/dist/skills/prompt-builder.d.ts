@@ -24,4 +24,6 @@ export declare function buildSystemPrompt(opts: {
     }>;
     /** Pre-built pending intent context to inject into warm tier */
     pendingIntentContext?: string;
+    /** Cognitive engine context (contradictions, evolution) in natural language */
+    cognitiveContext?: string;
 }): string;

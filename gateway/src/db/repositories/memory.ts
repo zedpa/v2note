@@ -107,6 +107,27 @@ export async function update(
   );
 }
 
+/** 统计用户记忆总条数 */
+export async function countByUser(userId: string): Promise<number> {
+  const row = await queryOne<{ count: string }>(
+    `SELECT COUNT(*) as count FROM memory WHERE user_id = $1`,
+    [userId],
+  );
+  return parseInt(row?.count ?? "0", 10);
+}
+
+/** 删除用户最低重要性的 N 条记忆（为新记忆腾位置） */
+export async function evictLeastImportant(userId: string, count: number): Promise<number> {
+  const result = await execute(
+    `DELETE FROM memory WHERE id IN (
+       SELECT id FROM memory WHERE user_id = $1
+       ORDER BY importance ASC, created_at ASC LIMIT $2
+     )`,
+    [userId, count],
+  );
+  return result;
+}
+
 export async function updateByUser(
   id: string,
   userId: string,

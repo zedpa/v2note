@@ -1,7 +1,7 @@
 import { query, queryOne, execute } from "../pool.js";
 export async function create(fields) {
-    const row = await queryOne(`INSERT INTO strike (user_id, nucleus, polarity, field, source_id, source_span, source_type, confidence, salience, status, is_cluster)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`, [
+    const row = await queryOne(`INSERT INTO strike (user_id, nucleus, polarity, field, source_id, source_span, source_type, confidence, salience, status, is_cluster, level, origin)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING *`, [
         fields.user_id,
         fields.nucleus,
         fields.polarity,
@@ -13,6 +13,8 @@ export async function create(fields) {
         fields.salience ?? 1.0,
         fields.status ?? "active",
         fields.is_cluster ?? false,
+        fields.level ?? null,
+        fields.origin ?? null,
     ]);
     return row;
 }
@@ -37,6 +39,14 @@ export async function findByUser(userId, opts) {
 }
 export async function findBySource(sourceId) {
     return query(`SELECT * FROM strike WHERE source_id = $1 ORDER BY created_at ASC`, [sourceId]);
+}
+/** 检查同一 source_id 下是否已有相同 nucleus 的 active Strike */
+export async function existsBySourceAndNucleus(sourceId, nucleus) {
+    const row = await queryOne(`SELECT EXISTS(
+       SELECT 1 FROM strike
+       WHERE source_id = $1 AND nucleus = $2 AND status = 'active'
+     ) as exists`, [sourceId, nucleus]);
+    return row?.exists ?? false;
 }
 export async function findActive(userId, limit) {
     return query(`SELECT * FROM strike WHERE user_id = $1 AND status = 'active'

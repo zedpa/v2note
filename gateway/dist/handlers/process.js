@@ -1,20 +1,8 @@
 import { digestRecords } from './digest.js';
-/* MOVED TO DIGEST */ // import { loadSkills, filterActiveSkills, mergeWithCustomSkills } from "../skills/loader.js";
-/* MOVED TO DIGEST */ // import { buildProcessPrompt } from "./process-prompt.js";
 import { chatCompletion } from "../ai/provider.js";
-/* MOVED TO DIGEST */ // import { MemoryManager } from "../memory/manager.js";
-/* MOVED TO DIGEST */ // import { updateSoul } from "../soul/manager.js";
-/* MOVED TO DIGEST */ // import { updateProfile } from "../profile/manager.js";
 import { appendToDiary } from "../diary/manager.js";
-/* MOVED TO DIGEST */ // import { join, dirname } from "node:path";
-/* MOVED TO DIGEST */ // import { fileURLToPath } from "node:url";
-/* MOVED TO DIGEST */ // import { skillConfigRepo } from "../db/repositories/index.js";
-/* MOVED TO DIGEST */ // import { todoRepo } from "../db/repositories/index.js";
-/* MOVED TO DIGEST */ // import { customerRequestRepo } from "../db/repositories/index.js";
-/* MOVED TO DIGEST */ // import { settingChangeRepo } from "../db/repositories/index.js";
-/* MOVED TO DIGEST */ // import { tagRepo } from "../db/repositories/index.js";
-import { recordRepo } from "../db/repositories/index.js";
-import { summaryRepo } from "../db/repositories/index.js";
+import { recordRepo, summaryRepo } from "../db/repositories/index.js";
+import { classifyVoiceIntent, executeVoiceAction } from "./voice-action.js";
 const CLEANUP_SYSTEM_PROMPT = `你是一个转写文本清理工具。对以下语音转写文本进行最小化清理：
 - 移除口语填充词（嗯、啊、那个、就是说等）
 - 修正错别字和语音识别错误
@@ -28,6 +16,38 @@ export async function processEntry(payload) {
     const result = {};
     try {
         console.log(`[process] Starting for record ${payload.recordId}, text length: ${payload.text.length}`);
+        // ── Step 0: Voice action — 意图分类（记录/指令/混合） ──────────
+        // 文本长度 > 10 才做分类（太短的不判断）
+        if (payload.text.length > 4) {
+            try {
+                const intentResult = await classifyVoiceIntent(payload.text);
+                result.voice_intent_type = intentResult.type;
+                if (intentResult.type === "action" || intentResult.type === "mixed") {
+                    const actionResults = [];
+                    for (const action of intentResult.actions) {
+                        const execResult = await executeVoiceAction(action, {
+                            userId: payload.userId,
+                            deviceId: payload.deviceId,
+                        });
+                        actionResults.push(execResult);
+                    }
+                    result.action_results = actionResults;
+                    // 纯指令型：执行完就返回，不走 Digest 管道
+                    if (intentResult.type === "action") {
+                        console.log(`[process] Pure action intent, skipping digest. Results: ${actionResults.length}`);
+                        await recordRepo.updateStatus(payload.recordId, "completed");
+                        return result;
+                    }
+                    // 混合型：继续走 Digest（只处理记录部分）
+                    console.log(`[process] Mixed intent, will also digest record portion`);
+                }
+            }
+            catch (err) {
+                // 意图分类失败不阻塞，降级为正常记录处理
+                console.warn(`[process] Voice intent classification failed, falling back to record: ${err.message}`);
+                result.voice_intent_type = "record";
+            }
+        }
         /* MOVED TO DIGEST — skill loading, complex prompt building, structured extraction
         const builtinSkills = loadSkills(SKILLS_DIR);
         const allSkills = mergeWithCustomSkills(builtinSkills, payload.localConfig?.skills?.configs as any);
@@ -322,7 +342,11 @@ export async function processEntry(payload) {
             console.warn("[process] Diary append failed:", e.message);
         });
         // 7. Cognitive layer: trigger digest
-        if (shouldDigestImmediately(result, payload.text.length)) {
+        const recordCount = payload.userId
+            ? await recordRepo.countByUser(payload.userId)
+            : 999;
+        const isColdStart = recordCount < 20;
+        if (shouldDigestImmediately(result, payload.text.length, isColdStart)) {
             digestRecords([payload.recordId], {
                 deviceId: payload.deviceId,
                 userId: payload.userId,
@@ -343,11 +367,8 @@ export async function processEntry(payload) {
     }
     return result;
 }
-function shouldDigestImmediately(result, textLength) {
-    /* MOVED TO DIGEST — intent-based detection no longer available here */
-    // const deepTypes = new Set(['reflection', 'goal', 'complaint']);
-    // const hasDeepIntent = result.intents.some(i => deepTypes.has(i.type));
-    const isSubstantial = textLength > 80;
-    return isSubstantial;
+function shouldDigestImmediately(_result, textLength, _isColdStart) {
+    // 所有有实质内容的输入都立即 Digest，确保待办/意图能被及时提取
+    return textLength > 2;
 }
 //# sourceMappingURL=process.js.map

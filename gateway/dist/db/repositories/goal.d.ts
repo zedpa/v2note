@@ -3,8 +3,9 @@ export interface Goal {
     device_id: string;
     title: string;
     parent_id: string | null;
-    status: "active" | "paused" | "completed" | "abandoned";
-    source: "speech" | "chat" | "manual";
+    status: "active" | "paused" | "completed" | "abandoned" | "progressing" | "blocked" | "suggested" | "dismissed";
+    source: "speech" | "chat" | "manual" | "explicit" | "emerged";
+    cluster_id: string | null;
     created_at: string;
     updated_at: string;
 }
@@ -19,12 +20,16 @@ export declare function create(fields: {
     title: string;
     parent_id?: string;
     source?: string;
+    status?: string;
 }): Promise<Goal>;
 export declare function update(id: string, fields: {
     title?: string;
     status?: string;
     parent_id?: string | null;
+    cluster_id?: string | null;
 }): Promise<void>;
+/** 批量更新 cluster_id 引用（聚类合并时用） */
+export declare function updateClusterRef(oldClusterId: string, newClusterId: string): Promise<void>;
 export declare function findWithTodos(goalId: string): Promise<{
     id: string;
     text: string;

@@ -54,16 +54,16 @@ describe("NowCard — 滑动露出标签", () => {
     expect(bgLayer).toBeInTheDocument();
   });
 
-  // 场景 4.9: 左滑背景层应包含晨光色跳过原因标签
-  it("should_contain_skip_reason_labels_in_left_swipe_area", () => {
+  // 场景 4.9: 左滑背景层应包含跳过标签（方案B: Action Sheet, 露出区只显示"跳过"）
+  it("should_contain_skip_label_in_left_swipe_area", () => {
     const { container } = render(
       <NowCard card={baseCard} onComplete={onComplete} onSkip={onSkip} />,
     );
-    // 跳过原因标签在 DOM 中存在（forking 时显示）
     const html = container.innerHTML;
-    expect(html).toContain("等条件");
-    expect(html).toContain("有阻力");
-    expect(html).toContain("要重想");
+    // 左滑露出区显示"跳过 →"
+    expect(html).toContain("跳过");
+    // 原因选择已移至 Action Sheet（滑动触发后弹出）
+    expect(container.querySelector("[class*='bg-dawn']")).toBeInTheDocument();
   });
 
   // 场景 4.11: 反复跳过 ≥ 5 应显示反思提示

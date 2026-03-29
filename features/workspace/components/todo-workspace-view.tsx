@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { Check, Sparkles, ChevronDown, ChevronUp, Phone, Mail } from "lucide-react";
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { Check, Sparkles, ChevronDown, ChevronUp, ChevronRight, Phone, Mail, Target, TreePine, Package } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTodayTodos } from "@/features/todos/hooks/use-today-todos";
 import { useTodos } from "@/features/todos/hooks/use-todos";
@@ -17,18 +17,91 @@ import { reportSwipe } from "@/shared/lib/api/action-panel";
 interface TodoWorkspaceViewProps {
   onOpenChat?: (initial?: string) => void;
   onReflect?: (strikeId: string) => void;
+  domainFilter?: string | null;
 }
 
-// 分组待办按时间：今日/转达/明天/稍后
-interface TodoGroup {
-  key: string;
-  label: string;
-  items: TodoItem[];
+/** 按目标/domain 分组 */
+interface GoalGroup {
+  type: "goal" | "domain" | "ungrouped";
+  id: string;
+  title: string;
+  icon: "tree-pine" | "target" | "package" | "circle";
+  clusterId?: string;
+  todos: TodoItem[];
+  doneCount: number;
+  totalCount: number;
 }
 
-export function TodoWorkspaceView({ onOpenChat, onReflect }: TodoWorkspaceViewProps) {
-  const { todos: todayTodos, loading: todayLoading, toggleTodo } = useTodayTodos();
-  const { todos: allTodos, loading: allLoading } = useTodos();
+/** 将 todo 列表按 parent_id（目标）分组，无 parent 的按 domain 兜底 */
+function groupTodosByGoal(todos: TodoItem[], goals: Array<{ id: string; text?: string; title?: string; cluster_id?: string }>): GoalGroup[] {
+  const goalMap = new Map(goals.map((g) => [g.id, g]));
+  const groups = new Map<string, GoalGroup>();
+
+  for (const todo of todos) {
+    const parentId = todo.parent_id;
+    const goal = parentId ? goalMap.get(parentId) : null;
+
+    if (goal) {
+      const key = `goal-${goal.id}`;
+      if (!groups.has(key)) {
+        groups.set(key, {
+          type: "goal",
+          id: goal.id,
+          title: goal.text || goal.title || "未命名目标",
+          icon: goal.cluster_id ? "tree-pine" : "target",
+          clusterId: goal.cluster_id ?? undefined,
+          todos: [],
+          doneCount: 0,
+          totalCount: 0,
+        });
+      }
+      const g = groups.get(key)!;
+      g.todos.push(todo);
+      g.totalCount++;
+      if (todo.done) g.doneCount++;
+    } else {
+      // 按 domain 兜底
+      const domain = todo.domain || "其他";
+      const key = `domain-${domain}`;
+      if (!groups.has(key)) {
+        groups.set(key, {
+          type: domain === "其他" ? "ungrouped" : "domain",
+          id: domain,
+          title: domain,
+          icon: domain === "其他" ? "circle" : "package",
+          todos: [],
+          doneCount: 0,
+          totalCount: 0,
+        });
+      }
+      const g = groups.get(key)!;
+      g.todos.push(todo);
+      g.totalCount++;
+      if (todo.done) g.doneCount++;
+    }
+  }
+
+  // 排序：goal 组在前，domain 组在后，ungrouped 最后
+  const typeOrder = { goal: 0, domain: 1, ungrouped: 2 };
+  return Array.from(groups.values()).sort(
+    (a, b) => typeOrder[a.type] - typeOrder[b.type] || b.totalCount - a.totalCount,
+  );
+}
+
+export function TodoWorkspaceView({ onOpenChat, onReflect, domainFilter }: TodoWorkspaceViewProps) {
+  const { todos: rawTodayTodos, loading: todayLoading, toggleTodo } = useTodayTodos();
+  const { todos: rawAllTodos, loading: allLoading } = useTodos();
+
+  // 维度筛选：按 domain 或 parent 目标的 domain 过滤
+  const todayTodos = useMemo(() => {
+    if (!domainFilter) return rawTodayTodos;
+    return rawTodayTodos.filter((t) => t.domain === domainFilter);
+  }, [rawTodayTodos, domainFilter]);
+
+  const allTodos = useMemo(() => {
+    if (!domainFilter) return rawAllTodos;
+    return rawAllTodos.filter((t) => t.domain === domainFilter);
+  }, [rawAllTodos, domainFilter]);
   const {
     now: nowCard,
     goals: actionGoals,
@@ -41,6 +114,8 @@ export function TodoWorkspaceView({ onOpenChat, onReflect }: TodoWorkspaceViewPr
   const [refreshKey, setRefreshKey] = useState(0);
   const [pendingIntents, setPendingIntents] = useState<any[]>([]);
   const [confirmCollapsed, setConfirmCollapsed] = useState(false);
+  const [goals, setGoals] = useState<Array<{ id: string; text?: string; title?: string; cluster_id?: string }>>([]);
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
 
   // NowCard 完成/跳过后刷新
   const handleNowComplete = useCallback(
@@ -60,10 +135,13 @@ export function TodoWorkspaceView({ onOpenChat, onReflect }: TodoWorkspaceViewPr
     [refetchPanel],
   );
 
-  // 加载待确认意图
+  // 加载待确认意图 + 目标列表
   useEffect(() => {
     listPendingIntents?.()
       .then((intents) => setPendingIntents(intents || []))
+      .catch(() => {});
+    listGoals()
+      .then((g) => setGoals((g || []).map((x: any) => ({ id: x.id, text: x.text, title: x.title, cluster_id: x.cluster_id }))))
       .catch(() => {});
   }, [refreshKey]);
 
@@ -98,9 +176,10 @@ export function TodoWorkspaceView({ onOpenChat, onReflect }: TodoWorkspaceViewPr
     return d && d > tomorrowDate;
   });
 
-  // 无排期
+  // 无排期（排除已在 todayTodos 中的）
+  const todayIds = new Set(todayTodos.map((t) => t.id));
   const unscheduledTodos = allTodos.filter(
-    (t) => !t.done && !t.scheduled_start,
+    (t) => !t.done && !t.scheduled_start && !todayIds.has(t.id),
   );
 
   const handleToggle = useCallback(
@@ -202,36 +281,50 @@ export function TodoWorkspaceView({ onOpenChat, onReflect }: TodoWorkspaceViewPr
         </div>
       </section>
 
-      {/* 今日待办 */}
+      {/* 今日待办 — 按目标分组（>5 条时分组，≤5 条平铺） */}
       <section className="px-4 pt-2">
-        {todayPending.map((todo) => (
-          <TodoRow
-            key={todo.id}
-            todo={todo}
-            onToggle={() => handleToggle(todo.id)}
-            onSelect={() => {
+        {todayTodos.length > 5 ? (
+          <TodayGrouped
+            todos={todayTodos}
+            goals={goals}
+            collapsedGroups={collapsedGroups}
+            onToggleCollapse={(key) =>
+              setCollapsedGroups((prev) => {
+                const next = new Set(prev);
+                next.has(key) ? next.delete(key) : next.add(key);
+                return next;
+              })
+            }
+            onToggleTodo={handleToggle}
+            onSelectTodo={(todo) => {
               setSelectedTodo(todo);
               setDetailOpen(true);
             }}
           />
-        ))}
-
-        {/* 已完成 */}
-        {todayDone.length > 0 && (
-          <div className="mt-2">
-            {todayDone.map((todo) => (
+        ) : (
+          <>
+            {todayPending.map((todo) => (
               <TodoRow
                 key={todo.id}
                 todo={todo}
-                done
                 onToggle={() => handleToggle(todo.id)}
-                onSelect={() => {
-                  setSelectedTodo(todo);
-                  setDetailOpen(true);
-                }}
+                onSelect={() => { setSelectedTodo(todo); setDetailOpen(true); }}
               />
             ))}
-          </div>
+            {todayDone.length > 0 && (
+              <div className="mt-4">
+                {todayDone.map((todo) => (
+                  <TodoRow
+                    key={todo.id}
+                    todo={todo}
+                    done
+                    onToggle={() => handleToggle(todo.id)}
+                    onSelect={() => { setSelectedTodo(todo); setDetailOpen(true); }}
+                  />
+                ))}
+              </div>
+            )}
+          </>
         )}
       </section>
 
@@ -271,18 +364,31 @@ export function TodoWorkspaceView({ onOpenChat, onReflect }: TodoWorkspaceViewPr
         </section>
       )}
 
-      {/* 空状态 */}
+      {/* 空状态 — 区分"全部完成"和"从未创建" */}
       {totalToday === 0 &&
         tomorrowTodos.length === 0 &&
         laterTodos.length === 0 &&
         unscheduledTodos.length === 0 && (
           <div className="flex flex-col items-center justify-center py-20">
-            <p className="font-serif text-2xl text-muted-accessible">
-              今日清单已清空
-            </p>
-            <p className="text-sm text-muted-accessible mt-2">
-              对路路说点什么，待办会自动出现
-            </p>
+            {doneCount > 0 ? (
+              <>
+                <p className="font-serif text-2xl text-muted-accessible">
+                  今天的事都做完了 ✦
+                </p>
+                <p className="text-sm text-muted-accessible mt-2">
+                  好好休息，明天继续
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="font-serif text-2xl text-muted-accessible">
+                  还没有待办
+                </p>
+                <p className="text-sm text-muted-accessible mt-2">
+                  长按底部麦克风说一句话，AI 帮你提取待办
+                </p>
+              </>
+            )}
           </div>
         )}
 
@@ -294,6 +400,97 @@ export function TodoWorkspaceView({ onOpenChat, onReflect }: TodoWorkspaceViewPr
         onUpdated={() => setRefreshKey((k) => k + 1)}
         onAskAI={onOpenChat ? (msg) => onOpenChat(msg) : undefined}
       />
+    </div>
+  );
+}
+
+/* ── 今日分组渲染 ── */
+
+function TodayGrouped({
+  todos,
+  goals,
+  collapsedGroups,
+  onToggleCollapse,
+  onToggleTodo,
+  onSelectTodo,
+}: {
+  todos: TodoItem[];
+  goals: Array<{ id: string; text?: string; title?: string; cluster_id?: string }>;
+  collapsedGroups: Set<string>;
+  onToggleCollapse: (key: string) => void;
+  onToggleTodo: (id: string) => void;
+  onSelectTodo: (todo: TodoItem) => void;
+}) {
+  const groups = useMemo(() => groupTodosByGoal(todos, goals), [todos, goals]);
+
+  const groupIcon = (icon: GoalGroup["icon"]) => {
+    switch (icon) {
+      case "tree-pine": return <TreePine size={16} className="text-deer" />;
+      case "target": return <Target size={16} className="text-deer" />;
+      case "package": return <Package size={16} className="text-muted-accessible" />;
+      default: return <div className="w-4 h-4 rounded-full bg-muted-accessible/20" />;
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      {groups.map((group) => {
+        const key = `${group.type}-${group.id}`;
+        const collapsed = collapsedGroups.has(key);
+        const hasPending = group.todos.some((t) => !t.done);
+        // 全部完成的组默认折叠
+        const isCollapsed = collapsed || (!hasPending && !collapsedGroups.has(key));
+
+        return (
+          <div key={key}>
+            {/* 组标题 */}
+            <button
+              onClick={() => onToggleCollapse(key)}
+              className="flex items-center gap-2 w-full py-2 px-1"
+            >
+              {groupIcon(group.icon)}
+              <span className="text-sm font-medium text-on-surface flex-1 text-left truncate">
+                {group.title}
+              </span>
+              <span className="text-xs font-mono text-muted-accessible">
+                {group.doneCount}/{group.totalCount}
+              </span>
+              {isCollapsed ? (
+                <ChevronRight size={14} className="text-muted-accessible" />
+              ) : (
+                <ChevronDown size={14} className="text-muted-accessible" />
+              )}
+            </button>
+
+            {/* 组内 todo */}
+            {!isCollapsed && (
+              <div className="pl-2">
+                {group.todos
+                  .filter((t) => !t.done)
+                  .map((todo) => (
+                    <TodoRow
+                      key={todo.id}
+                      todo={todo}
+                      onToggle={() => onToggleTodo(todo.id)}
+                      onSelect={() => onSelectTodo(todo)}
+                    />
+                  ))}
+                {group.todos
+                  .filter((t) => t.done)
+                  .map((todo) => (
+                    <TodoRow
+                      key={todo.id}
+                      todo={todo}
+                      done
+                      onToggle={() => onToggleTodo(todo.id)}
+                      onSelect={() => onSelectTodo(todo)}
+                    />
+                  ))}
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -328,7 +525,7 @@ function TodoRow({
         "flex items-center gap-3 py-3 min-h-[44px] rounded-lg transition-colors",
         isDone ? "bg-surface-high" : "bg-transparent",
       )}
-      style={{ marginBottom: "0.5rem" }}
+      style={{ marginBottom: "1rem" }}
     >
       {/* Checkbox */}
       <button

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useRef, useCallback, useEffect } from "react";
+import { useMemo, useState, useRef, useCallback, useEffect, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { MapPin, Clock, Trash2, X, CheckCircle2, Mic, Type, MoreVertical, Pencil, Copy } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -10,11 +10,15 @@ import { MiniAudioPlayer } from "./mini-audio-player";
 import { toast } from "sonner";
 import type { NoteItem } from "@/shared/lib/types";
 import { AiWindow } from "@/features/ai-bubble/components/ai-window";
+import { InsightCard } from "./insight-card";
 import { api } from "@/shared/lib/api";
+import { fetchCognitiveStats, type CognitiveStats } from "@/shared/lib/api/cognitive";
 
 interface NotesTimelineProps {
   filter?: string;
   notebook?: string | null;
+  clusterId?: string | null;
+  domainFilter?: string | null;
   onOpenChat?: (initial?: string) => void;
   onOpenOverlay?: (name: string) => void;
 }
@@ -36,11 +40,26 @@ function parseDayGroup(dateStr: string): { day: number; monthWeekday: string } {
   return { day, monthWeekday: `${month}月 周${weekday}` };
 }
 
-export function NotesTimeline({ filter, notebook, onOpenChat, onOpenOverlay }: NotesTimelineProps) {
-  const { notes, loading, deleteNotes, updateNote } = useNotes(notebook);
+export function NotesTimeline({ filter, notebook, clusterId, domainFilter, onOpenChat, onOpenOverlay }: NotesTimelineProps) {
+  const { notes, loading, deleteNotes, updateNote } = useNotes(notebook, clusterId);
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [deleting, setDeleting] = useState(false);
+
+  // Insight card: fetch top cluster for "路路发现"
+  const [insightText, setInsightText] = useState<string | null>(null);
+  useEffect(() => {
+    fetchCognitiveStats()
+      .then((stats) => {
+        const top = stats.top_clusters?.[0];
+        if (top) {
+          setInsightText(
+            `你最近在关注「${top.name}」，共 ${top.count} 条相关想法`,
+          );
+        }
+      })
+      .catch(() => { /* non-critical */ });
+  }, []);
 
   const toggleSelect = useCallback((id: string) => {
     setSelectedIds((prev) => {
@@ -72,7 +91,11 @@ export function NotesTimeline({ filter, notebook, onOpenChat, onOpenOverlay }: N
   const groups = useMemo(() => {
     let filtered = notes;
     if (filter && filter !== "全部") {
-      filtered = notes.filter((n) => n.tags.includes(filter));
+      filtered = filtered.filter((n) => n.tags.includes(filter));
+    }
+    // 维度筛选
+    if (domainFilter) {
+      filtered = filtered.filter((n) => n.domain === domainFilter);
     }
 
     const map = new Map<string, NoteItem[]>();
@@ -96,11 +119,11 @@ export function NotesTimeline({ filter, notebook, onOpenChat, onOpenOverlay }: N
       });
     }
     return groups.sort((a, b) => b.date.localeCompare(a.date));
-  }, [notes, filter]);
+  }, [notes, filter, domainFilter]);
 
   if (loading) {
     return (
-      <div className="px-4 space-y-3 pt-4">
+      <div className="px-4 space-y-6 pt-4">
         {[1, 2, 3].map((i) => (
           <div
             key={i}
@@ -153,8 +176,8 @@ export function NotesTimeline({ filter, notebook, onOpenChat, onOpenOverlay }: N
     <>
       <div className="px-4 pt-2 pb-28">
         <AiWindow onOpenChat={onOpenChat} onOpenOverlay={onOpenOverlay} />
-        {groups.map((group) => (
-          <div key={group.date} className="mb-6">
+        {groups.map((group, groupIdx) => (
+          <div key={group.date} className="mb-8">
             {/* Day header — editorial style with serif date */}
             <div className="flex items-baseline gap-2 py-3">
               <span className="text-4xl font-serif-display text-foreground/80 leading-none tabular-nums">
@@ -166,7 +189,7 @@ export function NotesTimeline({ filter, notebook, onOpenChat, onOpenOverlay }: N
             </div>
 
             {/* Note cards */}
-            <div className="space-y-3">
+            <div className="space-y-6">
               {group.notes.map((note) => {
                 const idx = cardIndex++;
                 return (
@@ -184,6 +207,16 @@ export function NotesTimeline({ filter, notebook, onOpenChat, onOpenOverlay }: N
                 );
               })}
             </div>
+
+            {/* Insert insight card after the first day group */}
+            {groupIdx === 0 && insightText && (
+              <div className="mt-6">
+                <InsightCard
+                  text={insightText}
+                  onDetail={onOpenChat ? () => onOpenChat(`路路发现：${insightText}`) : undefined}
+                />
+              </div>
+            )}
           </div>
         ))}
       </div>

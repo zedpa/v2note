@@ -36,6 +36,17 @@ export async function findByRecordId(recordId: string): Promise<Tag[]> {
   );
 }
 
+/** 批量查询多条 record 的 tags */
+export async function findByRecordIds(recordIds: string[]): Promise<Array<{ record_id: string } & Tag>> {
+  if (recordIds.length === 0) return [];
+  return query<{ record_id: string } & Tag>(
+    `SELECT rt.record_id, t.id, t.name FROM tag t
+     JOIN record_tag rt ON rt.tag_id = t.id
+     WHERE rt.record_id = ANY($1)`,
+    [recordIds],
+  );
+}
+
 export async function addToRecord(recordId: string, tagId: string): Promise<void> {
   await execute(
     `INSERT INTO record_tag (record_id, tag_id) VALUES ($1, $2)

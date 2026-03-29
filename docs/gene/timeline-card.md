@@ -17,11 +17,19 @@
 - 功能12：批量删除调用 useNotes().deleteNotes()
 - 功能13：Processing 骨架屏——未完成处理且无内容时显示 shimmer 动画
 
+### 性能优化（2026-03）
+- **Tab 保持挂载**：日记/待办 tab 切换用 CSS `hidden` 隐藏而非条件渲染卸载，切回瞬间显示（`app/page.tsx`）
+- **后端批量查询**：`GET /api/v1/records` 从 N+1 查询（200+ 次）改为 3 次批量查询（`summaryRepo.findByRecordIds` + `transcriptRepo.findByRecordIds` + `tagRepo.findByRecordIds`）
+- **缓存优先显示**：`useNotes` 首次渲染时 `getCachedNotes()` 有数据立即展示并跳过 loading 态，后台静默 `fetchNotes(true)` 刷新
+
 ### 关键文件
 - `features/notes/components/notes-timeline.tsx` — NotesTimeline + TimelineCard 组件
 - `features/notes/hooks/use-note-detail.ts` — 展开时按需加载详情（支持 null 跳过）
-- `features/notes/hooks/use-notes.ts` — 列表数据 + deleteNotes 方法
+- `features/notes/hooks/use-notes.ts` — 列表数据 + 缓存优先 + deleteNotes 方法
 - `features/notes/components/mini-audio-player.tsx` — 音频播放器
+- `features/workspace/lib/cache.ts` — 本地缓存（30min TTL）
+- `gateway/src/routes/records.ts` — Records REST API（批量关联查询）
+- `gateway/src/db/repositories/tag.ts` — `findByRecordIds()` 批量查询
 
 ### 测试描述
 - 输入：浏览时间线

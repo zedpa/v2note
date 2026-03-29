@@ -1,52 +1,46 @@
 ## gene_ai_processing
 ### 功能描述
-AI 处理管道。转写文本经过最小化清理（去填充词+修错别字，严格保留原文句式结构），按激活技能提取结构化数据（待办、客户要求等），标签仅匹配已有标签。使用分层上下文架构（Hot/Warm/Cold）组装 system prompt，process 模式跳过 Soul 加载、仅注入相关记忆。
+AI 处理管道（v2 两级架构）。Process 负责轻量文本清理 + 意图分类，Digest 负责认知分解。结构化提取（Strike/Bond/Todo/Goal）全部由 Digest Tier1 完成。
 
-### 详细功能
-- 功能1：转写清理（仅移除"嗯""那个""就是说"等填充词 + 修正错别字，不改写句式结构）
-- 功能2：按技能提取 JSON 结构化数据（新增 intents 数组格式，向后兼容 todos 数组）
-- 功能2b：意图路由——task→todo, wish/goal→pending_intent, complaint→soul, reflection→memory
-- 功能2c：目标自动关联——创建 todo 时用 extractKeywords 匹配活跃目标，自动设置 goal_id
-- 功能3：标签仅匹配已有标签列表，不创建新标签
-- 功能4：生成 summary（清理后的转写文本，保留原文结构）并保存到 summary 表
-- 功能5：工具调用循环（最多 3 轮）——内置工具（create_diary/delete_diary/create_todo）优先匹配，未命中回退 MCP
-- 功能6：结果写入数据库（todos、customer_requests、setting_changes、tags、summary、pending_intent）
-- 功能7：后台触发 Todo Enrichment（时间估算+domain+impact+ai_actionable，目标上下文优先从 goal 表获取）和记忆更新
-- 功能8：分层上下文架构——Hot 层=核心规则+反幻觉纪律+技能清单(metadata only)；Warm 层=相关记忆(相关性评分筛选)+匹配技能全文+标签规则+输出格式；Cold 层=完整 Agent.md+工具参数 schema
-- 功能9：process 模式优化——跳过 Soul 加载（提取不需要人格），Memory 并行加载(Promise.all)，仅注入输入相关的 5 条记忆
-- 功能10：反幻觉纪律——"只提取用户明确说出的内容"、"记忆仅供理解背景不作为提取来源"、"每条提取结果必须能在原文中找到对应原句"
+### 处理链路（用户感知延迟 = ASR + Process）
 
-#### 内置工具：create_todo
-- 使用场景：对话中模型识别到明确的行动事项，需要直接落地为待办
-- 参数：
-  - `text` (必填)：待办文本（动词开头、简洁可执行）
-  - `link_record_id` (可选)：将待办关联到指定记录
-  - `scheduled_start` / `scheduled_end` (可选)：任务时间范围（ISO）
-  - `estimated_minutes` (可选)：预估时长（分钟）
-  - `priority` (可选)：优先级（整数，越大越高）
-- 行为：
-  - 如未提供 `link_record_id`，自动创建一条记录 `source:"chat_tool"` 并将待办关联到该记录
-  - 创建待办后，根据可选参数更新排期/预估/优先级
-  - 返回 `{ todo_id, record_id }`
+```
+松手 → ASR(2-10s) → Process(1-5s) → 前端显示结果
+                      ├ 意图分类（指令型才调用 AI）
+                      └ 文本清理（1次 AI 调用）
+                     ↓ 后台异步（用户无感）
+                     Digest Tier1 → Strike 拆解 + Todo/Goal 投影
+                     ↓ 累计 ≥5 Strike
+                     Digest Tier2 → 批量认知分析（聚类/矛盾/模式）
+```
 
-### 转写清理规则（v2026.02.28）
+### Process 阶段（阻塞，用户等待）
+- Step 0：Voice Action 意图分类（record/action/mixed）— 仅 text>10字触发
+  - 纯指令型（action）：执行后直接返回，不走 Digest
+  - 混合型（mixed）：执行指令部分，继续走 Digest
+- Step 1：文本清理（1 次 AI 调用）— 去填充词 + 修错别字，严格保留原文句式
+- Step 2-3：保存 summary + 更新 record status
+- Step 4：写日记（后台 fire-and-forget）
+- Step 5：触发 Digest（条件：冷启动 record<20 或 text>80字）
+
+### Digest 阶段（后台异步，用户无感）
+- 详见 [cognitive-engine.md](./cognitive-engine.md) 的 Tier1/Tier2 流程
+- 含 Strike 去重机制（claimForDigest 原子抢占 + source_id+nucleus 去重）
+
+### 转写清理规则
 - 移除口语填充词和重复词
 - 修正明显的错别字和语音识别错误
 - **严格保留原文表述结构**：短句还是短句，倒装还是倒装
 - 不将口语转为书面语，不合并或拆分句子
-- 无填充词且无错别字时，转写结果应与原文完全一致
 
 ### 关键文件
-- `gateway/src/handlers/process.ts` — 处理入口（使用 loadRelevantContext 并行加载）
-- `gateway/src/skills/prompt-builder.ts` — buildTieredContext() + buildSystemPrompt() 兼容包装
-- `gateway/src/context/tiers.ts` — ContextTier 类型定义（hot/warm/cold）
-- `gateway/src/context/anti-hallucination.ts` — 反幻觉纪律常量
-- `gateway/src/context/loader.ts` — 异步并行加载器 + 关键词相关性评分
-- `gateway/src/skills/loader.ts` — 技能加载 + getSkillManifest() + partitionSkillsByRelevance()
-- `gateway/src/skills/types.ts` — 技能类型
-- `gateway/Agent.md` — 静态 AI 行为逻辑定义
-- `gateway/src/soul/manager.ts` — AI 身份定义更新
-- `gateway/src/tools/builtin.ts` — 内置工具定义与执行（包含 create_todo）
+- `gateway/src/handlers/process.ts` — Process 入口（意图分类 + 文本清理 + 触发 Digest）
+- `gateway/src/handlers/voice-action.ts` — 语音指令分类与执行
+- `gateway/src/handlers/digest.ts` — Tier1 认知分解（原子抢占 + Strike 去重）
+- `gateway/src/handlers/digest-prompt.ts` — Digest AI prompt
+- `gateway/src/cognitive/batch-analyze.ts` — Tier2 批量分析引擎
+- `gateway/src/handlers/reflect.ts` — 反思问题生成 + AI 状态生成
+- `gateway/src/proactive/engine.ts` — 定时任务（3h batch digest + 每日认知周期）
 
 ### 测试描述
 - 输入：口语化文本 "嗯那个明天要开会啊然后就是说下午三点"

@@ -49,55 +49,66 @@ cluster_member — 聚类成员关系
 record.digested / record.digested_at — 消化追踪
 ```
 
-## Digest 管道
+## Digest 管道（v2 两级架构）
 
-### Level 1: Strike 拆解（Phase 1 已实现）
+### Tier1: 实时 Strike 拆解
 
 **触发**：
 - 路径 A：Process 完成后 `shouldDigestImmediately()`（reflection/goal/complaint + 文本>80字）→ 立即
 - 路径 B：Cron 每 3 小时 → 查 undigested 记录 → 批量
+- 路径 C：Onboarding 冷启动 5 问 → 每步立即 Digest
 
-**流程**（2 次 AI 调用）：
+**流程**（1 次 AI 调用）：
+0. `claimForDigest()` 原子抢占 record（防并发重复 digest）
 1. 加载记录 summary + 原文
 2. AI 拆解为 Strike + 内部 bond
-3. 写入 strike / bond / strike_tag
-4. 混合检索历史 Strike（语义 + 结构化双通道）
-5. AI 判断跨记录 bond + supersede
-6. 标记 record.digested = true
+3. 写入 strike / bond / strike_tag（含 source_id + nucleus 去重）
+4. intend Strike 自动投影为 todo/goal
+5. 新 Strike 自动关联已有目标
+6. 记忆/Soul/Profile 更新
+7. 新 Strike 数 ≥ 5 → 触发 Tier2
 
-### Level 2: 关联聚类 + 矛盾检测 + 融合（每日，Phase 2 已实现）
+**失败回滚**：AI 调用或管道失败时 `unclaimDigest()` 恢复 digested=false，允许重试。
 
-**每日凌晨 3 点自动执行（daily-cycle.ts 编排）：**
+### Tier2: 批量认知分析（batch-analyze.ts）
 
-**2a. 聚类** (clustering.ts)
-- 加载活跃 Strike + Bond 邻接表
-- 三角闭合度计算（密度 > 0.3 为种子，BFS 扩展 > 0.2）
-- 合并重叠 > 50% 的候选，最小 3 个 Strike
-- AI 审核命名 → 创建 is_cluster=true Strike + cluster_member
-- 已有 cluster 增量更新
+**触发**（OR 逻辑）：
+- 累计 ≥ 5 个新 Strike → Tier1 结束时自动触发
+- 每日凌晨 3 点 daily-cycle.ts 编排
 
-**2b. 矛盾扫描** (contradiction.ts)
-- 取最近 N 天 Judge/Perceive 类 Strike
-- hybridRetrieve 反向极性通道找候选
-- AI 批量判定：contradiction (bond 0.8) / perspective_of (bond 0.6) / none
-- 双重去重（内存 Set + DB 已有 bond）
+**流程**（1 次 AI 调用，替代 v1 的 7 个模块）：
+1. 读取 cognitive_snapshot（压缩的认知结构快照，≤5K token）
+2. 加载 last_analyzed_strike_id 之后的新 Strike
+3. 单次 AI 调用：聚类分配、新聚类、合并、矛盾、模式、目标涌现
+4. 9 种结果批量写入 DB
+5. 更新 snapshot（乐观锁 version 字段）
 
-**2c. 融合 Promote** (promote.ts)
-- 在 cluster 成员中 AI 检测"本质说同一件事"的子组
-- 创建高阶 Strike + abstracted_from bond (strength 0.9)
-- 底层 Strike 保持 active 作为证据链
+**每日完整周期**（daily-cycle.ts）：
+1. `runBatchAnalyze(userId)` — Tier2 批量分析
+2. 维护 — Bond type 归一化 + Strength/Salience 衰减
+3. `generateCognitiveReport()` — 认知报告
 
-**2d. 维护** (maintenance.ts)
-- Bond type 归一化（7 组同义词 → 标准名，单条 SQL）
-- Strength 衰减（30d × 0.9，90d × 0.7）
-- Salience 衰减（30 天未引用 × 0.95，最低 0.01）+ 回升（引用时 + 0.1）
+**Cognitive Snapshot**（cognitive_snapshot 表）：
+- 存储聚类、目标、矛盾、模式的压缩 JSON
+- `last_analyzed_strike_id` 指针实现增量分析
+- 乐观锁防止并发写入冲突
+- 大小控制：50 cluster / 30 goal / 20 contradiction / 20 pattern
 
-### Level 3: 涌现（每周，Phase 3）
+## Strike 去重机制
 
-- cluster 间关系 → 高阶结构
-- cluster 演化检测（增长/萎缩/分裂/合并）
-- 认知模式提炼
-- 冲突检测 + 推送
+**两层防重，避免并发或重试产生重复 Strike：**
+
+| 层级 | 机制 | 位置 |
+|------|------|------|
+| Record 级 | `claimForDigest()` 原子抢占：`UPDATE ... WHERE digested=false RETURNING id` | record.ts |
+| Strike 级 | `existsBySourceAndNucleus(source_id, nucleus)` 写入前查重 | strike.ts + digest.ts |
+| 失败回滚 | `unclaimDigest()` 恢复 digested=false 允许重试 | record.ts + digest.ts |
+
+**防重场景覆盖：**
+- redigest 手动重跑 → claimForDigest 过滤已消化的 record
+- proactive batch digest 并发 → 同一 record 只有一个进程抢占成功
+- process + batch digest 竞争 → 原子 UPDATE 保证互斥
+- AI 幂等性兜底 → Strike 级 (source_id, nucleus) 去重
 
 ## 混合检索
 
@@ -125,24 +136,36 @@ record.digested / record.digested_at — 消化追踪
 | 文件 | 职责 |
 |------|------|
 | `supabase/migrations/017_cognitive_layer.sql` | 认知层四表 + record 扩展 |
-| `gateway/src/db/repositories/strike.ts` | Strike CRUD |
+| `supabase/migrations/029_cognitive_snapshot.sql` | cognitive_snapshot 表 |
+| `supabase/migrations/030_strike_source_cascade.sql` | strike.source_id ON DELETE SET NULL |
+| `gateway/src/db/repositories/strike.ts` | Strike CRUD + existsBySourceAndNucleus 去重 |
 | `gateway/src/db/repositories/bond.ts` | Bond CRUD（含批量创建） |
 | `gateway/src/db/repositories/strike-tag.ts` | Tag CRUD |
-| `gateway/src/handlers/digest.ts` | Digest Level 1 主管道 |
+| `gateway/src/db/repositories/snapshot.ts` | Cognitive snapshot CRUD（乐观锁） |
+| `gateway/src/db/repositories/record.ts` | Record CRUD + claimForDigest/unclaimDigest |
+| `gateway/src/handlers/digest.ts` | Tier1 主管道（原子抢占 + Strike 去重） |
 | `gateway/src/handlers/digest-prompt.ts` | Digest AI prompt 构建 |
+| `gateway/src/cognitive/batch-analyze.ts` | Tier2 批量分析引擎（单次 AI 调用） |
+| `gateway/src/cognitive/batch-analyze-prompt.ts` | Tier2 AI prompt 构建 |
 | `gateway/src/cognitive/retrieval.ts` | 混合检索模块 |
 | `gateway/src/handlers/process.ts` | shouldDigestImmediately + 触发 |
-| `gateway/src/proactive/engine.ts` | 3h cron 批量 digest |
+| `gateway/src/proactive/engine.ts` | 3h cron 批量 digest + 每日/每周认知周期 |
 | `gateway/src/routes/strikes.ts` | REST API |
-| `gateway/src/cognitive/clustering.ts` | Level 2 聚类引擎 |
-| `gateway/src/cognitive/clustering-prompt.ts` | 聚类 AI prompt |
-| `gateway/src/cognitive/contradiction.ts` | 矛盾扫描 |
-| `gateway/src/cognitive/promote.ts` | 融合 Promote |
 | `gateway/src/cognitive/maintenance.ts` | 维护（归一化+衰减） |
-| `gateway/src/cognitive/daily-cycle.ts` | 每日认知周期编排 |
+| `gateway/src/cognitive/daily-cycle.ts` | 每日认知周期编排（3 步） |
 | `features/notes/components/strike-preview.tsx` | 前端 Strike 展示 + 编辑 |
 | `features/notes/hooks/use-strikes.ts` | 懒加载 hook |
 | `shared/lib/api/strikes.ts` | 前端 API 客户端 |
+
+## HTTP 层
+
+- `gateway/src/lib/http-helpers.ts` 的 `sendJson()` / `sendError()` 统一返回 `Content-Type: application/json; charset=utf-8`
+- `gateway/src/companion/chat-generator.ts` 使用 `chatCompletion()` 而非已删除的 `callAI()`
+
+## 前端 Overlay 架构
+
+- `app/page.tsx` 的 `<AnimatePresence mode="wait">` 内使用链式三元表达式（而非多个 `&&`），确保同时只有一个带 key 的子节点，避免 React "duplicate key" 警告
+- 每个 overlay 组件必须有唯一 `key` prop
 
 ## 设计文档
 

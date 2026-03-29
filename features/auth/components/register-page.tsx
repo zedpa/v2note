@@ -56,7 +56,7 @@ export function RegisterPage({ onRegister, onSwitchToLogin, error, loading }: Re
           <div className="w-20 h-20 mx-auto">
             <LuluLogo size={80} variant="color" className="animate-none" />
           </div>
-          <h1 className="font-serif text-2xl text-on-surface">创建账号</h1>
+          <h1 className="font-serif text-3xl text-on-surface">创建账号</h1>
           <p className="text-sm text-muted-accessible">注册后可跨设备同步数据</p>
         </div>
 

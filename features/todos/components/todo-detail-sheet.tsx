@@ -328,23 +328,41 @@ export function TodoDetailSheet({ todo, open, onClose, onUpdated, onAskAI }: Tod
             </div>
           </div>
 
-          {/* AI action plan */}
-          {todo.ai_actionable && todo.ai_action_plan && todo.ai_action_plan.length > 0 && (
+          {/* AI action plan — sub-tasks as checkboxes */}
+          {todo.ai_action_plan && todo.ai_action_plan.length > 0 && (
             <div className="space-y-2.5">
               <div className="flex items-center gap-1.5 text-[11px] font-semibold text-violet-500/80 uppercase tracking-wider">
                 <Zap className="w-3 h-3" />
-                AI 执行计划
+                子任务
               </div>
-              <div className="space-y-1 rounded-xl bg-violet-500/[0.04] border border-violet-500/10 p-3">
+              <div className="space-y-1.5 rounded-xl bg-violet-500/[0.04] border border-violet-500/10 p-3">
                 {todo.ai_action_plan.map((step, i) => (
-                  <div key={i} className="flex items-start gap-2.5 text-[12px] leading-relaxed text-foreground/80">
-                    <span className="shrink-0 w-[18px] h-[18px] rounded-md bg-violet-500/10 flex items-center justify-center text-[9px] font-mono font-bold text-violet-500 mt-[2px]">
-                      {i + 1}
+                  <label key={i} className="flex items-start gap-2.5 cursor-default">
+                    <span className="shrink-0 mt-[3px] w-4 h-4 rounded border border-muted-foreground/30 flex items-center justify-center">
+                      {/* Visual-only unchecked checkbox */}
                     </span>
-                    <span>{step}</span>
-                  </div>
+                    <span className="text-sm text-on-surface leading-relaxed">{step}</span>
+                  </label>
                 ))}
               </div>
+              {/* 让AI帮忙 button with deer gradient */}
+              {onAskAI && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onAskAI(`帮我处理这个任务：${todo.text}`);
+                    onClose();
+                  }}
+                  className={cn(
+                    "w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-semibold text-white transition-all",
+                    "bg-gradient-to-r from-dawn to-antler",
+                    "hover:opacity-90 active:scale-[0.98]",
+                  )}
+                >
+                  <Sparkles className="w-4 h-4" />
+                  让AI帮忙
+                </button>
+              )}
             </div>
           )}
 

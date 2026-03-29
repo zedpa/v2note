@@ -4,9 +4,11 @@ import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
 import { initStatusBar } from "@/shared/lib/status-bar";
-import { WorkspaceHeader, type WorkspaceTab } from "@/features/workspace/components/workspace-header";
+import { WorkspaceHeader, type WorkspaceTab, type TopicFilter, type DimensionFilter } from "@/features/workspace/components/workspace-header";
 import { NotesTimeline } from "@/features/notes/components/notes-timeline";
 import { TodoWorkspaceView } from "@/features/workspace/components/todo-workspace-view";
+import { TopicLifecycleView } from "@/features/workspace/components/topic-lifecycle-view";
+import { AiWindow } from "@/features/companion/components/ai-window";
 import { FAB } from "@/features/recording/components/fab";
 import { SidebarDrawer } from "@/features/sidebar/components/sidebar-drawer";
 import { SearchView } from "@/features/search/components/search-view";
@@ -26,6 +28,7 @@ import { EveningSummary } from "@/features/daily/components/evening-summary";
 import { LifeMap } from "@/features/cognitive/components/life-map";
 import { ClusterDetailView } from "@/features/cognitive/components/cluster-detail";
 import { DecisionWorkspace } from "@/features/cognitive/components/decision-workspace";
+import { DiscoveryOverlay } from "@/features/workspace/components/discovery-overlay";
 import { OnboardingSeed } from "@/features/cognitive/components/onboarding-seed";
 import { GoalDetailOverlay } from "@/features/goals/components/goal-detail-overlay";
 import { ProjectDetailOverlay } from "@/features/goals/components/project-detail-overlay";
@@ -41,6 +44,7 @@ import { useUpdateCheck } from "@/shared/hooks/use-update-check";
 import { UpdateDialog } from "@/shared/components/update-dialog";
 import { NotificationCenter } from "@/features/notifications/components/notification-center";
 import type { AppNotification } from "@/features/notifications/hooks/use-notifications";
+import { AnimatePresence, motion } from "framer-motion";
 
 type OverlayName =
   | "search"
@@ -60,6 +64,7 @@ type OverlayName =
   | "goal-detail"
   | "project-detail"
   | "notifications"
+  | "discovery"
   | null;
 
 export default function Page() {
@@ -80,6 +85,39 @@ export default function Page() {
   const [chatInitialMessage, setChatInitialMessage] = useState<string | undefined>();
   const [chatMode, setChatMode] = useState<"review" | "command" | "insight">("review");
   const [selectedGoalId, setSelectedGoalId] = useState<string | null>(null);
+  // 主题筛选（场景 10: localStorage 持久化）
+  const [topicFilter, setTopicFilter] = useState<TopicFilter | null>(() => {
+    if (typeof window === "undefined") return null;
+    try {
+      const stored = localStorage.getItem("v2note:topicFilter");
+      return stored ? JSON.parse(stored) : null;
+    } catch { return null; }
+  });
+
+  // 维度筛选（L3 全局 domain 过滤）
+  const [dimensionFilter, setDimensionFilter] = useState<DimensionFilter | null>(() => {
+    if (typeof window === "undefined") return null;
+    try {
+      const stored = localStorage.getItem("v2note:dimensionFilter");
+      return stored ? JSON.parse(stored) : null;
+    } catch { return null; }
+  });
+
+  useEffect(() => {
+    if (topicFilter) {
+      localStorage.setItem("v2note:topicFilter", JSON.stringify(topicFilter));
+    } else {
+      localStorage.removeItem("v2note:topicFilter");
+    }
+  }, [topicFilter]);
+
+  useEffect(() => {
+    if (dimensionFilter) {
+      localStorage.setItem("v2note:dimensionFilter", JSON.stringify(dimensionFilter));
+    } else {
+      localStorage.removeItem("v2note:dimensionFilter");
+    }
+  }, [dimensionFilter]);
 
   // Workspace: Segment tab (日记 | 待办)
   const [activeTab, setActiveTab] = useState<WorkspaceTab>(() => {
@@ -287,12 +325,29 @@ export default function Page() {
         onViewSettings={() => setActiveOverlay("settings")}
         onViewSkills={() => setActiveOverlay("skills")}
         onViewReview={() => setActiveOverlay("review")}
+        onViewEvening={() => setActiveOverlay("evening-summary")}
         onViewSearch={() => setActiveOverlay("search")}
+        onViewDiscovery={() => setActiveOverlay("discovery")}
         onViewGoal={(goalId) => {
           setSelectedGoalId(goalId);
           setActiveOverlay("goal-detail");
         }}
         onViewGoals={() => setActiveOverlay("goals")}
+        onOpenChat={handleOpenCommandChat}
+        onSelectTopic={(clusterId, title) => {
+          setTopicFilter({ clusterId, title });
+          setActiveTab("todo");
+        }}
+        onSelectDimension={(domain) => {
+          setDimensionFilter({ domain });
+          setTopicFilter(null);
+        }}
+        onSelectToday={() => {
+          setDimensionFilter(null);
+          setTopicFilter(null);
+          setActiveTab("todo");
+        }}
+        activeDimension={dimensionFilter?.domain}
         onLogout={logout}
         userName={user?.displayName}
         userPhone={user?.phone}
@@ -308,25 +363,46 @@ export default function Page() {
         onSearchClick={() => setActiveOverlay("search")}
         onNotificationClick={() => setActiveOverlay("notifications")}
         userName={user?.displayName}
+        topicFilter={topicFilter}
+        onClearTopicFilter={() => setTopicFilter(null)}
+        dimensionFilter={dimensionFilter}
+        onClearDimensionFilter={() => setDimensionFilter(null)}
       />
 
-      {/* 工作区内容: 日记 or 待办 (swipeable) */}
+      {/* AI 伴侣窗口 — 常驻 header 下方 (spec ai-companion-window 场景 2.1) */}
+      <AiWindow
+        onOpenChat={handleOpenCommandChat}
+        onOpenOverlay={openOverlay}
+      />
+
+      {/* 工作区内容: 日记 or 待办 (swipeable) — 保持双 tab 挂载避免切换重载 */}
       <main
         className="overflow-x-hidden"
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
       >
-        {activeTab === "diary" ? (
-          <div className="bg-surface-low">
-            <NotesTimeline
-              notebook={activeNotebook}
+        <div className={activeTab === "diary" ? "bg-surface-low" : "hidden"}>
+          <NotesTimeline
+            notebook={activeNotebook}
+            clusterId={topicFilter?.clusterId}
+            domainFilter={dimensionFilter?.domain}
+            onOpenChat={handleOpenCommandChat}
+            onOpenOverlay={openOverlay}
+          />
+        </div>
+        <div className={activeTab === "todo" ? undefined : "hidden"}>
+          {topicFilter ? (
+            <TopicLifecycleView
+              clusterId={topicFilter.clusterId}
               onOpenChat={handleOpenCommandChat}
-              onOpenOverlay={openOverlay}
             />
-          </div>
-        ) : (
-          <TodoWorkspaceView onOpenChat={handleOpenCommandChat} />
-        )}
+          ) : (
+            <TodoWorkspaceView
+              onOpenChat={handleOpenCommandChat}
+              domainFilter={dimensionFilter?.domain}
+            />
+          )}
+        </div>
       </main>
 
       {/* FAB 录音按钮 — 常驻底部 */}
@@ -380,12 +456,13 @@ export default function Page() {
         />
       )}
 
-      {/* Overlays */}
-      {activeOverlay === "search" && (
-        <SearchView onClose={closeOverlay} />
-      )}
-      {activeOverlay === "chat" && chatDateRange && (
+      {/* Overlays — AnimatePresence 统一转场，key 由 activeOverlay 驱动 */}
+      <AnimatePresence mode="wait">
+      {activeOverlay === "search" ? (
+        <SearchView key="search" onClose={closeOverlay} />
+      ) : activeOverlay === "chat" && chatDateRange ? (
         <ChatView
+          key="chat"
           dateRange={chatDateRange}
           onClose={() => {
             closeOverlay();
@@ -402,58 +479,48 @@ export default function Page() {
             openOverlay,
           }}
         />
-      )}
-      {activeOverlay === "stats" && (
-        <StatsDashboard onClose={closeOverlay} />
-      )}
-      {activeOverlay === "memory" && (
-        <MemorySoulOverlay onClose={closeOverlay} />
-      )}
-      {activeOverlay === "review" && (
-        <ReviewOverlay onClose={closeOverlay} onStartInsight={handleStartInsight} />
-      )}
-      <TodoPanel
-        open={activeOverlay === "todos"}
-        onClose={closeOverlay}
-      />
-      {activeOverlay === "today-todo" && (
-        <TodayGantt onClose={closeOverlay} />
-      )}
-      {activeOverlay === "profile" && (
-        <ProfileEditor onClose={closeOverlay} />
-      )}
-      {activeOverlay === "skills" && (
-        <SkillsPage onClose={closeOverlay} />
-      )}
-      {activeOverlay === "settings" && (
+      ) : activeOverlay === "stats" ? (
+        <StatsDashboard key="stats" onClose={closeOverlay} />
+      ) : activeOverlay === "memory" ? (
+        <MemorySoulOverlay key="memory" onClose={closeOverlay} />
+      ) : activeOverlay === "review" ? (
+        <ReviewOverlay key="review" onClose={closeOverlay} onStartInsight={handleStartInsight} />
+      ) : activeOverlay === "todos" ? (
+        <TodoPanel key="todos" open onClose={closeOverlay} />
+      ) : activeOverlay === "today-todo" ? (
+        <TodayGantt key="today-todo" onClose={closeOverlay} />
+      ) : activeOverlay === "profile" ? (
+        <ProfileEditor key="profile" onClose={closeOverlay} />
+      ) : activeOverlay === "skills" ? (
+        <SkillsPage key="skills" onClose={closeOverlay} />
+      ) : activeOverlay === "settings" ? (
         <SettingsEditor
+          key="settings"
           onClose={closeOverlay}
           onThemeChange={setTheme}
         />
-      )}
-      {activeOverlay === "notebooks" && (
+      ) : activeOverlay === "notebooks" ? (
         <NotebookList
+          key="notebooks"
           activeNotebook={activeNotebook}
           onClose={closeOverlay}
           onSelect={(name, color) => {
             setActiveNotebook(name);
           }}
         />
-      )}
-      {activeOverlay === "morning-briefing" && (
-        <MorningBriefing onClose={closeOverlay} />
-      )}
-      {activeOverlay === "evening-summary" && (
-        <EveningSummary onClose={closeOverlay} />
-      )}
-      {activeOverlay === "notifications" && (
+      ) : activeOverlay === "morning-briefing" ? (
+        <MorningBriefing key="morning-briefing" onClose={closeOverlay} />
+      ) : activeOverlay === "evening-summary" ? (
+        <EveningSummary key="evening-summary" onClose={closeOverlay} />
+      ) : activeOverlay === "notifications" ? (
         <NotificationCenter
+          key="notifications"
           onClose={closeOverlay}
           onNavigate={handleNotificationNavigate}
         />
-      )}
-      {activeOverlay === "goals" && (
+      ) : activeOverlay === "goals" ? (
         <GoalList
+          key="goals"
           onClose={closeOverlay}
           onViewGoal={(goalId) => {
             setSelectedGoalId(goalId);
@@ -464,16 +531,16 @@ export default function Page() {
             setActiveOverlay("project-detail");
           }}
         />
-      )}
-      {activeOverlay === "goal-detail" && selectedGoalId && (
+      ) : activeOverlay === "goal-detail" && selectedGoalId ? (
         <GoalDetailOverlay
+          key="goal-detail"
           goalId={selectedGoalId}
           onClose={closeOverlay}
           onOpenChat={handleOpenCommandChat}
         />
-      )}
-      {activeOverlay === "project-detail" && selectedGoalId && (
+      ) : activeOverlay === "project-detail" && selectedGoalId ? (
         <ProjectDetailOverlay
+          key="project-detail"
           projectId={selectedGoalId}
           onClose={closeOverlay}
           onViewGoal={(goalId) => {
@@ -481,7 +548,18 @@ export default function Page() {
             setActiveOverlay("goal-detail");
           }}
         />
-      )}
+      ) : activeOverlay === "discovery" ? (
+        <DiscoveryOverlay
+          key="discovery"
+          onClose={closeOverlay}
+          onOpenTopic={(clusterId) => {
+            setSelectedClusterId(clusterId);
+            closeOverlay();
+            setCognitiveMapOpen(true);
+          }}
+        />
+      ) : null}
+      </AnimatePresence>
     </div>
   );
 }

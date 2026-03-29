@@ -19,13 +19,13 @@ export function readBody<T = any>(req: IncomingMessage): Promise<T> {
 
 /** Send a JSON response */
 export function sendJson(res: ServerResponse, data: any, status = 200): void {
-  res.writeHead(status, { "Content-Type": "application/json" });
+  res.writeHead(status, { "Content-Type": "application/json; charset=utf-8" });
   res.end(JSON.stringify(data));
 }
 
 /** Send an error response */
 export function sendError(res: ServerResponse, message: string, status = 400): void {
-  res.writeHead(status, { "Content-Type": "application/json" });
+  res.writeHead(status, { "Content-Type": "application/json; charset=utf-8" });
   res.end(JSON.stringify({ error: message }));
 }
 

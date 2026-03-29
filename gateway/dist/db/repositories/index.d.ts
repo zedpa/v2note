@@ -25,3 +25,6 @@ export * as appReleaseRepo from "./app-release.js";
 export * as strikeRepo from "./strike.js";
 export * as bondRepo from "./bond.js";
 export * as strikeTagRepo from "./strike-tag.js";
+export * as snapshotRepo from "./snapshot.js";
+export * as vocabularyRepo from "./vocabulary.js";
+export * as notificationRepo from "./notification.js";

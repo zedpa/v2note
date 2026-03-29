@@ -66,3 +66,16 @@ export async function createBond(params: {
 }): Promise<{ id: string }> {
   return api.post("/api/v1/cognitive/bonds", params);
 }
+
+export interface CognitiveStats {
+  polarity_distribution: Record<string, number>;
+  realize_lag_days: number;
+  top_clusters: Array<{ id: string; name: string; count: number }>;
+  contradiction_count: number;
+  total_strikes: number;
+  total_bonds: number;
+}
+
+export async function fetchCognitiveStats(): Promise<CognitiveStats> {
+  return api.get("/api/v1/cognitive/stats");
+}

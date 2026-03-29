@@ -15,21 +15,23 @@ interface DateGroup {
 
 const POLL_INTERVAL = 5000;
 
-export function useNotes(notebook?: string | null) {
+export function useNotes(notebook?: string | null, clusterId?: string | null) {
   const [notes, setNotes] = useState<NoteItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const pollRef = useRef<NodeJS.Timeout | null>(null);
   const initialLoadDone = useRef(false);
 
-  // Load from cache on first render (only for main timeline)
+  // 缓存优先：主时间线首次渲染时立即显示缓存，跳过 loading 态
   const cacheLoadedRef = useRef(false);
   useEffect(() => {
     if (cacheLoadedRef.current || notebook) return;
     cacheLoadedRef.current = true;
     getCachedNotes().then((cached) => {
-      if (cached && cached.length > 0 && notes.length === 0) {
+      if (cached && cached.length > 0) {
         setNotes(cached);
+        setLoading(false);        // 有缓存就不显示 loading
+        initialLoadDone.current = true;
       }
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -37,12 +39,16 @@ export function useNotes(notebook?: string | null) {
 
   const fetchNotes = useCallback(async (silent = false) => {
     try {
-      if (!silent) setLoading(true);
+      // 有缓存数据时静默刷新，不闪 loading
+      if (!silent && notes.length === 0) setLoading(true);
       await getDeviceId(); // ensure deviceId is set in api client
 
-      const records = await listRecords(
-        notebook !== undefined && notebook !== null ? { notebook } : undefined,
-      );
+      const fetchOpts: Parameters<typeof listRecords>[0] = {};
+      if (notebook !== undefined && notebook !== null) fetchOpts.notebook = notebook;
+      if (clusterId) fetchOpts.cluster_id = clusterId;
+      const hasOpts = Object.keys(fetchOpts).length > 0;
+
+      const records = await listRecords(hasOpts ? fetchOpts : undefined);
 
       const items: NoteItem[] = records.map((r: any) => {
         const summary = r.summary;
@@ -72,6 +78,7 @@ export function useNotes(notebook?: string | null) {
           duration_seconds: r.duration_seconds,
           audio_path: audioPath,
           created_at: r.created_at,
+          domain: r.domain ?? null,
         };
       });
 
@@ -87,7 +94,7 @@ export function useNotes(notebook?: string | null) {
       if (!initialLoadDone.current) setLoading(false);
       else setLoading(false);
     }
-  }, [notebook]);
+  }, [notebook, clusterId]);
 
   // Start/stop polling based on whether any notes are still processing
   useEffect(() => {
@@ -113,11 +120,11 @@ export function useNotes(notebook?: string | null) {
     };
   }, [notes, fetchNotes]);
 
-  // Reset on notebook change
+  // Reset on notebook/clusterId change
   useEffect(() => {
     setNotes([]);
     initialLoadDone.current = false;
-  }, [notebook]);
+  }, [notebook, clusterId]);
 
   // Initial fetch + event listeners
   useEffect(() => {

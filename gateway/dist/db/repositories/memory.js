@@ -1,4 +1,4 @@
-import { query, execute } from "../pool.js";
+import { query, queryOne, execute } from "../pool.js";
 export async function findByDevice(deviceId, dateRange, limit) {
     if (dateRange) {
         return query(`SELECT * FROM memory WHERE device_id = $1
@@ -49,6 +49,19 @@ export async function update(id, deviceId, fields) {
         return;
     params.push(id, deviceId);
     await execute(`UPDATE memory SET ${sets.join(", ")} WHERE id = $${i++} AND device_id = $${i}`, params);
+}
+/** 统计用户记忆总条数 */
+export async function countByUser(userId) {
+    const row = await queryOne(`SELECT COUNT(*) as count FROM memory WHERE user_id = $1`, [userId]);
+    return parseInt(row?.count ?? "0", 10);
+}
+/** 删除用户最低重要性的 N 条记忆（为新记忆腾位置） */
+export async function evictLeastImportant(userId, count) {
+    const result = await execute(`DELETE FROM memory WHERE id IN (
+       SELECT id FROM memory WHERE user_id = $1
+       ORDER BY importance ASC, created_at ASC LIMIT $2
+     )`, [userId, count]);
+    return result;
 }
 export async function updateByUser(id, userId, fields) {
     const sets = [];

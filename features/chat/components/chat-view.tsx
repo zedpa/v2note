@@ -15,9 +15,12 @@ interface ChatViewProps {
   title?: string;
   mode?: "review" | "command" | "insight";
   commandContext?: Partial<CommandContext>;
+  mood?: string;
+  moodText?: string;
+  deerState?: string;
 }
 
-export function ChatView({ dateRange, onClose, initialMessage, title, mode: modeProp, commandContext }: ChatViewProps) {
+export function ChatView({ dateRange, onClose, initialMessage, title, mode: modeProp, commandContext, mood, moodText, deerState }: ChatViewProps) {
   const resolvedMode = modeProp ?? (initialMessage ? "command" : "review");
   const { messages, send, streaming, connected, connect, disconnect } =
     useChat(dateRange, {
@@ -122,19 +125,26 @@ export function ChatView({ dateRange, onClose, initialMessage, title, mode: mode
             <p className="text-sm font-medium text-on-surface">
               {title ?? (resolvedMode === "insight" ? "洞察分析" : initialMessage ? "和路路聊聊" : "复盘")}
             </p>
-            {resolvedMode === "insight" ? (
-              <p className="text-[10px] text-muted-accessible">
-                {dateRange.start} — {dateRange.end}
-              </p>
-            ) : !initialMessage ? (
-              <p className="text-[10px] text-muted-accessible">
-                {dateRange.start} - {dateRange.end}
-              </p>
-            ) : (
-              <p className="text-[10px] text-muted-accessible">
-                和路路对话
-              </p>
-            )}
+            <div className="flex items-center gap-1">
+              {resolvedMode === "insight" ? (
+                <p className="text-[10px] text-muted-accessible">
+                  {dateRange.start} — {dateRange.end}
+                </p>
+              ) : !initialMessage ? (
+                <p className="text-[10px] text-muted-accessible">
+                  {dateRange.start} - {dateRange.end}
+                </p>
+              ) : (
+                <p className="text-[10px] text-muted-accessible">
+                  和路路对话
+                </p>
+              )}
+              {moodText && (
+                <p className="text-[10px] text-muted-accessible">
+                  · 心情: {moodText}{deerState ? ` · ${deerState}` : ""}
+                </p>
+              )}
+            </div>
           </div>
           {!connected && (
             <span className="text-[10px] text-dawn">连接中...</span>

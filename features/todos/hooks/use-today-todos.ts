@@ -41,6 +41,7 @@ export function useTodayTodos() {
           scheduled_end: t.scheduled_end,
           priority: t.priority,
           domain: t.domain,
+          parent_id: t.parent_id,
           impact: t.impact,
           ai_actionable: t.ai_actionable,
         }));

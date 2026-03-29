@@ -1,3 +1,5 @@
+/** 全局工具注册表——启动时初始化一次 */
+declare const toolRegistry: import("../tools/registry.js").ToolRegistry;
 export interface ChatStartPayload {
     deviceId: string;
     userId?: string;
@@ -40,3 +42,5 @@ export declare function sendChatMessage(deviceId: string, text: string): Promise
  * End a chat session. Summarize the conversation and update memory/soul.
  */
 export declare function endChat(deviceId: string): Promise<void>;
+/** 导出 toolRegistry 供 MCP server 等外部模块使用 */
+export { toolRegistry };

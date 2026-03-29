@@ -1,7 +1,23 @@
 # AI 伴侣窗口 — 像素小鹿 + 心情系统 + 工具可视化
 
-> 状态：🟡 待开发 | 优先级：Phase 7.2 | 预计：7-8 天
+> 状态：🔄 实现中 | 优先级：Phase 7.2 | 预计：7-8 天
 > 依赖：app-mobile-redesign（工作区布局），voice-action（语音指令），agent-tool-layer（工具链）
+> 进度 2026-03-28：
+>   ✅ 场景 1.1-1.2 小鹿状态机 + sprite 动画组件 (PixelDeer)
+>   ✅ 场景 2.1-2.2 AI Window 三态组件 (静默/气泡/点击→对话)
+>   ✅ 场景 2.3 对话态入口（携带消息→ChatView）
+>   ✅ 场景 3.1 心情系统（类型+API+WS推送）
+>   ✅ 场景 6.1 后端 /companion/status API（状态计算+心情计算）
+>   ✅ GatewayResponse 扩展（companion.state/mood/chat + tool.step）
+>   ✅ 集成到 app/page.tsx（header 下方常驻）
+>   ✅ 场景 3.2 心情→开场白注入（mood.ts + chat handler 改造）
+>   ✅ 场景 4.1-4.3 工具调用可视化（tool-steps.tsx + think-process.tsx）
+>   ✅ 场景 2.4-2.5 Chat 输入栏重构（chat-input-bar.tsx: sticky+deepThink+voice+send）
+>   ✅ ChatView header 心情标签（mood + deerState 显示）
+>   ✅ 场景 5.1-5.2 主动闲聊生成（chat-generator.ts + ChatRateLimiter）
+>   🟡 场景 5.3 闲聊转对话（proactive engine 集成触发）
+>   🟡 场景 2.6-2.8 语言切换+深度思考后端+多模态发送（需 gateway 改造）
+>   待做：sprite sheet 资产文件（/assets/deer-sprite.png），当前降级为 🦌 emoji
 
 ## 概述
 
@@ -67,9 +83,14 @@
   └─────────────┴──────────────────────────────────┴─────────────────┘
 
 并且 (And)    状态切换动画：当前状态淡出(150ms) → 新状态淡入(150ms)
-并且 (And)    小鹿尺寸：32×32px 像素精灵图（sprite sheet）
+并且 (And)    小鹿尺寸：32×32px
+并且 (And)    动画实现：优先 Lottie JSON（GPU 加速、体积小、缩放无损），
+              备选 sprite sheet WebP（总体积 ≤ 50KB）
 并且 (And)    每个状态 4-8 帧循环动画，帧率 6fps（像素风标准）
-并且 (And)    尊重 prefers-reduced-motion：降级为静态首帧
+并且 (And)    VoiceOver 支持：accessibilityLabel 动态映射状态
+              如"路路正在整理笔记"/"路路在发呆"
+并且 (And)    prefers-reduced-motion：停止动画显示静态首帧，
+              状态文字始终可见（不依赖动画传达信息）
 ```
 
 ### 场景 1.2: 小鹿动画规格
@@ -149,18 +170,25 @@
      - 🦌 说话动画
      - 无竖线，标准气泡样式
      - 基于日记内容的疑问/赞同/表扬
-     - 10s 后自动降级（用户无需回应）
+     - 5s 后自动降级（纯信息，用户无需回应）
      - 点击 → 打开对话态继续聊
 
   4. reflect.question（AI 追问）：
      - 🦌 思考动画
      - 追问内容
+     - 保持到下一条消息或用户交互（需要用户操作的不自动消失）
+     - 仅在用户主动查看日记/进入对话时触发，不作为冷推送
      - 点击 → 打开对话态
 
   5. proactive.*（主动推送）：
      - 🦌 说话动画
      - 晨间/待办/转达内容
+     - 5s 后自动降级（纯信息）
      - 点击 → 跳转对应页面
+
+  统一降级规则：
+    需要用户操作的（action.confirm / reflect.question）→ 不自动消失
+    纯信息的（action.result / companion.chat / proactive.*）→ 5s 后淡出
 
 当   (When)   气泡态超时或用户未互动
 那么 (Then)   消息淡出(200ms)，回到静默态
@@ -186,6 +214,127 @@
 并且 (And)    如果从静默态点击进入，路路先打招呼（基于心情和当前上下文）
 并且 (And)    对话支持流式输出 + 工具调用可视化（见场景 4.1-4.3）
 并且 (And)    对话上下文自动注入：路路心情 + 相关日记摘要 + 当前主题筛选
+```
+
+---
+
+### 二-B、Chat 输入栏
+
+### 场景 2.4: 输入栏常驻底部（sticky）
+```
+假设 (Given)  用户在对话态（Chat 界面）
+当   (When)   消息区内容超出一屏，用户向上滚动查看历史消息
+那么 (Then)   输入栏始终固定在屏幕底部（position: sticky / fixed）
+并且 (And)    输入栏不随消息滚动而消失
+并且 (And)    键盘弹起时输入栏上移（keyboard avoidance），消息区高度自适应收缩
+并且 (And)    键盘收起时输入栏回到底部 Safe Area 上方
+```
+
+### 场景 2.5: 输入栏布局与多模态入口
+```
+假设 (Given)  Chat 输入栏显示中
+那么 (Then)   输入栏布局：
+  ┌──────────────────────────────────────────────┐
+  │  [+]  [输入框...              ]  🧠  🎙  ▶  │
+  └──────────────────────────────────────────────┘
+
+  [+] 多模态按钮（左侧）：
+    点击展开附件菜单（从底部弹出 Sheet）：
+    📷 拍照         → 调用相机拍照后附加到消息
+    🖼️ 相册选图     → 从相册选择图片（支持多选，≤ 5 张）
+    📄 文件         → 选择文件（PDF/DOC/TXT/CSV 等）
+    📋 粘贴板       → 检测粘贴板内容，有图片/链接时高亮
+    附件选中后在输入框上方显示缩略图预览行（可删除单个附件）
+
+  输入框（中间）：
+    圆角 full，surface-lowest 背景
+    placeholder「说点什么...」
+    多行自动增高（最多 4 行，超出后内部滚动）
+    支持粘贴图片（自动添加到附件预览）
+
+  🧠 深度思考切换（右侧）：
+    默认关闭（图标弱文字色）
+    点击切换为开启（图标 deer 色 + 微光呼吸动画）
+    开启后图标下方出现极小标签「深度」
+    开启状态下发送的消息会触发深度推理模式（见场景 2.7）
+
+  🎙 语音输入（右侧）：
+    点击 → 切换为语音输入模式（复用 FAB 的录音交互）
+    长按 → 直接开始录音（微信语音条模式）
+
+  ▶ 发送按钮（最右）：
+    有内容时 deer 色，无内容时灰色禁用
+    点击发送文字 + 附件（如有）
+```
+
+### 场景 2.6: 语言切换
+```
+假设 (Given)  Chat 输入栏显示中
+当   (When)   用户需要切换输入语言
+那么 (Then)   长按 🎙 按钮 ≥ 500ms → 弹出语言选择浮层：
+  ┌────────────┐
+  │ 🇨🇳 中文    ✓ │  ← 当前选中
+  │ 🇬🇧 English  │
+  │ 🇯🇵 日本語   │
+  │ 自动检测    │  ← 默认模式
+  └────────────┘
+并且 (And)    语言选择影响：
+  - 语音识别（ASR）的语言模型
+  - 路路回复的语言（system prompt 注入）
+  - 领域词库匹配的语言范围
+并且 (And)    默认「自动检测」：ASR 自动识别语言，路路用用户输入的语言回复
+并且 (And)    切换后图标旁显示语言缩写标签（如「EN」），提示当前语言
+并且 (And)    语言偏好保存到 localStorage，下次打开保持
+```
+
+### 场景 2.7: 深度思考模式
+```
+假设 (Given)  用户开启了 🧠 深度思考
+当   (When)   发送消息
+那么 (Then)   Gateway 接收到 chat.message 带 deepThink: true 标记
+并且 (And)    路由到深度推理模型（更大参数 / 更长 context / Chain-of-Thought）
+并且 (And)    Chat UI 变化：
+  - 小鹿切换到「思考」动画（摸下巴，比普通思考更慢的帧率 3fps）
+  - 消息区显示思考过程指示：
+    ┌──────────────────────────────────┐
+    │ 🦌 路路正在深度思考...            │
+    │ ┌─ 思考过程 ──────────── ▾ ─┐   │
+    │ │ 分析了你最近 12 条相关记录   │   │  ← 可折叠
+    │ │ 比较了 3 种可能的方向       │   │
+    │ │ 权衡了短期收益和长期风险    │   │
+    │ └────────────────────────────┘   │
+    │                                  │
+    │ (思考完成后 → 完整分析回复)       │
+    └──────────────────────────────────┘
+  - 思考过程面板：surface-low 背景，Mono 12px 弱文字色
+  - 可折叠，折叠后显示「深度思考了 N 秒」
+并且 (And)    深度思考可能耗时较长（10-60s），期间输入栏显示「路路在深度思考中...」占位
+并且 (And)    用户仍可打字准备下一条消息（不阻塞输入）
+当   (When)   深度思考完成
+那么 (Then)   小鹿切换到「晒太阳」，回复内容比普通回答更结构化（分点、引用、对比）
+```
+
+### 场景 2.8: 多模态消息发送
+```
+假设 (Given)  用户通过 [+] 菜单选择了图片/文件
+当   (When)   附件添加到输入框
+那么 (Then)   输入框上方显示附件预览行：
+  ┌──────────────────────────────────────────────┐
+  │ [📷 photo1.jpg ✕] [📷 photo2.jpg ✕]          │  ← 缩略图 + 删除
+  ├──────────────────────────────────────────────┤
+  │  [+]  [对这张图有什么想法...]  🧠  🎙  ▶    │
+  └──────────────────────────────────────────────┘
+并且 (And)    图片缩略图 48×48px 圆角 8pt，点击可预览大图
+并且 (And)    文件显示文件名 + 图标（PDF/DOC 等）
+并且 (And)    附件上传进度：缩略图上方半透明遮罩 + 进度条
+并且 (And)    ✕ 可删除单个附件
+当   (When)   点击发送
+那么 (Then)   附件先上传到 Gateway（multipart/form-data）
+并且 (And)    路路可以：
+  - 识别图片内容（OCR + 视觉理解）
+  - 解析文件内容（PDF/DOC 文本提取）
+  - 结合文字消息一起分析
+并且 (And)    附件同时存储为日记附件（record.attachments），不丢失
 ```
 
 ---
@@ -341,10 +490,12 @@
      日记视图："看什么呢？要不要聊聊？"
      待办视图："接下来做哪个？"
 
-  频率硬限制：
-  - 两条主动消息间隔 ≥ 30 分钟
-  - 每日主动闲聊总数 ≤ 8 条（不含 action.result 等系统消息）
+  频率硬限制（遵循"AI 沉默为主"原则）：
+  - 两条主动消息间隔 ≥ 2 小时
+  - 每日主动闲聊总数 ≤ 3 条（不含 action.result / action.confirm 等系统响应）
   - 用户正在录音/输入/滑动 Now Card 时，暂缓推送（排队等操作结束）
+  - reflect.question 仅在用户主动打开日记卡片或进入对话时触发，不作为气泡主动推送
+  - 用户可在设置中开启「安静模式」→ 仅保留 action.confirm 和 action.result
 ```
 
 ### 场景 5.2: 闲聊内容生成
@@ -433,8 +584,11 @@
 | 新建 `features/companion/hooks/use-companion.ts` | 小鹿状态 + 心情数据 hook |
 | 新建 `features/companion/lib/deer-states.ts` | 状态映射表 + sprite 配置 |
 | 新建 `features/companion/assets/deer-sprite.png` | 像素小鹿精灵图 |
-| `features/chat/components/chat-view.tsx` | 修改：顶部小鹿 + 心情显示 + 工具步骤面板 |
+| `features/chat/components/chat-view.tsx` | 修改：顶部小鹿 + 心情显示 + 工具步骤面板 + 输入栏重构 |
 | 新建 `features/chat/components/tool-steps.tsx` | 工具调用步骤可视化组件 |
+| 新建 `features/chat/components/chat-input-bar.tsx` | 输入栏组件（sticky + 多模态 + 深度思考 + 语言切换） |
+| 新建 `features/chat/components/attachment-picker.tsx` | 附件选择菜单 + 缩略图预览 |
+| 新建 `features/chat/components/think-process.tsx` | 深度思考过程面板（可折叠） |
 | 新建 `gateway/src/companion/status.ts` | 小鹿状态计算引擎 |
 | 新建 `gateway/src/companion/mood.ts` | 心情计算引擎 |
 | 新建 `gateway/src/companion/chat-generator.ts` | 主动闲聊内容生成 |
@@ -455,6 +609,17 @@ WS 消息类型（新增）：
   companion.chat     — 主动闲聊消息
   tool.step          — 工具调用步骤推送（仅 Chat 中）
     { stepIndex, totalSteps, toolName, status: "running"|"done"|"error", result? }
+  think.progress     — 深度思考过程推送
+    { phase: string, detail: string, elapsed_ms: number }
+
+chat.message 扩展字段：
+  deepThink: boolean    — 是否启用深度思考模式
+  language: string      — 强制语言（如 "zh-CN"/"en"），null=自动检测
+  attachments: [{ type: "image"|"file", url, name, size }]  — 附件列表
+
+POST /api/v1/chat/upload
+  → multipart/form-data 上传附件
+  → 返回 { url, name, type, size }
 ```
 
 ## 边界条件
@@ -466,6 +631,12 @@ WS 消息类型（新增）：
 - [ ] 小鹿动画性能：sprite sheet 方案，单帧 32×32px，内存 < 100KB，不影响滚动性能
 - [ ] 深色模式（未来）：精灵图需要准备深色变体（或 CSS filter 反色）
 - [ ] prefers-reduced-motion：所有动画降级为静态首帧，状态仅通过文字表达
+- [ ] 输入栏键盘遮挡：iOS / Android 键盘弹起时，输入栏上移 + 消息区自动滚到底部
+- [ ] 深度思考超时（60s）：显示「思考时间有点长，再等一下...」，不自动取消，120s 硬超时
+- [ ] 附件上传失败：缩略图显示红色 ✕，可重试，不阻塞文字发送
+- [ ] 大文件限制：图片 ≤ 10MB，文件 ≤ 20MB，超出提示压缩
+- [ ] 多图输入性能：≤ 5 张图片合并为一条消息，缩略图懒加载
+- [ ] 语言切换后 ASR 缓存：切换语言后清空已有的识别 buffer
 
 ## 验收标准
 

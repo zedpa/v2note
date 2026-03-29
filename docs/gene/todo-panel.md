@@ -18,6 +18,12 @@
 - 左侧：头像按钮（打开侧边栏）+ 洞察按钮（Sparkles 图标，打开 review overlay）
 - 右侧：搜索按钮 + 待办按钮（ListChecks 图标，打开 TodoPanel）
 
+### 数据模型
+- `todo.record_id` — 可选（NULLABLE），通过 Digest 自动创建的 todo 关联 record，手动创建的 todo 无 record
+- `todo.user_id` / `todo.device_id` — 直接归属字段（migration 034），支持不关联 record 的独立 todo 查询
+- 查询策略：`LEFT JOIN record`，同时匹配 `record.user_id` 或 `todo.user_id`
+- `POST /api/v1/todos` — 支持无 record_id 的手动创建，自动填充 user_id/device_id
+
 ### 关键文件
 - `features/todos/components/todo-panel.tsx` — 三 Tab 看板主组件（TodayTab/AllTodosTab/GoalsTab）
 - `features/todos/components/todo-diary-card.tsx` — 旧全屏版（保留兼容，NudgeToast 等仍可引用）
@@ -29,6 +35,10 @@
 - `shared/components/new-header.tsx` — Header 组件（洞察+待办双入口）
 - `shared/lib/api/goals.ts` — listGoals API（目标 Tab 主数据源）
 - `shared/lib/api/memory.ts` — listMemories API（目标 Tab fallback 数据源）
+- `gateway/src/db/repositories/todo.ts` — Todo CRUD（动态字段创建 + LEFT JOIN 查询）
+- `gateway/src/routes/todos.ts` — REST API（GET/POST/PATCH/DELETE）
+- `supabase/migrations/033_todo_record_nullable.sql` — record_id 改为可选
+- `supabase/migrations/034_todo_ownership.sql` — todo 直接归属字段
 - `app/page.tsx` — TodoPanel open 状态绑定 activeOverlay==="todos"
 
 ### 测试描述

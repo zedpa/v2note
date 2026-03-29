@@ -70,12 +70,14 @@ export class MemoryManager {
     addShortTerm(content) {
         this.shortTerm.add(content);
     }
+    /** 每用户记忆上限。超出时自动淘汰最低重要性的记忆。 */
+    static MAX_MEMORIES_PER_USER = 500;
     /**
      * Mem0 two-stage memory management:
      * 1. AI extracts candidate facts from content
      * 2. For each candidate, embedding-retrieve top-5 similar memories
      * 3. AI decides in one call: ADD / UPDATE(id) / DELETE(id) / NONE
-     * 4. Execute decisions
+     * 4. Execute decisions（含上限淘汰）
      */
     async maybeCreateMemory(deviceId, content, date, userId) {
         // Load all existing memories for comparison
@@ -141,6 +143,15 @@ ${similarContext || "（暂无记忆）"}
                 switch (decision.action) {
                     case "ADD":
                         if (decision.content) {
+                            // 上限淘汰：超过 MAX 时删除最低重要性的记忆
+                            if (userId) {
+                                const count = await memoryRepo.countByUser(userId);
+                                if (count >= MemoryManager.MAX_MEMORIES_PER_USER) {
+                                    const evictCount = count - MemoryManager.MAX_MEMORIES_PER_USER + 1;
+                                    await memoryRepo.evictLeastImportant(userId, evictCount);
+                                    console.log(`[memory] Evicted ${evictCount} low-importance memories (total was ${count})`);
+                                }
+                            }
                             await saveMemory(deviceId, decision.content, date, decision.importance ?? 5, userId);
                             console.log(`[memory] ADD: "${decision.content.slice(0, 50)}..." (importance: ${decision.importance ?? 5})`);
                         }

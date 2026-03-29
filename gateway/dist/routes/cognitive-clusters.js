@@ -7,18 +7,18 @@ export function registerCognitiveClusterRoutes(router) {
     router.get("/api/v1/cognitive/clusters", async (req, res) => {
         const userId = getUserId(req);
         const clusters = await query(`SELECT s.id, s.nucleus,
-              COUNT(cm.member_strike_id)::text AS member_count,
+              COUNT(cm.target_strike_id)::text AS member_count,
               MAX(ms.created_at)::text AS last_record_at
        FROM strike s
-       LEFT JOIN cluster_member cm ON cm.cluster_strike_id = s.id
-       LEFT JOIN strike ms ON ms.id = cm.member_strike_id
+       LEFT JOIN bond cm ON cm.source_strike_id = s.id AND cm.type = 'cluster_member'
+       LEFT JOIN strike ms ON ms.id = cm.target_strike_id
        WHERE s.user_id = $1 AND s.is_cluster = true AND s.status = 'active'
        GROUP BY s.id, s.nucleus
-       ORDER BY COUNT(cm.member_strike_id) DESC`, [userId]);
+       ORDER BY COUNT(cm.target_strike_id) DESC`, [userId]);
         // Check contradiction & recency for each cluster
         const results = await Promise.all(clusters.map(async (c) => {
-            const memberIds = await query(`SELECT member_strike_id FROM cluster_member WHERE cluster_strike_id = $1`, [c.id]);
-            const ids = memberIds.map((m) => m.member_strike_id);
+            const memberIds = await query(`SELECT target_strike_id FROM bond WHERE source_strike_id = $1 AND type = 'cluster_member'`, [c.id]);
+            const ids = memberIds.map((m) => m.target_strike_id);
             let hasContradiction = false;
             if (ids.length > 0) {
                 const [{ count }] = await query(`SELECT COUNT(*) as count FROM bond
@@ -51,8 +51,8 @@ export function registerCognitiveClusterRoutes(router) {
         // Members with tags
         const members = await query(`SELECT s.id, s.nucleus, s.polarity, s.confidence, s.created_at
        FROM strike s
-       JOIN cluster_member cm ON cm.member_strike_id = s.id
-       WHERE cm.cluster_strike_id = $1 AND s.status = 'active'
+       JOIN bond cm ON cm.target_strike_id = s.id AND cm.type = 'cluster_member'
+       WHERE cm.source_strike_id = $1 AND s.status = 'active'
        ORDER BY s.created_at DESC`, [params.id]);
         const membersWithTags = await Promise.all(members.map(async (m) => {
             const tags = await strikeTagRepo.findByStrike(m.id);
