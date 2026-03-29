@@ -107,10 +107,10 @@ export function ChatView({ dateRange, onClose, initialMessage, title, mode: mode
 
   return (
     <SwipeBack onClose={onClose}>
-      <div className="flex flex-col min-h-dvh bg-surface pt-safe">
+      <div className="flex flex-col h-dvh bg-surface pt-safe">
         {/* Header — Glass & Soul */}
         <header
-          className="flex items-center gap-3 px-4 h-[44px] bg-surface/80 backdrop-blur-[12px] shrink-0"
+          className="flex items-center gap-3 px-4 h-[44px] bg-surface/80 backdrop-blur-[12px] shrink-0 border-b border-brand-border/40"
           style={{ paddingTop: "env(safe-area-inset-top)" }}
         >
           <button
@@ -178,8 +178,8 @@ export function ChatView({ dateRange, onClose, initialMessage, title, mode: mode
           )}
         </div>
 
-        {/* Input bar */}
-        <div className="px-4 py-3 pb-safe shrink-0 bg-surface/80 backdrop-blur-[12px]">
+        {/* Input bar — floating */}
+        <div className="px-4 py-3 pb-safe shrink-0 bg-surface/90 backdrop-blur-xl border-t border-brand-border/40 shadow-[0_-4px_20px_var(--shadow-ambient)]">
           <div className="flex items-end gap-2">
             <textarea
               ref={inputRef}

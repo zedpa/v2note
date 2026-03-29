@@ -192,7 +192,7 @@ export default function CounselorChat({ context, onClose }: CounselorChatProps) 
       </div>
 
       {/* Input */}
-      <div className="px-4 py-3 border-t border-brand-border">
+      <div className="px-4 py-3 border-t border-brand-border bg-cream/90 backdrop-blur-xl shadow-[0_-4px_20px_var(--shadow-ambient)]">
         <div className="flex gap-2">
           <input
             value={input}

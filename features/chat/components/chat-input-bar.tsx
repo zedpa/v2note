@@ -52,7 +52,7 @@ export function ChatInputBar({
   };
 
   return (
-    <div className="sticky bottom-0 px-4 py-3 pb-safe shrink-0 bg-surface/80 backdrop-blur-[12px]">
+    <div className="sticky bottom-0 px-4 py-3 pb-safe shrink-0 bg-surface/90 backdrop-blur-xl border-t border-brand-border/40 shadow-[0_-4px_20px_var(--shadow-ambient)]">
       <div className="flex items-end gap-2">
         {/* Text input */}
         <textarea
