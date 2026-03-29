@@ -147,9 +147,11 @@ export async function projectIntendStrike(
     // 自动关联 cluster（通过 embedding 匹配）
     await linkNewGoalToCluster(goal.id, uid);
 
-    // B3: 项目级 → AI 生成子目标建议
+    // B3: 项目级 → AI 生成子目标建议（异步，不阻塞主流程）
     if (parsed.granularity === "project") {
-      await generateSubGoalSuggestions(goal, uid);
+      generateSubGoalSuggestions(goal, uid).catch((e) =>
+        console.warn("[todo-projector] Async sub-goal generation failed:", e),
+      );
     }
 
     return goal;

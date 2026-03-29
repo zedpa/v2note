@@ -139,6 +139,7 @@ export async function digestRecords(
 
     // ── Step 3: Write Strikes to DB（含去重）─────────────────────
     const idxToId = new Map<number, string>();
+    const intendEntries: { entry: Awaited<ReturnType<typeof strikeRepo.create>>; idx: number }[] = [];
 
     for (let i = 0; i < rawStrikes.length; i++) {
       const s = rawStrikes[i];
@@ -172,17 +173,24 @@ export async function digestRecords(
           );
         }
 
-        // intend Strike 自动投影为 todo/goal
+        // 收集 intend Strike，后面并行投影
         if (s.polarity === "intend") {
-          try {
-            await projectIntendStrike(entry, userId);
-          } catch (e) {
-            console.error(`[digest] Failed to project intend strike ${entry.id} to todo:`, e);
-          }
+          intendEntries.push({ entry, idx: i });
         }
       } catch (e) {
         console.error(`[digest] Failed to write strike ${i}:`, e);
       }
+    }
+
+    // intend Strike 并行投影为 todo/goal
+    if (intendEntries.length > 0) {
+      await Promise.all(
+        intendEntries.map(({ entry }) =>
+          projectIntendStrike(entry, userId).catch((e) =>
+            console.error(`[digest] Failed to project intend strike ${entry.id} to todo:`, e),
+          ),
+        ),
+      );
     }
 
     // ── Step 4: Write internal Bonds ─────────────────────────────

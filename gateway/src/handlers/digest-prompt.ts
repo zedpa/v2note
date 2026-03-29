@@ -5,7 +5,12 @@
  */
 
 export function buildDigestPrompt(): string {
+  const today = new Date().toISOString().split("T")[0];
+  const weekday = ["日", "一", "二", "三", "四", "五", "六"][new Date().getDay()];
+
   return `你是一个认知分析引擎。将以下内容拆解为 Strike（认知触动）。每个 Strike 是一个能被独立理解的最小语义单元。
+
+当前日期：${today}（周${weekday}）。所有相对时间（"明天""后天""下周一"等）以此为基准计算绝对日期。
 
 每个 Strike 包含：
 - nucleus: string — 完整命题。包含足够上下文（谁、什么、何时），保留不确定性（"可能"/"觉得"）和归属（谁说的）。一年后单独读到它要能理解。

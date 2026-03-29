@@ -50,25 +50,20 @@ function mockTodo(id: string, text: string, overrides?: Record<string, any>) {
 
 describe("场景 1: classifyVoiceIntent — 记录型", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
   });
 
   it("should_classify_as_record_when_no_action_intent", async () => {
     const { classifyVoiceIntent } = await import("./voice-action.js");
     const { chatCompletion } = await import("../ai/provider.js");
 
-    vi.mocked(chatCompletion).mockResolvedValueOnce({
-      content: JSON.stringify({
-        type: "record",
-        actions: [],
-      }),
-      usage: { prompt_tokens: 10, completion_tokens: 10 },
-    });
-
+    // 规则预筛：无指令关键词，直接返回 record，不调用 AI
     const result = await classifyVoiceIntent("今天和张总开会，他说原材料涨了15%");
 
     expect(result.type).toBe("record");
     expect(result.actions).toHaveLength(0);
+    // 验证没有调用 AI（规则预筛跳过）
+    expect(chatCompletion).not.toHaveBeenCalled();
   });
 });
 
@@ -78,7 +73,7 @@ describe("场景 1: classifyVoiceIntent — 记录型", () => {
 
 describe("场景 2: classifyVoiceIntent — 指令型 modify_todo", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
   });
 
   it("should_classify_as_action_when_modify_intent_detected", async () => {
@@ -116,7 +111,7 @@ describe("场景 2: classifyVoiceIntent — 指令型 modify_todo", () => {
 
 describe("场景 3: classifyVoiceIntent — 混合型", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
   });
 
   it("should_classify_as_mixed_when_record_and_action_both_present", async () => {
@@ -154,7 +149,7 @@ describe("场景 3: classifyVoiceIntent — 混合型", () => {
 
 describe("场景 4: matchTodoByHint — 模糊匹配", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
   });
 
   it("should_match_todo_by_keyword", async () => {
@@ -206,7 +201,7 @@ describe("场景 4: matchTodoByHint — 模糊匹配", () => {
 
 describe("场景 5: executeVoiceAction — modify_todo", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
   });
 
   it("should_modify_matched_todo", async () => {
@@ -267,7 +262,7 @@ describe("场景 5: executeVoiceAction — modify_todo", () => {
 
 describe("场景 6: executeVoiceAction — complete_todo", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
   });
 
   it("should_complete_matched_todo", async () => {
@@ -303,7 +298,7 @@ describe("场景 6: executeVoiceAction — complete_todo", () => {
 
 describe("场景 7: executeVoiceAction — query_todo", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
   });
 
   it("should_return_matching_todos_for_query", async () => {
@@ -343,7 +338,7 @@ describe("场景 7: executeVoiceAction — query_todo", () => {
 
 describe("场景 8: executeVoiceAction — delete_todo (high risk)", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
   });
 
   it("should_return_needs_confirm_for_high_risk_action", async () => {
@@ -379,7 +374,7 @@ describe("场景 8: executeVoiceAction — delete_todo (high risk)", () => {
 
 describe("场景 9: 置信度低降级", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
   });
 
   it("should_skip_action_when_confidence_below_threshold", async () => {
@@ -411,7 +406,7 @@ describe("场景 9: 置信度低降级", () => {
 
 describe("场景 10: modify_todo 追加备注", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
   });
 
   it("should_append_note_to_todo_text", async () => {

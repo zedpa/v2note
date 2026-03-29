@@ -30,6 +30,13 @@ let _provider: ReturnType<typeof createOpenAI> | null = null;
 let _model: string | null = null;
 let _timeout: number | null = null;
 
+/** 推理模型不支持 response_format: json_object */
+const REASONING_MODEL_PATTERNS = [/qwen3\.\d/, /qwen3-/];
+
+function isReasoningModel(model: string): boolean {
+  return REASONING_MODEL_PATTERNS.some((p) => p.test(model));
+}
+
 function getProvider() {
   if (_provider === null) {
     const apiKey = process.env.DASHSCOPE_API_KEY ?? "";
@@ -42,7 +49,7 @@ function getProvider() {
     if (!apiKey) {
       console.warn("[ai] WARNING: DASHSCOPE_API_KEY is not set — AI calls will fail!");
     } else {
-      console.log(`[ai] Provider ready (AI SDK): model=${_model}, base=${baseUrl}`);
+      console.log(`[ai] Provider ready (AI SDK): model=${_model}, base=${baseUrl}, reasoning=${isReasoningModel(_model)}`);
     }
 
     _provider = createOpenAI({
@@ -73,13 +80,16 @@ export async function chatCompletion(
   const { provider, model, timeout } = getProvider();
   const effectiveTimeout = opts?.timeout ?? timeout;
 
+  // 推理模型（qwen3.x）不支持 response_format: json_object，只靠 prompt 约束
+  const useJsonFormat = opts?.json && !isReasoningModel(model);
+
   const result = await generateText({
     model: provider.chat(model),
     messages: messages as ModelMessage[],
     temperature: opts?.temperature ?? 0.7,
     maxRetries: 1,
     abortSignal: AbortSignal.timeout(effectiveTimeout),
-    ...(opts?.json ? {
+    ...(useJsonFormat ? {
       providerOptions: {
         openai: { response_format: { type: "json_object" } },
       },

@@ -190,6 +190,41 @@ describe("场景 1: intend Strike 自动投影为 todo", () => {
     const createArg = mockTodoCreate.mock.calls[0][0];
     expect(createArg.text).toBe("下周一提交季度报告给李总");
   });
+
+  it("should_extract_scheduled_start_from_intend_field", async () => {
+    // "明天要去上山打老虎" — digest 会提取 scheduled_start
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const tomorrowStr = tomorrow.toISOString().split("T")[0];
+
+    const strike = makeStrike({
+      id: "strike-tiger",
+      polarity: "intend",
+      nucleus: "上山打老虎",
+      source_id: "record-3",
+      field: { granularity: "action", scheduled_start: tomorrowStr },
+    });
+
+    const createdTodo = makeTodo({
+      id: "todo-tiger",
+      text: "上山打老虎",
+      strike_id: "strike-tiger",
+    } as any);
+    mockTodoCreate.mockResolvedValue(createdTodo);
+    mockTodoUpdate.mockResolvedValue(undefined);
+
+    await projectIntendStrike(strike, "user-1");
+
+    // 验证 todo 创建
+    expect(mockTodoCreate).toHaveBeenCalledTimes(1);
+    expect(mockTodoCreate.mock.calls[0][0].text).toBe("上山打老虎");
+
+    // 验证 scheduled_start 被写入
+    expect(mockTodoUpdate).toHaveBeenCalledWith(
+      "todo-tiger",
+      expect.objectContaining({ scheduled_start: tomorrowStr }),
+    );
+  });
 });
 
 describe("场景 2: 已有 todo 回补 Strike 关联", () => {
@@ -543,6 +578,9 @@ describe("场景 B3: 项目级意图创建 project goal + 子目标建议", () =
     mockQuery.mockResolvedValue([]);
 
     const result = await projectIntendStrike(strike, "user-1");
+
+    // 子目标生成是 fire-and-forget，等待微任务队列刷新
+    await new Promise((r) => setTimeout(r, 50));
 
     expect(result).toBeDefined();
     expect(mockGoalCreate).toHaveBeenCalledTimes(4); // 1 parent + 3 sub-goals

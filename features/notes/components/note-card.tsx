@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useCallback, useState } from "react";
-import { MapPin, Clock, Sparkles, Check, AlertCircle, ChevronDown, Link } from "lucide-react";
+import { MapPin, Clock, Sparkles, Check, AlertCircle, ChevronDown, ChevronUp, Link } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useStrikes } from "@/features/notes/hooks/use-strikes";
 import { useRelated } from "@/features/notes/hooks/use-related";
@@ -65,6 +65,8 @@ export function NoteCard({
 }: NoteCardProps) {
   const longPressTimer = useRef<NodeJS.Timeout | null>(null);
   const didLongPress = useRef(false);
+  const [expanded, setExpanded] = useState(false);
+  const summaryRef = useRef<HTMLParagraphElement>(null);
 
   const isError = note.status === "error" || note.status === "failed";
   const isProcessing = !isError && note.status != null && note.status !== "completed";
@@ -139,8 +141,10 @@ export function NoteCard({
     if (didLongPress.current) return;
     if (selectionMode) {
       onToggleSelect?.();
+    } else if (onClick) {
+      onClick();
     } else {
-      onClick?.();
+      setExpanded((prev) => !prev);
     }
   }, [selectionMode, onToggleSelect, onClick]);
 
@@ -244,13 +248,31 @@ export function NoteCard({
 
         {/* Summary */}
         <p
+          ref={summaryRef}
           className={cn(
             "mt-2.5 text-xs leading-relaxed text-muted-foreground",
-            isSummary ? "line-clamp-6" : "line-clamp-4",
+            !expanded && (isSummary ? "line-clamp-6" : "line-clamp-4"),
           )}
         >
           {note.summary}
         </p>
+
+        {/* 展开/收起指示 */}
+        {!onClick && note.summary && note.summary.length > 120 && (
+          <div className="flex items-center gap-1 mt-1.5 text-[11px] text-primary/70">
+            {expanded ? (
+              <>
+                <ChevronUp className="w-3 h-3" />
+                <span>收起</span>
+              </>
+            ) : (
+              <>
+                <ChevronDown className="w-3 h-3" />
+                <span>展开全文</span>
+              </>
+            )}
+          </div>
+        )}
 
         {/* Strikes + Related — only for completed notes */}
         {note.status === "completed" && (

@@ -75,14 +75,14 @@ export async function processEntry(payload: ProcessPayload): Promise<ProcessResu
         result.voice_intent_type = intentResult.type;
 
         if (intentResult.type === "action" || intentResult.type === "mixed") {
-          const actionResults: ActionExecResult[] = [];
-          for (const action of intentResult.actions) {
-            const execResult = await executeVoiceAction(action, {
-              userId: payload.userId,
-              deviceId: payload.deviceId,
-            });
-            actionResults.push(execResult);
-          }
+          const actionResults = await Promise.all(
+            intentResult.actions.map((action) =>
+              executeVoiceAction(action, {
+                userId: payload.userId,
+                deviceId: payload.deviceId,
+              }),
+            ),
+          );
           result.action_results = actionResults;
 
           // 纯指令型：执行完就返回，不走 Digest 管道
