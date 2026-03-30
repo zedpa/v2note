@@ -3,6 +3,7 @@ import { chatCompletion, type ChatMessage } from "../ai/provider.js";
 import { appendToDiary } from "../diary/manager.js";
 import { recordRepo, summaryRepo } from "../db/repositories/index.js";
 import { classifyVoiceIntent, executeVoiceAction, type VoiceAction, type ActionExecResult } from "./voice-action.js";
+import { getSession } from "../session/manager.js";
 
 export interface LocalConfigPayload {
   soul?: { content: string };
@@ -19,6 +20,7 @@ export interface ProcessPayload {
   recordId: string;
   notebook?: string;
   localConfig?: LocalConfigPayload;
+  forceCommand?: boolean;  // 上滑手势触发，跳过 AI 分类，直接走 Agent 工具链
 }
 
 export interface RelayExtract {
@@ -49,6 +51,8 @@ export interface ProcessResult {
   action_results?: ActionExecResult[];
   /** voice-action: 意图类型 (record/action/mixed) */
   voice_intent_type?: "record" | "action" | "mixed";
+  /** voice-action: 高风险操作等待用户确认的 ID */
+  pending_confirm?: { confirm_id: string; summary: string };
 }
 
 const CLEANUP_SYSTEM_PROMPT = `你是一个转写文本清理工具。对以下语音转写文本进行最小化清理：
@@ -68,10 +72,11 @@ export async function processEntry(payload: ProcessPayload): Promise<ProcessResu
     console.log(`[process] Starting for record ${payload.recordId}, text length: ${payload.text.length}`);
 
     // ── Step 0: Voice action — 意图分类（记录/指令/混合） ──────────
-    // 文本长度 > 10 才做分类（太短的不判断）
+    // forceCommand=true（上滑手势）时跳过关键词预筛，强制走 AI 分类
+    // 文本长度 > 4 才做分类（太短的不判断）
     if (payload.text.length > 4) {
       try {
-        const intentResult = await classifyVoiceIntent(payload.text);
+        const intentResult = await classifyVoiceIntent(payload.text, payload.forceCommand);
         result.voice_intent_type = intentResult.type;
 
         if (intentResult.type === "action" || intentResult.type === "mixed") {
@@ -80,10 +85,26 @@ export async function processEntry(payload: ProcessPayload): Promise<ProcessResu
               executeVoiceAction(action, {
                 userId: payload.userId,
                 deviceId: payload.deviceId,
+                recordId: payload.recordId,
               }),
             ),
           );
           result.action_results = actionResults;
+
+          // 高风险操作需要用户确认：存入 Session，前端展示确认卡片
+          const confirmNeeded = actionResults.find((r) => r.needs_confirm && r.todo_id);
+          if (confirmNeeded) {
+            const confirmId = crypto.randomUUID();
+            const session = getSession(payload.deviceId);
+            session.pendingConfirms.set(confirmId, {
+              confirmId,
+              action: confirmNeeded.action,
+              todoId: confirmNeeded.todo_id,
+              summary: confirmNeeded.confirm_summary ?? "确认执行此操作吗？",
+              expiresAt: Date.now() + 30_000,
+            });
+            result.pending_confirm = { confirm_id: confirmId, summary: confirmNeeded.confirm_summary ?? "确认执行此操作吗？" };
+          }
 
           // 纯指令型：执行完就返回，不走 Digest 管道
           if (intentResult.type === "action") {
@@ -142,7 +163,7 @@ export async function processEntry(payload: ProcessPayload): Promise<ProcessResu
     const dynamicTimeout = Math.min(300_000, 60_000 + Math.floor(payload.text.length / 1000) * 20_000);
     console.log(`[process] Calling AI for text cleanup... (timeout: ${dynamicTimeout}ms, text: ${payload.text.length} chars)`);
 
-    const response = await chatCompletion(messages, { json: true, temperature: 0.3, timeout: dynamicTimeout });
+    const response = await chatCompletion(messages, { json: true, temperature: 0.3, timeout: dynamicTimeout, tier: "fast" });
 
     if (!response) {
       throw new Error("AI provider returned null response");

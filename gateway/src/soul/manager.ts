@@ -73,7 +73,7 @@ async function doUpdateSoul(
         content: `## 现有 AI 身份定义\n${currentSoul || "（空白，第一次互动）"}\n\n## 新互动内容\n${newInteraction}`,
       },
     ],
-    { temperature: 0.3 },
+    { temperature: 0.3, tier: "background" },
   );
 
   if (userId) {

@@ -10,6 +10,7 @@ import * as goalRepo from "../db/repositories/goal.js";
 import * as recordRepo from "../db/repositories/record.js";
 import { query, queryOne } from "../db/pool.js";
 import { chatCompletion } from "../ai/provider.js";
+import { eventBus, type TodoCreatedEvent } from "../lib/event-bus.js";
 import type { StrikeEntry } from "../db/repositories/strike.js";
 import type { Todo } from "../db/repositories/todo.js";
 import type { Goal } from "../db/repositories/goal.js";
@@ -162,6 +163,8 @@ export async function projectIntendStrike(
     record_id: strike.source_id,
     text: strike.nucleus,
     strike_id: strike.id,
+    user_id: uid,
+    device_id: deviceId,
   };
 
   const todo = await todoRepo.create(createFields);
@@ -175,6 +178,14 @@ export async function projectIntendStrike(
   if (Object.keys(updateFields).length > 0) {
     await todoRepo.update(todo.id, updateFields);
   }
+
+  // 通知前端：待办已创建
+  eventBus.emit("todo.created", {
+    deviceId: strike.user_id,
+    todoText: strike.nucleus,
+    todoId: todo.id,
+    recordId: strike.source_id ?? undefined,
+  } satisfies TodoCreatedEvent);
 
   return todo;
 }
@@ -238,7 +249,7 @@ async function generateSubGoalSuggestions(parentGoal: Goal, userId: string): Pro
         },
         { role: "user", content: `项目目标：${parentGoal.title}` },
       ],
-      { json: true, temperature: 0.3 },
+      { json: true, temperature: 0.3, tier: "fast" },
     );
 
     const parsed = JSON.parse(resp.content);

@@ -1,6 +1,7 @@
 # 阅读器
 
-> 状态：✅ completed | 优先级：Phase 5 | 预计：3-4 天
+> 状态：🔴 未实现（仅reader-utils.ts工具函数，UI组件未创建）| 优先级：Phase 5
+> ⚠️ reader-view.tsx/text-toolbar.tsx 不存在，全屏阅读器未实现
 
 ## 概述
 长日记、每日回顾报告、参谋分析——都需要舒适的阅读体验。当前长内容在卡片中密排，没有专门的阅读模式。

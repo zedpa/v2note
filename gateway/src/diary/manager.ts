@@ -50,7 +50,7 @@ export async function regenerateSummary(
         content: entry.full_content,
       },
     ],
-    { temperature: 0.3 },
+    { temperature: 0.3, tier: "background" },
   );
 
   await aiDiaryRepo.updateSummary(entry.id, result.content);
@@ -92,7 +92,7 @@ export async function extractToMemory(
         content: diaryContent,
       },
     ],
-    { temperature: 0.3 },
+    { temperature: 0.3, tier: "background" },
   );
 
   const lines = result.content

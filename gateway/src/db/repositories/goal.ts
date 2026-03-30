@@ -140,3 +140,14 @@ export async function findWithTodos(goalId: string) {
     [goalId],
   );
 }
+
+/** 批量查询多个目标的子 todo（一次 SQL 替代 N 次查询） */
+export async function findTodosByGoalIds(goalIds: string[]) {
+  if (goalIds.length === 0) return [];
+  return query<{ parent_id: string; id: string; text: string; done: boolean; completed_at: string | null }>(
+    `SELECT parent_id, id, text, done, completed_at
+     FROM todo WHERE parent_id = ANY($1) AND level = 0
+     ORDER BY created_at`,
+    [goalIds],
+  );
+}

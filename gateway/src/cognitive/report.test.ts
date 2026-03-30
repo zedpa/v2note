@@ -58,7 +58,7 @@ describe("场景1: 结构化认知报告", () => {
       return Promise.resolve([]);
     });
 
-    const report = await generateCognitiveReport("user-1");
+    const report = await generateCognitiveReport({ userId: "user-1" });
 
     expect(report.today_strikes).toBeDefined();
     expect(report.today_strikes.perceive).toBe(5);
@@ -88,7 +88,7 @@ describe("场景1: 结构化认知报告", () => {
       return Promise.resolve([]);
     });
 
-    const report = await generateCognitiveReport("user-1");
+    const report = await generateCognitiveReport({ userId: "user-1" });
     expect(report.contradictions.length).toBeLessThanOrEqual(5);
   });
 
@@ -108,7 +108,7 @@ describe("场景1: 结构化认知报告", () => {
       return Promise.resolve([]);
     });
 
-    const report = await generateCognitiveReport("user-1");
+    const report = await generateCognitiveReport({ userId: "user-1" });
     expect(report.behavior_drift).toBeDefined();
     expect(report.behavior_drift.intend_count).toBeTypeOf("number");
   });
@@ -128,7 +128,7 @@ describe("场景5: 无活动日降级", () => {
     mockQuery.mockResolvedValue([]);
     mockQueryOne.mockResolvedValue(null);
 
-    const report = await generateCognitiveReport("user-1");
+    const report = await generateCognitiveReport({ userId: "user-1" });
 
     expect(report.today_strikes.perceive).toBe(0);
     expect(report.contradictions).toEqual([]);

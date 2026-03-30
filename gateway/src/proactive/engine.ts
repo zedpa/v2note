@@ -19,7 +19,6 @@ import { regenerateSummary, extractToMemory } from "../diary/manager.js";
 import { digestRecords } from "../handlers/digest.js";
 import { runDailyCognitiveCycle } from "../cognitive/daily-cycle.js";
 import { runBatchAnalyze } from "../cognitive/batch-analyze.js";
-import { ChatRateLimiter, generateCompanionChat, getRewardPhrase } from "../companion/chat-generator.js";
 
 interface ConnectedDevice {
   deviceId: string;
@@ -36,8 +35,6 @@ export class ProactiveEngine {
   private devices = new Map<string, ConnectedDevice>();
   private intervalMs = 30 * 60 * 1000; // 30 minutes
   private dailyPushSent = new Set<string>();
-  private chatRateLimiter = new ChatRateLimiter();
-
   // Fallback timer (used when Redis unavailable)
   private fallbackTimer: NodeJS.Timeout | null = null;
   private digestTimer: NodeJS.Timeout | null = null;
@@ -566,25 +563,6 @@ export class ProactiveEngine {
       }
     }
 
-    // ── Companion chat: daily first open greeting (场景 5.1-5.2) ──
-    const firstOpenKey = `companion:firstopen:${nudgeKey}`;
-    if (!this.dailyPushSent.has(firstOpenKey) && this.chatRateLimiter.canSend()) {
-      try {
-        const timeOfDay = hour < 12 ? "morning" : hour < 17 ? "afternoon" : hour < 21 ? "evening" : "night";
-        const chat = await generateCompanionChat("daily_open", {
-          mood: "calm",
-          recentStrikes: [],
-          timeOfDay,
-        });
-        this.sendMessage(device, { type: "companion.chat", payload: { text: chat } });
-        this.persistNotification(device, "companion.chat", "每日问候", chat);
-        this.dailyPushSent.add(firstOpenKey);
-        this.chatRateLimiter.record();
-      } catch (err: any) {
-        console.warn(`[proactive] Companion chat failed: ${err.message}`);
-      }
-    }
-
     // ── Goal harvest follow-up: 完成 7+ 天未跟进的目标 (topic-lifecycle 场景 6) ──
     const harvestKey = `harvest:${nudgeKey}`;
     if (!this.dailyPushSent.has(harvestKey)) {
@@ -653,15 +631,6 @@ export class ProactiveEngine {
       this.persistNotification(device, "proactive.schedule_reminder", "排期提醒", scheduleText);
       device.lastNudge = Date.now();
     }
-  }
-
-  /** 待办完成时发送奖励语（场景 5.3） */
-  onTodoCompleted(deviceId: string): void {
-    const device = this.devices.get(deviceId);
-    if (!device) return;
-    const phrase = getRewardPhrase();
-    this.sendMessage(device, { type: "companion.chat", payload: { text: phrase } });
-    this.persistNotification(device, "companion.chat", "完成奖励", phrase);
   }
 
   /** 持久化通知到数据库 */

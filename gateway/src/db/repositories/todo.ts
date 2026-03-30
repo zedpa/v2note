@@ -106,6 +106,8 @@ export async function create(fields: {
   user_id?: string;
   device_id?: string;
   parent_id?: string;
+  level?: number;
+  status?: string;
 }): Promise<Todo> {
   const cols = ["text", "done"];
   const vals: any[] = [fields.text, fields.done ?? false];
@@ -121,6 +123,8 @@ export async function create(fields: {
     ["user_id", fields.user_id],
     ["device_id", fields.device_id],
     ["parent_id", fields.parent_id],
+    ["level", fields.level],
+    ["status", fields.status],
   ];
   for (const [col, val] of optionals) {
     if (val !== undefined && val !== null) {
@@ -169,6 +173,8 @@ export async function update(
     ai_action_plan?: string[] | null;
     goal_id?: string | null;
     strike_id?: string | null;
+    level?: number;
+    status?: string;
   },
 ): Promise<void> {
   const sets: string[] = [];
@@ -222,6 +228,14 @@ export async function update(
     sets.push(`strike_id = $${i++}`);
     params.push(fields.strike_id);
   }
+  if (fields.level !== undefined) {
+    sets.push(`level = $${i++}`);
+    params.push(fields.level);
+  }
+  if (fields.status !== undefined) {
+    sets.push(`status = $${i++}`);
+    params.push(fields.status);
+  }
   if (sets.length === 0) return;
   params.push(id);
   await execute(`UPDATE todo SET ${sets.join(", ")} WHERE id = $${i}`, params);
@@ -274,6 +288,39 @@ export async function countByUserDateRange(
     total: parseInt(row?.total ?? "0", 10),
     done: parseInt(row?.done ?? "0", 10),
   };
+}
+
+/**
+ * 计算连续记录天数（从昨天往前数，一次 SQL 查出近 30 天有 todo 的日期）
+ */
+export async function getStreak(
+  opts: { userId?: string; deviceId?: string },
+): Promise<number> {
+  const { userId, deviceId } = opts;
+  const [where, params] = userId
+    ? ["user_id = $1", [userId]]
+    : ["device_id = $1", [deviceId]];
+
+  const rows = await query<{ d: string }>(
+    `SELECT DISTINCT DATE(created_at) AS d FROM todo
+     WHERE ${where} AND created_at >= NOW() - INTERVAL '30 days'
+     ORDER BY d DESC`,
+    params,
+  );
+
+  // 从昨天开始数连续天
+  let streak = 0;
+  const now = new Date();
+  for (let i = 1; i <= 30; i++) {
+    const target = new Date(now.getTime() - i * 86400000)
+      .toISOString().split("T")[0];
+    if (rows.some((r) => r.d.startsWith(target))) {
+      streak++;
+    } else {
+      break;
+    }
+  }
+  return streak;
 }
 
 export async function findPendingByDevice(deviceId: string): Promise<Todo[]> {
@@ -468,9 +515,17 @@ export async function findGoalsByDomain(userId: string, domain?: string): Promis
 /** 查询用户所有活跃目标（替代 goalRepo.findActiveByUser） */
 export async function findActiveGoalsByUser(userId: string): Promise<Todo[]> {
   return query<Todo>(
-    `SELECT * FROM todo WHERE user_id = $1 AND level >= 1
-     AND status IN ('active', 'progressing')
-     ORDER BY created_at DESC`,
+    `SELECT t.*,
+            COALESCE(sc.cnt, 0)::int AS subtask_count,
+            COALESCE(sc.done_cnt, 0)::int AS subtask_done_count
+     FROM todo t
+     LEFT JOIN LATERAL (
+       SELECT COUNT(*)::int AS cnt, COUNT(*) FILTER (WHERE done)::int AS done_cnt
+       FROM todo sub WHERE sub.parent_id = t.id
+     ) sc ON true
+     WHERE t.user_id = $1 AND t.level >= 1
+       AND t.status IN ('active', 'progressing')
+     ORDER BY t.created_at DESC`,
     [userId],
   );
 }
@@ -478,9 +533,17 @@ export async function findActiveGoalsByUser(userId: string): Promise<Todo[]> {
 /** 查询用户所有活跃目标（替代 goalRepo.findActiveByDevice） */
 export async function findActiveGoalsByDevice(deviceId: string): Promise<Todo[]> {
   return query<Todo>(
-    `SELECT * FROM todo WHERE device_id = $1 AND level >= 1
-     AND status IN ('active', 'progressing')
-     ORDER BY created_at DESC`,
+    `SELECT t.*,
+            COALESCE(sc.cnt, 0)::int AS subtask_count,
+            COALESCE(sc.done_cnt, 0)::int AS subtask_done_count
+     FROM todo t
+     LEFT JOIN LATERAL (
+       SELECT COUNT(*)::int AS cnt, COUNT(*) FILTER (WHERE done)::int AS done_cnt
+       FROM todo sub WHERE sub.parent_id = t.id
+     ) sc ON true
+     WHERE t.device_id = $1 AND t.level >= 1
+       AND t.status IN ('active', 'progressing')
+     ORDER BY t.created_at DESC`,
     [deviceId],
   );
 }

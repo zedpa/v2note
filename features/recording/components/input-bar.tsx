@@ -116,6 +116,10 @@ export function InputBar({ onStartReview, onCommandDetected, commandContext }: I
           // AI processing done in background
           emit("recording:processed");
           break;
+        case "todo.created":
+          toast.success(`已创建待办：${(msg.payload as any).text?.slice(0, 30)}`);
+          emit("recording:processed"); // 刷新待办列表
+          break;
         case "command.detected":
           onCommandDetected?.(msg.payload.command, msg.payload.args);
           break;
@@ -131,13 +135,13 @@ export function InputBar({ onStartReview, onCommandDetected, commandContext }: I
 
   // ── Voice recording handlers ──
 
-  const handleSave = useCallback(async () => {
+  const handleSave = useCallback(async (forceCommand?: boolean) => {
     try {
       recorder.stopRecording();
       const deviceId = await getDeviceId();
       const client = getGatewayClient();
-      client.send({ type: "asr.stop", payload: { deviceId } });
-      toast("正在处理录音...");
+      client.send({ type: "asr.stop", payload: { deviceId, forceCommand } });
+      toast(forceCommand ? "指令模式处理中..." : "正在处理录音...");
     } catch (err: any) {
       toast.error(`录音保存失败: ${err.message}`);
     } finally {
@@ -256,7 +260,8 @@ export function InputBar({ onStartReview, onCommandDetected, commandContext }: I
     stopTimers();
     setVoicePhase("idle");
     setDisplayDuration(0);
-    handleSave();
+    // 上滑触发的 locked 模式 = 指令通道，forceCommand: true 跳过关键词预筛
+    handleSave(true);
   }, [stopTimers, handleSave]);
 
   // ── Text submission ──
@@ -305,8 +310,8 @@ export function InputBar({ onStartReview, onCommandDetected, commandContext }: I
         <div className="flex-1 flex items-center justify-center w-full">
           <div className="flex flex-col items-center gap-8">
             <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-destructive animate-pulse" />
-              <span className="text-sm text-background/60 font-medium">录音中</span>
+              <span className="w-2.5 h-2.5 rounded-full bg-primary animate-pulse" />
+              <span className="text-sm text-primary font-medium">指令模式</span>
             </div>
             <div className="flex items-center gap-1 h-16">
               {waveHeights.map((h, i) => (

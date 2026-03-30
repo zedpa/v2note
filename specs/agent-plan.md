@@ -1,6 +1,9 @@
 # Agent Plan 机制
 
-> 状态：✅ 已完成 | 优先级：Phase 2.5（Agent 基础能力）| 完成日期：2026-03-24
+> 状态：✅ 后端+前端基础完成 | 优先级：Phase 2.5（Agent 基础能力）
+> 后端: plan-repo + plan-executor + migration 完成
+> 前端: plan-card.tsx + use-chat plan消息处理 + gateway-client类型扩展 (2026-03-29)
+> 待完善: chat handler 状态机深度改造（当前用 plan.proposed 消息触发前端 plan-card）
 > 依赖：agent-tool-layer（工具注册 + 原生 function calling）
 
 ## 概述

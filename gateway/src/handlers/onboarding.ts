@@ -8,9 +8,19 @@
  * Q5: 习惯 → onboarding_done + 日记 + Digest
  */
 
-import { recordRepo, transcriptRepo, userProfileRepo } from "../db/repositories/index.js";
+import { recordRepo, transcriptRepo, userProfileRepo, todoRepo } from "../db/repositories/index.js";
 import { digestRecords } from "./digest.js";
 import { appendToDiary } from "../diary/manager.js";
+
+/** 预设维度关键词（与 top-level.ts 保持一致） */
+const DOMAIN_KEYWORDS: Array<{ domain: string; keywords: string[] }> = [
+  { domain: "工作", keywords: ["上班", "工作", "公司", "项目", "领导", "同事", "会议", "加班", "出差", "业务"] },
+  { domain: "学习", keywords: ["学习", "上学", "考试", "读书", "课程", "培训", "技能", "知识"] },
+  { domain: "创业", keywords: ["创业", "产品", "创始", "融资", "客户", "市场", "商业", "合伙"] },
+  { domain: "家庭", keywords: ["家庭", "孩子", "带娃", "父母", "家人", "婚姻", "伴侣"] },
+  { domain: "健康", keywords: ["健康", "运动", "锻炼", "减肥", "饮食", "睡眠"] },
+  { domain: "生活", keywords: ["生活", "日常", "购物", "搬家", "租房", "做饭"] },
+];
 
 const QUESTIONS = [
   "", // 0-indexed padding
@@ -51,6 +61,13 @@ export async function handleOnboardingAnswer(
     return { ok: true, recordCreated: false, skipped: false };
   }
 
+  // Q2: 解析维度关键词，创建种子目标（让侧边栏维度不为空）
+  if (step === 2) {
+    seedDimensionGoals(userId, deviceId, trimmed).catch((e) =>
+      console.warn("[onboarding] Dimension seeding failed:", e.message),
+    );
+  }
+
   // Q4: 额外存 pain_points
   if (step === 4) {
     await userProfileRepo.upsertOnboardingField(userId, "pain_points", trimmed);
@@ -88,4 +105,30 @@ export async function handleOnboardingAnswer(
   }
 
   return { ok: true, recordCreated: true, skipped: false };
+}
+
+/**
+ * 从 Q2 回答中提取维度关键词，为每个匹配维度创建一个种子目标（level=1）。
+ * 保证至少有"生活"维度，使侧边栏在冷启动后不为空。
+ */
+async function seedDimensionGoals(userId: string, deviceId: string, answer: string): Promise<void> {
+  const text = answer.toLowerCase();
+  const matched = DOMAIN_KEYWORDS
+    .filter((d) => d.keywords.some((k) => text.includes(k)))
+    .map((d) => d.domain);
+
+  // 保证至少有"生活"
+  if (!matched.includes("生活")) matched.push("生活");
+
+  for (const domain of matched.slice(0, 6)) {
+    await todoRepo.createGoalAsTodo({
+      user_id: userId,
+      device_id: deviceId,
+      text: `${domain}相关目标`,
+      level: 1,
+      status: "active",
+      domain,
+    });
+  }
+  console.log(`[onboarding] Seeded ${matched.length} dimension goals: ${matched.join(", ")}`);
 }

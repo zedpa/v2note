@@ -53,7 +53,7 @@ describe("场景 3: 行为模式分析", () => {
         { hour: "21", count: "7" },
       ]);
 
-    const stats = await getActionStats("user-1", 14);
+    const stats = await getActionStats({ userId: "user-1" }, 14);
 
     expect(stats.totalEvents).toBe(30);
     expect(stats.completionRate).toBeCloseTo(0.67, 1); // 20/30
@@ -66,7 +66,7 @@ describe("场景 3: 行为模式分析", () => {
   it("should_handle_empty_stats", async () => {
     mockQuery.mockResolvedValue([]);
 
-    const stats = await getActionStats("user-1", 14);
+    const stats = await getActionStats({ userId: "user-1" }, 14);
 
     expect(stats.totalEvents).toBe(0);
     expect(stats.completionRate).toBe(0);
@@ -81,7 +81,7 @@ describe("场景 4: 跳过回流 — skip 3+ alert", () => {
       { id: "todo-2", text: "确认供应商报价", skip_count: "5", goal_title: "供应链" },
     ]);
 
-    const alerts = await getSkipAlerts("user-1");
+    const alerts = await getSkipAlerts({ userId: "user-1" });
 
     expect(alerts).toHaveLength(2);
     expect(alerts[0].todoText).toBe("审阅小李报告");
@@ -92,7 +92,7 @@ describe("场景 4: 跳过回流 — skip 3+ alert", () => {
   it("should_return_empty_when_no_high_skip_todos", async () => {
     mockQuery.mockResolvedValueOnce([]);
 
-    const alerts = await getSkipAlerts("user-1");
+    const alerts = await getSkipAlerts({ userId: "user-1" });
 
     expect(alerts).toHaveLength(0);
   });
@@ -111,7 +111,7 @@ describe("场景 5: 结果追踪提示", () => {
       },
     ]);
 
-    const prompts = await getResultTrackingPrompts("user-1");
+    const prompts = await getResultTrackingPrompts({ userId: "user-1" });
 
     expect(prompts).toHaveLength(1);
     expect(prompts[0].todoText).toBe("打给张总确认报价");
@@ -121,7 +121,7 @@ describe("场景 5: 结果追踪提示", () => {
   it("should_return_empty_when_no_qualifying_todos", async () => {
     mockQuery.mockResolvedValueOnce([]);
 
-    const prompts = await getResultTrackingPrompts("user-1");
+    const prompts = await getResultTrackingPrompts({ userId: "user-1" });
 
     expect(prompts).toHaveLength(0);
   });

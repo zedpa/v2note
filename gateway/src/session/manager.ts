@@ -1,6 +1,14 @@
 import { SessionContext } from "./context.js";
 import { MemoryManager } from "../memory/manager.js";
 
+export interface PendingConfirm {
+  confirmId: string;
+  action: string;       // e.g. "delete_todo"
+  todoId?: string;
+  summary: string;      // 展示给用户的确认文案
+  expiresAt: number;    // Date.now() + 30000（30秒超时）
+}
+
 export interface Session {
   id: string;
   deviceId: string;
@@ -8,6 +16,7 @@ export interface Session {
   context: SessionContext;
   mode: "idle" | "process" | "chat";
   memoryManager: MemoryManager;
+  pendingConfirms: Map<string, PendingConfirm>;
   createdAt: Date;
   lastActivity: Date;
 }
@@ -28,6 +37,7 @@ export function getSession(deviceId: string): Session {
       context: new SessionContext(),
       mode: "idle",
       memoryManager: new MemoryManager(),
+      pendingConfirms: new Map(),
       createdAt: new Date(),
       lastActivity: new Date(),
     };

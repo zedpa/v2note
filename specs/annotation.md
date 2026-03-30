@@ -1,6 +1,7 @@
 # 批注系统
 
-> 状态：✅ completed | 优先级：Phase 5 | 预计：2-3 天
+> 状态：🔴 未实现（后端工具函数在，前端UI组件从未创建）| 优先级：Phase 5
+> ⚠️ features/reader/components/ 为空，text-toolbar/annotation-sidebar 不存在
 > 依赖：reader
 
 ## 概述

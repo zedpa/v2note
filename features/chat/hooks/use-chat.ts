@@ -8,11 +8,17 @@ import { getCommandDefs } from "@/features/commands/lib/registry";
 
 export interface ChatMessage {
   id: string;
-  role: "user" | "assistant" | "tool-status";
+  role: "user" | "assistant" | "tool-status" | "plan";
   content: string;
   timestamp: Date;
   /** 工具状态消息的工具名（用于图标显示） */
   toolName?: string;
+  /** Plan 消息的结构化数据 */
+  plan?: {
+    planId: string;
+    intent: string;
+    steps: Array<{ index: number; description: string; toolName?: string; needsConfirm?: boolean; status?: string; result?: string }>;
+  };
 }
 
 interface UseChatOptions {
@@ -118,6 +124,52 @@ export function useChat(
         streamingTextRef.current = "";
         // 移除临时的 tool-status 消息
         setMessages((prev) => prev.filter((m) => m.role !== "tool-status"));
+        break;
+      }
+      case "plan.proposed": {
+        clearResponseTimeout();
+        setStreaming(false);
+        const { planId: ppId, intent: ppIntent, steps: ppSteps } = (msg as any).payload;
+        setMessages((prev) => [
+          ...prev.filter((m) => m.role !== "tool-status"),
+          {
+            id: `plan-${ppId}`,
+            role: "plan" as const,
+            content: ppIntent as string,
+            timestamp: new Date(),
+            plan: { planId: ppId as string, intent: ppIntent as string, steps: ppSteps },
+          },
+        ]);
+        break;
+      }
+      case "plan.step_done": {
+        const { planId, stepIndex, status: stepStatus, result: stepResult } = (msg as any).payload;
+        setMessages((prev) =>
+          prev.map((m): ChatMessage => {
+            if (m.plan && m.plan.planId === planId) {
+              const updatedSteps = m.plan.steps.map((s) =>
+                s.index === stepIndex ? { ...s, status: stepStatus as string, result: stepResult as string } : s,
+              );
+              return { ...m, plan: { planId: m.plan.planId, intent: m.plan.intent, steps: updatedSteps } };
+            }
+            return m;
+          }),
+        );
+        break;
+      }
+      case "plan.done": {
+        const { planId: donePlanId } = (msg as any).payload;
+        setMessages((prev) =>
+          prev.map((m): ChatMessage => {
+            if (m.plan && m.plan.planId === donePlanId) {
+              const doneSteps = m.plan.steps.map((s) =>
+                s.status === "pending" ? { ...s, status: "done" } : s,
+              );
+              return { ...m, plan: { planId: m.plan.planId, intent: m.plan.intent, steps: doneSteps } };
+            }
+            return m;
+          }),
+        );
         break;
       }
       case "error": {
@@ -371,5 +423,27 @@ export function useChat(
     };
   }, [clearResponseTimeout]);
 
-  return { messages, send, streaming, connected, connect, disconnect };
+  const confirmPlan = useCallback(async (
+    planId: string,
+    action: "execute_all" | "execute_modified" | "abandon",
+    modifications?: Array<{ stepIndex: number; description?: string; deleted?: boolean }>,
+  ) => {
+    const client = getGatewayClient();
+    const deviceId = await getDeviceId();
+    client.send({
+      type: "plan.confirm",
+      payload: { deviceId, planId, action, modifications },
+    });
+    // 标记 plan 消息为已确认
+    setMessages((prev) =>
+      prev.map((m) => {
+        if (m.plan?.planId === planId) {
+          return { ...m, content: action === "abandon" ? "已放弃" : m.content };
+        }
+        return m;
+      }),
+    );
+  }, []);
+
+  return { messages, send, streaming, connected, connect, disconnect, confirmPlan };
 }

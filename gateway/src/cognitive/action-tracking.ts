@@ -17,20 +17,30 @@ export interface ActionStats {
   timeDistribution: Array<{ hour: string; count: number }>;
 }
 
+/** 构建 user/device 过滤条件 */
+function ownerWhere(opts: { userId?: string; deviceId?: string }): [string, string] {
+  if (opts.userId) return ["t.user_id = $1", opts.userId];
+  return ["t.device_id = $1", opts.deviceId!];
+}
+
 /**
  * 统计过去 N 天的行动事件。
  */
-export async function getActionStats(userId: string, days: number = 14): Promise<ActionStats> {
-  // 1. 事件类型计数
+export async function getActionStats(
+  opts: { userId?: string; deviceId?: string },
+  days: number = 14,
+): Promise<ActionStats> {
+  const [where, id] = ownerWhere(opts);
+
+  // 1. 事件类型计数（通过 todo.user_id/device_id 直接过滤，不再 JOIN record）
   const typeCounts = await query<{ type: string; count: string }>(
     `SELECT ae.type, COUNT(*)::text as count
      FROM action_event ae
      JOIN todo t ON t.id = ae.todo_id
-     JOIN record r ON r.id = t.record_id
-     WHERE r.device_id IN (SELECT id FROM device WHERE user_id = $1)
+     WHERE ${where}
        AND ae.created_at >= NOW() - ($2 || ' days')::interval
      GROUP BY ae.type`,
-    [userId, String(days)],
+    [id, String(days)],
   );
 
   const counts: Record<string, number> = {};
@@ -46,29 +56,27 @@ export async function getActionStats(userId: string, days: number = 14): Promise
     `SELECT COALESCE(ae.reason, 'unknown') as reason, COUNT(*)::text as count
      FROM action_event ae
      JOIN todo t ON t.id = ae.todo_id
-     JOIN record r ON r.id = t.record_id
-     WHERE r.device_id IN (SELECT id FROM device WHERE user_id = $1)
+     WHERE ${where}
        AND ae.type = 'skip'
        AND ae.created_at >= NOW() - ($2 || ' days')::interval
      GROUP BY ae.reason
      ORDER BY count DESC`,
-    [userId, String(days)],
+    [id, String(days)],
   );
 
-  // 3. 按目标完成率
+  // 3. 按目标完成率（goal 已统一为 todo.level>=1，用 parent_id 关联）
   const goalStats = await query<{ goal_id: string; goal_title: string; total: string; completed: string }>(
-    `SELECT g.id as goal_id, g.title as goal_title,
+    `SELECT p.id as goal_id, p.text as goal_title,
             COUNT(ae.id)::text as total,
             COUNT(ae.id) FILTER (WHERE ae.type = 'complete')::text as completed
      FROM action_event ae
      JOIN todo t ON t.id = ae.todo_id
-     JOIN goal g ON g.id = t.goal_id
-     JOIN record r ON r.id = t.record_id
-     WHERE r.device_id IN (SELECT id FROM device WHERE user_id = $1)
+     JOIN todo p ON p.id = t.parent_id AND p.level >= 1
+     WHERE ${where}
        AND ae.created_at >= NOW() - ($2 || ' days')::interval
-     GROUP BY g.id, g.title
+     GROUP BY p.id, p.text
      ORDER BY total DESC`,
-    [userId, String(days)],
+    [id, String(days)],
   );
 
   // 4. 完成时间段分布
@@ -76,13 +84,12 @@ export async function getActionStats(userId: string, days: number = 14): Promise
     `SELECT EXTRACT(HOUR FROM ae.created_at)::text as hour, COUNT(*)::text as count
      FROM action_event ae
      JOIN todo t ON t.id = ae.todo_id
-     JOIN record r ON r.id = t.record_id
-     WHERE r.device_id IN (SELECT id FROM device WHERE user_id = $1)
+     WHERE ${where}
        AND ae.type = 'complete'
        AND ae.created_at >= NOW() - ($2 || ' days')::interval
      GROUP BY hour
      ORDER BY count DESC`,
-    [userId, String(days)],
+    [id, String(days)],
   );
 
   return {
@@ -112,19 +119,19 @@ export interface SkipAlert {
 /**
  * 获取 skip_count >= 3 的待办 alert（用于每日回顾注入）。
  */
-export async function getSkipAlerts(userId: string): Promise<SkipAlert[]> {
+export async function getSkipAlerts(opts: { userId?: string; deviceId?: string }): Promise<SkipAlert[]> {
+  const [where, id] = ownerWhere(opts);
   const rows = await query<{ id: string; text: string; skip_count: string; goal_title: string | null }>(
     `SELECT t.id, t.text, t.skip_count::text,
-            g.title as goal_title
+            p.text as goal_title
      FROM todo t
-     LEFT JOIN goal g ON g.id = t.goal_id
-     JOIN record r ON r.id = t.record_id
-     WHERE r.device_id IN (SELECT id FROM device WHERE user_id = $1)
+     LEFT JOIN todo p ON p.id = t.parent_id AND p.level >= 1
+     WHERE ${where}
        AND t.done = false
        AND t.skip_count >= 3
      ORDER BY t.skip_count DESC
      LIMIT 10`,
-    [userId],
+    [id],
   );
 
   return rows.map((r) => {
@@ -153,7 +160,8 @@ export interface ResultTrackingPrompt {
 /**
  * 查找完成 7+ 天、关联 goal 仍 active 的 todo → 生成追踪提示。
  */
-export async function getResultTrackingPrompts(userId: string): Promise<ResultTrackingPrompt[]> {
+export async function getResultTrackingPrompts(opts: { userId?: string; deviceId?: string }): Promise<ResultTrackingPrompt[]> {
+  const [where, id] = ownerWhere(opts);
   const rows = await query<{
     id: string;
     text: string;
@@ -162,18 +170,17 @@ export async function getResultTrackingPrompts(userId: string): Promise<ResultTr
     goal_title: string | null;
   }>(
     `SELECT t.id, t.text, t.completed_at,
-            g.id as goal_id, g.title as goal_title
+            p.id as goal_id, p.text as goal_title
      FROM todo t
-     LEFT JOIN goal g ON g.id = t.goal_id AND g.status IN ('active', 'progressing')
-     JOIN record r ON r.id = t.record_id
-     WHERE r.device_id IN (SELECT id FROM device WHERE user_id = $1)
+     JOIN todo p ON p.id = t.parent_id AND p.level >= 1 AND p.status IN ('active', 'progressing')
+     WHERE ${where}
        AND t.done = true
        AND t.completed_at IS NOT NULL
        AND t.completed_at <= NOW() - INTERVAL '7 days'
-       AND t.goal_id IS NOT NULL
+       AND t.parent_id IS NOT NULL
      ORDER BY t.completed_at DESC
      LIMIT 5`,
-    [userId],
+    [id],
   );
 
   return rows.map((r) => ({

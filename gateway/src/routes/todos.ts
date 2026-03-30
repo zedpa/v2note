@@ -25,6 +25,8 @@ export function registerTodoRoutes(router: Router) {
       scheduled_start?: string;
       estimated_minutes?: number;
       parent_id?: string;
+      level?: number;
+      status?: string;
     }>(_req);
     const userId = getUserId(_req) ?? undefined;
     const deviceId = getDeviceId(_req);
@@ -37,6 +39,8 @@ export function registerTodoRoutes(router: Router) {
       scheduled_start: body.scheduled_start,
       estimated_minutes: body.estimated_minutes,
       parent_id: body.parent_id,
+      level: body.level,
+      status: body.status,
       user_id: userId,
       device_id: deviceId,
     });
@@ -58,6 +62,9 @@ export function registerTodoRoutes(router: Router) {
       scheduled_end?: string | null;
       estimated_minutes?: number | null;
       priority?: number;
+      level?: number;
+      status?: string;
+      domain?: string;
     }>(req);
     await todoRepo.update(params.id, body);
     // todo 完成时触发双向一致性：降低 Strike salience

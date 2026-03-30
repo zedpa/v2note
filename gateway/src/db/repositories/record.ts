@@ -3,6 +3,7 @@ import { query, queryOne, execute } from "../pool.js";
 export interface Record {
   id: string;
   device_id: string;
+  user_id: string | null;
   status: string;
   source: string;
   audio_path: string | null;

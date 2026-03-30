@@ -180,7 +180,7 @@ ${similarContext || "（暂无记忆）"}
         },
         { role: "user", content },
       ],
-      { json: true, temperature: 0.3 },
+      { json: true, temperature: 0.3, tier: "background" },
     );
 
     try {

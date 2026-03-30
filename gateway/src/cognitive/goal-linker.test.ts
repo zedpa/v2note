@@ -225,6 +225,8 @@ describe("场景 14: 手动目标不重复涌现", () => {
 describe("场景 9-10: 行动事件持久化", () => {
   it("should_create_skip_event", async () => {
     mockExecute.mockResolvedValue(undefined);
+    // query: UPDATE skip_count RETURNING (no goal_id → no updateGoalStatus)
+    mockQuery.mockResolvedValueOnce([{ skip_count: "1", goal_id: null }]);
 
     await createActionEvent({
       todo_id: "t1",
@@ -232,16 +234,19 @@ describe("场景 9-10: 行动事件持久化", () => {
       reason: "resistance",
     });
 
-    // insert action_event + update skip_count = 2 次
-    expect(mockExecute).toHaveBeenCalledTimes(2);
+    // insert action_event via execute + update skip_count via query
+    expect(mockExecute).toHaveBeenCalledTimes(1);
     const sql = mockExecute.mock.calls[0][0] as string;
     expect(sql).toContain("action_event");
-    const sql2 = mockExecute.mock.calls[1][0] as string;
-    expect(sql2).toContain("skip_count");
+    expect(mockQuery).toHaveBeenCalledTimes(1);
+    const qsql = mockQuery.mock.calls[0][0] as string;
+    expect(qsql).toContain("skip_count");
   });
 
   it("should_create_complete_event", async () => {
     mockExecute.mockResolvedValue(undefined);
+    // query: SELECT goal_id FROM todo (no goal → no updateGoalStatus)
+    mockQuery.mockResolvedValueOnce([{ goal_id: null }]);
 
     await createActionEvent({
       todo_id: "t2",

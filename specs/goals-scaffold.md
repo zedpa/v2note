@@ -1,6 +1,8 @@
 # 目标场景前端骨架
 
-> 状态：✅ completed | 优先级：Phase 4 | 预计：3-4 天
+> 状态：✅ 列表+详情+子任务计数完成 | 优先级：Phase 4
+> 2026-03-29: findActiveGoalsByUser/Device 加入 subtask_count/subtask_done_count
+> 深入讨论按钮待后续 advisor 模式完善后接入
 > 说明：后端 goal 表 + CRUD API 已存在，但 features/goals/ 目录不存在。此 spec 补全前端。
 
 ## 概述

@@ -5,6 +5,7 @@ import { ArrowLeft, Send } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useChat } from "@/features/chat/hooks/use-chat";
 import { ChatBubble } from "./chat-bubble";
+import { PlanCard } from "./plan-card";
 import { SwipeBack } from "@/shared/components/swipe-back";
 import { executeCommand, getCommandDefs, type CommandContext } from "@/features/commands/lib/registry";
 
@@ -22,7 +23,7 @@ interface ChatViewProps {
 
 export function ChatView({ dateRange, onClose, initialMessage, title, mode: modeProp, commandContext, mood, moodText, deerState }: ChatViewProps) {
   const resolvedMode = modeProp ?? (initialMessage ? "command" : "review");
-  const { messages, send, streaming, connected, connect, disconnect } =
+  const { messages, send, streaming, connected, connect, disconnect, confirmPlan } =
     useChat(dateRange, {
       mode: resolvedMode,
       initialMessage,
@@ -153,13 +154,23 @@ export function ChatView({ dateRange, onClose, initialMessage, title, mode: mode
 
         {/* Messages */}
         <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4">
-          {messages.map((msg, i) => (
-            <ChatBubble
-              key={msg.id}
-              message={msg}
-              streaming={streaming && i === messages.length - 1 && msg.role === "assistant"}
-            />
-          ))}
+          {messages.map((msg, i) =>
+            msg.role === "plan" && msg.plan ? (
+              <PlanCard
+                key={msg.id}
+                planId={msg.plan.planId}
+                intent={msg.plan.intent}
+                steps={msg.plan.steps}
+                onConfirm={(action, mods) => confirmPlan(msg.plan!.planId, action, mods)}
+              />
+            ) : (
+              <ChatBubble
+                key={msg.id}
+                message={msg}
+                streaming={streaming && i === messages.length - 1 && msg.role === "assistant"}
+              />
+            ),
+          )}
 
           {/* Clickable command chips */}
           {showCommandChips && !streaming && (

@@ -1,7 +1,9 @@
 import type { Router } from "../router.js";
 import { readBody, sendJson, sendError, getDeviceId, getUserId } from "../lib/http-helpers.js";
 import * as vocabRepo from "../db/repositories/vocabulary.js";
-import { correctText, invalidateCache } from "../cognitive/vocabulary.js";
+import { invalidateCache } from "../cognitive/vocabulary.js";
+import { syncVocabularyToDashScope } from "../cognitive/vocabulary-sync.js";
+import { chatCompletion } from "../ai/provider.js";
 
 // ── 预设领域词汇 ──────────────────────────────────────────────────────
 
@@ -98,11 +100,14 @@ const PRESET_DOMAINS: Record<string, PresetTerm[]> = {
 
 export function registerVocabularyRoutes(router: Router) {
   // ── GET /api/v1/vocabulary ──
-  // 返回用户词汇，按 domain 分组
+  // 返回用户词汇，按 domain 分组（userId 优先，跨设备共享）
   router.get("/api/v1/vocabulary", async (req, res) => {
     try {
       const deviceId = getDeviceId(req);
-      const entries = await vocabRepo.findByDevice(deviceId);
+      const userId = getUserId(req);
+      const entries = userId
+        ? await vocabRepo.findByUser(userId)
+        : await vocabRepo.findByDevice(deviceId);
 
       // 按 domain 分组
       const grouped: Record<string, typeof entries> = {};
@@ -140,6 +145,8 @@ export function registerVocabularyRoutes(router: Router) {
       });
 
       invalidateCache(deviceId);
+      // 异步同步到 DashScope（不阻断响应）
+      syncVocabularyToDashScope(deviceId).catch(() => {});
       sendJson(res, entry, 201);
     } catch (err: any) {
       sendError(res, err.message ?? "Internal error", err.status ?? 500);
@@ -150,15 +157,19 @@ export function registerVocabularyRoutes(router: Router) {
   router.delete("/api/v1/vocabulary/:id", async (req, res, params) => {
     try {
       const deviceId = getDeviceId(req);
+      const userId = getUserId(req);
       const id = params.id;
 
-      const affected = await vocabRepo.deleteById(id);
+      // 校验所有权：只能删除属于自己设备或账号的词汇
+      const affected = await vocabRepo.deleteByIdOwned(id, deviceId, userId);
       if (affected === 0) {
         sendError(res, "Vocabulary entry not found", 404);
         return;
       }
 
       invalidateCache(deviceId);
+      // 异步同步到 DashScope（不阻断响应）
+      syncVocabularyToDashScope(deviceId).catch(() => {});
       sendJson(res, { deleted: true });
     } catch (err: any) {
       sendError(res, err.message ?? "Internal error", err.status ?? 500);
@@ -199,26 +210,89 @@ export function registerVocabularyRoutes(router: Router) {
       }
 
       invalidateCache(deviceId);
+      // 异步同步到 DashScope（不阻断响应）
+      syncVocabularyToDashScope(deviceId).catch(() => {});
       sendJson(res, { domain: body.domain, imported: created.length, entries: created }, 201);
     } catch (err: any) {
       sendError(res, err.message ?? "Internal error", err.status ?? 500);
     }
   });
 
-  // ── POST /api/v1/vocabulary/correct ──
-  // 使用词汇表纠正文本 { text }
-  router.post("/api/v1/vocabulary/correct", async (req, res) => {
+  // ── POST /api/v1/vocabulary/sync ──
+  // 手动触发同步到 DashScope（通常由增删自动触发）
+  router.post("/api/v1/vocabulary/sync", async (req, res) => {
     try {
       const deviceId = getDeviceId(req);
-      const body = await readBody<{ text: string }>(req);
+      const vocabularyId = await syncVocabularyToDashScope(deviceId);
+      sendJson(res, { vocabulary_id: vocabularyId, synced: !!vocabularyId });
+    } catch (err: any) {
+      sendError(res, err.message ?? "Internal error", err.status ?? 500);
+    }
+  });
 
-      if (!body.text) {
-        sendError(res, "Missing required field: text", 400);
+  // ── POST /api/v1/vocabulary/generate ──
+  // AI 生成自定义领域词库 { domain_name }
+  router.post("/api/v1/vocabulary/generate", async (req, res) => {
+    try {
+      const deviceId = getDeviceId(req);
+      const userId = getUserId(req);
+      const body = await readBody<{ domain_name: string }>(req);
+
+      if (!body.domain_name) {
+        sendError(res, "Missing required field: domain_name", 400);
         return;
       }
 
-      const result = await correctText(deviceId, body.text);
-      sendJson(res, result);
+      const systemPrompt = `你是专业词库生成助手。为给定的领域生成 50-80 个核心专业术语。
+返回 JSON 格式：
+{
+  "terms": [
+    { "term": "术语名称", "aliases": ["别名1", "别名2"] }
+  ]
+}
+要求：
+- 选择该领域最常用、最具代表性的专业词汇
+- aliases 填写该术语的常见误写、缩写或同义词（0-3个）
+- 只返回 JSON，不要解释`;
+
+      const aiResp = await chatCompletion(
+        [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: `领域：${body.domain_name}` },
+        ],
+        { json: true, temperature: 0.3, timeout: 60000, tier: "report" },
+      );
+
+      let parsed: { terms: Array<{ term: string; aliases?: string[] }> };
+      try {
+        parsed = JSON.parse(aiResp.content);
+      } catch {
+        sendError(res, "AI returned invalid JSON", 500);
+        return;
+      }
+
+      const terms = parsed.terms ?? [];
+      const created: vocabRepo.VocabularyEntry[] = [];
+      for (const t of terms) {
+        if (!t.term) continue;
+        try {
+          const entry = await vocabRepo.create({
+            deviceId,
+            userId,
+            term: t.term,
+            aliases: t.aliases ?? [],
+            domain: body.domain_name,
+            source: "preset",
+          });
+          created.push(entry);
+        } catch {
+          // 忽略重复插入
+        }
+      }
+
+      invalidateCache(deviceId);
+      syncVocabularyToDashScope(deviceId).catch(() => {});
+      sendJson(res, { domain: body.domain_name, generated: created.length, entries: created }, 201);
     } catch (err: any) {
       sendError(res, err.message ?? "Internal error", err.status ?? 500);
     }

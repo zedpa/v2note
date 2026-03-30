@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import { createInterface } from "node:readline";
 import { recordRepo } from "../db/repositories/index.js";
 import { transcriptRepo } from "../db/repositories/index.js";
+import { getVocabularyIdForDevice } from "../cognitive/vocabulary-sync.js";
 import { processEntry } from "./process.js";
 import { matchVoiceCommand } from "./voice-commands.js";
 import { generateReflection } from "./reflect.js";
@@ -32,6 +33,7 @@ interface ASRSession {
   audioChunks: Buffer[];
   saveAudio: boolean;
   startTime: number;
+  forceCommand?: boolean;  // 上滑手势触发，跳过 AI 分类直接走 Agent
 }
 
 const sessions = new Map<string, ASRSession>();
@@ -88,14 +90,20 @@ export async function startASR(
     return;
   }
 
+  // 查询用户的 DashScope 热词 ID（用户维度，跨设备共享）
+  const vocabularyId = await getVocabularyIdForDevice(deviceId);
+
   // Realtime mode: spawn Python streaming ASR process
+  const spawnEnv: Record<string, string> = {
+    ...process.env as Record<string, string>,
+    DASHSCOPE_API_KEY: apiKey,
+    ASR_MODEL: process.env.ASR_MODEL || "fun-asr-realtime",
+    PYTHONIOENCODING: "utf-8",
+  };
+  if (vocabularyId) spawnEnv.ASR_VOCABULARY_ID = vocabularyId;
+
   const py = spawn(PYTHON, [ASR_REALTIME_SCRIPT], {
-    env: {
-      ...process.env,
-      DASHSCOPE_API_KEY: apiKey,
-      ASR_MODEL: process.env.ASR_MODEL || "fun-asr-realtime",
-      PYTHONIOENCODING: "utf-8",
-    },
+    env: spawnEnv,
     stdio: ["pipe", "pipe", "pipe"],
   });
   
@@ -103,6 +111,19 @@ export async function startASR(
   console.log(`[asr] Spawned Python process (PID: ${py.pid}) for device ${deviceId}, task ${taskId}`);
   
   session.pythonProcess = py;
+
+  // Flush any audio chunks that arrived while we were awaiting vocabularyId
+  if (session.audioChunks.length > 0) {
+    console.log(`[asr] Flushing ${session.audioChunks.length} buffered chunks to Python`);
+    for (const buffered of session.audioChunks) {
+      try {
+        py.stdin.write(buffered);
+      } catch {
+        // Python stdin not ready yet — will be picked up on next chunk
+        break;
+      }
+    }
+  }
 
   // Read JSON lines from Python stdout
   const rl = createInterface({ input: py.stdout });
@@ -241,6 +262,9 @@ export function sendAudioChunk(deviceId: string, chunk: Buffer, sourceWs?: WsWeb
     return;
   }
 
+  // Always accumulate audio (for flush-on-ready + potential playback)
+  session.audioChunks.push(Buffer.from(chunk));
+
   // Realtime mode: forward to Python process stdin
   if (session.pythonProcess?.stdin?.writable) {
     try {
@@ -252,12 +276,8 @@ export function sendAudioChunk(deviceId: string, chunk: Buffer, sourceWs?: WsWeb
     } catch (err) {
       console.error(`[asr] Write exception to Python (PID: ${session.pythonProcess?.pid}):`, err);
     }
-  } else {
-    console.warn(`[asr] Python stdin not writable for device ${deviceId}`);
   }
-
-  // Always accumulate audio for potential playback
-  session.audioChunks.push(Buffer.from(chunk));
+  // If pythonProcess not ready yet, chunk is buffered in audioChunks and will be flushed when process spawns
 }
 
 /**
@@ -269,12 +289,14 @@ export async function stopASR(
   clientWs: WsWebSocket,
   deviceId: string,
   saveAudio?: boolean,
+  forceCommand?: boolean,
 ): Promise<void> {
   const session = sessions.get(deviceId);
   if (!session) return;
   if (session.ownerWs !== clientWs) return;
 
   if (saveAudio) session.saveAudio = true;
+  if (forceCommand) session.forceCommand = true;
 
   if (session.mode === "upload") {
     finishUploadASR(clientWs, deviceId, session.taskId).catch((err) => {
@@ -375,7 +397,10 @@ async function finishUploadASR(
   console.log(`[asr] Upload mode: transcribing ${wavBuffer.length} bytes WAV for device ${deviceId}`);
 
   // Transcribe via Python SDK
-  const transcript = await transcribeAudioFile(wavBuffer);
+  // 查询用户的 DashScope 热词 ID（用户维度，跨设备共享）
+  const uploadVocabId = await getVocabularyIdForDevice(session.deviceId);
+
+  const transcript = await transcribeAudioFile(wavBuffer, uploadVocabId);
 
   if (!transcript.trim()) {
     sendToClient(clientWs, {
@@ -457,6 +482,7 @@ async function createRecordAndProcess(
     userId: session.userId,
     recordId: record.id,
     notebook: session.notebook,
+    forceCommand: session.forceCommand,
   })
     .then(async (result) => {
       console.log(`[asr] Process result for ${record.id}: ${JSON.stringify(result)}`);
@@ -531,18 +557,21 @@ function pcmToWav(chunks: Buffer[]): Buffer {
  * Transcribe a WAV audio buffer via Python DashScope SDK subprocess.
  * Pipes WAV data to stdin, reads JSON result from stdout.
  */
-async function transcribeAudioFile(wavBuffer: Buffer): Promise<string> {
+async function transcribeAudioFile(wavBuffer: Buffer, vocabularyId?: string): Promise<string> {
   const apiKey = process.env.DASHSCOPE_API_KEY;
   if (!apiKey) throw new Error("Missing DASHSCOPE_API_KEY");
 
   return new Promise((resolve, reject) => {
+    const uploadEnv: Record<string, string> = {
+      ...process.env as Record<string, string>,
+      DASHSCOPE_API_KEY: apiKey,
+      ASR_MODEL: process.env.ASR_MODEL || "fun-asr-realtime",
+      PYTHONIOENCODING: "utf-8",
+    };
+    if (vocabularyId) uploadEnv.ASR_VOCABULARY_ID = vocabularyId;
+
     const py = spawn(PYTHON, [ASR_UPLOAD_SCRIPT], {
-      env: {
-        ...process.env,
-        DASHSCOPE_API_KEY: apiKey,
-        ASR_MODEL: process.env.ASR_MODEL || "fun-asr-realtime",
-        PYTHONIOENCODING: "utf-8",
-      },
+      env: uploadEnv,
       stdio: ["pipe", "pipe", "pipe"],
     });
 

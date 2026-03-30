@@ -29,7 +29,12 @@ export function buildTieredContext(opts: ContextBuildOptions): ContextTier {
   hot.push(agentMdCore);
 
   if (opts.mode === "chat") {
-    hot.push(`\n## 任务\n你正在与用户进行复盘对话。基于记忆和用户画像，帮助用户回顾和总结。自然地对话，按需提出问题和洞察。`);
+    hot.push(`\n## 任务\n你正在与用户进行复盘对话。基于记忆和用户画像，帮助用户回顾和总结。自然地对话，按需提出问题和洞察。
+
+## 工具使用规则
+- 删除类操作（delete_todo、delete_record）：**必须先用文字告知用户将要删除的内容，等用户明确回复"确认/好的/对"后才调用工具**。绝不能在用户第一句话就直接调用删除工具。
+- 创建目标（create_goal）、创建项目（create_project）：先描述方案，等用户同意后再调用。
+- 其他工具（search、create_todo、update_todo）：可以直接调用，无需确认。`);
   }
 
   // ── WARM TIER: task-specific ──

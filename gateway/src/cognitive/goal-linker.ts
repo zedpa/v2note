@@ -121,12 +121,28 @@ export async function createActionEvent(event: {
     [event.todo_id, event.type, event.reason ?? null],
   );
 
-  // 跳过事件：更新 skip_count
+  // 跳过事件：更新 skip_count，达 3 次触发目标状态转换
   if (event.type === "skip") {
-    await execute(
-      `UPDATE todo SET skip_count = skip_count + 1 WHERE id = $1`,
+    const rows = await query<{ skip_count: string; goal_id: string | null }>(
+      `UPDATE todo SET skip_count = skip_count + 1 WHERE id = $1
+       RETURNING skip_count::text, goal_id`,
       [event.todo_id],
     );
+    const row = rows[0];
+    if (row && Number(row.skip_count) >= 3 && row.goal_id) {
+      await updateGoalStatus(row.goal_id, "todo_skipped_3");
+    }
+  }
+
+  // 完成事件：触发目标状态转换（active→progressing）
+  if (event.type === "complete") {
+    const rows = await query<{ goal_id: string | null }>(
+      `SELECT goal_id FROM todo WHERE id = $1`,
+      [event.todo_id],
+    );
+    if (rows[0]?.goal_id) {
+      await updateGoalStatus(rows[0].goal_id, "todo_completed");
+    }
   }
 }
 

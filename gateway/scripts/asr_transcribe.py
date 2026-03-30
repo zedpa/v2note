@@ -29,6 +29,7 @@ if not api_key:
 dashscope.api_key = api_key
 
 MODEL = os.environ.get("ASR_MODEL", "fun-asr-realtime")
+VOCABULARY_ID = os.environ.get("ASR_VOCABULARY_ID")  # DashScope 热词表 ID
 
 
 class SimpleCallback(RecognitionCallback):
@@ -76,12 +77,15 @@ def main():
         tmp.close()
 
         callback = SimpleCallback()
-        recognition = Recognition(
+        recognition_kwargs = dict(
             model=MODEL,
             callback=callback,
             format="wav",
             sample_rate=16000,
         )
+        if VOCABULARY_ID:
+            recognition_kwargs["vocabulary_id"] = VOCABULARY_ID
+        recognition = Recognition(**recognition_kwargs)
 
         result = recognition.call(tmp.name, disfluency_removal_enabled=True)
 

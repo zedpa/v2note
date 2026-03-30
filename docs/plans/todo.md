@@ -46,6 +46,121 @@
 
 ---
 
+## 报告生成链路修复（P0 — 2026-03-29 诊断）
+
+> 影响：每日回顾、今日简报、复盘三条链路，用户反馈"经常报错"
+
+### BUG-1: AI JSON 解析无保护 🔴
+- **现象**: 简报/回顾生成失败，直接走 fallback 空数据
+- **根因**: DashScope qwen3 系列经常在 JSON 外包裹 ` ```json ``` ` 或输出思考过程文本，`JSON.parse()` 直接抛异常
+- **位置**: `gateway/src/handlers/daily-loop.ts:257, 560`
+- **修复**: 添加 `cleanJsonResponse()` 工具函数，strip markdown 代码块 + 思考文本后再 parse
+- [x] 实施修复 → `text-utils.ts:safeParseJson()` + `daily-loop.ts:257,560`
+
+### BUG-2: Streak 计算 N+1 查询 🔴
+- **现象**: 简报生成耗时 5-15 秒，容易触发前端/网关超时
+- **根因**: `daily-loop.ts:157-168` 循环最多 30 次，每次一个 `countByDateRange` DB 查询
+- **位置**: `gateway/src/handlers/daily-loop.ts:155-168`
+- **修复**: 改为单条 SQL `SELECT DISTINCT DATE(created_at) ... ORDER BY date DESC LIMIT 30`，一次查出近 30 天有记录的日期，代码数连续天数
+- [x] 实施修复 → `todo.ts:getStreak()` + `daily-loop.ts:155`
+
+### BUG-3: action_tracking 查询用过时 JOIN 模式 🔴
+- **现象**: 手动创建的 todo（record_id=NULL）被静默排除，跳过提醒和结果追踪不完整
+- **根因**: `getSkipAlerts()` / `getResultTrackingPrompts()` / `getActionStats()` 全部 `JOIN record r ON r.id = t.record_id`，但 migration 033 已允许 `record_id = NULL`
+- **位置**: `gateway/src/cognitive/action-tracking.ts:29, 50, 67, 82, 122, 169`
+- **修复**: 改用 `todo.user_id` / `todo.device_id` 直接过滤（migration 034 已添加这两列），移除 `JOIN record`
+- [x] 实施修复 → 签名改为 `opts: { userId?, deviceId? }`，`ownerWhere()` 动态条件
+
+### BUG-4: userId 降级 deviceId 导致认知查询全空 🟡
+- **现象**: 无登录用户的设备，每日回顾中认知收获/目标进度/矛盾提醒永远为空
+- **根因**: `const uid = userId ?? deviceId;` 然后传入 `WHERE user_id = $1`，deviceId 无法匹配 user_id
+- **位置**: `gateway/src/handlers/daily-loop.ts:113, 390, 458, 484`
+- **修复**: 无 userId 时用 `device_id` 字段查询（走 `ByDevice` 系列方法），同时为 `generateCognitiveReport()` / `generateAlerts()` 增加 `ByDevice` 变体
+- [x] 实施修复 → `report.ts` / `alerts.ts` 改为 `opts: { userId?, deviceId? }`, daily-loop 传正确参数
+
+### BUG-5: Goal 查询 N+1 🟡
+- **现象**: 有多个目标时简报生成变慢（每目标额外 1 次 DB 查询）
+- **根因**: `for (const g of activeGoals) { await goalRepo.findWithTodos(g.id) }` 逐个查
+- **位置**: `gateway/src/handlers/daily-loop.ts:120, 465`
+- **修复**: 批量查询 `SELECT * FROM todo WHERE parent_id = ANY($1) AND level = 0`，一次拿回所有目标的子任务
+- [x] 实施修复 → `goal.ts:findTodosByGoalIds()` + daily-loop 晨间/晚间两处替换
+
+### BUG-6: reviews/generate 路由无错误处理 🟡
+- **现象**: 复盘生成 AI 调用失败时返回裸 500 错误，无友好提示
+- **根因**: 路由 handler 无 try-catch，依赖 Router 全局 catch（错误信息暴露内部细节）
+- **位置**: `gateway/src/routes/reviews.ts:18-63`
+- **修复**: 添加 try-catch + 友好错误消息 + AI 失败 fallback
+- [x] 实施修复 → AI 失败返回基本统计 fallback + 外层 catch 返回友好消息
+
+---
+
+## 多模型分层 + 全链路修复（P0 — 2026-03-30 完成）
+
+### 已完成
+
+#### 多模型分层架构（88s → 15.7s，5.6x 提速）
+
+- [x] **`provider.ts` 重写为 6 层模型架构**
+  - `fast`（管道提取）→ qwen-plus，无推理，60s 超时
+  - `agent`（聊天工具调用 + 简单对话）→ qwen-plus，无推理，120s 超时
+  - `chat`（复杂分析对话）→ qwen3.5-plus，推理开启，180s 超时
+  - `report`（简报/复盘）→ qwen3.5-plus，推理开启，180s 超时
+  - `background`（记忆/画像）→ qwen3-max，推理关闭，60s 超时
+  - `vision`（图片理解）→ qwen-vl-max，60s 超时
+- [x] **推理模型 thinking 控制** — `buildProviderOptions()` 通过 `enable_thinking: false` 关闭推理
+  - qwen3.x 推理模型：thinking 占 96-99% tokens，30-60s/调用
+  - 关闭推理后：<2s/调用，适合管道提取场景
+- [x] **22 个调用点迁移至分层 tier**
+  - fast: process, voice-action, digest, todo-projector, time-estimator
+  - report: daily-loop, reflect, reviews, action-panel, batch-analyze, emergence, vocabulary
+  - background: memory, soul, profile, diary, person-profile, todo-handler
+- [x] **环境变量配置** — `.env` 新增 `AI_MODEL_FAST/CHAT/REPORT/BACKGROUND/VISION`
+
+#### Bug 修复
+
+- [x] **todo.updated_at 列缺失（PG 42703）** — Migration `040_todo_updated_at.sql`
+  - 根因：goalRepo 适配层引用 `todo.updated_at`，但该列从未创建
+  - 影响：intend Strike 投影为 goal 时 DB 报错，静默 catch，goal 级待办无法创建
+- [x] **E2E 测试 Digest 超时假阳性** — 测试文本被 VoiceAction 拦截为 action，跳过 Digest
+  - 修复：测试改用日记型文本触发完整 Digest 管道
+- [x] **待办创建后列表不显示** — `voice-action.ts` / `todo-projector.ts` 创建 todo 时缺少 `user_id`/`device_id`
+  - 根因：`findByUser`/`findByDevice` 查询依赖 `todo.user_id`/`todo.device_id`，未填写则查不到
+  - 修复：两处 `todoRepo.create()` 均传入 ownership 字段 + Migration `041_backfill_todo_ownership.sql` 回填历史数据
+- [x] **Digest FK 约束违反（strike_user_id_fkey）** — `digest.ts` userId 降级为 deviceId 后写入 strike 表失败
+  - 根因：`strike.user_id` 外键引用 `app_user(id)`，deviceId 不是合法 userId
+  - 修复：`digestRecords()` 增加 userId 查找链（record.user_id → device.user_id → skip）
+- [x] **ASR 初始音频丢失** — Python 进程 spawn 前的音频 chunk 被静默丢弃
+  - 根因：`startASR` await `getVocabularyIdForDevice()` 期间 `pythonProcess=null`，chunk 不写入 stdin
+  - 修复：chunk 先累积到 buffer，Python spawn 后立即 flush 全部缓冲 chunk
+- [x] **工具调用消息格式修复（AI SDK v6 schema 不匹配）** — 工具虽执行但结果无法回传给模型
+  - 根因1：assistant tool-call 内容用 `args` 字段，AI SDK v6 要求 `input` → OpenAI provider `JSON.stringify(part.input)` 得到 `undefined`
+  - 根因2：tool result 内容用 `result: string`，AI SDK v6 要求 `output: { type: "text", value: string }`
+  - 修复：`provider.ts` 两处字段名修正，工具调用 2-step 流程完全打通
+- [x] **fullStream 事件字段兼容** — `tool-input-start` 的 `id` vs `toolCallId`、`tool-input-delta` 的 `delta` vs `inputTextDelta`
+  - 修复：所有事件字段改为 fallback 模式 `p.toolCallId ?? p.id`、`p.inputTextDelta ?? p.delta`
+- [x] **聊天复杂度路由** — 简单指令走 agent 层（qwen-plus），复杂分析走 chat 层（qwen3.5-plus 推理）
+  - `chat.ts`：关键词分类器（COMPLEX_PATTERNS / SIMPLE_PATTERNS），无额外 AI 调用
+  - review/insight/decision 模式强制 chat 层，command 模式按消息分类
+
+### 实测数据对比
+
+| 环节 | 修复前（qwen3.5-plus 推理） | 修复后（多模型分层） | 提速 |
+|------|---------------------------|---------------------|------|
+| Record 创建 | 205ms | 230ms | — |
+| Process | **30,900ms** | **2,092ms** | **15x** |
+| Digest（Strike 分解）| **57,109ms**（或失败） | **13,110ms** | **4x** |
+| Todo 投影 | 失败（updated_at 缺失）| **90ms** | **修复** |
+| **总计** | **88,364ms** | **15,704ms** | **5.6x** |
+
+### Digest 仍偏慢（13s）的分析
+
+Digest 使用 fast 层（qwen-plus），但 13s 仍然偏慢。可能原因：
+- DashScope qwen-plus 冷启动/排队延迟
+- prompt 较长（digest-prompt 含完整 Strike 分解指令）
+- 可选优化：合并 Process + Digest 为单次调用
+
+---
+
 ## 4/1 上线前（P0）
 
 ### Agent 交互能力补全
@@ -54,24 +169,36 @@
 - [ ] 新增工具：`create_project_plan` — 创建项目 + 自动拆解为目标/子任务路径
 - [ ] 新增工具：`query_todos` — 查询待办列表（按状态/日期/目标筛选）
 - [ ] 新增工具：`query_goals` — 查询目标进度（含子任务完成率）
-- [ ] 确认所有现有工具 execute 参数正确传入（inputSchema 修复后端到端验证）
+- [x] 确认所有现有工具 execute 参数正确传入（inputSchema + args→input + result→output 修复，端到端验证通过）
 
-### 录音处理性能
-- [ ] Voice Action 分类改规则预筛（关键词/正则匹配祈使句，只命中时走 AI）
-- [ ] 评估合并 cleanup 到 digest（Process 阶段去掉 AI 调用，用户等待 = 纯 ASR）
+### 录音处理进一步优化
+- [ ] 合并 Process + Digest 为单次 AI 调用（消除串行 2 次调用，预期 15s → 5-8s）
+- [ ] VoiceAction 分类完全改为规则（消除 `classifyVoiceIntent` AI 调用）
 
 ### 数据完整性
 - [ ] 执行 Migration `029_cognitive_snapshot.sql`（cognitive_snapshot 表）
 - [ ] 执行 Migration `030_strike_source_cascade.sql`（strike 外键修复）
-- [ ] 端到端测试：录音 → Process → Digest → Strike → Tier2 batch-analyze
+- [x] 端到端测试：录音 → Process → Digest → Strike → Todo 投影（E2E 通过）
+- [x] Migration `040_todo_updated_at.sql`（goalRepo 适配层依赖）
+- [x] Migration `041_backfill_todo_ownership.sql`（回填历史孤儿 todo）
 
 ### 前端体验
 - [ ] 工具执行结果 Toast 反馈（"已创建待办：xxx"、"已更新时间：xxx"）
 - [ ] 首屏加载优化：skeleton screen 替代 loading spinner
 
+### 录音链路可靠性
+- [x] ASR 初始 chunk 缓冲 + Python spawn 后 flush（修复首段音频丢失）
+- [x] Digest userId 查找链（record → device → skip，修复 FK 违反）
+- [ ] ASR session 竞态：用户快速重录时 close 事件可能被忽略（需验证修复效果）
+- [ ] 前端录音→日记生成验证（gateway 侧已修复，需用户端重测）
+
 ---
 
 ## Beta 后（P1 — 4月中旬）
+
+### 并发基础设施
+- [ ] **AI 调用队列** — `provider.ts` 加 p-limit 信号量（max=20），避免 DashScope 429
+- [ ] **DB 连接池扩容** — `pool.ts` max 10→30，idleTimeoutMillis 30s→10s
 
 ### 记忆系统
 - [ ] 记忆合并任务：每周扫描语义相似记忆，合并低重要性条目
@@ -83,24 +210,31 @@
 - [ ] 工具执行结果 UI 卡片（待办卡片、目标卡片、项目看板缩略图）
 - [ ] confirm 类工具的用户确认流程（底部弹窗："确定删除这条记录？"）
 - [ ] 工具调用链：AI 自动规划多步操作（"创建项目 → 拆解目标 → 排期"一气呵成）
-- [ ] 评估 Mastra 框架（原生 DashScope 支持 + 自控 agent loop）
 
 ### 认知引擎
 - [ ] Tier2 端到端验证（真实数据 batch-analyze 效果）
 - [ ] 认知报告 UI（每周/月维度的认知变化可视化）
 - [ ] cluster 演化追踪（增长/萎缩/分裂/合并时间线）
 
-### 录音体验
-- [ ] Process + Digest 合并为单次 AI 调用（消除 2-5s 清理延迟）
-- [ ] ASR 断句优化（长录音分段处理，实时显示）
+### DB 优化
+- [ ] **Strike 批量写入** — `createBatch(strikes[])` + `ON CONFLICT DO NOTHING`
+- [ ] **Todo findPendingByUser 修复** — `JOIN record` 改为 `WHERE user_id = $1`
+- [ ] **索引补全**
+  - `CREATE INDEX idx_strike_source_nucleus ON strike(source_id, nucleus)`
+  - `CREATE INDEX idx_todo_user_status ON todo(user_id, status)`
+  - `CREATE INDEX idx_todo_device_status ON todo(device_id, status)`
 
 ---
 
 ## 长期（P2 — 5月+）
 
+### 200+ 并发架构
+- [ ] **Worker 分离** — Digest/Tier2 从 WebSocket 进程分离为独立 worker（BullMQ 队列）
+- [ ] **背压控制** — `processEntry` 入口加 admission control（202 Accepted + 轮询）
+- [ ] **DB 连接池分级** — 读写分离（只读走 replica，写入走 primary）
+
 ### 平台扩展
 - [ ] AI SDK 升级：关注 `maxSteps`/`stopWhen` 对 DashScope 的兼容性修复
-- [ ] 多模型支持：关键操作用 qwen-max，轻量操作用 qwen-turbo（成本优化）
 - [ ] Electron 桌面端适配
 
 ### 数据规模

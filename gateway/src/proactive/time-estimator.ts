@@ -35,7 +35,7 @@ export async function estimateTodoTime(
         { role: "system", content: prompt },
         { role: "user", content: todoText },
       ],
-      { json: true, temperature: 0.3 },
+      { json: true, temperature: 0.3, tier: "fast" },
     );
 
     const parsed = JSON.parse(response.content);
@@ -107,7 +107,7 @@ ${context?.soul ? `\n用户画像：${context.soul}` : ""}${goalContext}
         },
         { role: "user", content: todoList },
       ],
-      { json: true, temperature: 0.3 },
+      { json: true, temperature: 0.3, tier: "fast" },
     );
 
     const parsed = JSON.parse(response.content);

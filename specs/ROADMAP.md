@@ -2,7 +2,7 @@
 
 > 基于产品设计 + 代码审计 + 架构缺口分析 + Agent 能力规划 + 认知引擎 v2 重构。
 > 每个场景对应一个 `specs/` 文件，按 Given/When/Then 格式。
-> 最近更新: 2026-03-29 — 认知结构修复（统一模型+聚类重跑+前端分组）
+> 最近更新: 2026-03-29 — 全量spec审计（修正14个虚假完成标记）+ 核心链路减法
 
 ## 全景链路
 
@@ -46,69 +46,53 @@ Phase 0: 认知引擎 v2 重构（Week 0-1）⚡最高优先
     top-level-dimensions  → 层级结构改为 prompt 指令（概念保留）
 
 Phase 1: 数据质量 + 快速感知（v1 已完成，v2 部分重构）
-  source-type-weight      ✅→🔄 v1实现完成，v2中 material 降权移入 Tier2 prompt
+  source-type-weight      ⚠️ retrieval降权✅，clustering未过滤material（PDF可能污染聚类）
   cold-start-bonds        ✅→🔄 v1实现完成，v2中冷启动关联由 Tier2 一次性产出
-  cluster-tag-sync        ✅→🔄 v1实现完成，v2中标签反写并入 Tier2 输出
+  cluster-tag-sync        🔴 tag-sync.ts不存在，batch-analyze未包含tag回写逻辑
 
-Phase 2: 冷启动 + 报告通路（不变）
-  cold-start-onboarding   ✅ 冷启动 5 问（升级现有 3 问）
+Phase 2: 冷启动 + 报告通路
+  cold-start-onboarding   ⚠️ 5问流程在，Q2→维度生成未接入（onboarding不调用generateTopLevelDimensions）
   cognitive-report        ✅ 认知报告 + 每日回顾数据源
 
-Phase 2.5: Agent 基础能力（不变）
-  agent-tool-layer        ✅ 工具层重构——整合13个工具 + 原生function calling + 自主度分级
-  agent-plan              ✅ Plan机制——多步编排 + 持久化 + 状态机 + 确认协议
+Phase 2.5: Agent 基础能力
+  agent-tool-layer        ✅ 工具层重构——整合13+2个工具 + 原生function calling + 自主度分级
+  agent-plan              ⚠️ 后端完成（plan-repo/executor），前端plan-card+chat状态机缺失
   agent-web-tools         ✅ 联网工具——搜索 + URL抓取 + Ingest管道对接
 
 Phase 3: 结构能力（v1 已完成，v2 重构替代）
-  top-level-dimensions    ✅→🔄 v1实现完成，v2中层级概念保留，实现改为 prompt 指令
-  emergence-chain         ✅→🔄 v1实现完成，v2中整体替换为 Tier2 批量分析
+  top-level-dimensions    ⚠️ top-level.ts存在但孤立，未接入onboarding和daily-cycle
+  emergence-chain         ⚠️ 仅L1 cluster完成，L2/L3涌现逻辑完全缺失
 
-Phase 4: 认知→行动闭环（不变）
+Phase 4: 认知→行动闭环
   todo-strike-bridge      ✅ 数据桥梁——todo.strike_id + goal.cluster_id 统一模型
-  smart-todo              ✅ 智能待办——自然语言全生命周期管理（核心体验）
-  goal-lifecycle          ✅ 目标全生命周期——前端+关联+追踪+涌现+状态流转
+  smart-todo              ⚠️ 核心提取✅，创建待办后无自然语言反馈（静默创建）
+  goal-lifecycle          ⚠️ 核心CRUD✅，Skip→alert和7天result追踪不完整
   voice-action            ✅ 语音指令自动识别——统一入口，AI判断记录/指令/混合
 
   ※ 架构决策：todo/goal 不再是独立实体，而是 Strike/Cluster 的行动投影
   ※ goal-lifecycle 涌现入口从 v1 的 checkIntendEmergence → v2 的 Tier2 goal_suggestions 输出
 
-Phase 5: 深度体验（不变）
+Phase 5: 深度体验
   advisor-context         ✅ 参谋上下文合并
-  reader                  ✅ 阅读器
-  annotation              ✅ 批注系统
+  reader                  🔴 仅reader-utils.ts工具函数，UI组件从未实现
+  annotation              🔴 前端UI组件从未创建（features/reader/components/为空）
   agent-self-evolution    ✅ Agent自适应——交互偏好学习 + Soul守护
 
 Phase 7: 前端重构（功能骨架 ~85% 完成，视觉对齐未开始）
-
-  Phase 7 内部依赖：
-  design-visual-alignment ──→ app-mobile-redesign（视觉层）
-       (基础设施)                    ↑
-                              topic-lifecycle ──→ 发现页 + 侧边栏方向区
-                              ai-companion-window ──→ AI Window 三态
 
   design-visual-alignment ✅ 设计语言落地——字体/No-Line/间距/Glass/阴影/spring/粒子/欢迎页/卡片流/极性图
   app-mobile-redesign     🔄 移动端重构——功能骨架+视觉 ~60% 完成（2026-03-28 审计+实施）
   mobile-action-panel     ✅ 行动面板完善——Tinder滑动+露出标签+跳过原因+目标指示器+spring物理
   topic-lifecycle         🔄 主题生命周期——11/12场景完成，仅余场景6(收获追问)+12(冷启动种子)依赖proactive/onboarding
-  ai-companion-window     🔄 AI伴侣窗口——~15/20场景完成（三态+状态机+工具可视化+输入栏+心情注入+闲聊生成），余语言切换+深度思考后端+多模态上传
-  domain-vocabulary       🟡 领域词库——冷启动领域选择+专业名词RAG+语音修正
+  ai-companion-window     ⏸ 暂缓——路路头像/AiWindow 已从前端完整删除（2026-03-29）
+  domain-vocabulary       ✅ 领域词库——冷启动领域选择+DashScope同步+自动收录+AI生成
 
-  ※ design-visual-alignment 是纯前端工作，不阻塞后端，应最先启动
   ※ topic-lifecycle 后端数据源从 v1 graph 算法 → v2 Tier2 批量分析输出
-  ※ ai-companion-window 前端已有雏形（features/ai-bubble/ai-window.tsx 54行），需升级为三态状态机
-  ※ app-mobile-redesign 功能缺口: 发现页(依赖topic-lifecycle)、AI Window(依赖ai-companion-window)
-  ※ 其余前端 spec 不受认知引擎重构影响
+  ※ app-mobile-redesign 功能缺口: 发现页入口已隐藏（依赖 topic-lifecycle 稳定后恢复）
 
 Phase 7.5: 前后端闲置修复（2026-03-28 审计发现）
 
-  Phase 7.5 内部依赖：
-  discovery-page ──依赖──→ topic-lifecycle（后端 /topics API）
-  daily-review-redesign ──依赖──→ daily-loop（后端 briefing/summary API）
-  todo-subtask ──依赖──→ smart-todo（todo 基础模型）
-  auth-session ──无依赖──→ 独立实施
-  empty-state-guide ──依赖──→ 各功能页面基本完成
-
-  discovery-page          ✅ 发现页overlay——overlay+筛选pills+卡片+空状态引导
+  discovery-page          ✅ 发现页overlay——代码完成，入口已隐藏（2026-03-29 减法，待 topic-lifecycle 稳定后恢复）
   auth-session            ✅ 登出与会话——后端logout调用+token auto-refresh+前端logout清理
   daily-review-redesign   ✅ 每日回顾重构——卡片横滑+分页点+动态卡片构建
   todo-subtask            ✅ 子任务树（后端+DB）——todo.parent_id+LATERAL子查询+REST API，前端展示待补
@@ -120,52 +104,50 @@ Phase 8: 设计对齐（2026-03-28 全量设计图审计 + 全链路测试发现
   依赖：Phase 7/7.5 基本完成
 
   journal-card-insight    🟡 日记卡片AI分析——展开后显示要点/行动区域+"和路路聊聊这条"按钮
-  cognitive-stats-redesign 🟡 认知统计重构——极性分布图+Top Clusters替换录音/待办趋势图
+  cognitive-stats-redesign ⏸ 认知统计重构——极性分布图+Top Clusters替换录音/待办趋势图（暂缓）
   todo-subtask-ui         🟡 子任务前端UI——Detail Sheet内子任务列表+添加+完成联动
-  discovery-insights      🟡 发现页AI洞察——"路路的发现"趋势卡片区域
+  discovery-insights      ⏸ 发现页AI洞察——入口已隐藏，待核心链路稳定后恢复
   cluster-prompt-tuning   ✅ 聚类prompt调优——Step A纯聚类prompt + qwen3.5-plus + 9 Cluster + 68.7%覆盖率
-  cognitive-structure-repair ✅ 认知结构修复v2——统一task模型 + Goal迁移(345→53) + 聚类重跑(68.7%) + Todo关联(56%) + L3侧边栏 + 前端分组
-  date-format-alignment   🟡 日期格式对齐——"今天·3月28日"替换"28 3月 周六"
-  auth-input-style        🟡 登录注册输入框——下划线式替换填充圆角式
+  cognitive-structure-repair ⚠️ 后端统一task模型✅ + Goal迁移 + 聚类重跑，前端L3导航+Today分组待补
   chat-mic-button         🟡 聊天麦克风按钮——输入栏添加mic图标
   ui-polish               🟡 UI细节打磨——进度条/跳过语义/空状态0·0/侧边栏精简/红点
 
+  ※ date-format-alignment、auth-input-style 已删除（不做）
+  ※ cognitive-stats-redesign 暂缓
   ※ journal-card-insight 是核心体验差距，设计图09的关键区域
-  ※ cognitive-stats-redesign 工作量最大，需重写统计页
-  ※ date-format-alignment + auth-input-style + chat-mic-button 是快速见效项
   ※ ui-polish 合并5个P2小项，可逐个渐进修复
 
-Phase 6: 补充能力（不变）
+Phase 6: 补充能力
   goal-granularity        ✅ 目标粒度
   goal-auto-link          ✅ 目标自动关联
-  goals-scaffold          ✅ 目标前端骨架
+  goals-scaffold          ⚠️ 列表+详情✅，关联日记数+深入讨论按钮未接入
   action-tracking         ✅ 行动追踪
   knowledge-lifecycle     ✅ 知识生命周期（supersede 逻辑并入 Tier2 输出）
   person-profile          ✅ 人物画像系统
   decision-template       ✅ 决策模板涌现
 
-Phase 6+: 增强与扩展
-  harmony-support         🟡 鸿蒙适配
-  external-integration    🟡 外部数据源集成
+Phase 6+: 增强与扩展（暂缓）
+  harmony-support         ⏸ 鸿蒙适配
+  external-integration    ⏸ 外部数据源集成
 ```
 
 ## Spec 统计
 
-| Phase | Spec 数 | 场景数 | 状态 |
-|-------|---------|--------|------|
-| Phase 0 | 2 | 21 | 🔵 开发中 |
-| Phase 1 | 3 | 16 | ✅→🔄 v2重构中 |
-| Phase 2 | 2 | 11 | ✅ |
-| Phase 2.5 | 3 | 30 | ✅ |
-| Phase 3 | 2 | 10 | ✅→🔄 v2重构中 |
-| Phase 4 | 4 | 31 | ✅ |
-| Phase 5 | 4 | 24 | ✅ |
-| Phase 6 | 7 | 40 | ✅ |
-| Phase 7 | 6 | 88 | 🔄 |
-| Phase 7.5 | 5 | 30 | ✅ |
-| Phase 8 | 10 | ~50 | 🔄 2/10完成 |
-| Phase 6+ | 2 | 19 | 🟡 |
-| **总计** | **41** | **342** | |
+| Phase | Spec 数 | 状态 | 审计结果 |
+|-------|---------|------|----------|
+| Phase 0 | 2 | ✅ | cognitive-engine-v2 + snapshot 完成 |
+| Phase 1 | 3 | ⚠️ | source-type-weight部分，cluster-tag-sync🔴未实现 |
+| Phase 2 | 2 | ⚠️ | onboarding Q2→维度生成断裂 |
+| Phase 2.5 | 3 | ⚠️ | agent-plan前端缺失 |
+| Phase 3 | 2 | ⚠️ | top-level孤立，emergence仅L1 |
+| Phase 4 | 4 | ⚠️ | smart-todo静默创建，goal-lifecycle追踪不全 |
+| Phase 5 | 4 | ⚠️ | reader🔴+annotation🔴 UI从未实现 |
+| Phase 6 | 7 | ✅ | goals-scaffold小缺口 |
+| Phase 7 | 6 | 🔄 | companion⏸已删，vocabulary✅ |
+| Phase 7.5 | 5 | ✅ | |
+| Phase 8 | 7 | 🔄 | structure-repair后端✅前端待补 |
+| Phase 6+ | 2 | ⏸ | |
+| **总计** | **49** | | **✅26 ⚠️13 🔴3 💥3 ⏸4** |
 
 ## v2 重构文件变更清单
 
@@ -291,9 +273,50 @@ Phase 6+: 增强与扩展
 
 **本次迭代统计**: 14 文件新建/修改，1 migration，3 repair 脚本
 
+## 2026-03-29 减法记录（核心链路聚焦）
+
+> 原则：非核心链路一律隐藏或删除，保留最小可用集，待产品验证后再恢复。
+
+### 已删除（代码完全移除）
+
+| 功能 | 原位置 | 原因 |
+|------|--------|------|
+| 路路头像 / AiWindow | `features/companion/`, `features/ai-bubble/` | 路由依赖 sprite 资源未就绪，且非核心链路 |
+| PixelDeer 动画系统 | `features/companion/components/pixel-deer.tsx` | 同上 |
+| gateway companion 模块 | `gateway/src/companion/`, `gateway/src/routes/companion.ts` | 前端已删，后端同步清理 |
+| 心情注入（mood section） | `gateway/src/handlers/chat.ts` | 依赖已删的 companion/mood |
+| companion.chat 推送 | `gateway/src/proactive/engine.ts` | 前端无消费者 |
+
+### 已隐藏（代码保留，入口关闭）
+
+| 功能 | 隐藏方式 | 恢复条件 |
+|------|----------|----------|
+| LifeMap 认知图谱 | 从 page.tsx 移除 | 认知引擎 v2 Tier2 数据稳定后 |
+| ClusterDetailView | 从 page.tsx 移除 | 同上 |
+| DecisionWorkspace | 从 page.tsx 移除 | 同上 |
+| DiscoveryOverlay | 侧边栏"发现"入口已删 | topic-lifecycle 全部场景完成后 |
+| StatsDashboard | 从 page.tsx 移除 | 待设计稿确认后 |
+| MemorySoulOverlay | 从 page.tsx 移除 | 内部调试用，不面向用户 |
+| SkillsPage | 从 page.tsx 移除 | 内部功能 |
+| TodayGantt | 从 page.tsx 移除 | 待甘特图 UX 验证后 |
+
+### 当前核心链路（保留）
+
+```
+录音/文字输入 (FAB)
+  → ASR → Digest → Strike
+  → 日记时间线 (NotesTimeline)
+  → 待办 (TodoWorkspaceView)
+
+AI 对话 (ChatView)  ← 路路的聊天，无头像
+搜索 (SearchView)
+晨间简报 / 晚间总结
+目标管理 (GoalList / GoalDetail)
+侧边栏：今日 / 我的世界（维度+目标）/ 每日回顾 / 设置
+```
+
 ## 剩余（需用户配合）
 
-- 像素小鹿 sprite sheet（等用户制作，代码已降级为 emoji）
 - 多语言 ASR（暂缓）
 
 ## 剩余（后续迭代）
@@ -306,8 +329,28 @@ Phase 6+: 增强与扩展
 - `empty-state-guide.md` — ✅ 空状态引导
 
 ### 其他剩余
-- domain-vocabulary: 修正高亮UI + 自动收录 + AI生成词库
-- ai-companion-window: 语言切换 + 多模态上传
-- topic-lifecycle: 冷启动种子数据
+- ai-companion-window: ⏸ 代码已全部删除，spec仅作未来参考
+- topic-lifecycle: 冷启动种子数据（场景6+12）
 - `external-integration.md` — 🟡 概念级设计阶段
 - `harmony-support.md` — ⏸ 暂缓
+
+## 2026-03-29 全量审计：依赖断裂清单
+
+| 断裂链路 | 影响 | 修复优先级 |
+|----------|------|-----------|
+| onboarding → top-level-dimensions | 冷启动后侧边栏维度永远为空 | P1 |
+| batch-analyze → cluster-tag-sync | 聚类结果不反映在时间线标签上 | P1 |
+| batch-analyze → L2/L3 emergence | 三层涌现架构仅L1实现，L2/L3缺失 | P2（L1够用） |
+| app-mobile-redesign → ai-companion-window | redesign spec引用AI Window但companion已删 | P0（已清理） |
+| agent-plan → chat前端 | plan-executor后端在，plan-card前端不存在 | P2 |
+| cognitive-structure-repair → 前端L3 | 统一task模型后端完成，前端导航+分组待补 | P1 |
+| smart-todo → 用户反馈 | 待办静默创建，缺少自然语言确认消息 | P1 |
+| reader/annotation → 前端UI | spec标✅但组件从未创建 | P2（非核心链路） |
+
+### 虚假完成修正记录（2026-03-29）
+
+已修正14个spec的状态标记：
+- ✅→⏸：ai-companion-window（代码已删）
+- ✅→🔴：annotation、reader（UI从未创建）、cluster-tag-sync（实现不存在）
+- ✅→⚠️：emergence-chain、cold-start-onboarding、top-level-dimensions、source-type-weight、smart-todo、goal-lifecycle、goals-scaffold、agent-plan、cognitive-structure-repair
+- 🟡→⚠️：voice-tools-v2（核心已实现）

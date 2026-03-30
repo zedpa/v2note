@@ -41,7 +41,7 @@ export function registerActionPanelRoutes(router: Router) {
     }
     const url = new URL(req.url ?? "", "http://localhost");
     const days = parseInt(url.searchParams.get("days") ?? "14", 10);
-    const stats = await getActionStats(userId, days);
+    const stats = await getActionStats({ userId }, days);
     sendJson(res, stats);
   });
 
@@ -52,7 +52,7 @@ export function registerActionPanelRoutes(router: Router) {
       sendError(res, "Unauthorized", 401);
       return;
     }
-    const alerts = await getSkipAlerts(userId);
+    const alerts = await getSkipAlerts({ userId });
     sendJson(res, alerts);
   });
 
@@ -70,7 +70,7 @@ export function registerActionPanelRoutes(router: Router) {
         { role: "system", content: prompt },
         { role: "user", content: question },
       ],
-      { temperature: 0.7 },
+      { temperature: 0.7, tier: "report" },
     );
     sendJson(res, { content: response.content });
   });

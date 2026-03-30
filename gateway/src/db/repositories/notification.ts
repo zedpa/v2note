@@ -43,11 +43,20 @@ export async function findByUser(userId: string, limit = 50): Promise<Notificati
   );
 }
 
-/** 查询未读数量 */
+/** 查询未读数量（按设备） */
 export async function countUnread(deviceId: string): Promise<number> {
   const row = await queryOne<{ cnt: string }>(
     `SELECT COUNT(*) as cnt FROM notification WHERE device_id = $1 AND read = false`,
     [deviceId],
+  );
+  return parseInt(row?.cnt ?? "0", 10);
+}
+
+/** 查询未读数量（按用户，跨设备） */
+export async function countUnreadByUser(userId: string): Promise<number> {
+  const row = await queryOne<{ cnt: string }>(
+    `SELECT COUNT(*) as cnt FROM notification WHERE user_id = $1 AND read = false`,
+    [userId],
   );
   return parseInt(row?.cnt ?? "0", 10);
 }
@@ -81,5 +90,13 @@ export async function markAllRead(deviceId: string): Promise<void> {
   await execute(
     `UPDATE notification SET read = true WHERE device_id = $1 AND read = false`,
     [deviceId],
+  );
+}
+
+/** 标记用户所有通知已读（跨设备） */
+export async function markAllReadByUser(userId: string): Promise<void> {
+  await execute(
+    `UPDATE notification SET read = true WHERE user_id = $1 AND read = false`,
+    [userId],
   );
 }

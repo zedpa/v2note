@@ -8,27 +8,17 @@ import { WorkspaceHeader, type WorkspaceTab, type TopicFilter, type DimensionFil
 import { NotesTimeline } from "@/features/notes/components/notes-timeline";
 import { TodoWorkspaceView } from "@/features/workspace/components/todo-workspace-view";
 import { TopicLifecycleView } from "@/features/workspace/components/topic-lifecycle-view";
-import { AiWindow } from "@/features/companion/components/ai-window";
 import { FAB } from "@/features/recording/components/fab";
 import { SidebarDrawer } from "@/features/sidebar/components/sidebar-drawer";
 import { SearchView } from "@/features/search/components/search-view";
 import { ChatView } from "@/features/chat/components/chat-view";
 import { OfflineBanner } from "@/shared/components/offline-banner";
-import { StatsDashboard } from "@/features/sidebar/components/stats-dashboard";
-import { MemorySoulOverlay } from "@/features/memory/components/memory-soul-overlay";
 import { ReviewOverlay } from "@/features/reviews/components/review-overlay";
-import { TodoPanel } from "@/features/todos/components/todo-panel";
-import { TodayGantt } from "@/features/todos/components/today-gantt";
 import { ProfileEditor } from "@/features/profile/components/profile-editor";
 import { SettingsEditor } from "@/features/settings/components/settings-editor";
-import { SkillsPage } from "@/features/skills/components/skills-page";
 import { NotebookList } from "@/features/diary/components/notebook-list";
 import { MorningBriefing } from "@/features/daily/components/morning-briefing";
 import { EveningSummary } from "@/features/daily/components/evening-summary";
-import { LifeMap } from "@/features/cognitive/components/life-map";
-import { ClusterDetailView } from "@/features/cognitive/components/cluster-detail";
-import { DecisionWorkspace } from "@/features/cognitive/components/decision-workspace";
-import { DiscoveryOverlay } from "@/features/workspace/components/discovery-overlay";
 import { OnboardingSeed } from "@/features/cognitive/components/onboarding-seed";
 import { GoalDetailOverlay } from "@/features/goals/components/goal-detail-overlay";
 import { ProjectDetailOverlay } from "@/features/goals/components/project-detail-overlay";
@@ -49,12 +39,7 @@ import { AnimatePresence, motion } from "framer-motion";
 type OverlayName =
   | "search"
   | "chat"
-  | "stats"
-  | "memory"
   | "review"
-  | "skills"
-  | "todos"
-  | "today-todo"
   | "profile"
   | "settings"
   | "notebooks"
@@ -64,7 +49,6 @@ type OverlayName =
   | "goal-detail"
   | "project-detail"
   | "notifications"
-  | "discovery"
   | null;
 
 export default function Page() {
@@ -74,9 +58,6 @@ export default function Page() {
   const { update, dismiss, applying } = useUpdateCheck();
   const [authMode, setAuthMode] = useState<"login" | "register">("login");
   const [showSidebar, setShowSidebar] = useState(false);
-  const [cognitiveMapOpen, setCognitiveMapOpen] = useState(false);
-  const [selectedClusterId, setSelectedClusterId] = useState<string | null>(null);
-  const [decisionQuestion, setDecisionQuestion] = useState<string | null>(null);
   const [activeOverlay, setActiveOverlay] = useState<OverlayName>(null);
   const [chatDateRange, setChatDateRange] = useState<{
     start: string;
@@ -226,7 +207,6 @@ export default function Page() {
         setActiveOverlay(null);
         break;
       case "cognitive_alert":
-        setCognitiveMapOpen(true);
         setActiveOverlay(null);
         break;
     }
@@ -318,16 +298,11 @@ export default function Page() {
       <SidebarDrawer
         open={showSidebar}
         onClose={() => setShowSidebar(false)}
-        onViewStats={() => setActiveOverlay("stats")}
-        onViewMemory={() => setActiveOverlay("memory")}
         onViewProfile={() => setActiveOverlay("profile")}
         onViewBriefing={() => setActiveOverlay("morning-briefing")}
         onViewSettings={() => setActiveOverlay("settings")}
-        onViewSkills={() => setActiveOverlay("skills")}
-        onViewReview={() => setActiveOverlay("review")}
         onViewEvening={() => setActiveOverlay("evening-summary")}
         onViewSearch={() => setActiveOverlay("search")}
-        onViewDiscovery={() => setActiveOverlay("discovery")}
         onViewGoal={(goalId) => {
           setSelectedGoalId(goalId);
           setActiveOverlay("goal-detail");
@@ -367,12 +342,6 @@ export default function Page() {
         onClearTopicFilter={() => setTopicFilter(null)}
         dimensionFilter={dimensionFilter}
         onClearDimensionFilter={() => setDimensionFilter(null)}
-      />
-
-      {/* AI 伴侣窗口 — 常驻 header 下方 (spec ai-companion-window 场景 2.1) */}
-      <AiWindow
-        onOpenChat={handleOpenCommandChat}
-        onOpenOverlay={openOverlay}
       />
 
       {/* 工作区内容: 日记 or 待办 (swipeable) — 保持双 tab 挂载避免切换重载 */}
@@ -424,38 +393,6 @@ export default function Page() {
         }}
       />
 
-      {/* Cognitive Map (Level 0) */}
-      <LifeMap
-        isOpen={cognitiveMapOpen}
-        onClose={() => setCognitiveMapOpen(false)}
-        onSelectCluster={(id) => {
-          setSelectedClusterId(id);
-          setCognitiveMapOpen(false);
-        }}
-      />
-
-      {/* Cluster Detail (Level 2) */}
-      {selectedClusterId && (
-        <ClusterDetailView
-          clusterId={selectedClusterId}
-          isOpen={!!selectedClusterId}
-          onClose={() => setSelectedClusterId(null)}
-          onDecision={(q) => {
-            setDecisionQuestion(q);
-            setSelectedClusterId(null);
-          }}
-        />
-      )}
-
-      {/* Decision Workspace */}
-      {decisionQuestion && (
-        <DecisionWorkspace
-          question={decisionQuestion}
-          isOpen={!!decisionQuestion}
-          onClose={() => setDecisionQuestion(null)}
-        />
-      )}
-
       {/* Overlays — AnimatePresence 统一转场，key 由 activeOverlay 驱动 */}
       <AnimatePresence mode="wait">
       {activeOverlay === "search" ? (
@@ -479,20 +416,10 @@ export default function Page() {
             openOverlay,
           }}
         />
-      ) : activeOverlay === "stats" ? (
-        <StatsDashboard key="stats" onClose={closeOverlay} />
-      ) : activeOverlay === "memory" ? (
-        <MemorySoulOverlay key="memory" onClose={closeOverlay} />
       ) : activeOverlay === "review" ? (
         <ReviewOverlay key="review" onClose={closeOverlay} onStartInsight={handleStartInsight} />
-      ) : activeOverlay === "todos" ? (
-        <TodoPanel key="todos" open onClose={closeOverlay} />
-      ) : activeOverlay === "today-todo" ? (
-        <TodayGantt key="today-todo" onClose={closeOverlay} />
       ) : activeOverlay === "profile" ? (
         <ProfileEditor key="profile" onClose={closeOverlay} />
-      ) : activeOverlay === "skills" ? (
-        <SkillsPage key="skills" onClose={closeOverlay} />
       ) : activeOverlay === "settings" ? (
         <SettingsEditor
           key="settings"
@@ -504,7 +431,7 @@ export default function Page() {
           key="notebooks"
           activeNotebook={activeNotebook}
           onClose={closeOverlay}
-          onSelect={(name, color) => {
+          onSelect={(name, _color) => {
             setActiveNotebook(name);
           }}
         />
@@ -546,16 +473,6 @@ export default function Page() {
           onViewGoal={(goalId) => {
             setSelectedGoalId(goalId);
             setActiveOverlay("goal-detail");
-          }}
-        />
-      ) : activeOverlay === "discovery" ? (
-        <DiscoveryOverlay
-          key="discovery"
-          onClose={closeOverlay}
-          onOpenTopic={(clusterId) => {
-            setSelectedClusterId(clusterId);
-            closeOverlay();
-            setCognitiveMapOpen(true);
           }}
         />
       ) : null}

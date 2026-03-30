@@ -38,8 +38,9 @@ export type GatewayMessage =
   | { type: "chat.end"; payload: { deviceId: string } }
   | { type: "todo.aggregate"; payload: { deviceId: string } }
   | { type: "asr.start"; payload: { deviceId: string; locationText?: string; mode?: "realtime" | "upload"; notebook?: string } }
-  | { type: "asr.stop"; payload: { deviceId: string; saveAudio?: boolean } }
-  | { type: "asr.cancel"; payload: { deviceId: string } };
+  | { type: "asr.stop"; payload: { deviceId: string; saveAudio?: boolean; forceCommand?: boolean } }
+  | { type: "asr.cancel"; payload: { deviceId: string } }
+  | { type: "plan.confirm"; payload: { deviceId: string; planId: string; action: "execute_all" | "execute_modified" | "abandon"; modifications?: Array<{ stepIndex: number; description?: string; deleted?: boolean }> } };
 
 export type GatewayResponse =
   | { type: "process.result"; payload: Record<string, unknown> }
@@ -58,10 +59,11 @@ export type GatewayResponse =
   | { type: "proactive.evening_summary"; payload: { text: string } }
   | { type: "reflect.question"; payload: { question: string } }
   | { type: "ai.status"; payload: { text: string } }
-  | { type: "companion.state"; payload: Record<string, unknown> }
-  | { type: "companion.mood"; payload: { mood: string; moodText: string } }
-  | { type: "companion.chat"; payload: { text: string } }
   | { type: "tool.step"; payload: { stepIndex: number; totalSteps: number; toolName: string; status: string; result?: string } }
+  | { type: "plan.proposed"; payload: { planId: string; intent: string; steps: Array<{ index: number; description: string; toolName?: string; needsConfirm?: boolean }> } }
+  | { type: "plan.step_done"; payload: { planId: string; stepIndex: number; status: string; result?: string } }
+  | { type: "plan.done"; payload: { planId: string; status: string } }
+  | { type: "todo.created"; payload: { todoId: string; text: string } }
   | { type: "error"; payload: { message: string } };
 
 type MessageHandler = (msg: GatewayResponse) => void;

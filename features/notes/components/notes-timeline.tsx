@@ -9,7 +9,6 @@ import { useNoteDetail } from "@/features/notes/hooks/use-note-detail";
 import { MiniAudioPlayer } from "./mini-audio-player";
 import { toast } from "sonner";
 import type { NoteItem } from "@/shared/lib/types";
-import { AiWindow } from "@/features/ai-bubble/components/ai-window";
 import { InsightCard } from "./insight-card";
 import { api } from "@/shared/lib/api";
 import { fetchCognitiveStats, type CognitiveStats } from "@/shared/lib/api/cognitive";
@@ -175,7 +174,6 @@ export function NotesTimeline({ filter, notebook, clusterId, domainFilter, onOpe
   return (
     <>
       <div className="px-4 pt-2 pb-28">
-        <AiWindow onOpenChat={onOpenChat} onOpenOverlay={onOpenOverlay} />
         {groups.map((group, groupIdx) => (
           <div key={group.date} className="mb-8">
             {/* Day header — editorial style with serif date */}

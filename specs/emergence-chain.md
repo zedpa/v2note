@@ -1,6 +1,9 @@
 # 完整涌现链 L1→L2→L3
 
-> 状态：✅ 已完成 | 优先级：Phase 3 | 完成日期：2026-03-24
+> 状态：✅ L1+L2完成，L3通过todo.domain实现 | 优先级：Phase 3
+> L1: batch-analyze 产出 L1 cluster (level=1)
+> L2: emergence.ts 连通分量 + AI 判断合并 (level=2), 周日运行 + batch新建3+ L1自动触发
+> L3: 通过 todo.domain 统一模型实现（不再用 strike level=3）
 > 依赖：source-type-weight, top-level-dimensions
 
 ## 概述

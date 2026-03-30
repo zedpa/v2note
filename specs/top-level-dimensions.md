@@ -1,7 +1,9 @@
 # 顶层维度——预设骨架 + 涌现填充
 
-> 状态：✅ 已完成 | 优先级：Phase 3 | 完成日期：2026-03-24
-> 依赖：cold-start-onboarding（种子数据）
+> 状态：✅ 已通过统一模型实现 | 优先级：Phase 3
+> 场景1: onboarding seedDimensionGoals 种子化 todo.domain goals (2026-03-29)
+> 场景2: batch-analyze prompt 已传入 dimensions 列表，AI 自动为 cluster 分配 domain
+> 注: top-level.ts 为旧方案（strike level=3），实际维度改为 todo.domain 管理
 
 ## 概述
 纯涌现导致冷启动期地图空白。方案：冷启动 5 问后用 embedding 相似度（不调 LLM）生成个性化顶层维度（L3 预设 Cluster），后续由涌现逐步填充和调整。

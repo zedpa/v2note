@@ -1,6 +1,7 @@
 # AI 伴侣窗口 — 像素小鹿 + 心情系统 + 工具可视化
 
-> 状态：🔄 实现中 | 优先级：Phase 7.2 | 预计：7-8 天
+> 状态：⏸ 暂缓（2026-03-29 代码已全部删除）| 优先级：Phase 7.2
+> ⚠️ features/companion/、features/ai-bubble/、gateway/src/companion/ 已整体移除，spec 内容仅作未来参考
 > 依赖：app-mobile-redesign（工作区布局），voice-action（语音指令），agent-tool-layer（工具链）
 > 进度 2026-03-28：
 >   ✅ 场景 1.1-1.2 小鹿状态机 + sprite 动画组件 (PixelDeer)

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import {
-  X, Zap, Compass, Target, Settings, LogOut,
+  X, Zap, Target, Settings, LogOut,
   ChevronDown, ChevronRight, TreePine, CalendarDays,
   Briefcase, Home, BookOpen, Heart, Users, Coins, Sparkles,
 } from "lucide-react";
@@ -34,18 +34,13 @@ interface SidebarDrawerProps {
   onViewSearch?: () => void;
   onViewGoal?: (goalId: string) => void;
   onViewGoals?: () => void;
-  onViewDiscovery?: () => void;
   onSelectDimension?: (domain: string) => void;
   onSelectToday?: () => void;
   onLogout?: () => void;
   userName?: string | null;
   userPhone?: string | null;
   activeDimension?: string | null;
-  // 保留但不在设计图中显示的回调
-  onViewStats?: () => void;
-  onViewMemory?: () => void;
   onViewProfile?: () => void;
-  onViewSkills?: () => void;
   onSelectTopic?: (clusterId: string, title: string) => void;
   onOpenChat?: (initialMsg: string) => void;
 }
@@ -60,17 +55,13 @@ export function SidebarDrawer({
   onViewSearch,
   onViewGoal,
   onViewGoals,
-  onViewDiscovery,
   onSelectDimension,
   onSelectToday,
   onLogout,
   userName,
   userPhone,
   activeDimension,
-  onViewStats,
-  onViewMemory,
   onViewProfile,
-  onViewSkills,
   onSelectTopic,
   onOpenChat,
 }: SidebarDrawerProps) {
@@ -152,11 +143,6 @@ export function SidebarDrawer({
                 onClose();
                 onSelectToday?.();
               }}
-            />
-            <SidebarItem
-              icon={<Compass size={18} />}
-              label="发现"
-              onClick={() => { onClose(); onViewDiscovery?.(); }}
             />
           </nav>
 

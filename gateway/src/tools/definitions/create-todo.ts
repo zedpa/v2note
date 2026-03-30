@@ -37,7 +37,13 @@ export const createTodoTool: ToolDefinition = {
       recordId = rec.id;
     }
 
-    const todo = await todoRepo.create({ record_id: recordId, text, done: false });
+    const todo = await todoRepo.create({
+      record_id: recordId,
+      text,
+      done: false,
+      user_id: ctx.userId,
+      device_id: ctx.deviceId,
+    });
 
     // 更新可选的日程字段
     const updates: Record<string, any> = {};

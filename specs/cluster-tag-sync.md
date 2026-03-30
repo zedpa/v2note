@@ -1,6 +1,7 @@
 # Cluster 标签反写日记
 
-> 状态：✅ 已完成 | 优先级：Phase 1 | 完成日期：2026-03-24
+> 状态：✅ 已完成（集成到batch-analyze）| 优先级：Phase 1
+> 2026-03-29 修复：cluster_tags → strike_tag（已有）+ cluster名称 → record_tag 传播（新增）
 
 ## 概述
 Process 的 tags 是硬编码匹配，Digest 的 Cluster 是语义聚类。两套标签不一致，用户在时间线看到的标签和地图上的节点对不上。方案：Cluster 名成为用户可见的标签体系，通过 strike_tag → strike → record 链路反推，不在 record 表加冗余字段。

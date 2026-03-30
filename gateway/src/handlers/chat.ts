@@ -19,7 +19,7 @@ import { shouldUpdateSoulStrict } from "../cognitive/self-evolution.js";
 import { gatherDecisionContext, buildDecisionPrompt } from "../cognitive/decision.js";
 import { generateAlerts } from "../cognitive/alerts.js";
 import { detectCognitiveQuery, loadChatCognitive, buildGoalDiscussionContext, buildInsightDiscussionContext, saveConversationAsRecord } from "../cognitive/advisor-context.js";
-import { computeMood, buildMoodPromptSection } from "../companion/mood.js";
+import type { ModelTier } from "../ai/provider.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const INSIGHTS_DIR = join(__dirname, "../../insights");
@@ -164,25 +164,8 @@ export async function startChat(
     cognitiveContext,
   });
 
-  // 注入路路心情（场景 6.2）
-  let moodSection = "";
-  try {
-    const hour = new Date().getHours();
-    const moodResult = computeMood({
-      completedTodayCount: 0, // 简化：后续可从 todoRepo 查
-      hasNewCluster: false,
-      hasSkippedTodo: false,
-      hoursSinceLastRecord: 0,
-      currentHour: hour,
-      isDigestRunning: false,
-    });
-    moodSection = buildMoodPromptSection(moodResult);
-  } catch { /* non-critical */ }
-
   // Set up session context
-  session.context.setSystemPrompt(
-    moodSection ? `${systemPrompt}\n\n${moodSection}` : systemPrompt,
-  );
+  session.context.setSystemPrompt(systemPrompt);
 
   if (payload.mode === "decision") {
     // Decision mode: deep cognitive graph traversal for decision support
@@ -216,8 +199,11 @@ export async function startChat(
     }
   }
 
-  // Stream initial response with native tool calling
-  return streamWithNativeTools(session, payload.deviceId);
+  // Stream initial response — review/insight/decision 初次回复需要推理，command 走自动分类
+  const initialTier = (payload.mode === "review" || payload.mode === "insight" || payload.mode === "decision")
+    ? "chat" as ModelTier
+    : undefined;
+  return streamWithNativeTools(session, payload.deviceId, initialTier);
 }
 
 /**
@@ -252,15 +238,60 @@ export async function sendChatMessage(
   return streamWithNativeTools(session, deviceId);
 }
 
+// ── 聊天复杂度分类（关键词快筛，无 AI 调用） ────────────────────────
+
+/** 需要深度推理的关键词/模式 */
+const COMPLEX_PATTERNS = [
+  /为什么/, /怎么看/, /如何.*(?:分析|理解|评估|规划|决策|解决)/,
+  /帮我.*(?:分析|梳理|对比|规划|复盘|总结|拆解|评估)/,
+  /(?:优缺点|利弊|权衡|取舍)/,
+  /(?:建议|方案|策略|思路).*(?:给|提|想|出)/,
+  /(?:深入|详细|系统).*(?:分析|思考|讨论|了解)/,
+  /(?:矛盾|冲突|困惑|纠结|犹豫)/,
+  /(?:长期|短期|阶段).*(?:目标|计划|路径)/,
+  /(?:反思|复盘|回顾).*(?:做得|哪里|问题)/,
+];
+
+/** 明确简单的模式（工具调用、简短指令） */
+const SIMPLE_PATTERNS = [
+  /^(?:帮我|请)?(?:创建|新建|添加|记录|搜索|查找|删除|更新|修改|标记|完成)/,
+  /^(?:好的|嗯|知道了|谢谢|明白|ok|收到)/i,
+  /^(?:查一下|搜一下|找一下|看看)/,
+];
+
+/**
+ * 判断用户消息是否需要推理模型。
+ * 返回 "chat"（qwen3.5-plus 推理）或 "agent"（MiniMax 工具调用/简单对话）。
+ */
+function classifyChatTier(text: string): ModelTier {
+  const trimmed = text.trim();
+
+  // 短消息（<30字）且匹配简单模式 → agent
+  if (trimmed.length < 30) {
+    if (SIMPLE_PATTERNS.some(p => p.test(trimmed))) return "agent";
+  }
+
+  // 匹配复杂模式 → chat（推理）
+  if (COMPLEX_PATTERNS.some(p => p.test(trimmed))) return "chat";
+
+  // 长消息（>200字）可能是复杂问题 → chat
+  if (trimmed.length > 200) return "chat";
+
+  // 默认：agent（大多数日常对话不需要推理）
+  return "agent";
+}
+
 /**
  * Stream response using Vercel AI SDK native function calling.
  *
- * Replaces the old manual JSON extraction + 3-round loop.
- * AI SDK handles tool execution automatically via maxSteps.
+ * 根据用户消息复杂度自动选择模型层级：
+ * - 简单指令/工具调用 → fast（无推理，低延迟）
+ * - 分析/决策/复盘 → chat（推理，高质量）
  */
 async function* streamWithNativeTools(
   session: ReturnType<typeof getSession>,
   deviceId: string,
+  tierOverride?: ModelTier,
 ): AsyncGenerator<string, void, undefined> {
   // 构建工具执行上下文
   const toolCtx: ToolContext = {
@@ -272,12 +303,19 @@ async function* streamWithNativeTools(
   // 将注册表导出为 AI SDK tools 格式（绑定执行上下文）
   const aiTools = toolRegistry.toAISDKTools(toolCtx);
 
-  // 使用 AI SDK streamText + tools + maxSteps
-  // AI SDK 自动处理：工具调用 → 执行 → 结果反馈 → 继续生成
+  // 自动选择模型层级
+  const messages = session.context.getMessages();
+  const lastUserMsg = [...messages].reverse().find(m => m.role === "user");
+  const tier = tierOverride ?? (lastUserMsg ? classifyChatTier(lastUserMsg.content) : "fast");
+
+  if (tier !== "chat") {
+    console.log(`[chat] Using ${tier} tier for: "${lastUserMsg?.content.slice(0, 50)}..."`);
+  }
+
   const stream = streamWithTools(
-    session.context.getMessages(),
+    messages,
     aiTools,
-    { temperature: 0.7, maxSteps: 5 },
+    { temperature: 0.7, maxSteps: 5, tier },
   );
 
   let fullResponse = "";

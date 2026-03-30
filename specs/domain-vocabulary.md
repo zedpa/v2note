@@ -1,217 +1,184 @@
-# 领域词库 — 冷启动领域选择 + 语音修正 RAG
+﻿# 领域词库 — DashScope 热词 + 自动收录
 
-> 状态：🔄 实现中 | 优先级：Phase 7.3
-> 依赖：cold-start-onboarding（5 问流程），voice-action（语音指令）
-> 进度 2026-03-28：
+> 状态：✅ 完成 | 优先级：Phase 7.3
+> 依赖：cold-start-onboarding（5 问流程）
+>
+> ### 架构决策（2026-03-29 简化）
+>
+> **删除自建 ASR 后处理纠正引擎**，改用 DashScope VocabularyService 原生热词。
+>
+> 理由：
+> - DashScope `fun-asr-realtime` 原生支持 `vocabulary_id` 参数
+> - 热词在识别阶段生效，准确率远高于后处理替换
+> - 免费，无额外费用
+> - 代码改动极小（Python 脚本加 1 个参数）
+>
+> 删除项：
+> - ~~场景 3: ASR 后处理修正引擎~~ → 由 DashScope 热词替代
+> - ~~场景 4: 用户确认/拒绝修正 UI~~ → 热词在识别阶段生效，无"修正"概念
+> - ~~`gateway/src/cognitive/vocabulary.ts` 的 alias 匹配逻辑~~ → 不再需要
+> - ~~`POST /api/v1/vocabulary/correct` API~~ → 不再需要
+>
+> 进度：
 >   ✅ 场景 1 冷启动领域选择（DomainSelector + onboarding 集成）
->   ✅ 场景 2 预设词库结构（3 领域×25 词，hardcoded 在 routes/vocabulary.ts）
->   ✅ 场景 3 ASR 修正引擎（vocabulary.ts: alias 精确匹配，5分钟缓存）
->   ✅ 场景 6 手动管理词库（vocabulary-page.tsx: 搜索+分组+增删+导入）
->   ✅ 后端 5 个 API（CRUD + import-domain + correct）
+>   ✅ 场景 2 预设词库结构（routes/vocabulary.ts）
+>   ✅ 场景 5 手动管理词库（vocabulary-page.tsx）
 >   ✅ 数据库迁移 031
->   🟡 场景 4 用户确认/拒绝修正（日记卡片高亮，需前端 UI）
->   🟡 场景 5 自动收录新术语（需 daily-loop 集成）
->   🟡 场景 7 自定义领域 AI 生成（需 AI 调用集成）
+>   ✅ 场景 3 DashScope 热词同步（vocabulary-sync.ts）
+>   ✅ 场景 4 自动收录 + 热词刷新（auto-vocabulary.ts 收录后触发同步）
+>   ✅ 场景 6 自定义领域 AI 生成（/generate 路由）
 
 ## 概述
 
-用户在不同行业（供应链、金融、医疗、IT 等）有大量专业术语。当前语音识别（ASR）对专业词汇的准确率较低，例如「铝价」可能被识别为「旅价」，「OKR」被识别为「欧开瑞」。
+用户在不同行业有大量专业术语，ASR 对专业词汇准确率较低。通过 DashScope VocabularyService 的热词能力，在识别阶段直接提升准确率，无需后处理纠正。
 
-**核心改变：**
-- 冷启动新增领域选择步骤（Q2 之后，作为 Q2.5）
-- 每个领域预置一套专业词汇表
-- 用户日常录音中新出现的专业词也自动收录
-- ASR 转写后，用领域词库做后处理修正（RAG 式纠错）
-
-**修正流程：**
+**简化后流程：**
 ```
-用户语音 → ASR 转写（原始文本）
-  → 领域词库 RAG 匹配（embedding 或编辑距离）
-  → 修正候选词替换
-  → 最终文本进入 Process
+domain_vocabulary 表（用户词库）
+  → 同步到 DashScope VocabularyService（最多 500 词，权重 1-5）
+  → 生成 vocabulary_id
+  → Python ASR 脚本传入 vocabulary_id
+  → 识别阶段即生效，无后处理
 ```
 
 ## 场景
 
-### 场景 1: 冷启动 — 领域选择
+### 场景 1: 冷启动 — 领域选择 ✅
 ```
-假设 (Given)  用户在冷启动 Q2（"你现在主要在做什么"）回答后
+假设 (Given)  用户在冷启动 Q2 回答后
 当   (When)   系统分析 Q2 回答
-那么 (Then)   展示领域选择页面：
-  「路路想更了解你的工作，选一下你的领域吧（可多选）：」
-
-  预设领域卡片（2 列网格，每个卡片：图标 + 领域名 + 示例术语）：
-  🏭 制造/供应链    「BOM · 良品率 · 模具」
-  💰 金融/投资      「对冲 · 估值 · 标的」
-  💻 互联网/IT      「OKR · 灰度 · 微服务」
-  🏥 医疗/生物      「靶点 · 临床 · IND」
-  📐 设计/创意      「字距 · 渲染 · 色域」
-  📚 教育/学术      「SCI · peer review · 课题」
-  🏗️ 建筑/工程      「容积率 · 预算清单 · BIM」
-  🛒 电商/零售      「SKU · 客单价 · 复购率」
-  ➕ 自定义         → 输入领域名，AI 生成初始词库
-
-并且 (And)    可选择 1-3 个领域
-并且 (And)    选择后存入 UserProfile.domains（JSONB 数组）
+那么 (Then)   展示领域选择页面（2 列网格，8 预设 + 自定义）
+并且 (And)    选择后存入 UserProfile.domains
 并且 (And)    加载对应预设词库到 domain_vocabulary 表
-
-当   (When)   用户点击「跳过」
-那么 (Then)   不加载预设词库，后续通过用户录音自动积累
+并且 (And)    触发场景 3 同步到 DashScope
 ```
 
-### 场景 2: 预设词库结构
+### 场景 2: 预设词库结构 ✅
 ```
-假设 (Given)  用户选择了「制造/供应链」领域
+假设 (Given)  用户选择了某个领域
 当   (When)   词库加载
-那么 (Then)   导入预设词汇表到 domain_vocabulary 表：
-  每条记录：
-    - term: 正确写法（如「铝价」）
-    - aliases: 常见误识别（如 ["旅价", "律价", "吕价"]）
-    - domain: 领域标识（如 "manufacturing"）
-    - embedding: 词向量（pgvector，用于语义匹配）
-    - frequency: 使用频率（初始 0，用户提及后递增）
-    - source: 'preset' | 'user' | 'auto'
-并且 (And)    每个领域预设 100-300 个核心术语
+那么 (Then)   导入预设词汇到 domain_vocabulary 表
+  每条：term（正确写法）, domain, frequency, source='preset'
+并且 (And)    每个领域预设 25-100 个核心术语
 ```
 
-### 场景 3: ASR 转写后自动修正
+### 场景 3: DashScope 热词同步 🟡
 ```
-假设 (Given)  用户录音，ASR 转写出「今天旅价又涨了百分之五」
-并且 (And)    用户领域词库中有 term="铝价", aliases=["旅价"]
-当   (When)   转写文本进入后处理
-那么 (Then)   修正管线执行：
-  1. 分词，提取每个可能是术语的片段
-  2. 对每个片段查询 domain_vocabulary：
-     a. 精确匹配 aliases 数组（ILIKE）
-     b. 编辑距离 ≤ 2 的候选
-     c. embedding 相似度 > 0.85 的候选
-  3. 置信度 > 0.9：自动替换
-  4. 置信度 0.7-0.9：标记待确认（用户可在日记卡片中看到高亮）
-  5. 置信度 < 0.7：不修正
-并且 (And)    修正后文本：「今天铝价又涨了百分之五」
-并且 (And)    frequency += 1 for「铝价」
+假设 (Given)  domain_vocabulary 表中有词汇
+当   (When)   以下事件触发同步：
+  a. 冷启动领域选择后
+  b. 用户手动添加/删除词汇后
+  c. 自动收录新术语后（场景 4）
+  d. daily-loop 每日检查
+那么 (Then)   从 domain_vocabulary 取 top-500（按 frequency DESC）
+并且 (And)    调用 DashScope VocabularyService：
+  - 首次：create_vocabulary → 存储 vocabulary_id 到 device 表
+  - 后续：update_vocabulary（覆盖式更新）
+并且 (And)    词汇权重映射：
+  - frequency >= 10 → weight 5
+  - frequency >= 5  → weight 4
+  - frequency >= 1  → weight 3
+  - frequency == 0  → weight 2（预设词）
+并且 (And)    vocabulary_id 通过环境变量传递给 Python ASR 脚本
+
+边界条件：
+- DashScope 每表最多 500 词，超出时按 frequency 截断
+- 同步失败不阻断 ASR（降级为无热词）
+- vocabulary_id 缓存在 device 表，避免重复创建
 ```
 
-### 场景 4: 用户确认/拒绝修正
-```
-假设 (Given)  某词被置信度 0.7-0.9 自动修正
-当   (When)   用户查看日记卡片
-那么 (Then)   被修正的词显示淡色下划线（deer 色虚线）
-并且 (And)    点击可看到原始识别文本 + [恢复原文][确认修正]
-当   (When)   用户点击 [确认修正]
-那么 (Then)   该 alias 的匹配权重提升
-当   (When)   用户点击 [恢复原文]
-那么 (Then)   该修正回滚，该 alias 的权重降低
-```
-
-### 场景 5: 自动收录新术语
+### 场景 4: 自动收录 + 热词刷新 🟡
 ```
 假设 (Given)  用户多次提到某个词（如「OKR」），但词库中没有
-当   (When)   该词在近 7 天内出现 ≥ 3 次
-并且 (And)    不是常见词（不在通用词库中）
-那么 (Then)   自动添加到 domain_vocabulary：
-  term="OKR", source='auto', frequency=3
-并且 (And)    AI 生成可能的误识别别名（如 ["欧开瑞", "OK啊"]）
+当   (When)   daily-loop 执行自动收录（auto-vocabulary.ts 已实现）
+并且 (And)    该词在近 7 天内出现 ≥ 3 次
+那么 (Then)   自动添加到 domain_vocabulary（source='auto'）
+并且 (And)    触发场景 3 同步到 DashScope
 并且 (And)    晚间回顾中提示：「路路新学了几个词：OKR、Sprint，对吗？」
 ```
 
-### 场景 6: 手动管理词库
+### 场景 5: 手动管理词库 ✅
 ```
 假设 (Given)  用户进入设置 → 「我的词库」
 当   (When)   词库页面显示
-那么 (Then)   按领域分组展示：
-  🏭 制造/供应链 (156 词)
-    铝价 · BOM · 良品率 · 注塑 · ...
-  💻 自动收录 (12 词)
-    OKR · Sprint · 灰度发布 · ...
-并且 (And)    可搜索、删除、添加新词
-并且 (And)    可添加新的 alias（误识别形式）
-当   (When)   用户手动添加词汇
-那么 (Then)   source='user'，AI 自动生成可能的误识别别名
+那么 (Then)   按领域分组展示，可搜索/删除/添加
+当   (When)   用户添加或删除词汇
+那么 (Then)   触发场景 3 同步到 DashScope
 ```
 
-### 场景 7: 自定义领域
+### 场景 6: 自定义领域 AI 生成 🟡
 ```
 假设 (Given)  冷启动时用户选择「自定义」
 当   (When)   输入领域名（如「量化交易」）
-那么 (Then)   AI 根据领域名生成初始词库（50-100 词）：
-  如：alpha · 夏普比率 · 最大回撤 · 因子暴露 · tick数据 · ...
+那么 (Then)   AI 根据领域名生成初始词库（50-100 词）
 并且 (And)    展示给用户确认/删减
 并且 (And)    确认后导入 domain_vocabulary
+并且 (And)    触发场景 3 同步到 DashScope
 ```
 
 ## 接口约定
 
-### 数据库
+### 数据库（已有）
 
 ```sql
--- 领域词库表
-CREATE TABLE domain_vocabulary (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  device_id UUID NOT NULL REFERENCES device(id),
-  term TEXT NOT NULL,              -- 正确写法
-  aliases TEXT[] DEFAULT '{}',     -- 常见误识别
-  domain TEXT NOT NULL,            -- 领域标识
-  embedding vector(1536),          -- 词向量
-  frequency INT DEFAULT 0,         -- 使用频率
-  source TEXT DEFAULT 'preset',    -- preset/user/auto
-  created_at TIMESTAMPTZ DEFAULT now()
-);
-
-CREATE INDEX idx_vocab_device_domain ON domain_vocabulary(device_id, domain);
-CREATE INDEX idx_vocab_aliases ON domain_vocabulary USING GIN(aliases);
-
--- UserProfile 新增字段
-ALTER TABLE user_profile ADD COLUMN domains JSONB DEFAULT '[]';
+-- domain_vocabulary 表（迁移 031 已创建）
+-- 新增字段：
+ALTER TABLE device ADD COLUMN IF NOT EXISTS asr_vocabulary_id TEXT;
+-- 存储 DashScope vocabulary_id，避免重复创建
 ```
 
-### API
+### API（精简）
 
 ```
-GET /api/v1/vocabulary
-  → 返回用户词库列表（按领域分组）
+GET  /api/v1/vocabulary           → 用户词库列表（按领域分组）
+POST /api/v1/vocabulary           → 手动添加 { term, domain }
+DELETE /api/v1/vocabulary/:id     → 删除词汇
+POST /api/v1/vocabulary/import-domain → 导入预设领域 { domain }
+POST /api/v1/vocabulary/sync      → 手动触发同步到 DashScope（通常自动）
+POST /api/v1/vocabulary/generate  → AI 生成自定义领域词库 { domain_name }
+```
 
-POST /api/v1/vocabulary
-  → 手动添加词汇 { term, domain, aliases? }
+~~`POST /api/v1/vocabulary/correct`~~ — 已删除
 
-DELETE /api/v1/vocabulary/:id
-  → 删除词汇
+### DashScope VocabularyService 集成
 
-POST /api/v1/vocabulary/import-domain
-  → 导入预设领域词库 { domain: "manufacturing" }
+```python
+# gateway/scripts/asr_realtime.py 改动（1 行）
+recognition = Recognition(
+    model=MODEL,
+    callback=callback,
+    vocabulary_id=os.environ.get('ASR_VOCABULARY_ID'),  # 新增
+)
+```
 
-POST /api/v1/vocabulary/correct
-  → ASR 后处理修正 { text } → { corrected_text, corrections: [{original, corrected, confidence}] }
+```typescript
+// gateway/src/cognitive/vocabulary-sync.ts（新建）
+// 负责 domain_vocabulary → DashScope VocabularyService 同步
+export async function syncVocabularyToDashScope(deviceId: string): Promise<string>
+// 返回 vocabulary_id，存入 device.asr_vocabulary_id
 ```
 
 ## 涉及文件
 
 | 文件 | 改动类型 |
 |------|---------|
-| `features/cognitive/components/onboarding-seed.tsx` | 修改：Q2 之后插入领域选择页 |
-| 新建 `gateway/src/cognitive/vocabulary.ts` | 领域词库修正引擎 |
-| 新建 `gateway/src/db/repositories/vocabulary.ts` | 词库 CRUD |
-| 新建 `gateway/src/routes/vocabulary.ts` | REST API |
-| 新建 `gateway/data/vocabulary/` | 预设领域词库 JSON 文件 |
-| `gateway/src/handlers/process.ts` | 修改：ASR 后处理环节接入词库修正 |
-| 新建 `supabase/migrations/029_domain_vocabulary.sql` | 数据库迁移 |
-| 新建 `features/settings/components/vocabulary-page.tsx` | 词库管理 UI |
+| `gateway/scripts/asr_realtime.py` | 修改：加 `vocabulary_id` 参数 |
+| `gateway/scripts/asr_transcribe.py` | 修改：加 `vocabulary_id` 参数 |
+| 新建 `gateway/src/cognitive/vocabulary-sync.ts` | DashScope VocabularyService 同步 |
+| `gateway/src/cognitive/auto-vocabulary.ts` | 修改：收录后触发同步 |
+| `gateway/src/routes/vocabulary.ts` | 修改：增删后触发同步，新增 /sync 和 /generate |
+| `gateway/src/cognitive/vocabulary.ts` | 删除 alias 匹配逻辑（或标记废弃） |
+| `supabase/migrations/0xx_device_vocabulary_id.sql` | device 表加 asr_vocabulary_id |
 
-## AI 调用
+## 删除/废弃项
 
-- 自定义领域初始词库生成：1 次/领域
-- 误识别别名生成：1 次/新词（batch）
-- 自动收录判断：复用 daily-loop，无额外 AI 调用
-
-## 边界条件
-
-- [ ] 多领域重叠：同一术语属于多个领域，取最高 frequency 的
-- [ ] 修正冲突：一个片段匹配多个候选，取置信度最高的
-- [ ] 性能：修正管线需在 200ms 内完成（索引 + 缓存热词 top-100）
-- [ ] 隐私：词库按 device_id 隔离，不跨用户
-- [ ] 中英混合：如「BOM表」「OKR复盘」，需支持中英混合术语
-- [ ] 方言发音差异：同一术语不同地区发音可能产生不同误识别
+| 原有 | 处置 |
+|------|------|
+| `vocabulary.ts` 的 `correctText()` 函数 | 废弃，不再在 process 中调用 |
+| `POST /api/v1/vocabulary/correct` | 删除 |
+| 场景 4（确认/拒绝修正 UI） | 删除，热词无"修正"概念 |
+| aliases 字段 | 保留但不再用于后处理，仅作参考 |
 
 ## 验收标准
 
-选择领域后，语音中的专业术语识别准确率显著提升。用户能在设置中管理词库。
+选择领域后，DashScope 热词同步完成，语音中的专业术语识别准确率在 ASR 阶段即显著提升。用户能在设置中管理词库，增删会自动同步到 DashScope。

@@ -11,10 +11,15 @@ export function registerNotificationRoutes(router: Router) {
   router.get("/api/v1/notifications", async (req, res, _params, qry) => {
     try {
       const deviceId = getDeviceId(req);
+      const userId = getUserId(req);
       const limit = parseInt(qry.limit || "50", 10);
       const [notifications, unreadCount] = await Promise.all([
-        notificationRepo.findByDevice(deviceId, limit),
-        notificationRepo.countUnread(deviceId),
+        userId
+          ? notificationRepo.findByUser(userId, limit)
+          : notificationRepo.findByDevice(deviceId, limit),
+        userId
+          ? notificationRepo.countUnreadByUser(userId)
+          : notificationRepo.countUnread(deviceId),
       ]);
       sendJson(res, { notifications, unread_count: unreadCount });
     } catch (err: any) {
@@ -36,7 +41,12 @@ export function registerNotificationRoutes(router: Router) {
   router.post("/api/v1/notifications/read-all", async (req, res) => {
     try {
       const deviceId = getDeviceId(req);
-      await notificationRepo.markAllRead(deviceId);
+      const userId = getUserId(req);
+      if (userId) {
+        await notificationRepo.markAllReadByUser(userId);
+      } else {
+        await notificationRepo.markAllRead(deviceId);
+      }
       sendJson(res, { ok: true });
     } catch (err: any) {
       sendError(res, err.message ?? "Internal error", err.status ?? 500);

@@ -1,4 +1,7 @@
 ## gene_today_gantt
+
+> ⏸ **入口已隐藏（2026-03-29）** — TodayGantt 组件保留，但 page.tsx 中的 `today-todo` overlay 入口已移除。待 UX 验证后恢复。
+
 ### 功能描述
 /today-todo 命令触发的甘特图风格今日任务时间轴，按领域配色，标识 AI 可协助项。
 

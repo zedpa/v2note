@@ -1,19 +1,30 @@
 /**
- * AI provider — uses Vercel AI SDK v6 with DashScope OpenAI-compatible API.
+ * AI provider — 多模型分层架构
  *
- * Vercel AI SDK provides:
- * - Type-safe structured output via generateObject() + Zod schemas
- * - Unified streaming via streamText()
- * - Automatic retries and error handling
- * - Provider-agnostic interface (swap models easily)
+ * 5 种模型层级（ModelTier），按用途分配不同模型：
+ *   fast       — 管道提取（文本清理/分类/Strike/Todo），要求低延迟
+ *   agent      — 聊天工具调用 + 简单对话，低延迟，无推理
+ *   chat       — 复杂对话 + 深度分析，需要推理能力
+ *   report     — 简报/复盘/批量分析，后台生成，需要质量
+ *   background — 记忆/人格/画像更新，低优先级
+ *   vision     — 图片理解
  *
- * Environment variables are read lazily (on first call) because
- * dotenv.config() in index.ts runs AFTER ESM imports are resolved.
+ * 环境变量配置（.env）：
+ *   AI_MODEL_FAST=qwen-plus
+ *   AI_MODEL_AGENT=MiniMax/MiniMax-M2.5
+ *   AI_MODEL_CHAT=qwen3.5-plus
+ *   AI_MODEL_REPORT=qwen3.5-plus
+ *   AI_MODEL_BACKGROUND=qwen3-max
+ *   AI_MODEL_VISION=qwen-vl-max
+ *   AI_MODEL=qwen-plus              # 兜底默认模型
+ *   AI_TIMEOUT=60000
  */
 
 import { createOpenAI } from "@ai-sdk/openai";
 import { generateText, streamText, generateObject, type ModelMessage } from "ai";
 import type { z } from "zod";
+
+// ── Types ──────────────────────────────────────────────────────
 
 export interface ChatMessage {
   role: "system" | "user" | "assistant";
@@ -25,41 +36,97 @@ export interface AIResponse {
   usage?: { prompt_tokens: number; completion_tokens: number };
 }
 
-// Lazy-loaded provider (populated on first AI call)
-let _provider: ReturnType<typeof createOpenAI> | null = null;
-let _model: string | null = null;
-let _timeout: number | null = null;
+/** Chunk type for deep thinking streams */
+export interface DeepThinkChunk {
+  type: "thinking" | "text";
+  content: string;
+}
 
-/** 推理模型不支持 response_format: json_object */
-const REASONING_MODEL_PATTERNS = [/qwen3\.\d/, /qwen3-/];
+/**
+ * 模型层级：
+ * - fast: 管道提取，低延迟，无推理
+ * - agent: 聊天工具调用 + 简单对话，低延迟，无推理（MiniMax）
+ * - chat: 复杂对话 + 深度分析，推理模型
+ * - report: 简报/复盘/批量，后台，推理
+ * - background: 记忆/画像更新，低优先级，无推理
+ * - vision: 图片理解
+ */
+export type ModelTier = "fast" | "agent" | "chat" | "report" | "background" | "vision";
+
+interface TierConfig {
+  model: string;
+  reasoning: boolean;   // 是否启用推理（thinking）
+  timeout: number;
+}
+
+// ── 推理模型检测 ─────────────────────────────────────────────
+
+/** 匹配推理系列模型名 */
+const REASONING_MODEL_PATTERNS = [/qwen3\.\d/, /qwen3-/, /qwen3\.5/];
 
 function isReasoningModel(model: string): boolean {
   return REASONING_MODEL_PATTERNS.some((p) => p.test(model));
 }
 
-function getProvider() {
-  if (_provider === null) {
-    const apiKey = process.env.DASHSCOPE_API_KEY ?? "";
-    const baseUrl =
-      process.env.AI_BASE_URL ??
-      "https://dashscope.aliyuncs.com/compatible-mode/v1";
-    _model = process.env.AI_MODEL ?? "qwen3-max";
-    _timeout = parseInt(process.env.AI_TIMEOUT ?? "60000", 10);
+// ── Provider 初始化 ──────────────────────────────────────────
 
-    if (!apiKey) {
-      console.warn("[ai] WARNING: DASHSCOPE_API_KEY is not set — AI calls will fail!");
-    } else {
-      console.log(`[ai] Provider ready (AI SDK): model=${_model}, base=${baseUrl}, reasoning=${isReasoningModel(_model)}`);
-    }
+let _provider: ReturnType<typeof createOpenAI> | null = null;
+let _tiers: Record<ModelTier, TierConfig> | null = null;
+let _defaultModel: string | null = null;
+let _defaultTimeout: number | null = null;
 
-    _provider = createOpenAI({
-      apiKey,
-      baseURL: baseUrl,
-      name: "dashscope",
-    });
+function ensureProvider() {
+  if (_provider !== null) return;
+
+  const apiKey = process.env.DASHSCOPE_API_KEY ?? "";
+  const baseUrl = process.env.AI_BASE_URL ?? "https://dashscope.aliyuncs.com/compatible-mode/v1";
+  _defaultModel = process.env.AI_MODEL ?? "qwen-plus";
+  _defaultTimeout = parseInt(process.env.AI_TIMEOUT ?? "60000", 10);
+
+  if (!apiKey) {
+    console.warn("[ai] WARNING: DASHSCOPE_API_KEY is not set — AI calls will fail!");
   }
-  return { provider: _provider, model: _model!, timeout: _timeout! };
+
+  _provider = createOpenAI({ apiKey, baseURL: baseUrl, name: "dashscope" });
+
+  // 读取各层级模型配置
+  const fast = process.env.AI_MODEL_FAST ?? _defaultModel;
+  const agent = process.env.AI_MODEL_AGENT ?? _defaultModel;
+  const chat = process.env.AI_MODEL_CHAT ?? _defaultModel;
+  const report = process.env.AI_MODEL_REPORT ?? _defaultModel;
+  const background = process.env.AI_MODEL_BACKGROUND ?? _defaultModel;
+  const vision = process.env.AI_MODEL_VISION ?? "qwen-vl-max";
+
+  _tiers = {
+    fast:       { model: fast,       reasoning: false, timeout: _defaultTimeout },
+    agent:      { model: agent,      reasoning: false, timeout: _defaultTimeout * 2 },
+    chat:       { model: chat,       reasoning: true,  timeout: _defaultTimeout * 3 },
+    report:     { model: report,     reasoning: true,  timeout: _defaultTimeout * 3 },
+    background: { model: background, reasoning: false, timeout: _defaultTimeout },
+    vision:     { model: vision,     reasoning: false, timeout: _defaultTimeout },
+  };
+
+  console.log("[ai] Provider ready (multi-model):");
+  for (const [tier, cfg] of Object.entries(_tiers)) {
+    const isReasoning = isReasoningModel(cfg.model);
+    const thinkLabel = isReasoning ? (cfg.reasoning ? "thinking:ON" : "thinking:OFF") : "non-reasoning";
+    console.log(`  ${tier.padEnd(12)} → ${cfg.model} (${thinkLabel}, timeout=${cfg.timeout}ms)`);
+  }
 }
+
+/** 获取指定层级的配置 */
+function getTier(tier: ModelTier): { provider: ReturnType<typeof createOpenAI>; config: TierConfig } {
+  ensureProvider();
+  return { provider: _provider!, config: _tiers![tier] };
+}
+
+/** 兼容旧接口：无 tier 时使用 fast */
+function getProvider() {
+  ensureProvider();
+  return { provider: _provider!, model: _defaultModel!, timeout: _defaultTimeout! };
+}
+
+// ── 工具函数 ─────────────────────────────────────────────────
 
 function mapUsage(usage: { inputTokens?: number; outputTokens?: number } | undefined) {
   if (!usage) return undefined;
@@ -70,35 +137,60 @@ function mapUsage(usage: { inputTokens?: number; outputTokens?: number } | undef
 }
 
 /**
- * Non-streaming AI call. Returns the full response.
- * Backward-compatible with the old raw-fetch interface.
+ * 构建 providerOptions：
+ * - 推理模型 + reasoning=true → enable_thinking: true
+ * - 推理模型 + reasoning=false → enable_thinking: false（关闭推理，大幅降低延迟）
+ * - 非推理模型 → 不传 enable_thinking
+ * - json=true + 非推理模型 → response_format: json_object
+ * - json=true + 推理模型 → 不设 response_format（靠 prompt 约束）
+ */
+function buildProviderOptions(model: string, reasoning: boolean, json?: boolean, thinkingBudget?: number): Record<string, any> | undefined {
+  const isReasoning = isReasoningModel(model);
+  const opts: Record<string, any> = {};
+
+  if (isReasoning) {
+    opts.enable_thinking = reasoning;
+    if (reasoning && thinkingBudget) {
+      opts.thinking_budget = thinkingBudget;
+    }
+  }
+
+  if (json && !isReasoning) {
+    opts.response_format = { type: "json_object" };
+  }
+
+  if (Object.keys(opts).length === 0) return undefined;
+  return { openai: opts };
+}
+
+// ── 公共 API ─────────────────────────────────────────────────
+
+/**
+ * Non-streaming AI call.
+ * @param tier - 模型层级（默认 "fast"）
  */
 export async function chatCompletion(
   messages: ChatMessage[],
-  opts?: { json?: boolean; temperature?: number; timeout?: number },
+  opts?: { json?: boolean; temperature?: number; timeout?: number; tier?: ModelTier },
 ): Promise<AIResponse> {
-  const { provider, model, timeout } = getProvider();
-  const effectiveTimeout = opts?.timeout ?? timeout;
+  const tier = opts?.tier ?? "fast";
+  const { provider, config } = getTier(tier);
+  const effectiveTimeout = opts?.timeout ?? config.timeout;
 
-  // 推理模型（qwen3.x）不支持 response_format: json_object，只靠 prompt 约束
-  const useJsonFormat = opts?.json && !isReasoningModel(model);
+  const providerOptions = buildProviderOptions(config.model, config.reasoning, opts?.json);
 
   const result = await generateText({
-    model: provider.chat(model),
+    model: provider.chat(config.model),
     messages: messages as ModelMessage[],
     temperature: opts?.temperature ?? 0.7,
     maxRetries: 1,
     abortSignal: AbortSignal.timeout(effectiveTimeout),
-    ...(useJsonFormat ? {
-      providerOptions: {
-        openai: { response_format: { type: "json_object" } },
-      },
-    } : {}),
+    ...(providerOptions ? { providerOptions } : {}),
   });
 
   const content = result.text ?? "";
   if (!content) {
-    console.warn("[ai] AI returned empty content", { usage: result.usage });
+    console.warn(`[ai][${tier}] AI returned empty content`, { model: config.model, usage: result.usage });
   }
 
   return { content, usage: mapUsage(result.usage) };
@@ -106,20 +198,24 @@ export async function chatCompletion(
 
 /**
  * Streaming AI call. Yields text chunks.
- * Backward-compatible async generator interface.
+ * @param tier - 模型层级（默认 "chat"）
  */
 export async function* chatCompletionStream(
   messages: ChatMessage[],
-  opts?: { temperature?: number },
+  opts?: { temperature?: number; tier?: ModelTier },
 ): AsyncGenerator<string, void, undefined> {
-  const { provider, model, timeout } = getProvider();
+  const tier = opts?.tier ?? "chat";
+  const { provider, config } = getTier(tier);
+
+  const providerOptions = buildProviderOptions(config.model, config.reasoning);
 
   const result = streamText({
-    model: provider.chat(model),
+    model: provider.chat(config.model),
     messages: messages as ModelMessage[],
     temperature: opts?.temperature ?? 0.7,
     maxRetries: 1,
-    abortSignal: AbortSignal.timeout(timeout),
+    abortSignal: AbortSignal.timeout(config.timeout),
+    ...(providerOptions ? { providerOptions } : {}),
   });
 
   for await (const chunk of result.textStream) {
@@ -127,38 +223,22 @@ export async function* chatCompletionStream(
   }
 }
 
-/** Chunk type for deep thinking streams */
-export interface DeepThinkChunk {
-  type: "thinking" | "text";
-  content: string;
-}
-
 /**
  * Streaming AI call with deep thinking (Qwen enable_thinking).
- *
- * Enables `enable_thinking: true` via providerOptions so the model
- * produces a reasoning chain before the final answer.
- *
- * Vercel AI SDK v6 exposes `reasoning` on the stream result when the
- * provider returns `reasoning_content` chunks. We yield those as
- * `{ type: "thinking" }` and normal text as `{ type: "text" }`.
- *
- * If the SDK version does not surface reasoning separately, all
- * content is yielded as "text" — callers can show a generic
- * "深度思考中..." indicator based on elapsed time.
+ * 始终启用推理，使用 chat 层级模型。
  */
 export async function* chatCompletionStreamDeepThink(
   messages: ChatMessage[],
   opts?: { temperature?: number; thinkingBudget?: number },
 ): AsyncGenerator<DeepThinkChunk, void, undefined> {
-  const { provider, model, timeout } = getProvider();
+  const { provider, config } = getTier("chat");
 
   const result = streamText({
-    model: provider.chat(model),
+    model: provider.chat(config.model),
     messages: messages as ModelMessage[],
     temperature: opts?.temperature ?? 0.7,
     maxRetries: 1,
-    abortSignal: AbortSignal.timeout(timeout * 3), // 深度思考需要更长超时
+    abortSignal: AbortSignal.timeout(config.timeout),
     providerOptions: {
       openai: {
         enable_thinking: true,
@@ -167,10 +247,7 @@ export async function* chatCompletionStreamDeepThink(
     },
   });
 
-  // AI SDK v6: streamText result exposes reasoningStream for reasoning chunks
   const streamResult = result as any;
-
-  // Try to consume reasoning stream if available
   if (streamResult.reasoningStream) {
     try {
       for await (const chunk of streamResult.reasoningStream) {
@@ -181,7 +258,6 @@ export async function* chatCompletionStreamDeepThink(
     }
   }
 
-  // Always consume the text stream for the final answer
   for await (const chunk of result.textStream) {
     if (chunk) yield { type: "text", content: chunk };
   }
@@ -189,22 +265,19 @@ export async function* chatCompletionStreamDeepThink(
 
 /**
  * Structured output via Zod schema — type-safe JSON extraction.
- * Uses AI SDK's generateObject() for guaranteed schema conformance.
- *
- * Usage:
- *   const result = await generateStructured(messages, todoSchema, { temperature: 0.3 });
- *   // result.object is fully typed according to the Zod schema
+ * @param tier - 模型层级（默认 "fast"）
  */
 export async function generateStructured<T>(
   messages: ChatMessage[],
   schema: z.ZodType<T>,
-  opts?: { temperature?: number; timeout?: number; schemaName?: string; schemaDescription?: string },
+  opts?: { temperature?: number; timeout?: number; schemaName?: string; schemaDescription?: string; tier?: ModelTier },
 ): Promise<{ object: T; usage?: { prompt_tokens: number; completion_tokens: number } }> {
-  const { provider, model, timeout } = getProvider();
-  const effectiveTimeout = opts?.timeout ?? timeout;
+  const tier = opts?.tier ?? "fast";
+  const { provider, config } = getTier(tier);
+  const effectiveTimeout = opts?.timeout ?? config.timeout;
 
   const result = await generateObject({
-    model: provider.chat(model),
+    model: provider.chat(config.model),
     messages: messages as ModelMessage[],
     schema,
     schemaName: opts?.schemaName,
@@ -219,39 +292,35 @@ export async function generateStructured<T>(
 
 /**
  * AI call with native function calling (tool use).
- *
- * Uses Vercel AI SDK's generateText with tools + maxSteps.
- * Replaces the old manual JSON extraction + 3-round loop.
+ * @param tier - 模型层级（默认 "chat"）
  */
 export async function generateWithTools(
   messages: ChatMessage[],
   tools: Record<string, any>,
-  opts?: { temperature?: number; timeout?: number; maxSteps?: number },
+  opts?: { temperature?: number; timeout?: number; maxSteps?: number; tier?: ModelTier },
 ): Promise<{ text: string; usage?: { prompt_tokens: number; completion_tokens: number } }> {
-  const { provider, model, timeout } = getProvider();
-  const effectiveTimeout = opts?.timeout ?? timeout;
+  const tier = opts?.tier ?? "chat";
+  const { provider, config } = getTier(tier);
+  const effectiveTimeout = opts?.timeout ?? config.timeout;
 
-  // maxSteps 在 AI SDK v6 运行时支持但类型定义可能未包含
+  const providerOptions = buildProviderOptions(config.model, config.reasoning);
+
   const result = await generateText({
-    model: provider.chat(model),
+    model: provider.chat(config.model),
     messages: messages as ModelMessage[],
     tools,
     temperature: opts?.temperature ?? 0.7,
     maxRetries: 1,
     abortSignal: AbortSignal.timeout(effectiveTimeout),
     maxSteps: opts?.maxSteps ?? 5,
+    ...(providerOptions ? { providerOptions } : {}),
   } as any);
 
   return { text: result.text ?? "", usage: mapUsage(result.usage) };
 }
 
-/**
- * Streaming AI call with native function calling.
- *
- * Tools are executed automatically by the AI SDK between stream chunks.
- * Yields text chunks as they arrive.
- */
-// Tool 名称 → 用户可见的中文提示
+// ── Tool 名称 → 用户可见的中文提示 ──────────────────────────
+
 const TOOL_LABELS: Record<string, string> = {
   web_search: "🔍 正在联网搜索…",
   fetch_url: "🌐 正在获取网页内容…",
@@ -266,20 +335,14 @@ const TOOL_LABELS: Record<string, string> = {
 
 /**
  * 手动 tool call 循环（绕过 AI SDK maxSteps 的 DashScope 兼容性 bug）
- *
- * 已知问题：@ai-sdk/openai v3 + DashScope 的 tool calling 有两个 bug：
- * 1. tool call args 始终被解析为空对象 {}（参数丢失）
- * 2. tool result 后不发起第二轮请求（maxSteps 无效）
- *
- * 本实现：手动从 fullStream 收集 tool_calls → 手动解析参数 → 手动执行 →
- *         构造带 tool result 的消息 → 发起新一轮 streamText。
+ * @param opts.tier - 模型层级，默认 "chat"
  */
 export async function* streamWithTools(
   messages: ChatMessage[],
   tools: Record<string, any>,
-  opts?: { temperature?: number; maxSteps?: number; deepThink?: boolean; thinkingBudget?: number },
+  opts?: { temperature?: number; maxSteps?: number; deepThink?: boolean; thinkingBudget?: number; tier?: ModelTier },
 ): AsyncGenerator<string, void, undefined> {
-  const { provider, model, timeout } = getProvider();
+  const { provider, config } = getTier(opts?.tier ?? "chat");
   const maxSteps = opts?.maxSteps ?? 5;
 
   const deepThinkOptions = opts?.deepThink
@@ -291,30 +354,29 @@ export async function* streamWithTools(
           },
         },
       }
-    : {};
-
-  // 构建 tools schema 供 DashScope function calling
-  const toolDefs = Object.entries(tools).map(([name, t]) => ({
-    name,
-    tool: t,
-  }));
+    : {
+        // chat 层级默认启用推理
+        ...(isReasoningModel(config.model) ? {
+          providerOptions: {
+            openai: { enable_thinking: config.reasoning },
+          },
+        } : {}),
+      };
 
   let currentMessages = [...messages] as any[];
 
   for (let step = 0; step < maxSteps; step++) {
-    // 单步 streamText（maxSteps=1，不让 AI SDK 自动处理 tool result）
     const result = streamText({
-      model: provider.chat(model),
+      model: provider.chat(config.model),
       messages: currentMessages as ModelMessage[],
       tools,
       temperature: opts?.temperature ?? 0.7,
       maxRetries: 1,
-      abortSignal: AbortSignal.timeout(opts?.deepThink ? timeout * 3 : timeout),
+      abortSignal: AbortSignal.timeout(config.timeout),
       maxSteps: 1,
       ...deepThinkOptions,
     } as any);
 
-    // 收集 tool calls 的原始参数（从 tool-input-delta 拼接）
     const toolInputBuffers = new Map<string, { name: string; args: string }>();
     let hasToolCalls = false;
     let textGenerated = false;
@@ -330,18 +392,33 @@ export async function* streamWithTools(
             break;
           case "tool-input-start": {
             const p = part as any;
-            toolInputBuffers.set(p.id, { name: p.toolName, args: "" });
+            const id = p.toolCallId ?? p.id;
+            toolInputBuffers.set(id, { name: p.toolName, args: "" });
             break;
           }
           case "tool-input-delta": {
             const p = part as any;
-            const buf = toolInputBuffers.get(p.id);
-            if (buf) buf.args += p.delta;
+            const id = p.toolCallId ?? p.id;
+            const buf = toolInputBuffers.get(id);
+            if (buf) buf.args += (p.inputTextDelta ?? p.delta ?? "");
             break;
           }
-          case "tool-call":
+          case "tool-call": {
             hasToolCalls = true;
+            // Fallback: 如果模型不支持流式 tool args（MiniMax 等），
+            // 直接从 tool-call 事件提取完整参数
+            const tc = part as any;
+            const tcId = tc.toolCallId ?? tc.id;
+            if (tcId && tc.toolName && !toolInputBuffers.has(tcId)) {
+              // AI SDK tool-call 事件用 input 字段（可能是 string 或 object）
+              const rawInput = tc.input ?? tc.args ?? {};
+              toolInputBuffers.set(tcId, {
+                name: tc.toolName,
+                args: typeof rawInput === "string" ? rawInput : JSON.stringify(rawInput),
+              });
+            }
             break;
+          }
         }
       }
     } catch (err: any) {
@@ -350,22 +427,17 @@ export async function* streamWithTools(
       return;
     }
 
-    // 没有 tool calls → 结束
     if (!hasToolCalls || toolInputBuffers.size === 0) {
       return;
     }
 
-    // 执行 tool calls（手动解析参数 + 手动调用）
-    const toolCallMessages: any[] = [];
     const toolResultMessages: any[] = [];
 
     for (const [callId, { name, args: rawArgs }] of toolInputBuffers) {
-      // 向前端推送工具状态（特殊标记，由 gateway 层转为独立消息类型）
       const label = TOOL_LABELS[name] ?? `正在执行 ${name}…`;
       yield `\x00TOOL_STATUS:${name}:${label}`;
       console.log(`[ai] Tool call step=${step}: ${name}(${rawArgs.slice(0, 100)})`);
 
-      // 解析参数
       let parsedArgs: any = {};
       try {
         parsedArgs = rawArgs.trim() ? JSON.parse(rawArgs) : {};
@@ -373,7 +445,6 @@ export async function* streamWithTools(
         console.warn(`[ai] Failed to parse tool args for ${name}: ${rawArgs.slice(0, 100)}`);
       }
 
-      // 执行工具
       let toolResult: any = { success: false, message: "工具执行失败" };
       try {
         const toolDef = tools[name];
@@ -386,12 +457,6 @@ export async function* streamWithTools(
       }
       console.log(`[ai] Tool result: ${name} →`, JSON.stringify(toolResult).slice(0, 150));
 
-      // 构造 OpenAI 格式的 tool_call + tool result messages
-      toolCallMessages.push({
-        type: "function",
-        id: callId,
-        function: { name, arguments: rawArgs },
-      });
       toolResultMessages.push({
         tool_call_id: callId,
         toolName: name,
@@ -399,18 +464,13 @@ export async function* streamWithTools(
       });
     }
 
-    // 追加 AI SDK ModelMessage 格式的 tool call + result
-    // assistant 消息用 content array 格式（AI SDK v6 要求）
     const assistantContent: any[] = [];
-    if (textGenerated) {
-      // 如果有文本输出，需要加到 content 里（但我们已经 yield 过了，这里不重复）
-    }
     for (const [callId, { name, args: rawArgs }] of toolInputBuffers) {
       assistantContent.push({
         type: "tool-call",
         toolCallId: callId,
         toolName: name,
-        args: (() => { try { return JSON.parse(rawArgs || "{}"); } catch { return {}; } })(),
+        input: (() => { try { return JSON.parse(rawArgs || "{}"); } catch { return {}; } })(),
       });
     }
 
@@ -419,11 +479,14 @@ export async function* streamWithTools(
       { role: "assistant", content: assistantContent },
       ...toolResultMessages.map((tr: any) => ({
         role: "tool" as const,
-        content: [{ type: "tool-result", toolCallId: tr.tool_call_id, toolName: tr.toolName, result: tr.content }],
+        content: [{
+          type: "tool-result" as const,
+          toolCallId: tr.tool_call_id,
+          toolName: tr.toolName,
+          output: { type: "text" as const, value: tr.content },
+        }],
       })),
     ];
-
-    // 继续下一步（AI 将基于 tool result 生成最终回答）
   }
 
   console.warn(`[ai] maxSteps (${maxSteps}) exhausted`);
@@ -431,23 +494,22 @@ export async function* streamWithTools(
 
 /**
  * Streaming AI call with tools + deep thinking, yielding typed chunks.
- *
- * Same as streamWithTools but returns DeepThinkChunk with thinking/text distinction.
+ * 使用 chat 层级模型。
  */
 export async function* streamWithToolsDeepThink(
   messages: ChatMessage[],
   tools: Record<string, any>,
   opts?: { temperature?: number; maxSteps?: number; thinkingBudget?: number },
 ): AsyncGenerator<DeepThinkChunk, void, undefined> {
-  const { provider, model, timeout } = getProvider();
+  const { provider, config } = getTier("chat");
 
   const result = streamText({
-    model: provider.chat(model),
+    model: provider.chat(config.model),
     messages: messages as ModelMessage[],
     tools,
     temperature: opts?.temperature ?? 0.7,
     maxRetries: 1,
-    abortSignal: AbortSignal.timeout(timeout * 3),
+    abortSignal: AbortSignal.timeout(config.timeout),
     maxSteps: opts?.maxSteps ?? 5,
     providerOptions: {
       openai: {
@@ -475,4 +537,4 @@ export async function* streamWithToolsDeepThink(
 }
 
 // Re-export for convenience
-export { getProvider };
+export { getProvider, getTier, isReasoningModel };

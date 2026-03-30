@@ -11,6 +11,7 @@
 
 import { query } from "../db/pool.js";
 import * as vocabularyRepo from "../db/repositories/vocabulary.js";
+import { syncVocabularyToDashScope } from "./vocabulary-sync.js";
 
 // 常用中文停用词（精简版，避免将常见词误收为领域词汇）
 const COMMON_WORDS = new Set([
@@ -120,6 +121,8 @@ export async function autoCollectVocabulary(deviceId: string, userId?: string): 
 
     if (added > 0) {
       console.log(`[auto-vocabulary] Device ${deviceId}: added ${added} new terms`);
+      // 新词收录后触发 DashScope 热词同步
+      syncVocabularyToDashScope(deviceId).catch(() => {});
     }
 
     return added;

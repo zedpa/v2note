@@ -33,6 +33,51 @@ export function mayProfileUpdate(text: string): boolean {
   return PROFILE_KEYWORDS.some(kw => text.includes(kw));
 }
 
+/**
+ * 清理 AI 返回的 JSON 字符串：去除 markdown 代码块包裹、思考过程文本等。
+ * DashScope qwen3 系列经常返回 ```json ... ``` 或 <think>...</think> 包裹的 JSON。
+ */
+export function cleanJsonResponse(raw: string): string {
+  let s = raw.trim();
+
+  // 移除 <think>...</think> 思考过程（qwen3 系列特性）
+  s = s.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
+
+  // 移除 markdown 代码块包裹: ```json ... ``` 或 ``` ... ```
+  const fenceMatch = s.match(/```(?:json)?\s*\n?([\s\S]*?)\n?\s*```/);
+  if (fenceMatch) {
+    s = fenceMatch[1].trim();
+  }
+
+  // 如果开头仍不是 { 或 [，尝试找到第一个 JSON 起始字符
+  const jsonStart = s.search(/[{\[]/);
+  if (jsonStart > 0) {
+    s = s.slice(jsonStart);
+  }
+
+  // 如果末尾有多余内容（JSON 后面跟了文字），截断到最后一个 } 或 ]
+  const lastBrace = s.lastIndexOf("}");
+  const lastBracket = s.lastIndexOf("]");
+  const lastJson = Math.max(lastBrace, lastBracket);
+  if (lastJson > 0 && lastJson < s.length - 1) {
+    s = s.slice(0, lastJson + 1);
+  }
+
+  return s;
+}
+
+/**
+ * 安全解析 AI 返回的 JSON：先清理再解析。
+ * 失败时返回 null 而不是抛异常。
+ */
+export function safeParseJson<T = any>(raw: string): T | null {
+  try {
+    return JSON.parse(cleanJsonResponse(raw)) as T;
+  } catch {
+    return null;
+  }
+}
+
 export function extractKeywords(text: string): Set<string> {
   const keywords = new Set<string>();
 

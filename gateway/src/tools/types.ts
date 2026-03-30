@@ -42,11 +42,22 @@ export interface ToolDefinition {
   handler: (args: any, ctx: ToolContext) => Promise<ToolCallResult>;
 }
 
+/** 搜索过滤条件 */
+export interface SearchFilters {
+  status?: "active" | "completed" | "all";
+  date?: string;          // today/tomorrow/yesterday 或 ISO 日期
+  date_from?: string;
+  date_to?: string;
+  goal_id?: string;
+  domain?: string;
+}
+
 /** 统一搜索参数 */
 export interface SearchParams {
   query: string;
   scope: "all" | "records" | "goals" | "todos" | "clusters";
-  time_range?: { from: string; to: string };
+  filters?: SearchFilters;
+  time_range?: { from: string; to: string };  // 兼容保留
   limit?: number;
 }
 

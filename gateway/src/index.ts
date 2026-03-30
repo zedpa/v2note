@@ -2,6 +2,7 @@ import { createServer } from "node:http";
 import { WebSocketServer, WebSocket } from "ws";
 import { config } from "dotenv";
 import { processEntry, type ProcessPayload, type ProcessResult } from "./handlers/process.js";
+import { todoRepo } from "./db/repositories/index.js";
 import { startChat, sendChatMessage, endChat, type ChatStartPayload } from "./handlers/chat.js";
 import { aggregateTodos } from "./handlers/todo.js";
 import { startASR, sendAudioChunk, stopASR, cancelASR, type ASRMode } from "./handlers/asr.js";
@@ -37,12 +38,12 @@ import { registerIngestRoutes } from "./routes/ingest.js";
 import { registerCognitiveRelationRoutes } from "./routes/cognitive-relations.js";
 import { registerOnboardingRoutes } from "./routes/onboarding.js";
 import { registerTopicRoutes } from "./routes/topics.js";
-import { registerCompanionRoutes } from "./routes/companion.js";
 import { registerVocabularyRoutes } from "./routes/vocabulary.js";
 import { registerNotificationRoutes } from "./routes/notifications.js";
 import { getProactiveEngine } from "./proactive/engine.js";
 import { verifyAccessToken } from "./auth/jwt.js";
 import { generateAiStatus } from "./handlers/reflect.js";
+import { eventBus, type TodoCreatedEvent } from "./lib/event-bus.js";
 
 // Load environment
 config({ path: "../.env.local" });
@@ -60,8 +61,9 @@ type GatewayMessage =
   | { type: "chat.end"; payload: { deviceId: string } }
   | { type: "todo.aggregate"; payload: { deviceId: string } }
   | { type: "asr.start"; payload: { deviceId: string; locationText?: string; mode?: ASRMode; notebook?: string } }
-  | { type: "asr.stop"; payload: { deviceId: string; saveAudio?: boolean } }
-  | { type: "asr.cancel"; payload: { deviceId: string } };
+  | { type: "asr.stop"; payload: { deviceId: string; saveAudio?: boolean; forceCommand?: boolean } }
+  | { type: "asr.cancel"; payload: { deviceId: string } }
+  | { type: "action.confirm_reply"; payload: { deviceId: string; confirm_id: string; confirmed: boolean } };
 
 type GatewayResponse =
   | { type: "process.result"; payload: ProcessResult }
@@ -82,6 +84,8 @@ type GatewayResponse =
   | { type: "ai.status"; payload: { text: string } }
   | { type: "tool.status"; payload: { toolName: string; label: string } }
   | { type: "auth.ok"; payload: { userId: string } }
+  | { type: "action.result"; payload: { action: string; success: boolean; summary: string; todo_id?: string } }
+  | { type: "todo.created"; payload: { todoId: string; text: string } }
   | { type: "error"; payload: { message: string } };
 
 // ── HTTP Router ──
@@ -117,7 +121,6 @@ registerIngestRoutes(router);
 registerCognitiveRelationRoutes(router);
 registerOnboardingRoutes(router);
 registerTopicRoutes(router);
-registerCompanionRoutes(router);
 registerVocabularyRoutes(router);
 registerNotificationRoutes(router);
 
@@ -174,6 +177,27 @@ function send(ws: WebSocket, msg: GatewayResponse) {
 const proactiveEngine = getProactiveEngine();
 proactiveEngine.start().catch((err) => {
   console.error("[gateway] Proactive engine start failed:", err.message);
+});
+
+// 监听 todo.created 事件，通过 WS 通知对应客户端
+eventBus.on("todo.created", (evt: TodoCreatedEvent) => {
+  for (const [ws, uid] of connectionUserMap.entries()) {
+    if (uid === evt.deviceId || uid === evt.userId) {
+      send(ws, {
+        type: "todo.created",
+        payload: { todoId: evt.todoId, text: evt.todoText },
+      });
+    }
+  }
+  // 也检查 deviceMap（未登录用户）
+  for (const [ws, did] of connectionDeviceMap.entries()) {
+    if (did === evt.deviceId && !connectionUserMap.has(ws)) {
+      send(ws, {
+        type: "todo.created",
+        payload: { todoId: evt.todoId, text: evt.todoText },
+      });
+    }
+  }
 });
 
 wss.on("connection", (ws) => {
@@ -304,7 +328,7 @@ wss.on("connection", (ws) => {
         case "asr.stop": {
           const deviceId = connectionDeviceMap.get(ws);
           if (deviceId) {
-            await stopASR(ws, deviceId, msg.payload.saveAudio);
+            await stopASR(ws, deviceId, msg.payload.saveAudio, msg.payload.forceCommand);
             connectionDeviceMap.delete(ws);
           }
           break;
@@ -315,6 +339,46 @@ wss.on("connection", (ws) => {
           if (deviceId) {
             cancelASR(deviceId, ws);
             connectionDeviceMap.delete(ws);
+          }
+          break;
+        }
+
+        case "action.confirm_reply": {
+          const { deviceId, confirm_id, confirmed } = msg.payload;
+          const session = getSession(deviceId);
+          const pending = session.pendingConfirms.get(confirm_id);
+
+          if (!pending) {
+            send(ws, { type: "action.result", payload: { action: "unknown", success: false, summary: "确认已过期或不存在" } });
+            break;
+          }
+
+          // 过期检查
+          if (Date.now() > pending.expiresAt) {
+            session.pendingConfirms.delete(confirm_id);
+            send(ws, { type: "action.result", payload: { action: pending.action, success: false, summary: "确认已超时，操作未执行" } });
+            break;
+          }
+
+          session.pendingConfirms.delete(confirm_id);
+
+          if (!confirmed) {
+            send(ws, { type: "action.result", payload: { action: pending.action, success: false, summary: "已取消" } });
+            break;
+          }
+
+          // 执行实际操作
+          if (pending.action === "delete_todo" && pending.todoId) {
+            try {
+              const todo = await todoRepo.findById(pending.todoId);
+              await todoRepo.update(pending.todoId, { done: true });
+              const text = todo?.text?.slice(0, 30) ?? pending.todoId;
+              send(ws, { type: "action.result", payload: { action: "delete_todo", success: true, summary: `已取消「${text}」`, todo_id: pending.todoId } });
+            } catch (err: any) {
+              send(ws, { type: "action.result", payload: { action: "delete_todo", success: false, summary: `删除失败: ${err.message}` } });
+            }
+          } else {
+            send(ws, { type: "action.result", payload: { action: pending.action, success: false, summary: `暂不支持 ${pending.action} 的确认操作` } });
           }
           break;
         }

@@ -53,6 +53,7 @@ export interface ActionExecResult {
 interface ActionContext {
   userId?: string;
   deviceId: string;
+  recordId?: string;  // 当前正在处理的记录 ID，用于 create_todo 关联
 }
 
 // ── 规则预筛 ──────────────────────────────────────────────────────────
@@ -116,9 +117,10 @@ const CLASSIFY_PROMPT = `你是一个语音意图分类器。判断用户这句�
 - delete_todo 和批量修改的 risk_level 为 "high"，其余为 "low"
 - confidence 反映你对判断的确信程度`;
 
-export async function classifyVoiceIntent(text: string): Promise<VoiceIntentResult> {
+export async function classifyVoiceIntent(text: string, forceAction?: boolean): Promise<VoiceIntentResult> {
   // 规则预筛：没有指令特征 → 直接返回 record，跳过 AI 调用
-  if (!mayBeAction(text)) {
+  // forceAction=true 时（上滑手势）跳过预筛，强制走 AI 分类
+  if (!forceAction && !mayBeAction(text)) {
     return { type: "record", actions: [] };
   }
 
@@ -127,7 +129,7 @@ export async function classifyVoiceIntent(text: string): Promise<VoiceIntentResu
     { role: "user", content: text },
   ];
 
-  const response = await chatCompletion(messages, { json: true, temperature: 0.2, timeout: 15000 });
+  const response = await chatCompletion(messages, { json: true, temperature: 0.2, timeout: 15000, tier: "fast" });
 
   if (!response?.content) {
     return { type: "record", actions: [] };
@@ -375,15 +377,15 @@ async function executeCreateTodo(action: VoiceAction, ctx: ActionContext): Promi
     };
   }
 
-  // 创建待办需要一个 record_id，这里用 placeholder
-  // 实际中 process handler 会提供 recordId
-  const todos = await todoRepo.createMany([{
-    record_id: "voice-action",
+  const todo = await todoRepo.create({
+    record_id: ctx.recordId ?? undefined,
     text,
     done: false,
-  }]);
+    user_id: ctx.userId ?? undefined,
+    device_id: ctx.deviceId,
+  });
 
-  const todoId = Array.isArray(todos) && todos.length > 0 ? todos[0]?.id : undefined;
+  const todoId = todo?.id;
 
   return {
     action: "create_todo",

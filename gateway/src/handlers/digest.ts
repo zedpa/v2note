@@ -47,7 +47,24 @@ export async function digestRecords(
   recordIds: string[],
   context: { deviceId: string; userId?: string },
 ): Promise<void> {
-  const userId = context.userId ?? context.deviceId;
+  // userId 必须是 app_user.id；如果未传入，从 record/device 表查找
+  let userId = context.userId;
+  if (!userId) {
+    const rec = recordIds[0] ? await recordRepo.findById(recordIds[0]) : null;
+    userId = rec?.user_id ?? undefined;
+    if (!userId) {
+      // 从 device 表查找关联的 user_id
+      const { queryOne: qo } = await import("../db/pool.js");
+      const dev = await qo<{ user_id: string | null }>(
+        `SELECT user_id FROM device WHERE id = $1`, [context.deviceId],
+      ).catch(() => null);
+      userId = dev?.user_id ?? undefined;
+    }
+    if (!userId) {
+      console.warn(`[digest] No userId for device ${context.deviceId}, skipping digest`);
+      return;
+    }
+  }
 
   try {
     // ── Step 0: 原子抢占 — 防止并发 digest 同一 record ────────
@@ -116,6 +133,7 @@ export async function digestRecords(
     const digestResp = await chatCompletion(digestMessages, {
       json: true,
       temperature: 0.3,
+      tier: "fast",
     });
 
     let rawStrikes: RawStrike[];

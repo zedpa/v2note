@@ -33,17 +33,23 @@ export interface CognitiveReport {
 
 const today = () => new Date().toISOString().split("T")[0];
 
-export async function generateCognitiveReport(userId: string): Promise<CognitiveReport> {
+export async function generateCognitiveReport(
+  opts: { userId?: string; deviceId?: string },
+): Promise<CognitiveReport> {
   const todayStr = today();
+  // 支持 userId 或 deviceId 查询（无登录用户时走 device 路径）
+  const [strikeWhere, todoWhere, params] = opts.userId
+    ? ["user_id = $1", "user_id = $1", [opts.userId]]
+    : ["source_id IN (SELECT id FROM record WHERE device_id = $1)", "device_id = $1", [opts.deviceId!]];
 
   // 1. 今日极性分布（只统计 think）
   const polarityRows = await query<{ polarity: string; count: string }>(
     `SELECT polarity, COUNT(*) as count FROM strike
-     WHERE user_id = $1 AND status = 'active'
+     WHERE ${strikeWhere} AND status = 'active'
        AND COALESCE(source_type, 'think') != 'material'
        AND created_at::date = $2::date
      GROUP BY polarity`,
-    [userId, todayStr],
+    [...params, todayStr],
   );
 
   const polarityMap: Record<string, number> = {};
@@ -69,11 +75,11 @@ export async function generateCognitiveReport(userId: string): Promise<Cognitive
      FROM bond b
      JOIN strike sa ON sa.id = b.source_strike_id
      JOIN strike sb ON sb.id = b.target_strike_id
-     WHERE sa.user_id = $1 AND b.type = 'contradiction'
+     WHERE sa.${strikeWhere} AND b.type = 'contradiction'
        AND b.created_at::date = $2::date
      ORDER BY b.strength DESC
      LIMIT 5`,
-    [userId, todayStr],
+    [...params, todayStr],
   );
 
   const contradictions = contradictionRows.slice(0, 5).map((r) => ({
@@ -85,9 +91,9 @@ export async function generateCognitiveReport(userId: string): Promise<Cognitive
   // 3. Cluster 变化（今日新建的）
   const newClusters = await query<{ nucleus: string }>(
     `SELECT nucleus FROM strike
-     WHERE user_id = $1 AND is_cluster = true AND status = 'active'
+     WHERE ${strikeWhere} AND is_cluster = true AND status = 'active'
        AND created_at::date = $2::date`,
-    [userId, todayStr],
+    [...params, todayStr],
   );
 
   const cluster_changes = newClusters.map((c) => ({
@@ -101,8 +107,8 @@ export async function generateCognitiveReport(userId: string): Promise<Cognitive
        COUNT(*)::text as total,
        COUNT(*) FILTER (WHERE done = true)::text as done
      FROM todo
-     WHERE user_id = $1 AND created_at::date = $2::date`,
-    [userId, todayStr],
+     WHERE ${todoWhere} AND created_at::date = $2::date`,
+    [...params, todayStr],
   );
 
   const totalTodos = parseInt(todoStats[0]?.total ?? "0", 10);

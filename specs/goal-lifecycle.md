@@ -1,6 +1,6 @@
 # 目标全生命周期
 
-> 状态：✅ completed | 优先级：Phase 4（目标闭环）| 预计：5-6 天
+> 状态：⚠️ 部分完成（核心CRUD✅，Skip→alert和7天result追踪不完整）| 优先级：Phase 4（目标闭环）
 > 依赖：todo-strike-bridge（数据桥梁）
 
 ## 概述

@@ -44,7 +44,7 @@ export async function aggregateTodos(
       },
       { role: "user", content: todoText },
     ],
-    { temperature: 0.5 },
+    { temperature: 0.5, tier: "background" },
   );
 
   // Save as a new record

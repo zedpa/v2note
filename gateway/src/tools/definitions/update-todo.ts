@@ -6,7 +6,7 @@ export const updateTodoTool: ToolDefinition = {
   name: "update_todo",
   description: `更新待办事项——修改文本、时间、优先级，或标记完成/重新打开。
 使用：用户要修改待办（"改一下时间"、"标记完成"、"把那个待办改成xxx"）。
-不用：用户要删除待办 → 用 delete_record。
+不用：用户要删除待办 → 用 delete_todo。
 不用：用户要创建新待办 → 用 create_todo。`,
   parameters: z.object({
     todo_id: z.string().min(1).describe("待办事项 ID"),

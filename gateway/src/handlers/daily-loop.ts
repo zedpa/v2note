@@ -16,6 +16,7 @@ import { generateAlerts } from "../cognitive/alerts.js";
 import { generateCognitiveReport } from "../cognitive/report.js";
 import { aiDiaryRepo } from "../db/repositories/index.js";
 import { autoCollectVocabulary } from "../cognitive/auto-vocabulary.js";
+import { safeParseJson } from "../lib/text-utils.js";
 
 // ── Types ──
 
@@ -77,9 +78,9 @@ export async function generateMorningBriefing(
 
   // Check cache first (2-hour TTL)
   try {
-    const cached = await briefingRepo.findFresh(deviceId, today, "morning", 2);
+    const cached = await briefingRepo.findFresh(deviceId, today, "morning", 2, userId);
     if (cached) {
-      console.log(`[daily-loop] Using cached morning briefing for ${deviceId}`);
+      console.log(`[daily-loop] Using cached morning briefing for ${userId ?? deviceId}`);
       return cached.content as BriefingResult;
     }
   } catch (err: any) {
@@ -110,14 +111,15 @@ export async function generateMorningBriefing(
   // 2. 活跃目标 + 每个目标下的今日待办
   let goalContext = "";
   try {
-    const uid = userId ?? deviceId;
     const activeGoals = userId
-      ? await goalRepo.findActiveByUser(uid)
-      : await goalRepo.findActiveByDevice(uid);
+      ? await goalRepo.findActiveByUser(userId)
+      : await goalRepo.findActiveByDevice(deviceId);
     if (activeGoals.length > 0) {
+      const topGoals = activeGoals.slice(0, 5);
+      const allTodosForGoals = await goalRepo.findTodosByGoalIds(topGoals.map((g) => g.id));
       const goalLines: string[] = [];
-      for (const g of activeGoals.slice(0, 5)) {
-        const todos = await goalRepo.findWithTodos(g.id);
+      for (const g of topGoals) {
+        const todos = allTodosForGoals.filter((t) => t.parent_id === g.id);
         const pending = todos.filter((t) => !t.done);
         const done = todos.filter((t) => t.done);
         goalLines.push(
@@ -151,18 +153,10 @@ export async function generateMorningBriefing(
     ? await todoRepo.countByUserDateRange(userId, yesterdayStart, yesterdayEnd)
     : await todoRepo.countByDateRange(deviceId, yesterdayStart, yesterdayEnd);
 
-  // 5. 连续记录天数
+  // 5. 连续记录天数（单次 SQL 查询）
   let streak = 0;
   try {
-    for (let i = 1; i <= 30; i++) {
-      const d = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
-      const ds = d.toISOString().split("T")[0];
-      const count = userId
-        ? await todoRepo.countByUserDateRange(userId, `${ds}T00:00:00Z`, `${ds}T23:59:59Z`)
-        : await todoRepo.countByDateRange(deviceId, `${ds}T00:00:00Z`, `${ds}T23:59:59Z`);
-      if (count.total > 0) streak++;
-      else break;
-    }
+    streak = await todoRepo.getStreak({ userId: userId ?? undefined, deviceId });
   } catch {
     // non-critical
   }
@@ -253,8 +247,13 @@ ${aiActionableContext}
     const response = await chatCompletion(messages, {
       json: true,
       temperature: 0.5,
+      tier: "report",
     });
-    const parsed = JSON.parse(response.content) as BriefingResult;
+    const parsed = safeParseJson<BriefingResult>(response.content);
+    if (!parsed) {
+      console.error("[daily-loop] Failed to parse briefing JSON, raw:", response.content.slice(0, 200));
+      throw new Error("AI 返回格式异常");
+    }
 
     // 确保 stats 不为空
     if (!parsed.stats) {
@@ -279,11 +278,11 @@ ${aiActionableContext}
 
     // Cache
     try {
-      await briefingRepo.upsert(deviceId, today, "morning", parsed);
+      await briefingRepo.upsert(deviceId, today, "morning", parsed, userId);
     } catch (cacheErr: any) {
       console.warn(`[daily-loop] Failed to cache briefing: ${cacheErr.message}`);
     }
-    console.log(`[daily-loop] Morning briefing generated for ${deviceId}`);
+    console.log(`[daily-loop] Morning briefing generated for ${userId ?? deviceId}`);
     return parsed;
   } catch (err: any) {
     console.error(`[daily-loop] AI briefing generation failed: ${err.message}`);
@@ -307,7 +306,7 @@ ${aiActionableContext}
       },
     };
 
-    try { await briefingRepo.upsert(deviceId, today, "morning", fallback); } catch { /* ignore */ }
+    try { await briefingRepo.upsert(deviceId, today, "morning", fallback, userId); } catch { /* ignore */ }
     return fallback;
   }
 }
@@ -325,9 +324,9 @@ export async function generateEveningSummary(
 
   // Check cache
   try {
-    const cached = await briefingRepo.findFresh(deviceId, today, "evening", 2);
+    const cached = await briefingRepo.findFresh(deviceId, today, "evening", 2, userId);
     if (cached) {
-      console.log(`[daily-loop] Using cached evening summary for ${deviceId}`);
+      console.log(`[daily-loop] Using cached evening summary for ${userId ?? deviceId}`);
       return cached.content as SummaryResult;
     }
   } catch (err: any) {
@@ -387,8 +386,8 @@ export async function generateEveningSummary(
   let cognitiveSection = "";
   let totalStrikes = 0;
   try {
-    const uid = userId ?? deviceId;
-    const report = await generateCognitiveReport(uid);
+    const ownerOpts = userId ? { userId } : { deviceId };
+    const report = await generateCognitiveReport(ownerOpts);
     if (!report.is_empty) {
       const lines: string[] = [];
       const { today_strikes: ts } = report;
@@ -419,8 +418,7 @@ export async function generateEveningSummary(
   // 6b. 认知矛盾提醒（供回顾反思）
   let alertSection = "";
   try {
-    const uid = userId ?? deviceId;
-    const alerts = await generateAlerts(uid);
+    const alerts = await generateAlerts(userId ? { userId } : { deviceId });
     if (alerts.length > 0) {
       const alertLines = alerts.slice(0, 3).map((a) => {
         const aShort = a.strikeA.nucleus.slice(0, 30);
@@ -455,16 +453,17 @@ export async function generateEveningSummary(
   // 7. 目标维度回顾
   let goalSection = "";
   try {
-    const uid = userId ?? deviceId;
     const activeGoals = userId
-      ? await goalRepo.findActiveByUser(uid)
-      : await goalRepo.findActiveByDevice(uid);
+      ? await goalRepo.findActiveByUser(userId)
+      : await goalRepo.findActiveByDevice(deviceId);
     if (activeGoals.length > 0) {
+      const topGoals = activeGoals.slice(0, 5);
+      const allTodosForGoals = await goalRepo.findTodosByGoalIds(topGoals.map((g) => g.id));
       const goalLines: string[] = [];
-      for (const g of activeGoals.slice(0, 5)) {
-        const todos = await goalRepo.findWithTodos(g.id);
-        const completedToday = allTodos.filter(
-          (t) => (t as any).goal_id === g.id && t.done && t.completed_at?.startsWith(today),
+      for (const g of topGoals) {
+        const todos = allTodosForGoals.filter((t) => t.parent_id === g.id);
+        const completedToday = todos.filter(
+          (t) => t.done && t.completed_at?.startsWith(today),
         );
         const remaining = todos.filter((t) => !t.done);
         goalLines.push(
@@ -481,11 +480,11 @@ export async function generateEveningSummary(
   let skipAlertSection = "";
   let resultTrackingSection = "";
   try {
-    const uid = userId ?? deviceId;
+    const ownerOpts = userId ? { userId } : { deviceId };
     const { getSkipAlerts, getResultTrackingPrompts } = await import("../cognitive/action-tracking.js");
     const [skipAlerts, resultPrompts] = await Promise.all([
-      getSkipAlerts(uid),
-      getResultTrackingPrompts(uid),
+      getSkipAlerts(ownerOpts),
+      getResultTrackingPrompts(ownerOpts),
     ]);
     if (skipAlerts.length > 0) {
       skipAlertSection = `\n## 需要关注的行动\n${skipAlerts.map((a) => `- ${a.description}`).join("\n")}\n请在 attention_needed 中温和提及。`;
@@ -556,8 +555,13 @@ ${cognitiveDigest}${cognitiveSection}${alertSection}${goalSection}${skipAlertSec
     const response = await chatCompletion(messages, {
       json: true,
       temperature: 0.5,
+      tier: "report",
     });
-    const parsed = JSON.parse(response.content) as SummaryResult;
+    const parsed = safeParseJson<SummaryResult>(response.content);
+    if (!parsed) {
+      console.error("[daily-loop] Failed to parse summary JSON, raw:", response.content.slice(0, 200));
+      throw new Error("AI 返回格式异常");
+    }
 
     // 确保 stats 不为空
     if (!parsed.stats) {
@@ -579,7 +583,7 @@ ${cognitiveDigest}${cognitiveSection}${alertSection}${goalSection}${skipAlertSec
     }
 
     // Cache
-    try { await briefingRepo.upsert(deviceId, today, "evening", parsed); } catch { /* ignore */ }
+    try { await briefingRepo.upsert(deviceId, today, "evening", parsed, userId); } catch { /* ignore */ }
 
     // 将 tomorrow_preview 存入 memory，供明日简报参考
     try {
@@ -631,7 +635,7 @@ ${cognitiveDigest}${cognitiveSection}${alertSection}${goalSection}${skipAlertSec
       },
     };
 
-    try { await briefingRepo.upsert(deviceId, today, "evening", fallback); } catch { /* ignore */ }
+    try { await briefingRepo.upsert(deviceId, today, "evening", fallback, userId); } catch { /* ignore */ }
     return fallback;
   }
 }

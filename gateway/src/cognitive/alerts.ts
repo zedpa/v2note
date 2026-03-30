@@ -31,8 +31,13 @@ function formatDate(dateStr: string): string {
 }
 
 export async function generateAlerts(
-  userId: string,
+  opts: { userId?: string; deviceId?: string },
 ): Promise<CognitiveAlert[]> {
+  // 支持 userId 或 deviceId（无登录用户走 device 路径）
+  const [where, params] = opts.userId
+    ? ["sa.user_id = $1", [opts.userId]]
+    : ["sa.source_id IN (SELECT id FROM record WHERE device_id = $1)", [opts.deviceId!]];
+
   // Find contradiction bonds created in the last 7 days, with both strikes' info
   const rows = await query<RecentContradiction>(
     `SELECT b.*,
@@ -41,13 +46,13 @@ export async function generateAlerts(
      FROM bond b
      JOIN strike sa ON sa.id = b.source_strike_id
      JOIN strike sb ON sb.id = b.target_strike_id
-     WHERE sa.user_id = $1
+     WHERE ${where}
        AND b.type = 'contradiction'
        AND b.created_at >= NOW() - INTERVAL '7 days'
        AND COALESCE(sa.source_type, 'think') != 'material'
        AND COALESCE(sb.source_type, 'think') != 'material'
      ORDER BY b.created_at DESC`,
-    [userId],
+    params,
   );
 
   return rows.map((r) => ({

@@ -1,6 +1,7 @@
 # source_type 权重全链路落地
 
-> 状态：✅ 已完成 | 优先级：Phase 1 | 完成日期：2026-03-24
+> 状态：⚠️ 部分完成（retrieval降权✅，clustering未过滤material）| 优先级：Phase 1
+> ⚠️ batch-analyze-prompt中未过滤material Strike参与聚类种子
 
 ## 概述
 Ingest 层区分了 think/material，retrieval.ts 已实现 material ×0.2 降权，但 clustering 和 emergence 管道中 material Strike 未被过滤。一份 50 页 PDF 会产出几十个高权重 Strike，直接污染 Cluster 结构和认知地图。同时需要统一 cluster_member 存储方式（migration 017 建了 cluster_member 表，但代码用 bond.type='cluster_member'）。
