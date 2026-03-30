@@ -16,6 +16,8 @@ export interface StrikeEntry {
   is_cluster: boolean;
   level: number | null;
   origin: string | null;
+  domain: string | null;
+  embedding: any | null;
   created_at: string;
   digested_at: string | null;
 }
@@ -34,25 +36,34 @@ export async function create(fields: {
   is_cluster?: boolean;
   level?: number;
   origin?: string;
+  embedding?: number[];
 }): Promise<StrikeEntry> {
+  const hasEmbedding = fields.embedding && fields.embedding.length > 0;
+  const cols = "user_id, nucleus, polarity, field, source_id, source_span, source_type, confidence, salience, status, is_cluster, level, origin"
+    + (hasEmbedding ? ", embedding" : "");
+  const placeholders = "$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13"
+    + (hasEmbedding ? ", $14::vector" : "");
+  const params: any[] = [
+    fields.user_id,
+    fields.nucleus,
+    fields.polarity,
+    JSON.stringify(fields.field ?? {}),
+    fields.source_id ?? null,
+    fields.source_span ?? null,
+    fields.source_type ?? "voice",
+    fields.confidence ?? 0.5,
+    fields.salience ?? 1.0,
+    fields.status ?? "active",
+    fields.is_cluster ?? false,
+    fields.level ?? null,
+    fields.origin ?? null,
+  ];
+  if (hasEmbedding) {
+    params.push(`[${fields.embedding!.join(",")}]`);
+  }
   const row = await queryOne<StrikeEntry>(
-    `INSERT INTO strike (user_id, nucleus, polarity, field, source_id, source_span, source_type, confidence, salience, status, is_cluster, level, origin)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING *`,
-    [
-      fields.user_id,
-      fields.nucleus,
-      fields.polarity,
-      JSON.stringify(fields.field ?? {}),
-      fields.source_id ?? null,
-      fields.source_span ?? null,
-      fields.source_type ?? "voice",
-      fields.confidence ?? 0.5,
-      fields.salience ?? 1.0,
-      fields.status ?? "active",
-      fields.is_cluster ?? false,
-      fields.level ?? null,
-      fields.origin ?? null,
-    ],
+    `INSERT INTO strike (${cols}) VALUES (${placeholders}) RETURNING *`,
+    params,
   );
   return row!;
 }

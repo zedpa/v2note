@@ -1,5 +1,6 @@
 import { strikeRepo, strikeTagRepo, bondRepo, todoRepo } from "../db/repositories/index.js";
 import { query } from "../db/pool.js";
+import { writeStrikeEmbedding } from "./embed-writer.js";
 import type { Todo } from "../db/repositories/todo.js";
 
 export interface SwipeEvent {
@@ -70,6 +71,7 @@ async function handleLeftSwipe(
         confidence: 0.8,
         salience: 0.6,
       });
+      void writeStrikeEmbedding(feelStrike.id, feelStrike.nucleus);
       // Bond it to the original
       await bondRepo.create({
         source_strike_id: strikeId,

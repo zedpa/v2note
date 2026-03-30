@@ -199,6 +199,7 @@ export interface TodoItem {
   status?: string
   subtask_count?: number
   subtask_done_count?: number
+  goal_title?: string | null
 }
 
 export interface Goal {

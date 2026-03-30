@@ -4,6 +4,7 @@ import { query, queryOne } from "../db/pool.js";
 import { strikeRepo, bondRepo, goalRepo } from "../db/repositories/index.js";
 import type { StrikeEntry } from "../db/repositories/strike.js";
 import type { Goal } from "../db/repositories/goal.js";
+import { writeStrikeEmbedding } from "../cognitive/embed-writer.js";
 
 // ── Types ──
 
@@ -253,6 +254,8 @@ export function registerTopicRoutes(router: Router) {
         confidence: 1.0,
         salience: 1.0,
       });
+
+      void writeStrikeEmbedding(reviewStrike.id, `${goal.title} 已完成`);
 
       // 3. 如果 goal 有 cluster_id，创建 bond 关联到 cluster
       if (goal.cluster_id) {

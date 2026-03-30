@@ -14,6 +14,7 @@ import { eventBus, type TodoCreatedEvent } from "../lib/event-bus.js";
 import type { StrikeEntry } from "../db/repositories/strike.js";
 import type { Todo } from "../db/repositories/todo.js";
 import type { Goal } from "../db/repositories/goal.js";
+import { writeTodoEmbedding } from "./embed-writer.js";
 
 const MIN_SALIENCE = 0.1;
 const COMPLETED_SALIENCE_FACTOR = 0.3;
@@ -115,6 +116,7 @@ export async function projectIntendStrike(
   strike: StrikeEntry,
   userId?: string,
 ): Promise<Todo | Goal | null> {
+  const tp0 = Date.now();
   if (strike.polarity !== "intend") return null;
   if (!strike.source_id) return null;
 
@@ -145,6 +147,18 @@ export async function projectIntendStrike(
       source: "explicit",
     });
 
+    // 异步写入 goal embedding
+    void writeTodoEmbedding(goal.id, strike.nucleus, 1);
+
+    // 通知前端：目标已创建
+    eventBus.emit("todo.created", {
+      deviceId,
+      userId: uid,
+      todoText: strike.nucleus,
+      todoId: goal.id,
+      recordId: strike.source_id ?? undefined,
+    } satisfies TodoCreatedEvent);
+
     // 自动关联 cluster（通过 embedding 匹配）
     await linkNewGoalToCluster(goal.id, uid);
 
@@ -155,6 +169,7 @@ export async function projectIntendStrike(
       );
     }
 
+    console.log(`[todo-projector][⏱] ${Date.now() - tp0}ms — created goal "${strike.nucleus.slice(0, 30)}" → event emitted`);
     return goal;
   }
 
@@ -169,6 +184,9 @@ export async function projectIntendStrike(
 
   const todo = await todoRepo.create(createFields);
 
+  // 异步写入 embedding
+  void writeTodoEmbedding(todo.id, strike.nucleus, 0);
+
   // 写入时间/优先级等结构化字段
   const updateFields: Parameters<typeof todoRepo.update>[1] = {};
   if (parsed.scheduled_start) updateFields.scheduled_start = parsed.scheduled_start;
@@ -181,12 +199,14 @@ export async function projectIntendStrike(
 
   // 通知前端：待办已创建
   eventBus.emit("todo.created", {
-    deviceId: strike.user_id,
+    deviceId,
+    userId: uid,
     todoText: strike.nucleus,
     todoId: todo.id,
     recordId: strike.source_id ?? undefined,
   } satisfies TodoCreatedEvent);
 
+  console.log(`[todo-projector][⏱] ${Date.now() - tp0}ms — created todo "${strike.nucleus.slice(0, 30)}" → event emitted`);
   return todo;
 }
 

@@ -116,17 +116,13 @@ tags 返回空数组 []，不要创建任何标签。`);
   "summary": "清理后文本",
   "intents": [{"type": "task|wish|goal|complaint|reflection", "text": "", "context": ""}],
   "relays": [{"text": "", "source_person": "", "target_person": "", "context": "", "direction": "outgoing|incoming"}],
-  "tags": [],
-  "customer_requests": [],
-  "setting_changes": []
+  "tags": []
 }
 
 - \`summary\`: string — 清理后的转写文本
 - \`intents\`: 识别到的意图数组（每条含 type, text, 可选 context）
 - \`relays\`: 信息转达任务数组
 - \`tags\`: 从已有标签中匹配的标签
-- \`customer_requests\`: string[] — 客户需求（需启用相关技能才提取，否则空数组）
-- \`setting_changes\`: string[] — 设置变更（需启用相关技能才提取，否则空数组）
 
 如果某个字段没有相关内容，返回空数组 []。不要包含额外的字段或注释。`);
 

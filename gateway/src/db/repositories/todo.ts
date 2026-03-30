@@ -33,15 +33,19 @@ export interface Todo {
   cluster_id?: string | null;
   /** 状态（level>=1 时使用）：active/paused/completed/abandoned/progressing/blocked/suggested/dismissed（DB DEFAULT 'active'） */
   status?: string;
+  /** 父目标名称（JOIN 得到，非 DB 列） */
+  goal_title?: string | null;
 }
 
 export async function findByDevice(deviceId: string): Promise<Todo[]> {
   return query<Todo>(
     `SELECT t.*,
             COALESCE(sc.cnt, 0)::int AS subtask_count,
-            COALESCE(sc.done_cnt, 0)::int AS subtask_done_count
+            COALESCE(sc.done_cnt, 0)::int AS subtask_done_count,
+            p.text AS goal_title
      FROM todo t
      LEFT JOIN record r ON r.id = t.record_id
+     LEFT JOIN todo p ON p.id = t.parent_id AND p.level >= 1
      LEFT JOIN LATERAL (
        SELECT COUNT(*)::int AS cnt, COUNT(*) FILTER (WHERE done)::int AS done_cnt
        FROM todo sub WHERE sub.parent_id = t.id
@@ -56,9 +60,11 @@ export async function findByUser(userId: string): Promise<Todo[]> {
   return query<Todo>(
     `SELECT t.*,
             COALESCE(sc.cnt, 0)::int AS subtask_count,
-            COALESCE(sc.done_cnt, 0)::int AS subtask_done_count
+            COALESCE(sc.done_cnt, 0)::int AS subtask_done_count,
+            p.text AS goal_title
      FROM todo t
      LEFT JOIN record r ON r.id = t.record_id
+     LEFT JOIN todo p ON p.id = t.parent_id AND p.level >= 1
      LEFT JOIN LATERAL (
        SELECT COUNT(*)::int AS cnt, COUNT(*) FILTER (WHERE done)::int AS done_cnt
        FROM todo sub WHERE sub.parent_id = t.id

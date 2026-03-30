@@ -53,8 +53,8 @@ async function request<T>(
     if (refreshed) {
       return request<T>(method, path, body, true);
     }
-    // Refresh failed — clear auth and throw
-    await auth.logout();
+    // Refresh failed — clear auth（会触发 auth:logout 事件）and throw
+    await auth.logout("token_expired");
     throw new Error("登录已过期，请重新登录");
   }
 

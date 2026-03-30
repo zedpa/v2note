@@ -1,6 +1,9 @@
 /**
  * Client-side authentication state management.
  * Stores tokens in cross-platform storage (Capacitor Preferences / localStorage).
+ *
+ * 事件系统：当登录态发生变化时广播 "auth:logout" 事件，
+ * 供 useAuth / gateway-client 等订阅方实时响应。
  */
 
 import { getItem, setItem, removeItem } from "./storage";
@@ -14,6 +17,22 @@ let _accessToken: string | null = null;
 let _refreshToken: string | null = null;
 let _user: AppUser | null = null;
 let _initialized = false;
+
+// ── 认证状态事件总线 ──────────────────────────────────────────────
+type AuthEventType = "auth:logout";
+type AuthListener = (reason?: string) => void;
+const _listeners = new Map<AuthEventType, Set<AuthListener>>();
+
+/** 订阅认证事件，返回取消函数 */
+export function onAuthEvent(event: AuthEventType, fn: AuthListener): () => void {
+  if (!_listeners.has(event)) _listeners.set(event, new Set());
+  _listeners.get(event)!.add(fn);
+  return () => { _listeners.get(event)?.delete(fn); };
+}
+
+function emitAuthEvent(event: AuthEventType, reason?: string) {
+  _listeners.get(event)?.forEach((fn) => fn(reason));
+}
 
 /** Initialize auth state from storage (call once at startup) */
 export async function initAuth(): Promise<void> {
@@ -73,11 +92,16 @@ export async function updateTokens(accessToken: string, refreshToken: string): P
   await setItem(KEY_REFRESH_TOKEN, refreshToken);
 }
 
-export async function logout(): Promise<void> {
+export async function logout(reason?: string): Promise<void> {
+  const wasLoggedIn = !!_accessToken && !!_user;
   _accessToken = null;
   _refreshToken = null;
   _user = null;
   await removeItem(KEY_ACCESS_TOKEN);
   await removeItem(KEY_REFRESH_TOKEN);
   await removeItem(KEY_USER);
+  // 只在确实从登录态变为未登录时广播
+  if (wasLoggedIn) {
+    emitAuthEvent("auth:logout", reason);
+  }
 }

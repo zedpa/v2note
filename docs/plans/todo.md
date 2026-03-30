@@ -161,6 +161,44 @@ Digest 使用 fast 层（qwen-plus），但 13s 仍然偏慢。可能原因：
 
 ---
 
+## 数据库 Schema 清理 + Embedding 持久化（P0 — 2026-03-30 完成）
+
+> Spec: `specs/042-schema-cleanup-and-embedding.md`
+
+### Schema 修复（Migration 042）
+- [x] **strike.embedding 列创建** — `vector(1024)` + HNSW 索引（修复语义匹配全部静默失败）
+- [x] **todo_embedding / goal_embedding 表创建** — 独立 embedding 表 + HNSW 索引 + RLS
+- [x] **device_id TEXT → UUID** — `pending_intent` / `agent_plan` 类型与 `device(id)` 统一
+- [x] **goal 表 → VIEW** — `DROP TABLE goal` → `CREATE VIEW goal AS SELECT FROM todo WHERE level >= 1`
+- [x] **废弃表删除** — DROP `weekly_review`、`customer_request`、`setting_change`
+- [x] **domain CHECK 约束** — 中文域值（工作/学习/创业/家庭/健康/生活/社交）+ NULL 允许
+- [x] **复合索引补全** — `idx_strike_user_created`、`idx_todo_user_done_level`、`idx_todo_device_done_level`
+
+### Embedding 持久化链路
+- [x] **`embed-writer.ts` 新建** — `writeStrikeEmbedding()` / `writeTodoEmbedding()` / `backfillStrikeEmbeddings()`
+- [x] **fire-and-forget 异步模式** — `void writeStrikeEmbedding(id, text)`，不阻塞主链路
+- [x] **12 个写入点接入** — digest、batch-analyze、emergence、top-level、todo-projector、swipe-tracker、topics、create-todo
+- [x] **todo_embedding 按 level 路由** — level >= 1 → goal_embedding, level 0 → todo_embedding
+- [x] **retrieval.ts 重写** — O(N) API 调用 → pgvector SQL 查询（单次 getEmbedding + DB 索引检索）
+
+### 配套代码清理
+- [x] **link-device.ts** — 移除 `"goal"`（VIEW）和 `"weekly_review"`（已 DROP），添加 `"todo"`
+- [x] **time-estimator.ts** — domain 英文 → 中文（work → 工作）
+- [x] **死代码删除** — `customer-request.ts`、`setting-change.ts`、`repositories/index.ts` 清理
+- [x] **process.ts / process-prompt.ts** — 移除 `customer_requests` / `setting_changes` 字段
+
+### batch-analyze 超时修复
+- [x] **根因定位** — `tier: "report"`（qwen3.5-plus 推理）处理 >6 strikes 时超时（thinking tokens 占 96%+）
+- [x] **修复** — `batch-analyze.ts` tier 改为 `"fast"`（qwen-plus 无推理），30 strikes 6s 完成，6 个质量 cluster
+
+### E2E 核心链路测试
+- [x] **`e2e/core-pipeline.spec.ts`** — 15 个串行测试覆盖完整链路
+  - 设备注册 → 用户注册 → flomo HTML 批量导入 → digest 等待 → strikes 验证
+  - embedding 验证 → todo 提取 → tags → batch-analyze 聚类 → 认知统计 → 目标/意图
+- [x] **实测结果** — 9 records, 34 Strikes（全部带 embedding）, 35 Bonds, 6 Clusters, 12 Todos, 10 Goals
+
+---
+
 ## 4/1 上线前（P0）
 
 ### Agent 交互能力补全
@@ -176,9 +214,11 @@ Digest 使用 fast 层（qwen-plus），但 13s 仍然偏慢。可能原因：
 - [ ] VoiceAction 分类完全改为规则（消除 `classifyVoiceIntent` AI 调用）
 
 ### 数据完整性
+- [x] 执行 Migration `042_schema_cleanup.sql`（embedding 列 + 表清理 + domain 约束 + 索引）
 - [ ] 执行 Migration `029_cognitive_snapshot.sql`（cognitive_snapshot 表）
 - [ ] 执行 Migration `030_strike_source_cascade.sql`（strike 外键修复）
 - [x] 端到端测试：录音 → Process → Digest → Strike → Todo 投影（E2E 通过）
+- [x] E2E 核心链路测试：批量导入 → 聚类 → 语义匹配 → 目标提取（15/15 通过）
 - [x] Migration `040_todo_updated_at.sql`（goalRepo 适配层依赖）
 - [x] Migration `041_backfill_todo_ownership.sql`（回填历史孤儿 todo）
 
@@ -191,6 +231,10 @@ Digest 使用 fast 层（qwen-plus），但 13s 仍然偏慢。可能原因：
 - [x] Digest userId 查找链（record → device → skip，修复 FK 违反）
 - [ ] ASR session 竞态：用户快速重录时 close 事件可能被忽略（需验证修复效果）
 - [ ] 前端录音→日记生成验证（gateway 侧已修复，需用户端重测）
+
+### 代码清理
+- [ ] 移除 `batch-analyze.ts` 调试日志（AI raw response / Parsed / cluster skip 的 console.log）
+- [ ] 移除 E2E 测试中的 DEBUG 日志
 
 ---
 
@@ -212,17 +256,15 @@ Digest 使用 fast 层（qwen-plus），但 13s 仍然偏慢。可能原因：
 - [ ] 工具调用链：AI 自动规划多步操作（"创建项目 → 拆解目标 → 排期"一气呵成）
 
 ### 认知引擎
-- [ ] Tier2 端到端验证（真实数据 batch-analyze 效果）
+- [x] Tier2 端到端验证（真实数据 batch-analyze 效果）— 8 条 flomo 笔记 → 6 个质量 cluster
 - [ ] 认知报告 UI（每周/月维度的认知变化可视化）
 - [ ] cluster 演化追踪（增长/萎缩/分裂/合并时间线）
 
 ### DB 优化
 - [ ] **Strike 批量写入** — `createBatch(strikes[])` + `ON CONFLICT DO NOTHING`
-- [ ] **Todo findPendingByUser 修复** — `JOIN record` 改为 `WHERE user_id = $1`
-- [ ] **索引补全**
-  - `CREATE INDEX idx_strike_source_nucleus ON strike(source_id, nucleus)`
-  - `CREATE INDEX idx_todo_user_status ON todo(user_id, status)`
-  - `CREATE INDEX idx_todo_device_status ON todo(device_id, status)`
+- [x] **Embedding 持久化** — strike.embedding + todo_embedding + goal_embedding（pgvector HNSW）
+- [x] **retrieval.ts pgvector 切换** — O(N) API → O(logN) 索引查询
+- [x] **索引补全** — `idx_strike_user_created`、`idx_todo_user_done_level`、`idx_todo_device_done_level`
 
 ---
 

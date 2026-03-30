@@ -2,6 +2,7 @@
 
 > 状态：✅ 已完成 | 优先级：Phase 4（核心体验）
 > 2026-03-29 修复：eventBus todo.created → WS 推送 → 前端 toast "已创建待办：XXX"
+> 2026-03-30 修复：goal 创建也触发事件 + userId 字段补全 + 测试覆盖
 > 依赖：todo-strike-bridge（数据桥梁）, agent-tool-layer + agent-plan（Agent 能力）
 
 ## 概述

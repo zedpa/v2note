@@ -69,12 +69,27 @@ export type GatewayResponse =
 type MessageHandler = (msg: GatewayResponse) => void;
 
 import { getGatewayWsUrl } from "@/shared/lib/gateway-url";
-import { getAccessToken } from "@/shared/lib/auth";
+import { getAccessToken, logout as authLogout, onAuthEvent } from "@/shared/lib/auth";
 import { getApiDeviceId } from "@/shared/lib/api";
 import { getDeviceId } from "@/shared/lib/device";
 
 const MAX_RECONNECT_ATTEMPTS = 10;
 const BASE_RECONNECT_DELAY = 3000;
+
+/** 尝试通过 REST 刷新 token，成功返回 true */
+async function tryRefreshForWs(): Promise<boolean> {
+  try {
+    const auth = await import("@/shared/lib/auth");
+    const rt = auth.getRefreshTokenValue();
+    if (!rt) return false;
+    const { refreshToken } = await import("@/shared/lib/api/auth");
+    const result = await refreshToken(rt);
+    await auth.updateTokens(result.accessToken, result.refreshToken);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 export class GatewayClient {
   private ws: WebSocket | null = null;
@@ -84,6 +99,8 @@ export class GatewayClient {
   private _connectPromise: Promise<void> | null = null;
   private pendingMessages: GatewayMessage[] = [];
   private reconnectAttempts = 0;
+  private _authRefreshing = false;
+  private _unsubAuthLogout: (() => void) | null = null;
 
   get connected(): boolean {
     return this._connected;
@@ -95,6 +112,14 @@ export class GatewayClient {
     // Manual connect resets retry counter
     if (this.reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
       this.reconnectAttempts = 0;
+    }
+
+    // 监听被动登出事件 → 立即断开，不再重连
+    if (!this._unsubAuthLogout) {
+      this._unsubAuthLogout = onAuthEvent("auth:logout", () => {
+        console.log("[gateway-client] Auth logout detected, disconnecting");
+        this.disconnect();
+      });
     }
 
     this._connectPromise = new Promise<void>((resolve) => {
@@ -137,23 +162,16 @@ export class GatewayClient {
             getDeviceId()
               .then((did) => sendAuth(did))
               .catch(() => {
-                // Even if device lookup fails, flush pending and resolve
-                if (this.pendingMessages.length > 0) {
-                  for (const pending of this.pendingMessages) {
-                    this.ws?.send(JSON.stringify(pending));
-                  }
-                  this.pendingMessages = [];
-                }
+                // device lookup 失败，无法认证，丢弃 pending 并断开
+                console.warn("[gateway-client] No deviceId available, cannot authenticate");
+                this.pendingMessages = [];
                 resolve();
               });
           } else {
-            // No token — not logged in, just flush pending
-            if (this.pendingMessages.length > 0) {
-              for (const pending of this.pendingMessages) {
-                this.ws?.send(JSON.stringify(pending));
-              }
-              this.pendingMessages = [];
-            }
+            // 无 token = 未登录，禁止使用 WebSocket，丢弃 pending 消息并断开
+            console.warn("[gateway-client] No access token, closing unauthenticated connection");
+            this.pendingMessages = [];
+            this.ws?.close();
             resolve();
           }
         };
@@ -161,6 +179,17 @@ export class GatewayClient {
         this.ws.onmessage = (event) => {
           try {
             const msg: GatewayResponse = JSON.parse(event.data);
+
+            // 处理 gateway 认证失败：尝试刷新 token 后重连
+            if (msg.type === "error" && (
+              msg.payload?.message === "Authentication failed" ||
+              msg.payload?.message === "Not authenticated"
+            )) {
+              console.warn("[gateway-client] Auth rejected by gateway, attempting token refresh...");
+              this._handleAuthFailure();
+              return;
+            }
+
             for (const handler of this.handlers) {
               handler(msg);
             }
@@ -205,6 +234,11 @@ export class GatewayClient {
   }
 
   send(msg: GatewayMessage): void {
+    // 未登录时拒绝发送任何消息（auth 消息由 connect 内部处理）
+    if (!getAccessToken()) {
+      console.warn("[gateway-client] Not authenticated, message dropped");
+      return;
+    }
     if (this.ws?.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify(msg));
     } else {
@@ -215,6 +249,7 @@ export class GatewayClient {
 
   /** Send binary data (e.g. PCM audio chunks) */
   sendBinary(data: ArrayBuffer): void {
+    if (!getAccessToken()) return;
     if (this.ws?.readyState === WebSocket.OPEN) {
       this.ws.send(data);
     }
@@ -240,6 +275,46 @@ export class GatewayClient {
     this._connected = false;
     this.pendingMessages = [];
     this.reconnectAttempts = 0;
+    // 清理 auth 事件监听
+    this._unsubAuthLogout?.();
+    this._unsubAuthLogout = null;
+  }
+
+  /**
+   * Gateway 返回 "Authentication failed" 时：
+   * 1. 尝试 REST 刷新 token
+   * 2. 成功 → 重新发送 auth 消息（复用当前连接）
+   * 3. 失败 → 触发 auth:logout 并断开
+   */
+  private async _handleAuthFailure(): Promise<void> {
+    if (this._authRefreshing) return;
+    this._authRefreshing = true;
+    try {
+      const refreshed = await tryRefreshForWs();
+      if (refreshed) {
+        // token 刷新成功，重新发送 auth 消息
+        const token = getAccessToken();
+        const deviceId = getApiDeviceId() ?? await getDeviceId();
+        if (token && this.ws?.readyState === WebSocket.OPEN) {
+          this.ws.send(JSON.stringify({
+            type: "auth",
+            payload: { token, deviceId },
+          }));
+          console.log("[gateway-client] Re-authenticated with refreshed token");
+        }
+      } else {
+        // refresh 也失败，用户需要重新登录
+        console.warn("[gateway-client] Token refresh failed, forcing logout");
+        await authLogout("ws_auth_failed");
+        this.disconnect();
+      }
+    } catch (err: any) {
+      console.error("[gateway-client] Auth failure handling error:", err.message);
+      await authLogout("ws_auth_failed");
+      this.disconnect();
+    } finally {
+      this._authRefreshing = false;
+    }
   }
 }
 

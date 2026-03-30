@@ -12,6 +12,11 @@ vi.mock("@/shared/lib/auth", () => ({
   saveAuthTokens: vi.fn().mockResolvedValue(undefined),
   logout: vi.fn().mockResolvedValue(undefined),
   getRefreshTokenValue: vi.fn().mockReturnValue("rt_123"),
+  onAuthEvent: vi.fn().mockReturnValue(() => {}),
+}));
+
+vi.mock("sonner", () => ({
+  toast: { error: vi.fn(), success: vi.fn(), info: vi.fn() },
 }));
 
 vi.mock("@/shared/lib/api/auth", () => ({

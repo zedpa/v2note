@@ -5,8 +5,16 @@ export async function listTodos(): Promise<any[]> {
 }
 
 export async function createTodo(fields: {
-  record_id: string;
   text: string;
+  record_id?: string;
+  domain?: string;
+  impact?: number;
+  goal_id?: string;
+  scheduled_start?: string;
+  estimated_minutes?: number;
+  parent_id?: string;
+  level?: number;
+  status?: string;
 }): Promise<{ id: string }> {
   return api.post("/api/v1/todos", fields);
 }
@@ -20,6 +28,13 @@ export async function updateTodo(
     scheduled_end?: string | null;
     estimated_minutes?: number | null;
     priority?: number;
+    domain?: string;
+    impact?: number;
+    level?: number;
+    status?: string;
+    ai_actionable?: boolean;
+    ai_action_plan?: string[];
+    parent_id?: string | null;
   },
 ): Promise<void> {
   await api.patch(`/api/v1/todos/${id}`, fields);

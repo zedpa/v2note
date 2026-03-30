@@ -36,6 +36,11 @@ vi.mock("../db/repositories/index.js", () => ({
     upsertByUser: vi.fn(),
     upsertOnboardingField: vi.fn(),
   },
+  todoRepo: {
+    createGoalAsTodo: vi.fn().mockImplementation((fields: any) =>
+      Promise.resolve({ id: `todo-${fields.domain}`, ...fields, done: false, created_at: new Date().toISOString() }),
+    ),
+  },
 }));
 
 vi.mock("../ai/provider.js", () => ({
@@ -192,6 +197,88 @@ describe("场景4: 跳过机制", () => {
     expect(result.ok).toBe(true);
     expect(result.recordCreated).toBe(false);
     expect(result.skipped).toBe(true);
+  });
+});
+
+// =====================================================================
+// top-level-dimensions 场景 1: Q2 创建种子维度
+// =====================================================================
+describe("top-level-dimensions 场景1: seedDimensionGoals", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("should_seed_work_and_startup_dimensions_when_q2_mentions_them", async () => {
+    const { handleOnboardingAnswer } = await import("./onboarding.js");
+    const { todoRepo } = await import("../db/repositories/index.js");
+
+    await handleOnboardingAnswer({
+      userId: "user-1",
+      deviceId: "dev-1",
+      step: 2,
+      answer: "我在铸造厂上班，业余做自己的产品",
+    });
+
+    // seedDimensionGoals 是 fire-and-forget，等它完成
+    await vi.waitFor(() => {
+      expect(todoRepo.createGoalAsTodo).toHaveBeenCalled();
+    });
+
+    const calls = vi.mocked(todoRepo.createGoalAsTodo).mock.calls;
+    const domains = calls.map((c: any[]) => c[0].domain);
+
+    expect(domains).toContain("工作");
+    expect(domains).toContain("创业");
+    // 兜底"生活"
+    expect(domains).toContain("生活");
+    // 每个都是 level=1
+    for (const call of calls) {
+      expect(call[0].level).toBe(1);
+      expect(call[0].status).toBe("active");
+      expect(call[0].user_id).toBe("user-1");
+    }
+  });
+
+  it("should_always_include_life_as_fallback_dimension", async () => {
+    const { handleOnboardingAnswer } = await import("./onboarding.js");
+    const { todoRepo } = await import("../db/repositories/index.js");
+
+    // 只提到投资，没有"生活"关键词
+    await handleOnboardingAnswer({
+      userId: "user-1",
+      deviceId: "dev-1",
+      step: 2,
+      answer: "主要是炒币和投资理财",
+    });
+
+    await vi.waitFor(() => {
+      expect(todoRepo.createGoalAsTodo).toHaveBeenCalled();
+    });
+
+    const calls = vi.mocked(todoRepo.createGoalAsTodo).mock.calls;
+    const domains = calls.map((c: any[]) => c[0].domain);
+    expect(domains).toContain("投资");
+    expect(domains).toContain("生活");
+  });
+
+  it("should_cap_dimensions_at_6", async () => {
+    const { handleOnboardingAnswer } = await import("./onboarding.js");
+    const { todoRepo } = await import("../db/repositories/index.js");
+
+    // 命中所有维度的关键词
+    await handleOnboardingAnswer({
+      userId: "user-1",
+      deviceId: "dev-1",
+      step: 2,
+      answer: "上班做项目开会，学习课程培训，创业融资，带娃家庭，运动锻炼，购物搬家，炒币投资",
+    });
+
+    await vi.waitFor(() => {
+      expect(todoRepo.createGoalAsTodo).toHaveBeenCalled();
+    });
+
+    const calls = vi.mocked(todoRepo.createGoalAsTodo).mock.calls;
+    expect(calls.length).toBeLessThanOrEqual(6);
   });
 });
 

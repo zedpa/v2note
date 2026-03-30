@@ -23,6 +23,7 @@ import { updateSoul } from "../soul/manager.js";
 import { updateProfile } from "../profile/manager.js";
 import { maySoulUpdate, mayProfileUpdate } from "../lib/text-utils.js";
 import { TIER2_STRIKE_THRESHOLD } from "../cognitive/batch-analyze.js";
+import { writeStrikeEmbedding } from "../cognitive/embed-writer.js";
 
 interface RawStrike {
   nucleus: string;
@@ -67,8 +68,10 @@ export async function digestRecords(
   }
 
   try {
+    const dt0 = Date.now();
     // ── Step 0: 原子抢占 — 防止并发 digest 同一 record ────────
     const claimedIds = await recordRepo.claimForDigest(recordIds);
+    console.log(`[digest][⏱ claim] ${Date.now() - dt0}ms — claimed ${claimedIds.length}/${recordIds.length}`);
     if (claimedIds.length === 0) {
       console.log("[digest] All records already claimed, skipping");
       return;
@@ -123,6 +126,7 @@ export async function digestRecords(
     }
 
     const combinedText = textParts.join("\n\n---\n\n");
+    console.log(`[digest][⏱ load-text] ${Date.now() - dt0}ms — text: ${combinedText.length} chars`);
 
     // ── Step 2: AI decomposition (1 次调用) ─────────────────────
     const digestMessages: ChatMessage[] = [
@@ -130,11 +134,13 @@ export async function digestRecords(
       { role: "user", content: combinedText },
     ];
 
+    const dtAi = Date.now();
     const digestResp = await chatCompletion(digestMessages, {
       json: true,
       temperature: 0.3,
       tier: "fast",
     });
+    console.log(`[digest][⏱ ai-call] ${Date.now() - dtAi}ms — response: ${digestResp.content.length} chars`);
 
     let rawStrikes: RawStrike[];
     let rawBonds: RawBond[];
@@ -181,6 +187,9 @@ export async function digestRecords(
         });
         idxToId.set(i, entry.id);
 
+        // 异步写入 embedding（不阻塞主流程）
+        void writeStrikeEmbedding(entry.id, s.nucleus);
+
         // Write tags
         if (s.tags && s.tags.length > 0) {
           await strikeTagRepo.createMany(
@@ -200,8 +209,11 @@ export async function digestRecords(
       }
     }
 
+    console.log(`[digest][⏱ write-strikes] ${Date.now() - dt0}ms — ${idxToId.size} strikes, ${intendEntries.length} intend`);
+
     // intend Strike 并行投影为 todo/goal
     if (intendEntries.length > 0) {
+      const dtProj = Date.now();
       await Promise.all(
         intendEntries.map(({ entry }) =>
           projectIntendStrike(entry, userId).catch((e) =>
@@ -209,6 +221,7 @@ export async function digestRecords(
           ),
         ),
       );
+      console.log(`[digest][⏱ project-intend] ${Date.now() - dtProj}ms — ${intendEntries.length} items`);
     }
 
     // ── Step 4: Write internal Bonds ─────────────────────────────
@@ -231,6 +244,7 @@ export async function digestRecords(
     }
 
     // ── Step 5: 新 Strike 自动关联已有目标 ─────────────────────
+    const dtGoalLink = Date.now();
     try {
       const newStrikesForGoalLink = Array.from(idxToId.entries()).map(([_idx, id]) => ({
         id,
@@ -240,6 +254,7 @@ export async function digestRecords(
     } catch (e) {
       console.error("[digest] Goal auto-link failed:", e);
     }
+    console.log(`[digest][⏱ goal-link] ${Date.now() - dtGoalLink}ms`);
 
     // Step 6 已移除：record 在 Step 0 由 claimForDigest 原子标记
 
@@ -272,6 +287,7 @@ export async function digestRecords(
     try {
       const newCount = await snapshotRepo.countNewStrikes(userId);
       if (newCount >= TIER2_STRIKE_THRESHOLD) {
+        console.log(`[digest][⏱ tier2-trigger] newStrikes=${newCount} >= ${TIER2_STRIKE_THRESHOLD}, launching batch-analyze`);
         const { runBatchAnalyze } = await import("../cognitive/batch-analyze.js");
         runBatchAnalyze(userId).catch((e) =>
           console.warn("[digest] Tier2 batch-analyze failed:", e.message),
@@ -280,6 +296,7 @@ export async function digestRecords(
     } catch (e) {
       console.warn("[digest] Tier2 trigger check failed:", e);
     }
+    console.log(`[digest][⏱ total] ${Date.now() - dt0}ms — pipeline done for ${claimedIds.length} records`);
   } catch (e) {
     console.error("[digest] Pipeline failed:", e);
     // 回滚：管道失败时恢复 digested 状态，允许重试

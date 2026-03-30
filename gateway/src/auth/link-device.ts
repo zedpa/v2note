@@ -16,12 +16,11 @@ export async function linkDeviceToUser(
   // 2. Backfill user_id on all tables that reference device_id
   const tables = [
     "record",
+    "todo",
     "memory",
-    "goal",
     "pending_intent",
     "notebook",
     "ai_diary",
-    "weekly_review",
     "skill_config",
   ];
 

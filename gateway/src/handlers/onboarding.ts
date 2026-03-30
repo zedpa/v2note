@@ -12,13 +12,15 @@ import { recordRepo, transcriptRepo, userProfileRepo, todoRepo } from "../db/rep
 import { digestRecords } from "./digest.js";
 import { appendToDiary } from "../diary/manager.js";
 
-/** 预设维度关键词（与 top-level.ts 保持一致） */
+/** 预设维度关键词（覆盖 9 个核心维度，与 time-estimator domain CHECK 一致） */
 const DOMAIN_KEYWORDS: Array<{ domain: string; keywords: string[] }> = [
   { domain: "工作", keywords: ["上班", "工作", "公司", "项目", "领导", "同事", "会议", "加班", "出差", "业务"] },
   { domain: "学习", keywords: ["学习", "上学", "考试", "读书", "课程", "培训", "技能", "知识"] },
   { domain: "创业", keywords: ["创业", "产品", "创始", "融资", "客户", "市场", "商业", "合伙"] },
+  { domain: "投资", keywords: ["投资", "理财", "股票", "基金", "炒币", "房产", "收益", "风险"] },
   { domain: "家庭", keywords: ["家庭", "孩子", "带娃", "父母", "家人", "婚姻", "伴侣"] },
-  { domain: "健康", keywords: ["健康", "运动", "锻炼", "减肥", "饮食", "睡眠"] },
+  { domain: "健康", keywords: ["健康", "运动", "锻炼", "减肥", "饮食", "睡眠", "医院"] },
+  { domain: "社交", keywords: ["朋友", "社交", "聚会", "人脉", "关系", "沟通"] },
   { domain: "生活", keywords: ["生活", "日常", "购物", "搬家", "租房", "做饭"] },
 ];
 
@@ -95,6 +97,7 @@ export async function handleOnboardingAnswer(
   appendToDiary(deviceId, "default", fullText, userId).catch(() => {});
 
   // 立即触发 Digest（冷启动期不等 batch）
+  console.log(`[onboarding][⏱] Q${step} firing digest for record ${record.id}`);
   digestRecords([record.id], { deviceId, userId }).catch((e) => {
     console.warn("[onboarding] Digest failed:", e.message);
   });

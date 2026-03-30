@@ -222,50 +222,51 @@ wss.on("connection", (ws) => {
     }
 
     try {
-      switch (msg.type) {
-        case "auth": {
-          // WebSocket authentication
-          try {
-            const payload = verifyAccessToken(msg.payload.token);
-            connectionUserMap.set(ws, payload.userId);
-            connectionDeviceMap.set(ws, payload.deviceId);
-            console.log(`[gateway] WebSocket authenticated: user=${payload.userId}, device=${payload.deviceId}`);
-            send(ws, { type: "auth.ok", payload: { userId: payload.userId } });
+      // ── auth 消息单独处理 ──
+      if (msg.type === "auth") {
+        try {
+          const payload = verifyAccessToken(msg.payload.token);
+          connectionUserMap.set(ws, payload.userId);
+          connectionDeviceMap.set(ws, payload.deviceId);
+          console.log(`[gateway] WebSocket authenticated: user=${payload.userId}, device=${payload.deviceId}`);
+          send(ws, { type: "auth.ok", payload: { userId: payload.userId } });
 
-            // Register device with userId for proactive engine
-            proactiveEngine.registerDevice(payload.deviceId, ws, payload.userId);
+          proactiveEngine.registerDevice(payload.deviceId, ws, payload.userId);
 
-            // Send personalized AI status in background
-            generateAiStatus(payload.deviceId, payload.userId)
-              .then((text) => {
-                send(ws, { type: "ai.status", payload: { text } });
-              })
-              .catch((err) => {
-                console.warn("[gateway] AI status generation failed:", err.message);
-              });
-          } catch {
-            send(ws, { type: "error", payload: { message: "Authentication failed" } });
-          }
-          break;
+          generateAiStatus(payload.deviceId, payload.userId)
+            .then((text) => {
+              send(ws, { type: "ai.status", payload: { text } });
+            })
+            .catch((err) => {
+              console.warn("[gateway] AI status generation failed:", err.message);
+            });
+        } catch {
+          send(ws, { type: "error", payload: { message: "Authentication failed" } });
         }
+        return;
+      }
 
+      // ── 认证门控：非 auth 消息必须已认证，禁止游客操作 ──
+      if (!connectionUserMap.has(ws)) {
+        send(ws, { type: "error", payload: { message: "Not authenticated" } });
+        return;
+      }
+
+      const authedUserId = connectionUserMap.get(ws)!;
+
+      switch (msg.type) {
         case "process": {
-          // Inject userId from WebSocket auth
-          const userId = connectionUserMap.get(ws);
-          if (userId) (msg.payload as any).userId = userId;
+          (msg.payload as any).userId = authedUserId;
           const result = await processEntry(msg.payload);
           send(ws, { type: "process.result", payload: result });
           break;
         }
 
         case "chat.start": {
-          // Inject userId from WebSocket auth
-          const userId = connectionUserMap.get(ws);
-          if (userId) (msg.payload as any).userId = userId;
+          (msg.payload as any).userId = authedUserId;
           const stream = await startChat(msg.payload);
           let fullText = "";
           for await (const chunk of stream) {
-            // 工具状态标记：转为独立消息类型，不混入聊天内容
             if (chunk.startsWith("\x00TOOL_STATUS:")) {
               const parts = chunk.slice(13).split(":", 2);
               send(ws, { type: "tool.status", payload: { toolName: parts[0], label: parts[1] } });
@@ -274,7 +275,6 @@ wss.on("connection", (ws) => {
             fullText += chunk;
             send(ws, { type: "chat.chunk", payload: { text: chunk } });
           }
-          // Save assistant response to session
           const session = getSession(msg.payload.deviceId);
           session.context.addMessage({ role: "assistant", content: fullText });
           send(ws, { type: "chat.done", payload: { full_text: fullText } });
@@ -296,7 +296,6 @@ wss.on("connection", (ws) => {
             fullText += chunk;
             send(ws, { type: "chat.chunk", payload: { text: chunk } });
           }
-          // Save assistant response to session
           const session = getSession(msg.payload.deviceId);
           session.context.addMessage({ role: "assistant", content: fullText });
           send(ws, { type: "chat.done", payload: { full_text: fullText } });
@@ -310,8 +309,7 @@ wss.on("connection", (ws) => {
         }
 
         case "todo.aggregate": {
-          const userId = connectionUserMap.get(ws);
-          const result = await aggregateTodos(msg.payload.deviceId, userId);
+          const result = await aggregateTodos(msg.payload.deviceId, authedUserId);
           send(ws, { type: "todo.result", payload: result });
           break;
         }
@@ -319,9 +317,8 @@ wss.on("connection", (ws) => {
         case "asr.start": {
           console.log(`[asr.start] notebook=${msg.payload.notebook}, mode=${msg.payload.mode}`);
           connectionDeviceMap.set(ws, msg.payload.deviceId);
-          const userId = connectionUserMap.get(ws);
-          proactiveEngine.registerDevice(msg.payload.deviceId, ws, userId);
-          await startASR(ws, msg.payload.deviceId, msg.payload.locationText, msg.payload.mode, msg.payload.notebook, userId);
+          proactiveEngine.registerDevice(msg.payload.deviceId, ws, authedUserId);
+          await startASR(ws, msg.payload.deviceId, msg.payload.locationText, msg.payload.mode, msg.payload.notebook, authedUserId);
           break;
         }
 
@@ -353,7 +350,6 @@ wss.on("connection", (ws) => {
             break;
           }
 
-          // 过期检查
           if (Date.now() > pending.expiresAt) {
             session.pendingConfirms.delete(confirm_id);
             send(ws, { type: "action.result", payload: { action: pending.action, success: false, summary: "确认已超时，操作未执行" } });
@@ -367,7 +363,6 @@ wss.on("connection", (ws) => {
             break;
           }
 
-          // 执行实际操作
           if (pending.action === "delete_todo" && pending.todoId) {
             try {
               const todo = await todoRepo.findById(pending.todoId);

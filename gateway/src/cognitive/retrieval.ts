@@ -1,11 +1,11 @@
 /**
  * Hybrid retrieval module for cognitive engine.
  *
- * Combines semantic (embedding) and structured (tag/person/temporal/polarity)
+ * Combines semantic (pgvector) and structured (tag/person/temporal/polarity)
  * channels to find relevant historical Strikes for a given new Strike.
  */
 
-import { getEmbedding, cosineSimilarity } from "../memory/embeddings.js";
+import { getEmbedding } from "../memory/embeddings.js";
 import { query } from "../db/pool.js";
 import * as strikeRepo from "../db/repositories/strike.js";
 import type { StrikeEntry } from "../db/repositories/strike.js";
@@ -33,7 +33,7 @@ function extractChineseNames(text: string): string[] {
 }
 
 // ---------------------------------------------------------------------------
-// Channel A: Semantic retrieval
+// Channel A: Semantic retrieval (pgvector)
 // ---------------------------------------------------------------------------
 
 interface ScoredStrike {
@@ -43,25 +43,28 @@ interface ScoredStrike {
 
 async function semanticChannel(
   nucleus: string,
-  activeStrikes: StrikeEntry[],
+  userId: string,
   topK: number,
 ): Promise<ScoredStrike[]> {
-  if (activeStrikes.length === 0) return [];
+  try {
+    const embedding = await getEmbedding(nucleus);
+    const pgVector = `[${embedding.join(",")}]`;
 
-  const queryEmbedding = await getEmbedding(nucleus);
+    const rows = await query<StrikeEntry & { similarity: number }>(
+      `SELECT *, 1 - (embedding <=> $1::vector) as similarity
+       FROM strike
+       WHERE user_id = $2 AND status = 'active'
+         AND is_cluster = false AND embedding IS NOT NULL
+       ORDER BY embedding <=> $1::vector
+       LIMIT $3`,
+      [pgVector, userId, topK],
+    );
 
-  const scored: ScoredStrike[] = [];
-  for (const s of activeStrikes) {
-    try {
-      const emb = await getEmbedding(s.nucleus);
-      scored.push({ strike: s, similarity: cosineSimilarity(queryEmbedding, emb) });
-    } catch {
-      // skip strikes that fail to embed
-    }
+    return rows.map((r) => ({ strike: r, similarity: r.similarity }));
+  } catch (err) {
+    console.warn("[retrieval] pgvector semantic failed, skipping:", err);
+    return [];
   }
-
-  scored.sort((a, b) => b.similarity - a.similarity);
-  return scored.slice(0, topK);
 }
 
 // ---------------------------------------------------------------------------
@@ -123,37 +126,36 @@ async function temporalChannel(
   );
 }
 
-/** B4: Semantically similar but opposite polarity. */
+/** B4: Semantically similar but opposite polarity (pgvector). */
 async function polarityChannel(
   nucleus: string,
   polarity: string | undefined,
-  activeStrikes: StrikeEntry[],
+  userId: string,
   limit: number,
 ): Promise<StrikeEntry[]> {
-  if (!polarity || activeStrikes.length === 0) return [];
+  if (!polarity) return [];
 
-  const queryEmbedding = await getEmbedding(nucleus);
-  const results: { strike: StrikeEntry; sim: number }[] = [];
+  try {
+    const embedding = await getEmbedding(nucleus);
+    const pgVector = `[${embedding.join(",")}]`;
 
-  for (const s of activeStrikes) {
-    if (s.polarity === polarity) continue; // want opposite polarity
-    try {
-      const emb = await getEmbedding(s.nucleus);
-      const sim = cosineSimilarity(queryEmbedding, emb);
-      if (sim > 0.7) {
-        results.push({ strike: s, sim });
-      }
-    } catch {
-      // skip
-    }
+    return query<StrikeEntry>(
+      `SELECT * FROM strike
+       WHERE user_id = $1 AND status = 'active'
+         AND polarity != $2 AND embedding IS NOT NULL
+         AND 1 - (embedding <=> $3::vector) > 0.7
+       ORDER BY embedding <=> $3::vector
+       LIMIT $4`,
+      [userId, polarity, pgVector, limit],
+    );
+  } catch (err) {
+    console.warn("[retrieval] pgvector polarity failed, skipping:", err);
+    return [];
   }
-
-  results.sort((a, b) => b.sim - a.sim);
-  return results.slice(0, limit).map((r) => r.strike);
 }
 
 // ---------------------------------------------------------------------------
-// Channel C: Cluster retrieval
+// Channel C: Cluster retrieval (pgvector)
 // ---------------------------------------------------------------------------
 
 async function clusterChannel(
@@ -162,53 +164,44 @@ async function clusterChannel(
   topClusters: number,
   membersPerCluster: number,
 ): Promise<ScoredStrike[]> {
-  // 1. Load cluster Strikes for this user
-  const clusters = await query<StrikeEntry>(
-    `SELECT * FROM strike WHERE is_cluster = true AND user_id = $1 AND status = 'active'`,
-    [userId],
-  );
-  if (clusters.length === 0) return [];
+  try {
+    const embedding = await getEmbedding(nucleus);
+    const pgVector = `[${embedding.join(",")}]`;
 
-  // 2. Compute similarity of input nucleus to each cluster nucleus
-  const queryEmbedding = await getEmbedding(nucleus);
-  const clusterScored: { cluster: StrikeEntry; similarity: number }[] = [];
-  for (const c of clusters) {
-    try {
-      const emb = await getEmbedding(c.nucleus);
-      clusterScored.push({ cluster: c, similarity: cosineSimilarity(queryEmbedding, emb) });
-    } catch {
-      // skip clusters that fail to embed
-    }
-  }
-  clusterScored.sort((a, b) => b.similarity - a.similarity);
-  const topHits = clusterScored.slice(0, topClusters);
-
-  // 3. For each top cluster, load members and find best matches
-  const results: ScoredStrike[] = [];
-  for (const { cluster } of topHits) {
-    const members = await query<StrikeEntry>(
-      `SELECT s.* FROM bond b
-       JOIN strike s ON s.id = b.target_strike_id
-       WHERE b.source_strike_id = $1 AND b.type = 'cluster_member'
-         AND s.status = 'active'`,
-      [cluster.id],
+    // 1. 找最相似的 cluster（pgvector）
+    const clusters = await query<StrikeEntry & { similarity: number }>(
+      `SELECT *, 1 - (embedding <=> $1::vector) as similarity
+       FROM strike
+       WHERE user_id = $2 AND is_cluster = true AND status = 'active'
+         AND embedding IS NOT NULL
+       ORDER BY embedding <=> $1::vector
+       LIMIT $3`,
+      [pgVector, userId, topClusters],
     );
-    if (members.length === 0) continue;
 
-    const memberScored: ScoredStrike[] = [];
-    for (const m of members) {
-      try {
-        const emb = await getEmbedding(m.nucleus);
-        memberScored.push({ strike: m, similarity: cosineSimilarity(queryEmbedding, emb) });
-      } catch {
-        // skip
-      }
+    if (clusters.length === 0) return [];
+
+    // 2. 批量加载成员，用 pgvector 排序
+    const results: ScoredStrike[] = [];
+    for (const cluster of clusters) {
+      const members = await query<StrikeEntry & { similarity: number }>(
+        `SELECT s.*, 1 - (s.embedding <=> $1::vector) as similarity
+         FROM bond b
+         JOIN strike s ON s.id = b.target_strike_id
+         WHERE b.source_strike_id = $2 AND b.type = 'cluster_member'
+           AND s.status = 'active' AND s.embedding IS NOT NULL
+         ORDER BY s.embedding <=> $1::vector
+         LIMIT $3`,
+        [pgVector, cluster.id, membersPerCluster],
+      );
+      results.push(...members.map((m) => ({ strike: m, similarity: m.similarity })));
     }
-    memberScored.sort((a, b) => b.similarity - a.similarity);
-    results.push(...memberScored.slice(0, membersPerCluster));
-  }
 
-  return results;
+    return results;
+  } catch (err) {
+    console.warn("[retrieval] pgvector cluster failed, skipping:", err);
+    return [];
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -223,18 +216,10 @@ export async function hybridRetrieve(
 ): Promise<RetrievalResult[]> {
   const finalLimit = opts?.limit ?? 10;
 
-  // Load active strikes once (shared by semantic & polarity channels)
-  let activeStrikes: StrikeEntry[] = [];
-  try {
-    activeStrikes = await strikeRepo.findActive(userId, 200);
-  } catch (err) {
-    console.warn("[retrieval] Failed to load active strikes:", err);
-  }
-
-  // Run channels A+B concurrently; each channel catches its own errors
-  const [semanticResults, tagResults, personResults, temporalResults, polarityResults] =
+  // Run all channels concurrently; each channel catches its own errors
+  const [semanticResults, tagResults, personResults, temporalResults, polarityResults, clusterResults] =
     await Promise.all([
-      semanticChannel(nucleus, activeStrikes, 5).catch((err) => {
+      semanticChannel(nucleus, userId, 5).catch((err) => {
         console.warn("[retrieval] semantic channel failed:", err);
         return [] as ScoredStrike[];
       }),
@@ -250,19 +235,15 @@ export async function hybridRetrieve(
         console.warn("[retrieval] temporal channel failed:", err);
         return [] as StrikeEntry[];
       }),
-      polarityChannel(nucleus, opts?.polarity, activeStrikes, 3).catch((err) => {
+      polarityChannel(nucleus, opts?.polarity, userId, 3).catch((err) => {
         console.warn("[retrieval] polarity channel failed:", err);
         return [] as StrikeEntry[];
       }),
+      clusterChannel(nucleus, userId, 3, 3).catch((err) => {
+        console.warn("[retrieval] cluster channel failed:", err);
+        return [] as ScoredStrike[];
+      }),
     ]);
-
-  // Channel C: cluster retrieval (isolated try/catch, failure doesn't affect A+B)
-  let clusterResults: ScoredStrike[] = [];
-  try {
-    clusterResults = await clusterChannel(nucleus, userId, 3, 3);
-  } catch (err) {
-    console.warn("[retrieval] cluster channel failed:", err);
-  }
 
   // Build a map: strikeId -> { strike, similarity, channels }
   const map = new Map<

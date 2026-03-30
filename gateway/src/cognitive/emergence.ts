@@ -19,6 +19,7 @@ import { query, queryOne } from "../db/pool.js";
 import { chatCompletion } from "../ai/provider.js";
 import type { StrikeEntry } from "../db/repositories/strike.js";
 import type { BondEntry } from "../db/repositories/bond.js";
+import { writeStrikeEmbedding } from "./embed-writer.js";
 
 export interface EmergenceResult {
   higherOrderClusters: number;
@@ -145,6 +146,9 @@ export async function runEmergence(userId: string): Promise<EmergenceResult> {
         level: 2,
         origin: "emerged",
       });
+
+      // 异步写入 embedding
+      void writeStrikeEmbedding(l2.id, `[${parsed.name}] ${parsed.reason ?? ""}`);
 
       // 设置 domain（继承成员中最常见的 domain）
       if (domain) {

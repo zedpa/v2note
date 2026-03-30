@@ -8,11 +8,13 @@ import {
   saveAuthTokens,
   logout as doLogout,
   getRefreshTokenValue,
+  onAuthEvent,
 } from "@/shared/lib/auth";
 import { registerUser, loginUser, logoutUser } from "@/shared/lib/api/auth";
 import { getDeviceId } from "@/shared/lib/device";
 import { setApiDeviceId } from "@/shared/lib/api";
 import type { AppUser } from "@/shared/lib/types";
+import { toast } from "sonner";
 
 export function useAuth() {
   const [loggedIn, setLoggedIn] = useState(false);
@@ -25,6 +27,19 @@ export function useAuth() {
       setLoggedIn(checkLoggedIn());
       setUser(getCurrentUser());
       setLoading(false);
+    });
+  }, []);
+
+  // 监听来自 API 层 / gateway-client 的被动登出事件
+  useEffect(() => {
+    return onAuthEvent("auth:logout", (reason) => {
+      setLoggedIn(false);
+      setUser(null);
+      if (reason === "token_expired") {
+        toast.error("登录已过期，请重新登录");
+      } else if (reason === "ws_auth_failed") {
+        toast.error("连接认证失败，请重新登录");
+      }
     });
   }, []);
 

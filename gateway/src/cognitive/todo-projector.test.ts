@@ -26,6 +26,8 @@ function makeStrike(overrides: Partial<StrikeEntry> = {}): StrikeEntry {
     is_cluster: false,
     level: 1,
     origin: null,
+    domain: null,
+    embedding: null,
     created_at: new Date().toISOString(),
     digested_at: null,
     ...overrides,
@@ -115,6 +117,11 @@ vi.mock("../db/pool.js", () => ({
   query: (...args: any[]) => mockQuery(...args),
   queryOne: (...args: any[]) => mockQueryOne(...args),
   execute: (...args: any[]) => mockExecute(...args),
+}));
+
+const mockEventEmit = vi.fn();
+vi.mock("../lib/event-bus.js", () => ({
+  eventBus: { emit: (...args: any[]) => mockEventEmit(...args) },
 }));
 
 // ── Import after mocks ────────────────────────────────────────────────
@@ -611,5 +618,88 @@ describe("场景 B3: 项目级意图创建 project goal + 子目标建议", () =
     // 即使 AI 失败，parent goal 也应创建成功
     expect(result).toBeDefined();
     expect(mockGoalCreate).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ── smart-todo 场景: 创建后事件反馈 ─────────────────────────────────
+
+describe("smart-todo: 创建后触发 todo.created 事件", () => {
+  it("should_emit_todo_created_event_with_userId_when_action_todo_created", async () => {
+    const strike = makeStrike({
+      id: "strike-event-1",
+      polarity: "intend",
+      nucleus: "明天去超市买水果",
+      source_id: "record-1",
+      user_id: "user-1",
+    });
+
+    const createdTodo = makeTodo({ id: "todo-event-1", text: strike.nucleus });
+    mockTodoCreate.mockResolvedValue(createdTodo);
+
+    await projectIntendStrike(strike, "user-1");
+
+    expect(mockEventEmit).toHaveBeenCalledWith(
+      "todo.created",
+      expect.objectContaining({
+        todoId: "todo-event-1",
+        todoText: "明天去超市买水果",
+        userId: "user-1",
+      }),
+    );
+  });
+
+  it("should_emit_todo_created_event_with_recordId", async () => {
+    const strike = makeStrike({
+      id: "strike-event-2",
+      polarity: "intend",
+      nucleus: "下午3点开会",
+      source_id: "record-42",
+    });
+
+    const createdTodo = makeTodo({ id: "todo-event-2", text: strike.nucleus });
+    mockTodoCreate.mockResolvedValue(createdTodo);
+
+    await projectIntendStrike(strike, "user-1");
+
+    expect(mockEventEmit).toHaveBeenCalledWith(
+      "todo.created",
+      expect.objectContaining({
+        recordId: "record-42",
+      }),
+    );
+  });
+
+  it("should_emit_todo_created_event_when_goal_created", async () => {
+    const strike = makeStrike({
+      id: "strike-event-3",
+      polarity: "intend",
+      nucleus: "今年要减肥20斤",
+      source_id: "record-1",
+      field: { granularity: "goal" },
+    });
+
+    const createdGoal = makeGoal({ id: "goal-event-1", title: strike.nucleus });
+    mockGoalCreate.mockResolvedValue(createdGoal);
+    mockQuery.mockResolvedValue([]);
+
+    await projectIntendStrike(strike, "user-1");
+
+    // goal 创建也应该触发事件
+    expect(mockEventEmit).toHaveBeenCalledWith(
+      "todo.created",
+      expect.objectContaining({
+        todoId: "goal-event-1",
+        todoText: "今年要减肥20斤",
+        userId: "user-1",
+      }),
+    );
+  });
+
+  it("should_not_emit_event_when_polarity_is_not_intend", async () => {
+    const strike = makeStrike({ polarity: "perceive" });
+
+    await projectIntendStrike(strike, "user-1");
+
+    expect(mockEventEmit).not.toHaveBeenCalled();
   });
 });

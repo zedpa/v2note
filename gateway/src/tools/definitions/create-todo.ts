@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { recordRepo, todoRepo } from "../../db/repositories/index.js";
+import { writeTodoEmbedding } from "../../cognitive/embed-writer.js";
 import type { ToolDefinition } from "../types.js";
 
 export const createTodoTool: ToolDefinition = {
@@ -44,6 +45,9 @@ export const createTodoTool: ToolDefinition = {
       user_id: ctx.userId,
       device_id: ctx.deviceId,
     });
+
+    // 异步写入 embedding
+    void writeTodoEmbedding(todo.id, text, 0);
 
     // 更新可选的日程字段
     const updates: Record<string, any> = {};

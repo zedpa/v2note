@@ -51,6 +51,7 @@ export async function startASR(
   notebook?: string,
   userId?: string,
 ): Promise<void> {
+  const asrT0 = Date.now();
   const apiKey = process.env.DASHSCOPE_API_KEY;
   if (!apiKey) throw new Error("Missing DASHSCOPE_API_KEY");
 
@@ -83,6 +84,7 @@ export async function startASR(
     startTime: Date.now(),
   };
   sessions.set(deviceId, session);
+  console.log(`[asr][⏱ session-create] ${Date.now() - asrT0}ms`);
 
   if (mode === "upload") {
     // Upload mode: no subprocess, just accumulate chunks
@@ -91,7 +93,9 @@ export async function startASR(
   }
 
   // 查询用户的 DashScope 热词 ID（用户维度，跨设备共享）
+  const tVocab = Date.now();
   const vocabularyId = await getVocabularyIdForDevice(deviceId);
+  console.log(`[asr][⏱ vocabulary-query] ${Date.now() - tVocab}ms — buffered chunks during wait: ${session.audioChunks.length}`);
 
   // Realtime mode: spawn Python streaming ASR process
   const spawnEnv: Record<string, string> = {
@@ -102,19 +106,20 @@ export async function startASR(
   };
   if (vocabularyId) spawnEnv.ASR_VOCABULARY_ID = vocabularyId;
 
+  const tSpawn = Date.now();
   const py = spawn(PYTHON, [ASR_REALTIME_SCRIPT], {
     env: spawnEnv,
     stdio: ["pipe", "pipe", "pipe"],
   });
-  
-  // Debug: log Python process PID
-  console.log(`[asr] Spawned Python process (PID: ${py.pid}) for device ${deviceId}, task ${taskId}`);
-  
+  console.log(`[asr][⏱ python-spawn] ${Date.now() - tSpawn}ms — PID: ${py.pid}`);
+
   session.pythonProcess = py;
 
   // Flush any audio chunks that arrived while we were awaiting vocabularyId
-  if (session.audioChunks.length > 0) {
-    console.log(`[asr] Flushing ${session.audioChunks.length} buffered chunks to Python`);
+  const bufferedCount = session.audioChunks.length;
+  const bufferedBytes = session.audioChunks.reduce((sum, c) => sum + c.length, 0);
+  if (bufferedCount > 0) {
+    console.log(`[asr][⏱ flush] ${bufferedCount} chunks (${bufferedBytes} bytes = ${(bufferedBytes / 32000).toFixed(1)}s audio) → Python stdin`);
     for (const buffered of session.audioChunks) {
       try {
         py.stdin.write(buffered);
@@ -124,6 +129,7 @@ export async function startASR(
       }
     }
   }
+  console.log(`[asr][⏱ startASR-total] ${Date.now() - asrT0}ms — Python launched, waiting for "started" event`);
 
   // Read JSON lines from Python stdout
   const rl = createInterface({ input: py.stdout });
@@ -181,12 +187,20 @@ function handleRealtimeEvent(
   if (!session || session.taskId !== taskId || session.ownerWs !== clientWs) return;
 
   switch (event.type) {
-    case "started":
-      console.log(`[asr] Python ASR started for device ${deviceId}`);
+    case "started": {
+      const elapsed = Date.now() - session.startTime;
+      const totalChunks = session.audioChunks.length;
+      const totalBytes = session.audioChunks.reduce((s, c) => s + c.length, 0);
+      console.log(`[asr][⏱ python-ready] ${elapsed}ms since asr.start — Python ASR ready to receive audio`);
+      console.log(`[asr][⏱ chunks-status] ${totalChunks} chunks (${totalBytes} bytes = ${(totalBytes / 32000).toFixed(1)}s audio) accumulated so far`);
       break;
+    }
 
     case "sentence": {
       const sid = event.sentence_id ?? 0;
+      if (session.sentences.length === 0) {
+        console.log(`[asr][⏱ first-sentence] ${Date.now() - session.startTime}ms — "${event.text?.slice(0, 40)}" begin_time=${event.begin_time}ms`);
+      }
       const existing = session.sentences.find((s) => s.sentenceId === sid);
       if (existing) {
         existing.text = event.text;
@@ -214,6 +228,9 @@ function handleRealtimeEvent(
     }
 
     case "partial":
+      if (!session.partialText && event.text) {
+        console.log(`[asr][⏱ first-partial] ${Date.now() - session.startTime}ms — "${(event.text ?? "").slice(0, 40)}"`);
+      }
       session.partialText = event.text ?? "";
       sendToClient(clientWs, {
         type: "asr.partial",
@@ -251,9 +268,12 @@ export function sendAudioChunk(deviceId: string, chunk: Buffer, sourceWs?: WsWeb
   if (!session) return;
   if (sourceWs && session.ownerWs !== sourceWs) return;
 
-  // Debug: log first few chunks
-  if (session.audioChunks.length < 5) {
-    console.log(`[asr] Received chunk for ${deviceId}: ${chunk.length} bytes`);
+  // Debug: log first few chunks with timing
+  const chunkIdx = session.audioChunks.length;
+  const sinceStart = Date.now() - session.startTime;
+  if (chunkIdx < 10 || chunkIdx % 50 === 0) {
+    const pyReady = session.pythonProcess?.stdin?.writable ? "→py" : "→buf";
+    console.log(`[asr] chunk#${chunkIdx} +${sinceStart}ms ${chunk.length}B ${pyReady}`);
   }
 
   if (session.mode === "upload") {
@@ -294,6 +314,11 @@ export async function stopASR(
   const session = sessions.get(deviceId);
   if (!session) return;
   if (session.ownerWs !== clientWs) return;
+
+  const totalDuration = Date.now() - session.startTime;
+  const totalChunks = session.audioChunks.length;
+  const totalBytes = session.audioChunks.reduce((s, c) => s + c.length, 0);
+  console.log(`[asr][⏱ stop] ${totalDuration}ms — ${totalChunks} chunks, ${totalBytes} bytes (${(totalBytes / 32000).toFixed(1)}s audio)`);
 
   if (saveAudio) session.saveAudio = true;
   if (forceCommand) session.forceCommand = true;

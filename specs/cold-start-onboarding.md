@@ -56,7 +56,7 @@
 ```
 假设 (Given)  5 问和 Digest 都完成
 当   (When)   用户进入主界面
-那么 (Then)   顶层维度已生成（top-level-dimensions 的产出）
+那么 (Then)   种子维度已生成（seedDimensionGoals 创建 level=1 带 domain 的 goals）
 并且 (And)    写作面板 placeholder 个性化：
       "[名字]，可以开始了。想到什么就说——关于[Q3焦点]、或任何其他东西。"
 并且 (And)    如果 Q3 产生了 suggested goal，目标场景已有内容
@@ -91,14 +91,14 @@
 | `features/cognitive/components/onboarding-seed.tsx` | 重构：3 问 → 5 问对话式 |
 | `gateway/src/handlers/process.ts` | 修改：冷启动期每条立即 Digest |
 | `gateway/src/db/repositories/user-profile.ts` | 修改：新增 name/pain_points/preferences 字段 |
-| `gateway/src/cognitive/top-level.ts`（新建） | Q2 回答 → 顶层维度生成 |
+| `gateway/src/handlers/onboarding.ts` | Q2 回答 → seedDimensionGoals 创建种子目标 |
 
 ## 数据库变更
 - UserProfile 表确认/新增：name, pain_points, preferences (JSONB), onboarding_done (bool)
 - 无新表
 
 ## AI 调用
-- 顶层维度生成：1 次（Q2 完成后）
+- 种子维度生成：0 次（纯关键词匹配，不调 LLM）
 - 种子日记 Digest：4 次标准 L1 调用
 
 ## 验收标准

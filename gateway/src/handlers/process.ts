@@ -41,8 +41,6 @@ export interface ProcessResult {
   todos?: string[];
   intents?: IntentSignal[];
   pending_followups?: number;
-  customer_requests?: string[];
-  setting_changes?: string[];
   tags?: string[];
   relays?: RelayExtract[];
   summary?: string;
@@ -69,6 +67,7 @@ export async function processEntry(payload: ProcessPayload): Promise<ProcessResu
   const result: ProcessResult = {};
 
   try {
+    const t0 = Date.now();
     console.log(`[process] Starting for record ${payload.recordId}, text length: ${payload.text.length}`);
 
     // ── Step 0: Voice action — 意图分类（记录/指令/混合） ──────────
@@ -76,7 +75,9 @@ export async function processEntry(payload: ProcessPayload): Promise<ProcessResu
     // 文本长度 > 4 才做分类（太短的不判断）
     if (payload.text.length > 4) {
       try {
+        const t1 = Date.now();
         const intentResult = await classifyVoiceIntent(payload.text, payload.forceCommand);
+        console.log(`[process][⏱ intent-classify] ${Date.now() - t1}ms → ${intentResult.type}`);
         result.voice_intent_type = intentResult.type;
 
         if (intentResult.type === "action" || intentResult.type === "mixed") {
@@ -163,7 +164,9 @@ export async function processEntry(payload: ProcessPayload): Promise<ProcessResu
     const dynamicTimeout = Math.min(300_000, 60_000 + Math.floor(payload.text.length / 1000) * 20_000);
     console.log(`[process] Calling AI for text cleanup... (timeout: ${dynamicTimeout}ms, text: ${payload.text.length} chars)`);
 
+    const tCleanup = Date.now();
     const response = await chatCompletion(messages, { json: true, temperature: 0.3, timeout: dynamicTimeout, tier: "fast" });
+    console.log(`[process][⏱ cleanup-ai] ${Date.now() - tCleanup}ms`);
 
     if (!response) {
       throw new Error("AI provider returned null response");
@@ -192,12 +195,6 @@ export async function processEntry(payload: ProcessPayload): Promise<ProcessResu
           result.intents = result.todos.map((t) => ({ type: "task" as const, text: t }));
         }
 
-        result.customer_requests = Array.isArray(parsed.customer_requests)
-          ? parsed.customer_requests
-          : [];
-        result.setting_changes = Array.isArray(parsed.setting_changes)
-          ? parsed.setting_changes
-          : [];
         result.tags = Array.isArray(parsed.tags) ? parsed.tags : [];
         result.relays = Array.isArray(parsed.relays) ? parsed.relays : [];
 
@@ -338,7 +335,9 @@ export async function processEntry(payload: ProcessPayload): Promise<ProcessResu
     }
 
     // 5. Update record status
+    const tStatus = Date.now();
     await recordRepo.updateStatus(payload.recordId, "completed");
+    console.log(`[process][⏱ db-status] ${Date.now() - tStatus}ms`);
     console.log(`[process] Record ${payload.recordId} marked as completed`);
 
     /* MOVED TO DIGEST — todo enrichment
@@ -432,6 +431,7 @@ export async function processEntry(payload: ProcessPayload): Promise<ProcessResu
       : 999;
     const isColdStart = recordCount < 20;
     if (shouldDigestImmediately(result, payload.text.length, isColdStart)) {
+      console.log(`[process][⏱ total-sync] ${Date.now() - t0}ms — now firing digest async`);
       digestRecords([payload.recordId], {
         deviceId: payload.deviceId,
         userId: payload.userId,

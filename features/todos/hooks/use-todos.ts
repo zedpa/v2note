@@ -18,19 +18,8 @@ export function useTodos() {
       const data = await listTodos();
 
       const items: TodoItem[] = data.map((t: any) => ({
-        id: t.id,
-        text: t.text,
-        done: t.done,
-        source: null,
-        record_id: t.record_id,
-        created_at: t.created_at,
-        scheduled_start: t.scheduled_start,
-        scheduled_end: t.scheduled_end,
-        domain: t.domain,
-        parent_id: t.parent_id,
-        impact: t.impact,
-        ai_actionable: t.ai_actionable,
-        ai_action_plan: t.ai_action_plan,
+        ...t,
+        source: t.source ?? t.category ?? null,
       }));
 
       setTodos(items);

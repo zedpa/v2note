@@ -25,6 +25,7 @@ import {
   type BatchAnalyzeOutput,
 } from "./batch-analyze-prompt.js";
 import type { SnapshotCluster, SnapshotGoal } from "../db/repositories/snapshot.js";
+import { writeStrikeEmbedding, writeTodoEmbedding } from "./embed-writer.js";
 
 // ── 配置 ───────────────────────────────────────────────────────────────
 
@@ -114,15 +115,16 @@ export async function runBatchAnalyze(userId: string): Promise<BatchAnalyzeResul
 
     const messages = buildBatchAnalyzeMessages(input);
 
-    // 4. 单次 AI 调用
+    // 4. 单次 AI 调用（用 fast 层：聚类分析不需要推理，需要快速响应）
     const resp = await chatCompletion(messages, {
       json: true,
       temperature: 0.3,
       timeout: AI_TIMEOUT,
-      tier: "report",
+      tier: "fast",
     });
 
     // 5. 解析输出
+    console.log(`[batch-analyze] AI raw response (first 2000 chars):`, resp.content.slice(0, 2000));
     let output: BatchAnalyzeOutput;
     try {
       output = JSON.parse(resp.content);
@@ -130,6 +132,7 @@ export async function runBatchAnalyze(userId: string): Promise<BatchAnalyzeResul
       console.error("[batch-analyze] Failed to parse AI JSON:", e);
       return empty;
     }
+    console.log(`[batch-analyze] Parsed: new_clusters=${output.new_clusters?.length ?? 0}, assign=${output.assign?.length ?? 0}, bonds=${output.bonds?.length ?? 0}, merge=${output.merge_clusters?.length ?? 0}`);
 
     // 6. 已知 ID 集合（用于验证 AI 输出）
     const knownStrikeIds = new Set(newStrikeRows.map((s) => s.id));
@@ -150,9 +153,17 @@ export async function runBatchAnalyze(userId: string): Promise<BatchAnalyzeResul
 
     // 7a. new_clusters — 先创建聚类（后续 assign 可能引用）
     for (const nc of output.new_clusters ?? []) {
-      if (!nc.name || !nc.member_strike_ids?.length) continue;
+      if (!nc.name || !nc.member_strike_ids?.length) {
+        console.log(`[batch-analyze] Cluster skipped (no name or members): ${JSON.stringify(nc).slice(0, 200)}`);
+        continue;
+      }
       const validMembers = nc.member_strike_ids.filter((id) => knownStrikeIds.has(id));
-      if (validMembers.length === 0) continue;
+      if (validMembers.length === 0) {
+        console.log(`[batch-analyze] Cluster "${nc.name}" skipped: 0 valid members out of ${nc.member_strike_ids.length} (IDs not in knownStrikeIds)`);
+        console.log(`[batch-analyze]   member_ids: ${nc.member_strike_ids.slice(0, 5).join(", ")}`);
+        console.log(`[batch-analyze]   known sample: ${[...knownStrikeIds].slice(0, 3).join(", ")}`);
+        continue;
+      }
 
       try {
         const cluster = await strikeRepo.create({
@@ -169,6 +180,9 @@ export async function runBatchAnalyze(userId: string): Promise<BatchAnalyzeResul
 
         knownClusterIds.add(cluster.id);
         newClusterNameToId.set(nc.name, cluster.id);
+
+        // 异步写入 embedding
+        void writeStrikeEmbedding(cluster.id, `[${nc.name}] ${nc.description ?? ""}`);
 
         // 设置 Cluster 的 domain（L3 维度归属）
         if (nc.domain) {
@@ -237,6 +251,9 @@ export async function runBatchAnalyze(userId: string): Promise<BatchAnalyzeResul
           level: 1,
           origin: "emerged",
         });
+
+        // 异步写入 embedding
+        void writeStrikeEmbedding(merged.id, `[${mc.new_name}] ${mc.reason ?? ""}`);
 
         // 迁移旧聚类的成员到新聚类
         for (const oldClusterId of [mc.cluster_a_id, mc.cluster_b_id]) {
@@ -342,6 +359,8 @@ export async function runBatchAnalyze(userId: string): Promise<BatchAnalyzeResul
           source_type: "inference",
         });
 
+        void writeStrikeEmbedding(patternStrike.id, p.pattern);
+
         const validEvidence = (p.evidence_strike_ids ?? []).filter((id) => knownStrikeIds.has(id));
         if (validEvidence.length > 0) {
           await bondRepo.createMany(
@@ -389,10 +408,11 @@ export async function runBatchAnalyze(userId: string): Promise<BatchAnalyzeResul
           cluster_id: clusterId,
         });
         if (action === "matched") {
-          // 去重命中，跳过
           console.log(`[batch-analyze] Goal dedup matched: "${gs.title}"`);
           continue;
         }
+        // 新目标写入 embedding
+        void writeTodoEmbedding(goal.id, gs.title, 1);
 
         snapshotGoals.push({
           id: goal.id,

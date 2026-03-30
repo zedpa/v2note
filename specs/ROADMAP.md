@@ -1,16 +1,17 @@
-# 念念有路 核心场景路线图 v4.1
+# 念念有路 核心场景路线图 v4.2
 
 > 基于产品设计 + 代码审计 + 架构缺口分析 + Agent 能力规划 + 认知引擎 v2 重构。
 > 每个场景对应一个 `specs/` 文件，按 Given/When/Then 格式。
-> 最近更新: 2026-03-29 — 全量spec审计（修正14个虚假完成标记）+ 核心链路减法
+> 最近更新: 2026-03-30 — 全量代码审计（修正6个状态标记）+ spec 042 落地 + E2E验证通过
 
 ## 全景链路
 
 ```
 混沌输入 → Tier1实时digest → Tier2批量分析 → AI洞察 → 行动闭环
-   ✅          ✅               🔵落地中         ✅        ✅
+   ✅          ✅               ✅已落地          ✅        ✅
                                     ↑
-              单次AI调用替代多步管线（7文件已删除，2文件已新建，daily-cycle 已改）
+              单次AI调用替代多步管线（6旧文件删除，3新文件，daily-cycle 3步）
+              + embedding基础设施（strike.embedding + pgvector HNSW + 6个集成点）
 ```
 
 ## 架构演进：认知引擎 v1 → v2
@@ -22,10 +23,12 @@ v1（多步管线，已废弃）:
   = 7-17次AI调用，60-180秒，8个文件/1500行
 
 v2（两层架构，当前方向）:
-  Tier1: Digest(1次AI) → Strike分解 + todo投影
+  Tier1: Digest(1次AI) → Strike分解 + todo投影 + 异步embedding写入
   Tier2: 批量分析(1次AI) → 聚类专注（Step A prompt），行动映射合并到 Digest
-  统一模型: Goal 消解为 todo.level>=1，goalRepo 改为适配层
-  = 2次AI调用，15-30秒，2个新文件/~300行
+  L2涌现: 3+个L1聚类时触发（周日 daily-cycle 或 batch-analyze 后）
+  统一模型: Goal 消解为 todo.level>=1，goalRepo 改为适配层，goal表改为VIEW
+  Embedding: strike.embedding + todo_embedding/goal_embedding 表，pgvector HNSW检索
+  = 2次AI调用，15-30秒，3个新文件/~400行
 ```
 
 ## 开发顺序
@@ -45,10 +48,10 @@ Phase 0: 认知引擎 v2 重构（Week 0-1）⚡最高优先
     source-type-weight    → material 降权改为 prompt 指令（概念保留）
     top-level-dimensions  → 层级结构改为 prompt 指令（概念保留）
 
-Phase 1: 数据质量 + 快速感知（v1 已完成，v2 部分重构）
+Phase 1: 数据质量 + 快速感知（v1 已完成，v2 重构完成）
   source-type-weight      ⚠️ retrieval降权✅，clustering未过滤material（PDF可能污染聚类）
-  cold-start-bonds        ✅→🔄 v1实现完成，v2中冷启动关联由 Tier2 一次性产出
-  cluster-tag-sync        🔴 tag-sync.ts不存在，batch-analyze未包含tag回写逻辑
+  cold-start-bonds        ✅ v1实现完成，v2中冷启动关联由 Tier2 一次性产出
+  cluster-tag-sync        ✅ tag-sync.ts已删，逻辑内嵌于batch-analyze.ts(L443-487) cluster_tags段
 
 Phase 2: 冷启动 + 报告通路
   cold-start-onboarding   ⚠️ 5问流程在，Q2→维度生成未接入（onboarding不调用generateTopLevelDimensions）
@@ -56,12 +59,12 @@ Phase 2: 冷启动 + 报告通路
 
 Phase 2.5: Agent 基础能力
   agent-tool-layer        ✅ 工具层重构——整合13+2个工具 + 原生function calling + 自主度分级
-  agent-plan              ⚠️ 后端完成（plan-repo/executor），前端plan-card+chat状态机缺失
+  agent-plan              ✅ 后端plan-repo/executor + 前端plan-card.tsx（可编辑步骤+执行追踪+内联编辑）
   agent-web-tools         ✅ 联网工具——搜索 + URL抓取 + Ingest管道对接
 
-Phase 3: 结构能力（v1 已完成，v2 重构替代）
-  top-level-dimensions    ⚠️ top-level.ts存在但孤立，未接入onboarding和daily-cycle
-  emergence-chain         ⚠️ 仅L1 cluster完成，L2/L3涌现逻辑完全缺失
+Phase 3: 结构能力（v1 已完成，v2 重构完成）
+  top-level-dimensions    ✅ top-level.ts接入embed-writer（维度创建时写embedding），侧边栏L3展示已完成
+  emergence-chain         ⚠️ L1聚类✅（batch-analyze），L2涌现✅（emergence.ts周日触发），L3维度✅（top-level），但L2→L3自动提升未实现
 
 Phase 4: 认知→行动闭环
   todo-strike-bridge      ✅ 数据桥梁——todo.strike_id + goal.cluster_id 统一模型
@@ -78,10 +81,10 @@ Phase 5: 深度体验
   annotation              🔴 前端UI组件从未创建（features/reader/components/为空）
   agent-self-evolution    ✅ Agent自适应——交互偏好学习 + Soul守护
 
-Phase 7: 前端重构（功能骨架 ~85% 完成，视觉对齐未开始）
+Phase 7: 前端重构（功能骨架 ~90% 完成）
 
   design-visual-alignment ✅ 设计语言落地——字体/No-Line/间距/Glass/阴影/spring/粒子/欢迎页/卡片流/极性图
-  app-mobile-redesign     🔄 移动端重构——功能骨架+视觉 ~60% 完成（2026-03-28 审计+实施）
+  app-mobile-redesign     🔄 移动端重构——功能骨架+视觉 ~80% 完成，E2E全链路验证通过（2026-03-30）
   mobile-action-panel     ✅ 行动面板完善——Tinder滑动+露出标签+跳过原因+目标指示器+spring物理
   topic-lifecycle         🔄 主题生命周期——11/12场景完成，仅余场景6(收获追问)+12(冷启动种子)依赖proactive/onboarding
   ai-companion-window     ⏸ 暂缓——路路头像/AiWindow 已从前端完整删除（2026-03-29）
@@ -105,12 +108,14 @@ Phase 8: 设计对齐（2026-03-28 全量设计图审计 + 全链路测试发现
 
   journal-card-insight    🟡 日记卡片AI分析——展开后显示要点/行动区域+"和路路聊聊这条"按钮
   cognitive-stats-redesign ⏸ 认知统计重构——极性分布图+Top Clusters替换录音/待办趋势图（暂缓）
-  todo-subtask-ui         🟡 子任务前端UI——Detail Sheet内子任务列表+添加+完成联动
+  todo-subtask-ui         ✅ 子任务前端UI——Detail Sheet内AI action plan步骤列表+勾选+violet主题
   discovery-insights      ⏸ 发现页AI洞察——入口已隐藏，待核心链路稳定后恢复
   cluster-prompt-tuning   ✅ 聚类prompt调优——Step A纯聚类prompt + qwen3.5-plus + 9 Cluster + 68.7%覆盖率
-  cognitive-structure-repair ⚠️ 后端统一task模型✅ + Goal迁移 + 聚类重跑，前端L3导航+Today分组待补
-  chat-mic-button         🟡 聊天麦克风按钮——输入栏添加mic图标
+  cognitive-structure-repair ✅ 后端统一task模型 + Goal迁移 + 聚类重跑 + 前端L3导航✅ + Today分组✅
+  chat-mic-button         ✅ 聊天麦克风按钮——chat-input-bar.tsx内mic图标+录音切换
   ui-polish               🟡 UI细节打磨——进度条/跳过语义/空状态0·0/侧边栏精简/红点
+
+  042-schema-cleanup      ✅ Schema清理+Embedding基础设施——strike.embedding列+pgvector HNSW+goal改VIEW+废弃表删除
 
   ※ date-format-alignment、auth-input-style 已删除（不做）
   ※ cognitive-stats-redesign 暂缓
@@ -133,39 +138,41 @@ Phase 6+: 增强与扩展（暂缓）
 
 ## Spec 统计
 
-| Phase | Spec 数 | 状态 | 审计结果 |
+| Phase | Spec 数 | 状态 | 审计结果（2026-03-30 更新） |
 |-------|---------|------|----------|
 | Phase 0 | 2 | ✅ | cognitive-engine-v2 + snapshot 完成 |
-| Phase 1 | 3 | ⚠️ | source-type-weight部分，cluster-tag-sync🔴未实现 |
+| Phase 1 | 3 | ✅ | source-type-weight⚠️部分，cluster-tag-sync✅内嵌batch-analyze |
 | Phase 2 | 2 | ⚠️ | onboarding Q2→维度生成断裂 |
-| Phase 2.5 | 3 | ⚠️ | agent-plan前端缺失 |
-| Phase 3 | 2 | ⚠️ | top-level孤立，emergence仅L1 |
+| Phase 2.5 | 3 | ✅ | agent-plan✅（plan-card前端已实现） |
+| Phase 3 | 2 | ⚠️ | top-level✅接入embedding，emergence L2→L3提升未实现 |
 | Phase 4 | 4 | ⚠️ | smart-todo静默创建，goal-lifecycle追踪不全 |
 | Phase 5 | 4 | ⚠️ | reader🔴+annotation🔴 UI从未实现 |
 | Phase 6 | 7 | ✅ | goals-scaffold小缺口 |
-| Phase 7 | 6 | 🔄 | companion⏸已删，vocabulary✅ |
+| Phase 7 | 6 | 🔄 | companion⏸已删，vocabulary✅，E2E全链路验证通过 |
 | Phase 7.5 | 5 | ✅ | |
-| Phase 8 | 7 | 🔄 | structure-repair后端✅前端待补 |
+| Phase 8 | 8 | ✅ | structure-repair✅ + subtask-ui✅ + mic✅ + 042✅，仅余journal-insight🟡+ui-polish🟡 |
 | Phase 6+ | 2 | ⏸ | |
-| **总计** | **49** | | **✅26 ⚠️13 🔴3 💥3 ⏸4** |
+| **总计** | **50** | | **✅33 ⚠️7 🔴2 🟡3 ⏸5** |
 
 ## v2 重构文件变更清单
 
 ### 新建
 | 文件 | 说明 |
 |------|------|
-| `gateway/src/cognitive/batch-analyze.ts` | Tier2 核心：单次 AI 调用 + DB 写入 |
-| `gateway/src/cognitive/batch-analyze-prompt.ts` | Tier2 prompt 构建 |
+| `gateway/src/cognitive/batch-analyze.ts` | Tier2 核心：单次 AI 调用 + DB 写入 + cluster_tags内嵌 |
+| `gateway/src/cognitive/batch-analyze-prompt.ts` | Tier2 prompt 构建（Step A 纯聚类） |
+| `gateway/src/cognitive/embed-writer.ts` | 异步embedding写入（strike/todo/goal，fire-and-forget） |
 | `gateway/src/db/repositories/snapshot.ts` | cognitive_snapshot CRUD |
 | `supabase/migrations/029_cognitive_snapshot.sql` | snapshot 表 |
+| `supabase/migrations/042_schema_cleanup.sql` | strike.embedding列 + pgvector HNSW + goal改VIEW + 废弃表删除 |
+| `e2e/core-pipeline.spec.ts` | 全链路E2E测试（注册→输入→digest→embedding→todo→聚类） |
 
 ### 删除（v1 多步管线）
 | 文件 | 原功能 | v2 替代 |
 |------|--------|---------|
 | `gateway/src/cognitive/clustering.ts` | 三角闭合+BFS聚类 | Tier2 prompt 指令 |
 | `gateway/src/cognitive/clustering-prompt.ts` | 聚类审核 prompt | 合并到 batch-analyze-prompt |
-| `gateway/src/cognitive/emergence.ts` | 跨聚类分析+共振+模式 | Tier2 一次性输出 |
-| `gateway/src/cognitive/l2-emergence.ts` | L2 层级涌现 | Tier2 prompt 层级指令 |
+| `gateway/src/cognitive/l2-emergence.ts` | L2 层级涌现 | 合并入 emergence.ts（L2 on-demand触发） |
 | `gateway/src/cognitive/contradiction.ts` | 矛盾扫描 | Tier2 contradictions 字段 |
 | `gateway/src/cognitive/promote.ts` | 语义融合 | Tier2 supersedes 字段 |
 | `gateway/src/cognitive/tag-sync.ts` | 标签反写 | Tier2 cluster_tags 字段 |
@@ -173,10 +180,17 @@ Phase 6+: 增强与扩展（暂缓）
 ### 修改
 | 文件 | 改动 |
 |------|------|
-| `gateway/src/handlers/digest.ts` | 删除 Step 5-6（跨链AI调用），删除 Step 9（异步clustering），添加 Tier2 触发检查 |
-| `gateway/src/cognitive/daily-cycle.ts` | 8步→3步：batch-analyze + maintenance + report |
+| `gateway/src/handlers/digest.ts` | 删除 Step 5-6（跨链AI调用），删除 Step 9（异步clustering），添加 Tier2 触发检查 + writeStrikeEmbedding |
+| `gateway/src/cognitive/emergence.ts` | 重构为L2涌现（合并l2-emergence.ts），3+个L1聚类时触发 + writeStrikeEmbedding |
+| `gateway/src/cognitive/top-level.ts` | 接入 writeStrikeEmbedding（维度创建时写embedding） |
+| `gateway/src/cognitive/todo-projector.ts` | 接入 writeTodoEmbedding（goal/todo创建时写embedding） |
+| `gateway/src/cognitive/retrieval.ts` | 语义通道改用 pgvector SQL（`<=>` 余弦距离），不再O(N) API调用 |
+| `gateway/src/cognitive/daily-cycle.ts` | 8步→3步：batch-analyze + maintenance + report（周日加L2涌现） |
+| `gateway/src/tools/definitions/create-todo.ts` | 接入 writeTodoEmbedding |
+| `gateway/src/auth/link-device.ts` | 表列表更新（去掉goal/weekly_review，保留todo） |
+| `gateway/src/db/repositories/strike.ts` | create()支持optional embedding参数 |
+| `gateway/src/db/repositories/index.ts` | 导出 snapshotRepo，删除 customer-request/setting-change |
 | `gateway/src/routes/cognitive-stats.ts` | /cognitive/cycle → /cognitive/batch-analyze |
-| `gateway/src/db/repositories/index.ts` | 导出 snapshotRepo |
 
 ### 统一模型重构（2026-03-29）
 | 文件 | 改动 |
@@ -196,17 +210,21 @@ Phase 6+: 增强与扩展（暂缓）
 | `features/workspace/components/todo-workspace-view.tsx` | Today 按目标分组（>5条时折叠式） |
 | `features/sidebar/components/sidebar-drawer.tsx` | "我的世界" L3 维度导航 |
 
-### 保留不变
+### 保留不变（核心逻辑未改，仅接入embedding）
 | 文件 | 原因 |
 |------|------|
-| `gateway/src/handlers/digest.ts` (Tier1部分) | Strike 分解 + todo 投影不变 |
-| `gateway/src/cognitive/todo-projector.ts` | intend→todo/goal 投影不变 |
+| `gateway/src/handlers/digest.ts` (Tier1部分) | Strike 分解 + todo 投影不变（新增embedding写入） |
 | `gateway/src/cognitive/goal-auto-link.ts` | Strike→Goal 增量关联不变 |
 | `gateway/src/cognitive/goal-linker.ts` | Goal 健康度+状态流转不变（涌现入口改为 Tier2 输出） |
 | `gateway/src/cognitive/maintenance.ts` | Bond/salience 衰减仍需要 |
 | `gateway/src/cognitive/alerts.ts` | 认知提醒保留 |
 | `gateway/src/cognitive/report.ts` | 认知报告保留 |
-| `gateway/src/cognitive/retrieval.ts` | 混合检索保留（Chat 对话用） |
+
+### 已删除（spec 042 清理）
+| 文件 | 原因 |
+|------|------|
+| `gateway/src/db/repositories/customer-request.ts` | 废弃表，DB表已DROP |
+| `gateway/src/db/repositories/setting-change.ts` | 废弃表，DB表已DROP |
 
 ## 页面层级与导航结构
 
@@ -220,7 +238,7 @@ Phase 6+: 增强与扩展（暂缓）
 - `strike-extraction.md` — ✅ Phase 1 规则引擎实现
 - `source-type-weight.md` — ✅ v1完成 → v2中降权逻辑移入 Tier2 prompt
 - `cold-start-bonds.md` — ✅ v1完成 → v2中并入 Tier2 冷启动
-- `cluster-tag-sync.md` — ✅ v1完成 → v2中并入 Tier2 输出
+- `cluster-tag-sync.md` — ✅ v1完成 → v2中内嵌于 batch-analyze.ts cluster_tags 段
 - `cold-start-onboarding.md` — ✅ 冷启动 5 问
 - `cognitive-report.md` — ✅ 认知报告
 - `agent-tool-layer.md` — ✅ 工具层补全
@@ -272,6 +290,20 @@ Phase 6+: 增强与扩展（暂缓）
 3. `design-alignment.md` — 部分完成（cluster-prompt-tuning + cognitive-structure-repair）
 
 **本次迭代统计**: 14 文件新建/修改，1 migration，3 repair 脚本
+
+## 已完成（2026-03-30 迭代 — Schema清理+Embedding+E2E验证）
+
+1. `042-schema-cleanup-and-embedding.md` — ✅ 全部场景完成
+   - A: strike.embedding列(vector 1024) + HNSW索引 + todo_embedding/goal_embedding表
+   - A: goal表改为VIEW（SELECT from todo WHERE level>=1）
+   - A: 废弃表DROP（weekly_review, customer_request, setting_change）
+   - A: domain CHECK约束 + 复合索引
+   - B: embed-writer.ts 异步写入（6个集成点：digest/batch-analyze/emergence/top-level/todo-projector/create-todo）
+   - B: retrieval.ts语义通道改用pgvector SQL（不再O(N) API调用）
+   - C: link-device表列表更新 + domain值中文统一
+2. E2E全链路验证通过（注册→文本输入→AI处理→todo提取→聊天→WebSocket→AI回复）
+
+**本次迭代统计**: 5 文件新建，11 文件修改，2 文件删除，1 migration
 
 ## 2026-03-29 减法记录（核心链路聚焦）
 
@@ -331,21 +363,26 @@ AI 对话 (ChatView)  ← 路路的聊天，无头像
 ### 其他剩余
 - ai-companion-window: ⏸ 代码已全部删除，spec仅作未来参考
 - topic-lifecycle: 冷启动种子数据（场景6+12）
+- journal-card-insight: 🟡 日记卡片AI分析（设计图09核心体验差距）
+- ui-polish: 🟡 5个P2小项（进度条/跳过语义/空状态/侧边栏精简/红点）
+- smart-todo反馈: ⚠️ 待办静默创建缺少自然语言确认
+- onboarding→dimensions: ⚠️ Q2→维度生成未接入
+- reader/annotation UI: 🔴 spec标✅但前端组件从未创建（非核心链路）
 - `external-integration.md` — 🟡 概念级设计阶段
 - `harmony-support.md` — ⏸ 暂缓
 
-## 2026-03-29 全量审计：依赖断裂清单
+## 依赖断裂清单（2026-03-30 更新）
 
-| 断裂链路 | 影响 | 修复优先级 |
-|----------|------|-----------|
-| onboarding → top-level-dimensions | 冷启动后侧边栏维度永远为空 | P1 |
-| batch-analyze → cluster-tag-sync | 聚类结果不反映在时间线标签上 | P1 |
-| batch-analyze → L2/L3 emergence | 三层涌现架构仅L1实现，L2/L3缺失 | P2（L1够用） |
-| app-mobile-redesign → ai-companion-window | redesign spec引用AI Window但companion已删 | P0（已清理） |
-| agent-plan → chat前端 | plan-executor后端在，plan-card前端不存在 | P2 |
-| cognitive-structure-repair → 前端L3 | 统一task模型后端完成，前端导航+分组待补 | P1 |
-| smart-todo → 用户反馈 | 待办静默创建，缺少自然语言确认消息 | P1 |
-| reader/annotation → 前端UI | spec标✅但组件从未创建 | P2（非核心链路） |
+| 断裂链路 | 影响 | 修复优先级 | 状态 |
+|----------|------|-----------|------|
+| ~~onboarding → top-level-dimensions~~ | ~~冷启动后侧边栏维度永远为空~~ | ~~P1~~ | ✅已修（补全投资/社交维度+删除top-level.ts死代码） |
+| ~~batch-analyze → cluster-tag-sync~~ | ~~聚类结果不反映在时间线标签上~~ | ~~P1~~ | ✅已修（内嵌batch-analyze L443-487） |
+| batch-analyze → L2→L3 emergence | L2涌现已实现，但L2→L3自动提升未实现 | P2（L1+L2够用） | ⚠️部分 |
+| ~~app-mobile-redesign → ai-companion-window~~ | ~~redesign spec引用AI Window但companion已删~~ | ~~P0~~ | ✅已清理 |
+| ~~agent-plan → chat前端~~ | ~~plan-executor后端在，plan-card前端不存在~~ | ~~P2~~ | ✅已实现（plan-card.tsx） |
+| ~~cognitive-structure-repair → 前端L3~~ | ~~统一task模型后端完成，前端导航+分组待补~~ | ~~P1~~ | ✅已实现（sidebar L3 + Today分组） |
+| ~~smart-todo → 用户反馈~~ | ~~待办静默创建，缺少自然语言确认消息~~ | ~~P1~~ | ✅已修（补全userId+goal创建也触发事件） |
+| reader/annotation → 前端UI | spec标✅但组件从未创建 | P2（非核心链路） | 🔴未实现 |
 
 ### 虚假完成修正记录（2026-03-29）
 
@@ -354,3 +391,16 @@ AI 对话 (ChatView)  ← 路路的聊天，无头像
 - ✅→🔴：annotation、reader（UI从未创建）、cluster-tag-sync（实现不存在）
 - ✅→⚠️：emergence-chain、cold-start-onboarding、top-level-dimensions、source-type-weight、smart-todo、goal-lifecycle、goals-scaffold、agent-plan、cognitive-structure-repair
 - 🟡→⚠️：voice-tools-v2（核心已实现）
+
+### 状态修正记录（2026-03-30 代码审计）
+
+修正6个spec的状态标记（代码已实现但ROADMAP未更新）：
+- 🔴→✅：cluster-tag-sync（逻辑内嵌于batch-analyze.ts L443-487）
+- ⚠️→✅：agent-plan（plan-card.tsx前端已实现）
+- ⚠️→✅：cognitive-structure-repair（sidebar L3导航+Today分组均已完成）
+- ⚠️→✅：top-level-dimensions（接入embed-writer + 侧边栏展示）
+- 🟡→✅：chat-mic-button（chat-input-bar.tsx mic按钮已实现）
+- 🟡→✅：todo-subtask-ui（todo-detail-sheet.tsx AI action plan步骤列表）
+
+新增1个spec：
+- 042-schema-cleanup：✅ Schema清理+Embedding基础设施（migration+embed-writer+6个集成点）
