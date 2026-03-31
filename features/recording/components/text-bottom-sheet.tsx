@@ -195,9 +195,8 @@ export function TextBottomSheet({
     setText("");
     onClose();
     try {
-      toast("正在保存...");
       await createManualNote({ content: trimmed, useAi: true, notebook: activeNotebook ?? undefined });
-      toast("已保存");
+      toast.success("已保存");
       emit("recording:processed");
     } catch (err: any) {
       toast.error(`保存失败: ${err.message}`);

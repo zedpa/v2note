@@ -64,7 +64,6 @@ export function RecordButton({ onOpenTextEditor }: RecordButtonProps) {
     try {
       const result = await recorder.stopRecording();
       setUploading(true);
-      toast("正在上传录音...");
 
       const uploaded = await uploadAudio(
         result.base64,
@@ -72,12 +71,11 @@ export function RecordButton({ onOpenTextEditor }: RecordButtonProps) {
         result.duration,
       );
 
-      toast("录音上传成功，AI 正在处理...");
       emit("recording:uploaded");
 
       // Process in background — don't await
       processRecording(uploaded.recordId, uploaded.audioUrl).then(() => {
-        toast("AI 处理完成！");
+        toast.success("处理完成");
         emit("recording:processed");
       }).catch((err) => {
         toast.error(`处理失败: ${err.message}`);

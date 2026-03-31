@@ -44,7 +44,7 @@ export function TextEditor({ onClose }: TextEditorProps) {
           tags: selectedTags.length > 0 ? selectedTags : undefined,
           useAi,
         });
-        toast(useAi ? "笔记已创建，AI 正在分析..." : "笔记已创建");
+        toast.success("笔记已创建");
         onClose();
       } catch (err: any) {
         toast.error(`保存失败: ${err.message}`);

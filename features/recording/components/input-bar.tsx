@@ -141,7 +141,6 @@ export function InputBar({ onStartReview, onCommandDetected, commandContext }: I
       const deviceId = await getDeviceId();
       const client = getGatewayClient();
       client.send({ type: "asr.stop", payload: { deviceId, forceCommand } });
-      toast(forceCommand ? "指令模式处理中..." : "正在处理录音...");
     } catch (err: any) {
       toast.error(`录音保存失败: ${err.message}`);
     } finally {
@@ -285,9 +284,8 @@ export function InputBar({ onStartReview, onCommandDetected, commandContext }: I
     // Normal text → create manual note
     setText("");
     try {
-      toast("正在保存...");
       await createManualNote({ content: trimmed, useAi: true });
-      toast("已保存");
+      toast.success("已保存");
       emit("recording:processed");
     } catch (err: any) {
       toast.error(`保存失败: ${err.message}`);

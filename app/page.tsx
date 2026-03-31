@@ -6,7 +6,7 @@ import { useTheme } from "next-themes";
 import { initStatusBar } from "@/shared/lib/status-bar";
 import { WorkspaceHeader, type WorkspaceTab, type TopicFilter, type DimensionFilter } from "@/features/workspace/components/workspace-header";
 import { NotesTimeline } from "@/features/notes/components/notes-timeline";
-import { TodoWorkspaceView } from "@/features/workspace/components/todo-workspace-view";
+import { TodoWorkspace } from "@/features/todos/components/todo-workspace";
 import { TopicLifecycleView } from "@/features/workspace/components/topic-lifecycle-view";
 import { FAB } from "@/features/recording/components/fab";
 import { SidebarDrawer } from "@/features/sidebar/components/sidebar-drawer";
@@ -366,9 +366,8 @@ export default function Page() {
               onOpenChat={handleOpenCommandChat}
             />
           ) : (
-            <TodoWorkspaceView
+            <TodoWorkspace
               onOpenChat={handleOpenCommandChat}
-              domainFilter={dimensionFilter?.domain}
             />
           )}
         </div>

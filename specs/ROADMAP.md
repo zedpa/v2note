@@ -131,6 +131,20 @@ Phase 6: 补充能力
   person-profile          ✅ 人物画像系统
   decision-template       ✅ 决策模板涌现
 
+Phase 9: 待办 UI 全面重构（2026-03-31 启动）
+
+  todo-ui-redesign        ✅ 双视图体系重构——时间视图(日期轴+4时段块+无限滚动)+项目视图(水平轮播+PageDots+"其他"分组)
+                          数据层: TodoDTO类型安全+useTodoStore统一状态+API重写
+                          原子组件: TaskItem共用+TodoCreateSheet手动创建+AddTaskRow
+                          时间视图: TimeViewHeader+CalendarStrip无限滚动+TimeBlock中文标签+已完成划线
+                          项目视图: ProjectCard+InboxCard散装任务+水平轮播+PageDots分页指示器
+                          编辑层: TodoEditSheet重构+视图切换动画+WebSocket实时同步
+                          E2E: 11场景Playwright全流程验证
+                          清理: 删除6个旧组件(todo-panel/diary-card/gantt/todo-view/use-todos/use-today-todos)
+
+  ※ 替代现有停摆的待办前端(6个组件职责重叠+数据流断裂+交互缺失)
+  ※ 依赖: todo-strike-bridge✅ + todo-subtask✅ + cognitive-structure-repair✅
+
 Phase 6+: 增强与扩展（暂缓）
   harmony-support         ⏸ 鸿蒙适配
   external-integration    ⏸ 外部数据源集成
@@ -151,8 +165,9 @@ Phase 6+: 增强与扩展（暂缓）
 | Phase 7 | 6 | 🔄 | companion⏸已删，vocabulary✅，E2E全链路验证通过 |
 | Phase 7.5 | 5 | ✅ | |
 | Phase 8 | 8 | ✅ | structure-repair✅ + subtask-ui✅ + mic✅ + 042✅，仅余journal-insight🟡+ui-polish🟡 |
+| Phase 9 | 1 | 🔄 | todo-ui-redesign 启动（2026-03-31） |
 | Phase 6+ | 2 | ⏸ | |
-| **总计** | **50** | | **✅33 ⚠️7 🔴2 🟡3 ⏸5** |
+| **总计** | **51** | | **✅33 ⚠️7 🔴2 🟡3 🔄1 ⏸5** |
 
 ## v2 重构文件变更清单
 
@@ -267,6 +282,7 @@ Phase 6+: 增强与扩展（暂缓）
 ## 进行中
 
 - `app-mobile-redesign.md` — 🔄 移动端重构（功能+视觉 ~80% 完成，2026-03-28 大规模实施）
+- `todo-ui-redesign.md` — ✅ 待办 UI 全面重构（双视图+E2E，2026-03-31 完成）
 
 ## 已完成（2026-03-28 迭代）
 

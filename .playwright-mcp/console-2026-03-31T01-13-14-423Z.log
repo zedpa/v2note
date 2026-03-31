@@ -1,0 +1,7 @@
+[   30369ms] [ERROR] Failed to load resource: net::ERR_TIMED_OUT @ https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700;900&family=Noto+Sans+SC:wght@300;400;500;600;700&display=swap:0
+[   30508ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3001/api/v1/cognitive/stats:0
+[   30510ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3001/api/v1/cognitive/stats:0
+[   31774ms] [WARNING] [gateway-client] Auth rejected by gateway, attempting token refresh... @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[   31937ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3001/api/v1/auth/refresh:0
+[   33006ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3001/api/v1/auth/refresh:0
+[   33006ms] [WARNING] [gateway-client] Token refresh failed, forcing logout @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297

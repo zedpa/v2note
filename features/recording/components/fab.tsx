@@ -153,12 +153,15 @@ export function FAB({
           break;
         case "process.result":
           emit("recording:processed");
+          toast.success("处理完成");
           setProcessing(false);
           setWittyText("");
           break;
         case "error":
-          // Reset processing state on any gateway error
-          setProcessing(false);
+          setProcessing((was) => {
+            if (was) toast.error("处理失败");
+            return false;
+          });
           setWittyText("");
           break;
         case "command.detected":
@@ -316,11 +319,9 @@ export function FAB({
         if (asCommand) {
           commandReleaseRef.current = true;
           client.send({ type: "asr.stop", payload: { deviceId, saveAudio: false } });
-          toast("正在识别语音指令...");
         } else {
           commandReleaseRef.current = false;
           client.send({ type: "asr.stop", payload: { deviceId } });
-          toast("正在处理录音...");
           setDisplayDuration(0);
           setConfirmedText("");
           setPartialText("");

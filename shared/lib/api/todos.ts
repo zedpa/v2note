@@ -1,9 +1,21 @@
 import { api } from "../api";
+import type { TodoDTO } from "@/features/todos/lib/todo-types";
 
-export async function listTodos(): Promise<any[]> {
+/** 获取所有待办（完整类型，不手动映射） */
+export async function listTodos(): Promise<TodoDTO[]> {
   return api.get("/api/v1/todos");
 }
 
+/** 获取项目列表（level >= 1 的活跃目标/项目） */
+export async function listProjects(): Promise<TodoDTO[]> {
+  const data: any[] = await api.get("/api/v1/goals");
+  return data.map((g) => ({
+    ...g,
+    text: g.title ?? g.text, // goals API 返回 title，统一为 text
+  }));
+}
+
+/** 创建待办 */
 export async function createTodo(fields: {
   text: string;
   record_id?: string;
@@ -19,6 +31,7 @@ export async function createTodo(fields: {
   return api.post("/api/v1/todos", fields);
 }
 
+/** 更新待办 */
 export async function updateTodo(
   id: string,
   fields: {
@@ -40,6 +53,7 @@ export async function updateTodo(
   await api.patch(`/api/v1/todos/${id}`, fields);
 }
 
+/** 删除待办 */
 export async function deleteTodo(id: string): Promise<void> {
   await api.delete(`/api/v1/todos/${id}`);
 }
