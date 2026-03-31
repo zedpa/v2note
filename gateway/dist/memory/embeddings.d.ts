@@ -4,11 +4,12 @@
  * Uses DashScope's text-embedding API for vector similarity search.
  * Enhances the existing keyword-based relevance scoring with semantic matching.
  *
- * Design: runs alongside the existing keyword-based system as an optional
- * enhancement. Falls back gracefully if embedding API is unavailable.
+ * 缓存架构（三级）：
+ *   内存 LRU(100 条) → 磁盘文件(10 万条，重启不丢) → DashScope API
  */
 /**
  * Get embedding vector for text using DashScope API.
+ * 查找顺序：内存 LRU → 磁盘文件 → DashScope API → 回写两层
  */
 export declare function getEmbedding(text: string): Promise<number[]>;
 /**

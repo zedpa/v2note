@@ -23,6 +23,10 @@
 import { createOpenAI } from "@ai-sdk/openai";
 import { generateText, streamText, generateObject, type ModelMessage } from "ai";
 import type { z } from "zod";
+import { Semaphore } from "../lib/semaphore.js";
+
+// DashScope LLM 并发控制：非流式调用最多 5 个同时进行
+const llmSemaphore = new Semaphore(5);
 
 // ── Types ──────────────────────────────────────────────────────
 
@@ -173,27 +177,29 @@ export async function chatCompletion(
   messages: ChatMessage[],
   opts?: { json?: boolean; temperature?: number; timeout?: number; tier?: ModelTier },
 ): Promise<AIResponse> {
-  const tier = opts?.tier ?? "fast";
-  const { provider, config } = getTier(tier);
-  const effectiveTimeout = opts?.timeout ?? config.timeout;
+  return llmSemaphore.acquire(async () => {
+    const tier = opts?.tier ?? "fast";
+    const { provider, config } = getTier(tier);
+    const effectiveTimeout = opts?.timeout ?? config.timeout;
 
-  const providerOptions = buildProviderOptions(config.model, config.reasoning, opts?.json);
+    const providerOptions = buildProviderOptions(config.model, config.reasoning, opts?.json);
 
-  const result = await generateText({
-    model: provider.chat(config.model),
-    messages: messages as ModelMessage[],
-    temperature: opts?.temperature ?? 0.7,
-    maxRetries: 1,
-    abortSignal: AbortSignal.timeout(effectiveTimeout),
-    ...(providerOptions ? { providerOptions } : {}),
+    const result = await generateText({
+      model: provider.chat(config.model),
+      messages: messages as ModelMessage[],
+      temperature: opts?.temperature ?? 0.7,
+      maxRetries: 1,
+      abortSignal: AbortSignal.timeout(effectiveTimeout),
+      ...(providerOptions ? { providerOptions } : {}),
+    });
+
+    const content = result.text ?? "";
+    if (!content) {
+      console.warn(`[ai][${tier}] AI returned empty content`, { model: config.model, usage: result.usage });
+    }
+
+    return { content, usage: mapUsage(result.usage) };
   });
-
-  const content = result.text ?? "";
-  if (!content) {
-    console.warn(`[ai][${tier}] AI returned empty content`, { model: config.model, usage: result.usage });
-  }
-
-  return { content, usage: mapUsage(result.usage) };
 }
 
 /**
@@ -272,22 +278,24 @@ export async function generateStructured<T>(
   schema: z.ZodType<T>,
   opts?: { temperature?: number; timeout?: number; schemaName?: string; schemaDescription?: string; tier?: ModelTier },
 ): Promise<{ object: T; usage?: { prompt_tokens: number; completion_tokens: number } }> {
-  const tier = opts?.tier ?? "fast";
-  const { provider, config } = getTier(tier);
-  const effectiveTimeout = opts?.timeout ?? config.timeout;
+  return llmSemaphore.acquire(async () => {
+    const tier = opts?.tier ?? "fast";
+    const { provider, config } = getTier(tier);
+    const effectiveTimeout = opts?.timeout ?? config.timeout;
 
-  const result = await generateObject({
-    model: provider.chat(config.model),
-    messages: messages as ModelMessage[],
-    schema,
-    schemaName: opts?.schemaName,
-    schemaDescription: opts?.schemaDescription,
-    temperature: opts?.temperature ?? 0.3,
-    maxRetries: 1,
-    abortSignal: AbortSignal.timeout(effectiveTimeout),
+    const result = await generateObject({
+      model: provider.chat(config.model),
+      messages: messages as ModelMessage[],
+      schema,
+      schemaName: opts?.schemaName,
+      schemaDescription: opts?.schemaDescription,
+      temperature: opts?.temperature ?? 0.3,
+      maxRetries: 1,
+      abortSignal: AbortSignal.timeout(effectiveTimeout),
+    });
+
+    return { object: result.object, usage: mapUsage(result.usage) };
   });
-
-  return { object: result.object, usage: mapUsage(result.usage) };
 }
 
 /**

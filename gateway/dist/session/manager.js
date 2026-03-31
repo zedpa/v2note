@@ -1,13 +1,36 @@
 import { SessionContext } from "./context.js";
 import { MemoryManager } from "../memory/manager.js";
 const sessions = new Map();
-const SESSION_TTL = 30 * 60 * 1000; // 30 minutes
+const SESSION_TTL = 10 * 60 * 1000; // 10 分钟（从 30 分钟缩短，减少内存占用）
+const MAX_SESSIONS = 30; // 单 worker 最大 session 数
+/**
+ * 淘汰最久未活跃的 session
+ */
+function evictOldest() {
+    let oldestKey = null;
+    let oldestTime = Infinity;
+    for (const [key, s] of sessions) {
+        const t = s.lastActivity.getTime();
+        if (t < oldestTime) {
+            oldestTime = t;
+            oldestKey = key;
+        }
+    }
+    if (oldestKey) {
+        sessions.delete(oldestKey);
+        console.log(`[session] Evicted oldest session: ${oldestKey}`);
+    }
+}
 /**
  * Get or create a session for a device.
  */
 export function getSession(deviceId) {
     let session = sessions.get(deviceId);
     if (!session) {
+        // 超限时淘汰最久未活跃的 session
+        if (sessions.size >= MAX_SESSIONS) {
+            evictOldest();
+        }
         session = {
             id: crypto.randomUUID(),
             deviceId,

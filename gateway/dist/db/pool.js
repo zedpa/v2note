@@ -19,8 +19,12 @@ export function getPool() {
             user,
             password,
             ssl: process.env.RDS_SSL === "true" ? { rejectUnauthorized: false } : false,
-            max: 10,
+            max: 15,
             idleTimeoutMillis: 30_000,
+            connectionTimeoutMillis: 5_000,
+        });
+        pool.on("connect", (client) => {
+            client.query("SET statement_timeout = 10000");
         });
         pool.on("error", (err) => {
             console.error("[db] Unexpected pool error:", err);

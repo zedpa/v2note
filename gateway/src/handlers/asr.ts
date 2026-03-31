@@ -4,6 +4,7 @@ import { spawn, type ChildProcess } from "node:child_process";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createInterface } from "node:readline";
+import { createWriteStream, readFileSync, unlinkSync, mkdirSync, readdirSync, type WriteStream } from "node:fs";
 import { recordRepo } from "../db/repositories/index.js";
 import { transcriptRepo } from "../db/repositories/index.js";
 import { getVocabularyIdForDevice } from "../cognitive/vocabulary-sync.js";
@@ -16,6 +17,24 @@ const __dirname = dirname(__filename);
 const ASR_UPLOAD_SCRIPT = join(__dirname, "../../scripts/asr_transcribe.py");
 const ASR_REALTIME_SCRIPT = join(__dirname, "../../scripts/asr_realtime.py");
 const PYTHON = process.platform === "win32" ? "python" : "python3";
+
+// 音频临时文件目录
+const ASR_TMP_DIR = process.env.CACHE_DIR
+  ? join(process.env.CACHE_DIR, "tmp", "asr")
+  : join(process.cwd(), ".cache", "tmp", "asr");
+mkdirSync(ASR_TMP_DIR, { recursive: true });
+
+// 启动时清理孤立的临时文件
+try {
+  for (const f of readdirSync(ASR_TMP_DIR)) {
+    if (f.endsWith(".pcm")) {
+      try { unlinkSync(join(ASR_TMP_DIR, f)); } catch {}
+    }
+  }
+} catch {}
+
+// 最大录音时长 120 秒，16kHz 16bit mono = 32000 bytes/sec
+const MAX_AUDIO_BYTES = 120 * 32000;
 
 export type ASRMode = "realtime" | "upload";
 
@@ -30,10 +49,16 @@ interface ASRSession {
   partialText: string;
   locationText?: string;
   notebook?: string;
-  audioChunks: Buffer[];
+  // 磁盘音频存储（替代原来的内存 Buffer[]）
+  audioFile: string;
+  audioStream: WriteStream;
+  audioBytes: number;
+  audioChunkCount: number;
+  // 仅 realtime 模式：Python 未就绪时的临时缓冲（就绪后清空）
+  preFlushBuffer: Buffer[];
   saveAudio: boolean;
   startTime: number;
-  forceCommand?: boolean;  // 上滑手势触发，跳过 AI 分类直接走 Agent
+  forceCommand?: boolean;
 }
 
 const sessions = new Map<string, ASRSession>();
@@ -59,14 +84,16 @@ export async function startASR(
   if (existingSession) {
     if (existingSession.pythonProcess) {
       console.log(`[asr] Killing existing Python process (PID: ${existingSession.pythonProcess.pid}) for device ${deviceId}`);
-      // Send SIGKILL to ensure immediate termination
       existingSession.pythonProcess.kill('SIGKILL');
     }
+    cleanupSessionFiles(existingSession);
     sessions.delete(deviceId);
     console.warn(`[asr] Replaced existing ASR session for device ${deviceId}`);
   }
 
   const taskId = randomUUID();
+  const audioFile = join(ASR_TMP_DIR, `${taskId}.pcm`);
+  const audioStream = createWriteStream(audioFile);
 
   const session: ASRSession = {
     deviceId,
@@ -79,7 +106,11 @@ export async function startASR(
     partialText: "",
     locationText,
     notebook,
-    audioChunks: [],
+    audioFile,
+    audioStream,
+    audioBytes: 0,
+    audioChunkCount: 0,
+    preFlushBuffer: [],
     saveAudio: false,
     startTime: Date.now(),
   };
@@ -95,7 +126,7 @@ export async function startASR(
   // 查询用户的 DashScope 热词 ID（用户维度，跨设备共享）
   const tVocab = Date.now();
   const vocabularyId = await getVocabularyIdForDevice(deviceId);
-  console.log(`[asr][⏱ vocabulary-query] ${Date.now() - tVocab}ms — buffered chunks during wait: ${session.audioChunks.length}`);
+  console.log(`[asr][⏱ vocabulary-query] ${Date.now() - tVocab}ms — buffered chunks during wait: ${session.preFlushBuffer.length}`);
 
   // Realtime mode: spawn Python streaming ASR process
   const spawnEnv: Record<string, string> = {
@@ -115,19 +146,19 @@ export async function startASR(
 
   session.pythonProcess = py;
 
-  // Flush any audio chunks that arrived while we were awaiting vocabularyId
-  const bufferedCount = session.audioChunks.length;
-  const bufferedBytes = session.audioChunks.reduce((sum, c) => sum + c.length, 0);
+  // Flush pre-ready buffer to Python stdin
+  const bufferedCount = session.preFlushBuffer.length;
+  const bufferedBytes = session.preFlushBuffer.reduce((sum, c) => sum + c.length, 0);
   if (bufferedCount > 0) {
     console.log(`[asr][⏱ flush] ${bufferedCount} chunks (${bufferedBytes} bytes = ${(bufferedBytes / 32000).toFixed(1)}s audio) → Python stdin`);
-    for (const buffered of session.audioChunks) {
+    for (const buffered of session.preFlushBuffer) {
       try {
         py.stdin.write(buffered);
       } catch {
-        // Python stdin not ready yet — will be picked up on next chunk
         break;
       }
     }
+    session.preFlushBuffer = []; // 释放内存
   }
   console.log(`[asr][⏱ startASR-total] ${Date.now() - asrT0}ms — Python launched, waiting for "started" event`);
 
@@ -189,10 +220,8 @@ function handleRealtimeEvent(
   switch (event.type) {
     case "started": {
       const elapsed = Date.now() - session.startTime;
-      const totalChunks = session.audioChunks.length;
-      const totalBytes = session.audioChunks.reduce((s, c) => s + c.length, 0);
       console.log(`[asr][⏱ python-ready] ${elapsed}ms since asr.start — Python ASR ready to receive audio`);
-      console.log(`[asr][⏱ chunks-status] ${totalChunks} chunks (${totalBytes} bytes = ${(totalBytes / 32000).toFixed(1)}s audio) accumulated so far`);
+      console.log(`[asr][⏱ chunks-status] ${session.audioChunkCount} chunks (${session.audioBytes} bytes = ${(session.audioBytes / 32000).toFixed(1)}s audio) accumulated so far`);
       break;
     }
 
@@ -268,36 +297,47 @@ export function sendAudioChunk(deviceId: string, chunk: Buffer, sourceWs?: WsWeb
   if (!session) return;
   if (sourceWs && session.ownerWs !== sourceWs) return;
 
+  // 录音时长限制
+  if (session.audioBytes >= MAX_AUDIO_BYTES) {
+    if (session.audioBytes - chunk.length < MAX_AUDIO_BYTES) {
+      console.log(`[asr] Max audio duration reached (120s) for device ${deviceId}, auto-stopping`);
+      stopASR(session.ownerWs, deviceId, session.saveAudio, session.forceCommand).catch(console.error);
+    }
+    return;
+  }
+
   // Debug: log first few chunks with timing
-  const chunkIdx = session.audioChunks.length;
+  const chunkIdx = session.audioChunkCount;
   const sinceStart = Date.now() - session.startTime;
   if (chunkIdx < 10 || chunkIdx % 50 === 0) {
     const pyReady = session.pythonProcess?.stdin?.writable ? "→py" : "→buf";
     console.log(`[asr] chunk#${chunkIdx} +${sinceStart}ms ${chunk.length}B ${pyReady}`);
   }
 
+  // 写入磁盘临时文件（替代内存 Buffer[]）
+  session.audioStream.write(chunk);
+  session.audioBytes += chunk.length;
+  session.audioChunkCount++;
+
   if (session.mode === "upload") {
-    // Upload mode: always accumulate chunks
-    session.audioChunks.push(Buffer.from(chunk));
-    return;
+    return; // upload 模式只写磁盘，结束后统一读取
   }
 
-  // Always accumulate audio (for flush-on-ready + potential playback)
-  session.audioChunks.push(Buffer.from(chunk));
-
-  // Realtime mode: forward to Python process stdin
+  // Realtime 模式：转发到 Python stdin
   if (session.pythonProcess?.stdin?.writable) {
     try {
       session.pythonProcess.stdin.write(chunk, (err) => {
         if (err) {
-            console.error(`[asr] Write error to Python (PID: ${session.pythonProcess?.pid}):`, err);
+          console.error(`[asr] Write error to Python (PID: ${session.pythonProcess?.pid}):`, err);
         }
       });
     } catch (err) {
       console.error(`[asr] Write exception to Python (PID: ${session.pythonProcess?.pid}):`, err);
     }
+  } else {
+    // Python 未就绪，暂存到内存缓冲（就绪后 flush 并清空）
+    session.preFlushBuffer.push(Buffer.from(chunk));
   }
-  // If pythonProcess not ready yet, chunk is buffered in audioChunks and will be flushed when process spawns
 }
 
 /**
@@ -316,9 +356,10 @@ export async function stopASR(
   if (session.ownerWs !== clientWs) return;
 
   const totalDuration = Date.now() - session.startTime;
-  const totalChunks = session.audioChunks.length;
-  const totalBytes = session.audioChunks.reduce((s, c) => s + c.length, 0);
-  console.log(`[asr][⏱ stop] ${totalDuration}ms — ${totalChunks} chunks, ${totalBytes} bytes (${(totalBytes / 32000).toFixed(1)}s audio)`);
+  console.log(`[asr][⏱ stop] ${totalDuration}ms — ${session.audioChunkCount} chunks, ${session.audioBytes} bytes (${(session.audioBytes / 32000).toFixed(1)}s audio)`);
+
+  // 关闭磁盘写入流
+  session.audioStream.end();
 
   if (saveAudio) session.saveAudio = true;
   if (forceCommand) session.forceCommand = true;
@@ -365,6 +406,7 @@ async function finishRealtimeASR(
       type: "asr.done",
       payload: { transcript: "", recordId: "", duration: 0 },
     });
+    cleanupSessionFiles(session);
     return;
   }
 
@@ -376,6 +418,7 @@ async function finishRealtimeASR(
       type: "command.detected",
       payload: { command: voiceCmd.command, args: voiceCmd.args },
     });
+    cleanupSessionFiles(session);
     return;
   }
 
@@ -401,11 +444,12 @@ async function finishUploadASR(
 
   const durationSeconds = Math.round((Date.now() - session.startTime) / 1000);
 
-  if (session.audioChunks.length === 0) {
+  if (session.audioBytes === 0) {
     sendToClient(clientWs, {
       type: "asr.done",
       payload: { transcript: "", recordId: "", duration: 0 },
     });
+    cleanupSessionFiles(session);
     sessions.delete(deviceId);
     return;
   }
@@ -416,8 +460,9 @@ async function finishUploadASR(
     payload: { text: "正在识别录音...", sentenceId: 0 },
   });
 
-  // Convert PCM chunks to WAV
-  const wavBuffer = pcmToWav(session.audioChunks);
+  // 从磁盘读取 PCM 数据并转换为 WAV
+  const pcmData = readFileSync(session.audioFile);
+  const wavBuffer = pcmToWavFromBuffer(pcmData);
 
   console.log(`[asr] Upload mode: transcribing ${wavBuffer.length} bytes WAV for device ${deviceId}`);
 
@@ -444,6 +489,7 @@ async function finishUploadASR(
       type: "command.detected",
       payload: { command: voiceCmd.command, args: voiceCmd.args },
     });
+    cleanupSessionFiles(session);
     sessions.delete(deviceId);
     return;
   }
@@ -488,16 +534,20 @@ async function createRecordAndProcess(
   });
 
   // Save audio to OSS and update record with the URL
-  if (session.audioChunks.length > 0) {
+  if (session.audioBytes > 0) {
     try {
       const { uploadPCM, isOssConfigured } = await import("../storage/oss.js");
       if (isOssConfigured()) {
-        const audioUrl = await uploadPCM(session.deviceId, session.audioChunks);
+        // 从磁盘读取 PCM 数据，分块传入 uploadPCM
+        const pcmData = readFileSync(session.audioFile);
+        const audioUrl = await uploadPCM(session.deviceId, [pcmData]);
         await recordRepo.updateFields(record.id, { audio_path: audioUrl });
       }
     } catch (err) {
       console.error("[asr] OSS audio upload failed:", err);
     }
+    // 上传完成后清理临时文件
+    cleanupSessionFiles(session);
   }
 
   // Trigger AI processing in background
@@ -543,11 +593,19 @@ async function createRecordAndProcess(
 }
 
 /**
- * Convert PCM Int16 chunks to a WAV buffer.
- * PCM format: 16-bit signed, mono, 16kHz.
+ * 清理 ASR session 的临时文件
  */
-function pcmToWav(chunks: Buffer[]): Buffer {
-  const pcmData = Buffer.concat(chunks);
+function cleanupSessionFiles(session: ASRSession): void {
+  try {
+    if (!session.audioStream.destroyed) session.audioStream.destroy();
+    unlinkSync(session.audioFile);
+  } catch {}
+}
+
+/**
+ * Convert PCM buffer to a WAV buffer.
+ */
+function pcmToWavFromBuffer(pcmData: Buffer): Buffer {
   const header = Buffer.alloc(44);
 
   const sampleRate = 16000;
@@ -653,6 +711,7 @@ export function cancelASR(deviceId: string, clientWs?: WsWebSocket): void {
     console.log(`[asr] Cancelling session, killing Python process (PID: ${session.pythonProcess.pid})`);
     session.pythonProcess.kill('SIGKILL');
   }
+  cleanupSessionFiles(session);
   sessions.delete(deviceId);
   console.log(`[asr] Session cancelled for device ${deviceId}`);
 }

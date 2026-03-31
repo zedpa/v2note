@@ -21,6 +21,9 @@
  */
 import { createOpenAI } from "@ai-sdk/openai";
 import { generateText, streamText, generateObject } from "ai";
+import { Semaphore } from "../lib/semaphore.js";
+// DashScope LLM 并发控制：非流式调用最多 5 个同时进行
+const llmSemaphore = new Semaphore(5);
 // ── 推理模型检测 ─────────────────────────────────────────────
 /** 匹配推理系列模型名 */
 const REASONING_MODEL_PATTERNS = [/qwen3\.\d/, /qwen3-/, /qwen3\.5/];
@@ -114,23 +117,25 @@ function buildProviderOptions(model, reasoning, json, thinkingBudget) {
  * @param tier - 模型层级（默认 "fast"）
  */
 export async function chatCompletion(messages, opts) {
-    const tier = opts?.tier ?? "fast";
-    const { provider, config } = getTier(tier);
-    const effectiveTimeout = opts?.timeout ?? config.timeout;
-    const providerOptions = buildProviderOptions(config.model, config.reasoning, opts?.json);
-    const result = await generateText({
-        model: provider.chat(config.model),
-        messages: messages,
-        temperature: opts?.temperature ?? 0.7,
-        maxRetries: 1,
-        abortSignal: AbortSignal.timeout(effectiveTimeout),
-        ...(providerOptions ? { providerOptions } : {}),
+    return llmSemaphore.acquire(async () => {
+        const tier = opts?.tier ?? "fast";
+        const { provider, config } = getTier(tier);
+        const effectiveTimeout = opts?.timeout ?? config.timeout;
+        const providerOptions = buildProviderOptions(config.model, config.reasoning, opts?.json);
+        const result = await generateText({
+            model: provider.chat(config.model),
+            messages: messages,
+            temperature: opts?.temperature ?? 0.7,
+            maxRetries: 1,
+            abortSignal: AbortSignal.timeout(effectiveTimeout),
+            ...(providerOptions ? { providerOptions } : {}),
+        });
+        const content = result.text ?? "";
+        if (!content) {
+            console.warn(`[ai][${tier}] AI returned empty content`, { model: config.model, usage: result.usage });
+        }
+        return { content, usage: mapUsage(result.usage) };
     });
-    const content = result.text ?? "";
-    if (!content) {
-        console.warn(`[ai][${tier}] AI returned empty content`, { model: config.model, usage: result.usage });
-    }
-    return { content, usage: mapUsage(result.usage) };
 }
 /**
  * Streaming AI call. Yields text chunks.
@@ -194,20 +199,22 @@ export async function* chatCompletionStreamDeepThink(messages, opts) {
  * @param tier - 模型层级（默认 "fast"）
  */
 export async function generateStructured(messages, schema, opts) {
-    const tier = opts?.tier ?? "fast";
-    const { provider, config } = getTier(tier);
-    const effectiveTimeout = opts?.timeout ?? config.timeout;
-    const result = await generateObject({
-        model: provider.chat(config.model),
-        messages: messages,
-        schema,
-        schemaName: opts?.schemaName,
-        schemaDescription: opts?.schemaDescription,
-        temperature: opts?.temperature ?? 0.3,
-        maxRetries: 1,
-        abortSignal: AbortSignal.timeout(effectiveTimeout),
+    return llmSemaphore.acquire(async () => {
+        const tier = opts?.tier ?? "fast";
+        const { provider, config } = getTier(tier);
+        const effectiveTimeout = opts?.timeout ?? config.timeout;
+        const result = await generateObject({
+            model: provider.chat(config.model),
+            messages: messages,
+            schema,
+            schemaName: opts?.schemaName,
+            schemaDescription: opts?.schemaDescription,
+            temperature: opts?.temperature ?? 0.3,
+            maxRetries: 1,
+            abortSignal: AbortSignal.timeout(effectiveTimeout),
+        });
+        return { object: result.object, usage: mapUsage(result.usage) };
     });
-    return { object: result.object, usage: mapUsage(result.usage) };
 }
 /**
  * AI call with native function calling (tool use).

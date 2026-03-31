@@ -33,7 +33,7 @@ function extractChineseNames(text: string): string[] {
 }
 
 // ---------------------------------------------------------------------------
-// Channel A: Semantic retrieval (pgvector)
+// Internal types
 // ---------------------------------------------------------------------------
 
 interface ScoredStrike {
@@ -41,76 +41,11 @@ interface ScoredStrike {
   similarity: number;
 }
 
-async function semanticChannel(
-  nucleus: string,
-  userId: string,
-  topK: number,
-): Promise<ScoredStrike[]> {
-  try {
-    const embedding = await getEmbedding(nucleus);
-    const pgVector = `[${embedding.join(",")}]`;
-
-    const rows = await query<StrikeEntry & { similarity: number }>(
-      `SELECT *, 1 - (embedding <=> $1::vector) as similarity
-       FROM strike
-       WHERE user_id = $2 AND status = 'active'
-         AND is_cluster = false AND embedding IS NOT NULL
-       ORDER BY embedding <=> $1::vector
-       LIMIT $3`,
-      [pgVector, userId, topK],
-    );
-
-    return rows.map((r) => ({ strike: r, similarity: r.similarity }));
-  } catch (err) {
-    console.warn("[retrieval] pgvector semantic failed, skipping:", err);
-    return [];
-  }
-}
-
 // ---------------------------------------------------------------------------
-// Channel B: Structured retrieval
+// Channel: Temporal retrieval
 // ---------------------------------------------------------------------------
 
-/** B1: Strikes sharing tags with the new Strike. */
-async function tagChannel(
-  tags: string[],
-  userId: string,
-  limit: number,
-): Promise<StrikeEntry[]> {
-  if (tags.length === 0) return [];
-  const placeholders = tags.map((_, i) => `$${i + 2}`).join(", ");
-  return query<StrikeEntry>(
-    `SELECT DISTINCT s.* FROM strike s
-     JOIN strike_tag st ON st.strike_id = s.id
-     WHERE s.user_id = $1 AND s.status = 'active'
-       AND st.label IN (${placeholders})
-     ORDER BY s.created_at DESC
-     LIMIT $${tags.length + 2}`,
-    [userId, ...tags, limit],
-  );
-}
-
-/** B2: Strikes that share person-name tags extracted from nucleus. */
-async function personChannel(
-  nucleus: string,
-  userId: string,
-  limit: number,
-): Promise<StrikeEntry[]> {
-  const names = extractChineseNames(nucleus);
-  if (names.length === 0) return [];
-  const placeholders = names.map((_, i) => `$${i + 2}`).join(", ");
-  return query<StrikeEntry>(
-    `SELECT DISTINCT s.* FROM strike s
-     JOIN strike_tag st ON st.strike_id = s.id
-     WHERE s.user_id = $1 AND s.status = 'active'
-       AND st.label IN (${placeholders})
-     ORDER BY s.created_at DESC
-     LIMIT $${names.length + 2}`,
-    [userId, ...names, limit],
-  );
-}
-
-/** B3: Strikes created within +/-7 days of now. */
+/** Strikes created within +/-7 days of now. */
 async function temporalChannel(
   userId: string,
   limit: number,
@@ -126,84 +61,6 @@ async function temporalChannel(
   );
 }
 
-/** B4: Semantically similar but opposite polarity (pgvector). */
-async function polarityChannel(
-  nucleus: string,
-  polarity: string | undefined,
-  userId: string,
-  limit: number,
-): Promise<StrikeEntry[]> {
-  if (!polarity) return [];
-
-  try {
-    const embedding = await getEmbedding(nucleus);
-    const pgVector = `[${embedding.join(",")}]`;
-
-    return query<StrikeEntry>(
-      `SELECT * FROM strike
-       WHERE user_id = $1 AND status = 'active'
-         AND polarity != $2 AND embedding IS NOT NULL
-         AND 1 - (embedding <=> $3::vector) > 0.7
-       ORDER BY embedding <=> $3::vector
-       LIMIT $4`,
-      [userId, polarity, pgVector, limit],
-    );
-  } catch (err) {
-    console.warn("[retrieval] pgvector polarity failed, skipping:", err);
-    return [];
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Channel C: Cluster retrieval (pgvector)
-// ---------------------------------------------------------------------------
-
-async function clusterChannel(
-  nucleus: string,
-  userId: string,
-  topClusters: number,
-  membersPerCluster: number,
-): Promise<ScoredStrike[]> {
-  try {
-    const embedding = await getEmbedding(nucleus);
-    const pgVector = `[${embedding.join(",")}]`;
-
-    // 1. 找最相似的 cluster（pgvector）
-    const clusters = await query<StrikeEntry & { similarity: number }>(
-      `SELECT *, 1 - (embedding <=> $1::vector) as similarity
-       FROM strike
-       WHERE user_id = $2 AND is_cluster = true AND status = 'active'
-         AND embedding IS NOT NULL
-       ORDER BY embedding <=> $1::vector
-       LIMIT $3`,
-      [pgVector, userId, topClusters],
-    );
-
-    if (clusters.length === 0) return [];
-
-    // 2. 批量加载成员，用 pgvector 排序
-    const results: ScoredStrike[] = [];
-    for (const cluster of clusters) {
-      const members = await query<StrikeEntry & { similarity: number }>(
-        `SELECT s.*, 1 - (s.embedding <=> $1::vector) as similarity
-         FROM bond b
-         JOIN strike s ON s.id = b.target_strike_id
-         WHERE b.source_strike_id = $2 AND b.type = 'cluster_member'
-           AND s.status = 'active' AND s.embedding IS NOT NULL
-         ORDER BY s.embedding <=> $1::vector
-         LIMIT $3`,
-        [pgVector, cluster.id, membersPerCluster],
-      );
-      results.push(...members.map((m) => ({ strike: m, similarity: m.similarity })));
-    }
-
-    return results;
-  } catch (err) {
-    console.warn("[retrieval] pgvector cluster failed, skipping:", err);
-    return [];
-  }
-}
-
 // ---------------------------------------------------------------------------
 // Main: hybrid retrieval
 // ---------------------------------------------------------------------------
@@ -216,33 +73,114 @@ export async function hybridRetrieve(
 ): Promise<RetrievalResult[]> {
   const finalLimit = opts?.limit ?? 10;
 
-  // Run all channels concurrently; each channel catches its own errors
-  const [semanticResults, tagResults, personResults, temporalResults, polarityResults, clusterResults] =
+  // 预计算 embedding（semantic + polarity + cluster 共用，只调一次 DashScope）
+  let sharedEmbedding: number[] | null = null;
+  let pgVector: string | null = null;
+  try {
+    sharedEmbedding = await getEmbedding(nucleus);
+    pgVector = `[${sharedEmbedding.join(",")}]`;
+  } catch (err) {
+    console.warn("[retrieval] Embedding failed, semantic/polarity/cluster channels disabled:", err);
+  }
+
+  // tag + person 合并为一条 UNION 查询
+  const names = extractChineseNames(nucleus);
+  const allLabels = [...new Set([...tags, ...names])];
+
+  // Run all channels concurrently
+  const [semanticResults, tagPersonResults, temporalResults, polarityResults, clusterResults] =
     await Promise.all([
-      semanticChannel(nucleus, userId, 5).catch((err) => {
-        console.warn("[retrieval] semantic channel failed:", err);
-        return [] as ScoredStrike[];
-      }),
-      tagChannel(tags, userId, 3).catch((err) => {
-        console.warn("[retrieval] tag channel failed:", err);
-        return [] as StrikeEntry[];
-      }),
-      personChannel(nucleus, userId, 3).catch((err) => {
-        console.warn("[retrieval] person channel failed:", err);
-        return [] as StrikeEntry[];
-      }),
+      // semantic channel（使用预计算的 embedding）
+      pgVector
+        ? query<StrikeEntry & { similarity: number }>(
+            `SELECT *, 1 - (embedding <=> $1::vector) as similarity
+             FROM strike
+             WHERE user_id = $2 AND status = 'active'
+               AND is_cluster = false AND embedding IS NOT NULL
+             ORDER BY embedding <=> $1::vector
+             LIMIT $3`,
+            [pgVector, userId, 5],
+          ).then((rows) => rows.map((r) => ({ strike: r, similarity: r.similarity }))).catch((err) => {
+            console.warn("[retrieval] semantic channel failed:", err);
+            return [] as ScoredStrike[];
+          })
+        : Promise.resolve([] as ScoredStrike[]),
+
+      // tag + person 合并查询
+      allLabels.length > 0
+        ? (() => {
+            const placeholders = allLabels.map((_, i) => `$${i + 2}`).join(", ");
+            return query<StrikeEntry & { label: string }>(
+              `SELECT DISTINCT s.*, st.label FROM strike s
+               JOIN strike_tag st ON st.strike_id = s.id
+               WHERE s.user_id = $1 AND s.status = 'active'
+                 AND st.label IN (${placeholders})
+               ORDER BY s.created_at DESC
+               LIMIT $${allLabels.length + 2}`,
+              [userId, ...allLabels, 6],
+            ).catch((err) => {
+              console.warn("[retrieval] tag+person channel failed:", err);
+              return [] as Array<StrikeEntry & { label: string }>;
+            });
+          })()
+        : Promise.resolve([] as Array<StrikeEntry & { label: string }>),
+
+      // temporal channel
       temporalChannel(userId, 3).catch((err) => {
         console.warn("[retrieval] temporal channel failed:", err);
         return [] as StrikeEntry[];
       }),
-      polarityChannel(nucleus, opts?.polarity, userId, 3).catch((err) => {
-        console.warn("[retrieval] polarity channel failed:", err);
-        return [] as StrikeEntry[];
-      }),
-      clusterChannel(nucleus, userId, 3, 3).catch((err) => {
-        console.warn("[retrieval] cluster channel failed:", err);
-        return [] as ScoredStrike[];
-      }),
+
+      // polarity channel（使用预计算的 embedding）
+      pgVector && opts?.polarity
+        ? query<StrikeEntry>(
+            `SELECT * FROM strike
+             WHERE user_id = $1 AND status = 'active'
+               AND polarity != $2 AND embedding IS NOT NULL
+               AND 1 - (embedding <=> $3::vector) > 0.7
+             ORDER BY embedding <=> $3::vector
+             LIMIT $4`,
+            [userId, opts.polarity, pgVector, 3],
+          ).catch((err) => {
+            console.warn("[retrieval] polarity channel failed:", err);
+            return [] as StrikeEntry[];
+          })
+        : Promise.resolve([] as StrikeEntry[]),
+
+      // cluster channel（使用预计算的 embedding）
+      pgVector
+        ? (async () => {
+            try {
+              const clusters = await query<StrikeEntry & { similarity: number }>(
+                `SELECT *, 1 - (embedding <=> $1::vector) as similarity
+                 FROM strike
+                 WHERE user_id = $2 AND is_cluster = true AND status = 'active'
+                   AND embedding IS NOT NULL
+                 ORDER BY embedding <=> $1::vector
+                 LIMIT $3`,
+                [pgVector, userId, 3],
+              );
+              if (clusters.length === 0) return [] as ScoredStrike[];
+              // 批量加载所有 cluster 的成员（一条查询替代 N 条）
+              const clusterIds = clusters.map((c) => c.id);
+              const memberPlaceholders = clusterIds.map((_, i) => `$${i + 2}`).join(", ");
+              const members = await query<StrikeEntry & { similarity: number }>(
+                `SELECT s.*, 1 - (s.embedding <=> $1::vector) as similarity
+                 FROM bond b
+                 JOIN strike s ON s.id = b.target_strike_id
+                 WHERE b.source_strike_id IN (${memberPlaceholders}) AND b.type = 'cluster_member'
+                   AND s.status = 'active' AND s.embedding IS NOT NULL
+                 ORDER BY s.embedding <=> $1::vector
+                 LIMIT $${clusterIds.length + 2}`,
+                [pgVector, ...clusterIds, 9],
+              );
+              return members.map((m) => ({ strike: m, similarity: m.similarity }));
+            } catch (err) {
+              console.warn("[retrieval] cluster channel failed:", err);
+              return [] as ScoredStrike[];
+            }
+          })()
+        : Promise.resolve([] as ScoredStrike[]),
     ]);
 
   // Build a map: strikeId -> { strike, similarity, channels }
@@ -265,16 +203,16 @@ export async function hybridRetrieve(
     entry.channels.add("semantic");
   }
 
-  // Structured channels
-  for (const s of tagResults) {
+  // Tag + Person 合并结果（通过 label 判断来源）
+  const nameSet = new Set(names);
+  for (const s of tagPersonResults) {
     const entry = ensure(s);
     entry.structuredHits++;
-    entry.channels.add("tag");
-  }
-  for (const s of personResults) {
-    const entry = ensure(s);
-    entry.structuredHits++;
-    entry.channels.add("person");
+    if (nameSet.has((s as any).label)) {
+      entry.channels.add("person");
+    } else {
+      entry.channels.add("tag");
+    }
   }
   for (const s of temporalResults) {
     const entry = ensure(s);
