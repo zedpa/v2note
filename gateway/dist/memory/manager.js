@@ -134,7 +134,7 @@ ${similarContext || "（暂无记忆）"}
 如果没有任何值得保存的信息，返回 [{"action": "NONE"}]。`,
             },
             { role: "user", content },
-        ], { json: true, temperature: 0.3 });
+        ], { json: true, temperature: 0.3, tier: "background" });
         try {
             const decisions = JSON.parse(result.content);
             if (!Array.isArray(decisions))

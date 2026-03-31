@@ -134,6 +134,15 @@ export async function countNewStrikes(userId: string): Promise<number> {
   return parseInt(row?.count ?? "0", 10);
 }
 
+/** 用户 Strike 总数（用于冷启动判断） */
+export async function countTotalStrikes(userId: string): Promise<number> {
+  const row = await queryOne<{ count: string }>(
+    `SELECT COUNT(*)::text as count FROM strike WHERE user_id = $1 AND status = 'active'`,
+    [userId],
+  );
+  return parseInt(row?.count ?? "0", 10);
+}
+
 // ── 获取新增 Strike 列表 ──────────────────────────────────────────────
 
 export interface NewStrikeRow {

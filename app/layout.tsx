@@ -2,7 +2,6 @@ import React from "react"
 import type { Metadata, Viewport } from "next";
 import { Newsreader, Inter, Noto_Sans_SC, Geist_Mono } from "next/font/google";
 import { ThemeProvider } from "@/components/theme-provider";
-import { Toaster } from "sonner";
 
 import "./globals.css";
 
@@ -68,7 +67,6 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           {children}
-          <Toaster position="top-center" offset={80} />
         </ThemeProvider>
       </body>
     </html>

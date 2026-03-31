@@ -454,12 +454,12 @@ export async function createWithDedup(params: {
   return { todo, action: "created" };
 }
 
-/** 创建目标/项目级 todo（替代 goalRepo.create） */
+/** 创建 todo（level 0=行动, 1=目标, 2=项目） */
 export async function createGoalAsTodo(fields: {
   user_id: string;
   device_id: string;
   text: string;
-  level: 1 | 2;
+  level: 0 | 1 | 2;
   source?: string;
   status?: string;
   cluster_id?: string;
@@ -562,7 +562,9 @@ export async function findChildTodos(parentId: string): Promise<Todo[]> {
   );
 }
 
-/** 侧边栏：按 domain 分组统计（支持 user_id 或 device_id） */
+/** 侧边栏：按 domain 分组统计（支持 user_id 或 device_id）
+ * @deprecated 使用 getMyWorldData 替代
+ */
 export async function getDimensionSummary(userId: string | null, deviceId?: string): Promise<Array<{
   domain: string;
   pending_count: number;
@@ -581,4 +583,178 @@ export async function getDimensionSummary(userId: string | null, deviceId?: stri
      ORDER BY pending_count DESC`,
     [param],
   );
+}
+
+// ── My World 侧边栏树结构 ──────────────────────────────────────
+
+export interface MyWorldNode {
+  id: string;
+  type: "l2_cluster" | "l1_cluster" | "goal" | "action";
+  title: string;
+  memberCount?: number;
+  subtaskTotal?: number;
+  subtaskDone?: number;
+  status?: string;
+  done?: boolean;
+  children: MyWorldNode[];
+}
+
+/** 从 strike.nucleus 提取聚类名称：格式 "[名称] 描述" → "名称" */
+function extractClusterName(nucleus: string): string {
+  const m = nucleus.match(/^\[(.+?)\]/);
+  return m ? m[1] : nucleus.slice(0, 20);
+}
+
+/** 侧边栏"我的世界"：组装三级树结构 */
+export async function getMyWorldData(userId: string): Promise<MyWorldNode[]> {
+  // 1. 查所有活跃聚类（L1 + L2）
+  const clusters = await query<{
+    id: string;
+    nucleus: string;
+    level: number;
+    member_count: number;
+  }>(
+    `SELECT s.id, s.nucleus, COALESCE(s.level, 1) AS level,
+            COUNT(cm.target_strike_id)::int AS member_count
+     FROM strike s
+     LEFT JOIN bond cm ON cm.source_strike_id = s.id AND cm.type = 'cluster_member'
+     WHERE s.user_id = $1 AND s.is_cluster = true AND s.status = 'active'
+     GROUP BY s.id, s.nucleus, s.level
+     ORDER BY COUNT(cm.target_strike_id) DESC`,
+    [userId],
+  );
+
+  const l2Clusters = clusters.filter(c => c.level === 2);
+  const l1Clusters = clusters.filter(c => c.level !== 2);
+
+  // 2. 查 L2 的 L1 成员
+  const l2Ids = l2Clusters.map(c => c.id);
+  const l2Members = l2Ids.length > 0
+    ? await query<{ source_strike_id: string; target_strike_id: string }>(
+        `SELECT source_strike_id, target_strike_id FROM bond
+         WHERE source_strike_id = ANY($1) AND type = 'cluster_member'`,
+        [l2Ids],
+      )
+    : [];
+
+  const l1InL2 = new Set(l2Members.map(m => m.target_strike_id));
+  const independentL1 = l1Clusters.filter(c => !l1InL2.has(c.id));
+
+  // 3. 查所有 level>=1 目标（挂在聚类下或独立）
+  const allClusterIds = clusters.map(c => c.id);
+  const goals = await query<Todo & { subtask_count: number; subtask_done_count: number }>(
+    `SELECT t.*,
+            COALESCE(sc.cnt, 0)::int AS subtask_count,
+            COALESCE(sc.done_cnt, 0)::int AS subtask_done_count
+     FROM todo t
+     LEFT JOIN LATERAL (
+       SELECT COUNT(*)::int AS cnt, COUNT(*) FILTER (WHERE done)::int AS done_cnt
+       FROM todo sub WHERE sub.parent_id = t.id
+     ) sc ON true
+     WHERE t.user_id = $1 AND t.level >= 1
+       AND t.status IN ('active', 'progressing')
+     ORDER BY t.updated_at DESC NULLS LAST`,
+    [userId],
+  );
+
+  // 按 cluster_id 分组
+  const goalsByCluster = new Map<string, typeof goals>();
+  const orphanGoals: typeof goals = [];
+  for (const g of goals) {
+    const cid = (g as any).cluster_id;
+    if (cid && allClusterIds.includes(cid)) {
+      const list = goalsByCluster.get(cid) ?? [];
+      list.push(g);
+      goalsByCluster.set(cid, list);
+    } else if (!g.parent_id) {
+      orphanGoals.push(g);
+    }
+  }
+
+  // 4. 查第三级子任务（goals 的子项）
+  const goalIds = goals.map(g => g.id);
+  const actions = goalIds.length > 0
+    ? await query<Todo>(
+        `SELECT * FROM todo
+         WHERE parent_id = ANY($1) AND level = 0 AND status != 'archived'
+         ORDER BY created_at`,
+        [goalIds],
+      )
+    : [];
+
+  const actionsByParent = new Map<string, Todo[]>();
+  for (const a of actions) {
+    const list = actionsByParent.get(a.parent_id!) ?? [];
+    list.push(a);
+    actionsByParent.set(a.parent_id!, list);
+  }
+
+  // ── 辅助函数：构建目标节点 ──
+  function buildGoalNode(g: typeof goals[0]): MyWorldNode {
+    const childActions = actionsByParent.get(g.id) ?? [];
+    return {
+      id: g.id,
+      type: "goal",
+      title: g.text,
+      status: g.status ?? "active",
+      subtaskTotal: g.subtask_count,
+      subtaskDone: g.subtask_done_count,
+      children: childActions.slice(0, 10).map(a => ({
+        id: a.id,
+        type: "action" as const,
+        title: a.text,
+        done: a.done,
+        children: [],
+      })),
+    };
+  }
+
+  // ── 辅助函数：构建 L1 聚类节点 ──
+  function buildL1Node(c: typeof l1Clusters[0]): MyWorldNode {
+    const clusterGoals = goalsByCluster.get(c.id) ?? [];
+    return {
+      id: c.id,
+      type: "l1_cluster",
+      title: extractClusterName(c.nucleus),
+      memberCount: c.member_count,
+      children: clusterGoals.slice(0, 8).map(buildGoalNode),
+    };
+  }
+
+  // ── 组装第一级 ──
+  const nodes: MyWorldNode[] = [];
+
+  // 有 L2 时：L2 → L1 → 目标
+  for (const l2 of l2Clusters) {
+    const memberL1Ids = l2Members
+      .filter(m => m.source_strike_id === l2.id)
+      .map(m => m.target_strike_id);
+    const memberL1s = l1Clusters.filter(c => memberL1Ids.includes(c.id));
+
+    // L2 下也可能直接挂目标
+    const l2Goals = goalsByCluster.get(l2.id) ?? [];
+
+    nodes.push({
+      id: l2.id,
+      type: "l2_cluster",
+      title: extractClusterName(l2.nucleus),
+      memberCount: l2.member_count,
+      children: [
+        ...memberL1s.map(buildL1Node),
+        ...l2Goals.slice(0, 8).map(buildGoalNode),
+      ],
+    });
+  }
+
+  // 独立 L1 聚类
+  for (const c of independentL1) {
+    nodes.push(buildL1Node(c));
+  }
+
+  // 独立目标（无聚类归属、无父级）
+  for (const g of orphanGoals.slice(0, 15)) {
+    nodes.push(buildGoalNode(g));
+  }
+
+  return nodes;
 }

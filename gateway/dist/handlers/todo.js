@@ -31,7 +31,7 @@ export async function aggregateTodos(deviceId, userId) {
             content: `将以下待办事项整理成一段简洁的日记条目。按优先级和关联性重新组织，去除重复。用自然的语言，不要用列表格式。`,
         },
         { role: "user", content: todoText },
-    ], { temperature: 0.5 });
+    ], { temperature: 0.5, tier: "background" });
     // Save as a new record
     const record = await recordRepo.create({
         device_id: deviceId,

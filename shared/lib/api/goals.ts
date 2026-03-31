@@ -8,6 +8,7 @@ export async function listGoals(): Promise<Goal[]> {
 export async function createGoal(fields: {
   title: string;
   parent_id?: string;
+  cluster_id?: string;
   source?: string;
 }): Promise<Goal> {
   return api.post("/api/v1/goals", fields);
@@ -15,7 +16,7 @@ export async function createGoal(fields: {
 
 export async function updateGoal(
   id: string,
-  fields: { title?: string; status?: string; parent_id?: string | null },
+  fields: { title?: string; status?: string; parent_id?: string | null; done?: boolean },
 ): Promise<void> {
   await api.patch(`/api/v1/goals/${id}`, fields);
 }
@@ -77,7 +78,9 @@ export async function listPendingIntents(): Promise<PendingIntent[]> {
   return api.get("/api/v1/intents/pending");
 }
 
-/** L3 维度统计（侧边栏"我的世界"） */
+/** L3 维度统计（侧边栏"我的世界"）
+ * @deprecated 使用 getMyWorld 替代
+ */
 export interface DimensionSummary {
   domain: string;
   pending_count: number;
@@ -86,4 +89,32 @@ export interface DimensionSummary {
 
 export async function listDimensions(): Promise<DimensionSummary[]> {
   return api.get("/api/v1/dimensions");
+}
+
+// ── My World 树结构 ──────────────────────────────────────────
+
+export interface MyWorldNode {
+  id: string;
+  type: "l2_cluster" | "l1_cluster" | "goal" | "action";
+  title: string;
+  memberCount?: number;
+  subtaskTotal?: number;
+  subtaskDone?: number;
+  status?: string;
+  done?: boolean;
+  children: MyWorldNode[];
+}
+
+export async function getMyWorld(): Promise<{ nodes: MyWorldNode[] }> {
+  return api.get("/api/v1/sidebar/my-world");
+}
+
+// ── 聚类管理 ──────────────────────────────────────────────────
+
+export async function updateCluster(id: string, fields: { name: string }): Promise<void> {
+  await api.patch(`/api/v1/cognitive/clusters/${id}`, fields);
+}
+
+export async function dissolveCluster(id: string): Promise<void> {
+  await api.delete(`/api/v1/cognitive/clusters/${id}`);
 }

@@ -17,7 +17,7 @@ export declare function sendAudioChunk(deviceId: string, chunk: Buffer, sourceWs
  * - realtime: close Python subprocess stdin (signals EOF → stop)
  * - upload: transcribe accumulated audio via Python subprocess
  */
-export declare function stopASR(clientWs: WsWebSocket, deviceId: string, saveAudio?: boolean): Promise<void>;
+export declare function stopASR(clientWs: WsWebSocket, deviceId: string, saveAudio?: boolean, forceCommand?: boolean): Promise<void>;
 /**
  * Cancel ASR session.
  */

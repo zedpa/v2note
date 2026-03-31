@@ -25,6 +25,8 @@ export function registerTodoRoutes(router) {
             scheduled_start: body.scheduled_start,
             estimated_minutes: body.estimated_minutes,
             parent_id: body.parent_id,
+            level: body.level,
+            status: body.status,
             user_id: userId,
             device_id: deviceId,
         });

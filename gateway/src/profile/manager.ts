@@ -78,7 +78,7 @@ async function doUpdateProfile(
   );
 
   if (userId) {
-    await userProfileRepo.upsertByUser(userId, result.content);
+    await userProfileRepo.upsertByUser(userId, result.content, deviceId);
   } else {
     await userProfileRepo.upsert(deviceId, result.content);
   }

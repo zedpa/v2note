@@ -1,7 +1,10 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { Search, Bell, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { LuluLogo } from "@/components/brand/lulu-logo";
+import { onAiProcessingChange } from "@/shared/lib/ai-processing";
 
 export type WorkspaceTab = "diary" | "todo";
 
@@ -10,38 +13,36 @@ export interface TopicFilter {
   title: string;
 }
 
-export interface DimensionFilter {
-  domain: string;
-}
-
 interface WorkspaceHeaderProps {
   activeTab: WorkspaceTab;
   onTabChange: (tab: WorkspaceTab) => void;
   onAvatarClick: () => void;
+  onChatClick: () => void;
   onSearchClick: () => void;
   onNotificationClick: () => void;
   userName?: string | null;
   hasUnread?: boolean;
   topicFilter?: TopicFilter | null;
   onClearTopicFilter?: () => void;
-  dimensionFilter?: DimensionFilter | null;
-  onClearDimensionFilter?: () => void;
 }
 
 export function WorkspaceHeader({
   activeTab,
   onTabChange,
   onAvatarClick,
+  onChatClick,
   onSearchClick,
   onNotificationClick,
   userName,
   hasUnread,
   topicFilter,
   onClearTopicFilter,
-  dimensionFilter,
-  onClearDimensionFilter,
 }: WorkspaceHeaderProps) {
   const initial = userName?.charAt(0)?.toUpperCase() || "U";
+
+  // 监听全局 AI 处理状态
+  const [aiProcessing, setAiProcessing] = useState(false);
+  useEffect(() => onAiProcessingChange(setAiProcessing), []);
   // 主题筛选态：Tab 文字变为 脉络|进展（spec 1.5）
   const leftLabel = topicFilter ? "脉络" : "日记";
   const rightLabel = topicFilter ? "进展" : "待办";
@@ -88,8 +89,18 @@ export function WorkspaceHeader({
           </button>
         </div>
 
-        {/* 右侧: 搜索 + 通知 */}
+        {/* 右侧: 路路AI + 搜索 + 通知 */}
         <div className="flex items-center gap-1 shrink-0">
+          <button
+            onClick={onChatClick}
+            className="relative w-9 h-9 flex items-center justify-center rounded-full text-muted-accessible hover:text-on-surface transition-colors"
+            aria-label="AI 对话"
+          >
+            {aiProcessing && (
+              <span className="absolute inset-1.5 rounded-full border-[1.5px] border-deer/50 animate-ping" />
+            )}
+            <LuluLogo size={20} variant="light" className={aiProcessing ? "animate-pulse" : ""} />
+          </button>
           <button
             onClick={onSearchClick}
             className="w-9 h-9 flex items-center justify-center rounded-full text-muted-accessible hover:text-on-surface transition-colors"
@@ -123,18 +134,6 @@ export function WorkspaceHeader({
         </div>
       )}
 
-      {/* 维度筛选药丸 */}
-      {dimensionFilter && !topicFilter && (
-        <div className="flex items-center px-4 pb-2">
-          <button
-            onClick={onClearDimensionFilter}
-            className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-deer/10 text-deer text-xs font-medium transition-colors hover:bg-deer/15"
-          >
-            <span>{dimensionFilter.domain}</span>
-            <X size={12} />
-          </button>
-        </div>
-      )}
     </header>
   );
 }

@@ -9,6 +9,8 @@ import * as goalRepo from "../db/repositories/goal.js";
 import * as recordRepo from "../db/repositories/record.js";
 import { query, queryOne } from "../db/pool.js";
 import { chatCompletion } from "../ai/provider.js";
+import { eventBus } from "../lib/event-bus.js";
+import { writeTodoEmbedding } from "./embed-writer.js";
 const MIN_SALIENCE = 0.1;
 const COMPLETED_SALIENCE_FACTOR = 0.3;
 const BACKFILL_SIMILARITY_THRESHOLD = 0.7;
@@ -83,6 +85,7 @@ function extractKeywords(text) {
  * - project → 创建 goal + AI 生成子目标建议（B3 快路径）
  */
 export async function projectIntendStrike(strike, userId) {
+    const tp0 = Date.now();
     if (strike.polarity !== "intend")
         return null;
     if (!strike.source_id)
@@ -111,12 +114,23 @@ export async function projectIntendStrike(strike, userId) {
             title: strike.nucleus,
             source: "explicit",
         });
+        // 异步写入 goal embedding
+        void writeTodoEmbedding(goal.id, strike.nucleus, 1);
+        // 通知前端：目标已创建
+        eventBus.emit("todo.created", {
+            deviceId,
+            userId: uid,
+            todoText: strike.nucleus,
+            todoId: goal.id,
+            recordId: strike.source_id ?? undefined,
+        });
         // 自动关联 cluster（通过 embedding 匹配）
         await linkNewGoalToCluster(goal.id, uid);
-        // B3: 项目级 → AI 生成子目标建议
+        // B3: 项目级 → AI 生成子目标建议（异步，不阻塞主流程）
         if (parsed.granularity === "project") {
-            await generateSubGoalSuggestions(goal, uid);
+            generateSubGoalSuggestions(goal, uid).catch((e) => console.warn("[todo-projector] Async sub-goal generation failed:", e));
         }
+        console.log(`[todo-projector][⏱] ${Date.now() - tp0}ms — created goal "${strike.nucleus.slice(0, 30)}" → event emitted`);
         return goal;
     }
     // action（默认）→ 创建 todo
@@ -124,8 +138,12 @@ export async function projectIntendStrike(strike, userId) {
         record_id: strike.source_id,
         text: strike.nucleus,
         strike_id: strike.id,
+        user_id: uid,
+        device_id: deviceId,
     };
     const todo = await todoRepo.create(createFields);
+    // 异步写入 embedding
+    void writeTodoEmbedding(todo.id, strike.nucleus, 0);
     // 写入时间/优先级等结构化字段
     const updateFields = {};
     if (parsed.scheduled_start)
@@ -137,6 +155,15 @@ export async function projectIntendStrike(strike, userId) {
     if (Object.keys(updateFields).length > 0) {
         await todoRepo.update(todo.id, updateFields);
     }
+    // 通知前端：待办已创建
+    eventBus.emit("todo.created", {
+        deviceId,
+        userId: uid,
+        todoText: strike.nucleus,
+        todoId: todo.id,
+        recordId: strike.source_id ?? undefined,
+    });
+    console.log(`[todo-projector][⏱] ${Date.now() - tp0}ms — created todo "${strike.nucleus.slice(0, 30)}" → event emitted`);
     return todo;
 }
 // ── 同方向 goal 重复检测 ──────────────────────────────────────────────
@@ -191,7 +218,7 @@ async function generateSubGoalSuggestions(parentGoal, userId) {
 - 标题简洁明确`,
             },
             { role: "user", content: `项目目标：${parentGoal.title}` },
-        ], { json: true, temperature: 0.3 });
+        ], { json: true, temperature: 0.3, tier: "fast" });
         const parsed = JSON.parse(resp.content);
         const subGoals = parsed.sub_goals ?? [];
         for (const sub of subGoals) {

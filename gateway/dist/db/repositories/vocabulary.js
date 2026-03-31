@@ -34,6 +34,11 @@ export async function create(input) {
 export async function deleteById(id) {
     return execute(`DELETE FROM domain_vocabulary WHERE id = $1`, [id]);
 }
+/** 删除词汇条目（校验所有权：属于该用户或该设备） */
+export async function deleteByIdOwned(id, deviceId, userId) {
+    return execute(`DELETE FROM domain_vocabulary
+     WHERE id = $1 AND (device_id = $2 OR ($3::uuid IS NOT NULL AND user_id = $3))`, [id, deviceId, userId ?? null]);
+}
 /** 增加使用频率 */
 export async function incrementFrequency(id) {
     await execute(`UPDATE domain_vocabulary SET frequency = frequency + 1 WHERE id = $1`, [id]);

@@ -1,0 +1,116 @@
+[     591ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:3000/favicon.ico:0
+[     617ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3001/api/v1/cognitive/stats:0
+[     620ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3001/api/v1/cognitive/stats:0
+[     736ms] [WARNING] [gateway-client] Auth rejected by gateway, attempting token refresh... @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[    5345ms] [WARNING] [gateway-client] Not connected, message queued @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[   36039ms] [WARNING] [gateway-client] Not connected, message queued @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[   43615ms] [WARNING] [gateway-client] Not connected, message queued @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[  440063ms] [WARNING] [gateway-client] Not connected, message queued @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[  649789ms] [WARNING] [gateway-client] Not connected, message queued @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[  652599ms] [WARNING] WebSocket connection to 'ws://localhost:3001/' failed: WebSocket is closed before the connection is established. @ http://localhost:3000/_next/static/chunks/features_chat_d659f97b._.js:195
+[  652602ms] [WARNING] [gateway-client] Not connected, message queued @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 2211700ms] [WARNING] [gateway-client] Not connected, message queued @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 2211741ms] ReferenceError: dimensionFilter is not defined
+    at Page (http://localhost:3000/_next/static/chunks/_d99d9fac._.js?id=%255Bproject%255D%252Fapp%252Fpage.tsx+%255Bapp-client%255D+%2528ecmascript%2529:440:34)
+    at Object.react_stack_bottom_frame (http://localhost:3000/_next/static/chunks/dd884_next_dist_compiled_react-dom_ff212778._.js:14826:24)
+    at renderWithHooks (http://localhost:3000/_next/static/chunks/dd884_next_dist_compiled_react-dom_ff212778._.js:4651:24)
+    at updateFunctionComponent (http://localhost:3000/_next/static/chunks/dd884_next_dist_compiled_react-dom_ff212778._.js:6112:21)
+    at beginWork (http://localhost:3000/_next/static/chunks/dd884_next_dist_compiled_react-dom_ff212778._.js:6708:24)
+    at runWithFiberInDEV (http://localhost:3000/_next/static/chunks/dd884_next_dist_compiled_react-dom_ff212778._.js:965:74)
+    at performUnitOfWork (http://localhost:3000/_next/static/chunks/dd884_next_dist_compiled_react-dom_ff212778._.js:9562:97)
+    at workLoopSync (http://localhost:3000/_next/static/chunks/dd884_next_dist_compiled_react-dom_ff212778._.js:9456:40)
+    at renderRootSync (http://localhost:3000/_next/static/chunks/dd884_next_dist_compiled_react-dom_ff212778._.js:9440:13)
+    at performWorkOnRoot (http://localhost:3000/_next/static/chunks/dd884_next_dist_compiled_react-dom_ff212778._.js:9105:47)
+    at performWorkOnRootViaSchedulerTask (http://localhost:3000/_next/static/chunks/dd884_next_dist_compiled_react-dom_ff212778._.js:10230:9)
+    at MessagePort.performWorkUntilDeadline (http://localhost:3000/_next/static/chunks/dd884_next_dist_compiled_8268c86a._.js:2647:64)
+[ 2225080ms] [WARNING] [Fast Refresh] performing full reload because your application had an unrecoverable error @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 2225112ms] ReferenceError: dimensionFilter is not defined
+    at Page (http://localhost:3000/_next/static/chunks/_d99d9fac._.js?id=%255Bproject%255D%252Fapp%252Fpage.tsx+%255Bapp-client%255D+%2528ecmascript%2529:440:34)
+    at Object.react_stack_bottom_frame (http://localhost:3000/_next/static/chunks/dd884_next_dist_compiled_react-dom_ff212778._.js:14826:24)
+    at renderWithHooks (http://localhost:3000/_next/static/chunks/dd884_next_dist_compiled_react-dom_ff212778._.js:4651:24)
+    at updateFunctionComponent (http://localhost:3000/_next/static/chunks/dd884_next_dist_compiled_react-dom_ff212778._.js:6112:21)
+    at beginWork (http://localhost:3000/_next/static/chunks/dd884_next_dist_compiled_react-dom_ff212778._.js:6708:24)
+    at runWithFiberInDEV (http://localhost:3000/_next/static/chunks/dd884_next_dist_compiled_react-dom_ff212778._.js:965:74)
+    at performUnitOfWork (http://localhost:3000/_next/static/chunks/dd884_next_dist_compiled_react-dom_ff212778._.js:9562:97)
+    at workLoopSync (http://localhost:3000/_next/static/chunks/dd884_next_dist_compiled_react-dom_ff212778._.js:9456:40)
+    at renderRootSync (http://localhost:3000/_next/static/chunks/dd884_next_dist_compiled_react-dom_ff212778._.js:9440:13)
+    at performWorkOnRoot (http://localhost:3000/_next/static/chunks/dd884_next_dist_compiled_react-dom_ff212778._.js:9105:47)
+    at performWorkOnRootViaSchedulerTask (http://localhost:3000/_next/static/chunks/dd884_next_dist_compiled_react-dom_ff212778._.js:10230:9)
+    at MessagePort.performWorkUntilDeadline (http://localhost:3000/_next/static/chunks/dd884_next_dist_compiled_8268c86a._.js:2647:64)
+[ 2225657ms] ReferenceError: dimensionFilter is not defined
+    at Page (http://localhost:3000/_next/static/chunks/_d99d9fac._.js:2984:34)
+    at Object.react_stack_bottom_frame (http://localhost:3000/_next/static/chunks/dd884_next_dist_compiled_react-dom_ff212778._.js:14826:24)
+    at renderWithHooks (http://localhost:3000/_next/static/chunks/dd884_next_dist_compiled_react-dom_ff212778._.js:4651:24)
+    at updateFunctionComponent (http://localhost:3000/_next/static/chunks/dd884_next_dist_compiled_react-dom_ff212778._.js:6112:21)
+    at beginWork (http://localhost:3000/_next/static/chunks/dd884_next_dist_compiled_react-dom_ff212778._.js:6708:24)
+    at runWithFiberInDEV (http://localhost:3000/_next/static/chunks/dd884_next_dist_compiled_react-dom_ff212778._.js:965:74)
+    at performUnitOfWork (http://localhost:3000/_next/static/chunks/dd884_next_dist_compiled_react-dom_ff212778._.js:9562:97)
+    at workLoopSync (http://localhost:3000/_next/static/chunks/dd884_next_dist_compiled_react-dom_ff212778._.js:9456:40)
+    at renderRootSync (http://localhost:3000/_next/static/chunks/dd884_next_dist_compiled_react-dom_ff212778._.js:9440:13)
+    at performWorkOnRoot (http://localhost:3000/_next/static/chunks/dd884_next_dist_compiled_react-dom_ff212778._.js:9105:47)
+    at performWorkOnRootViaSchedulerTask (http://localhost:3000/_next/static/chunks/dd884_next_dist_compiled_react-dom_ff212778._.js:10230:9)
+    at MessagePort.performWorkUntilDeadline (http://localhost:3000/_next/static/chunks/dd884_next_dist_compiled_8268c86a._.js:2647:64)
+[ 2229729ms] [WARNING] [Fast Refresh] performing full reload because your application had an unrecoverable error @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 2230077ms] ReferenceError: dimensionFilter is not defined
+    at Page (http://localhost:3000/_next/static/chunks/_d99d9fac._.js:2984:34)
+    at Object.react_stack_bottom_frame (http://localhost:3000/_next/static/chunks/dd884_next_dist_compiled_react-dom_ff212778._.js:14826:24)
+    at renderWithHooks (http://localhost:3000/_next/static/chunks/dd884_next_dist_compiled_react-dom_ff212778._.js:4651:24)
+    at updateFunctionComponent (http://localhost:3000/_next/static/chunks/dd884_next_dist_compiled_react-dom_ff212778._.js:6112:21)
+    at beginWork (http://localhost:3000/_next/static/chunks/dd884_next_dist_compiled_react-dom_ff212778._.js:6708:24)
+    at runWithFiberInDEV (http://localhost:3000/_next/static/chunks/dd884_next_dist_compiled_react-dom_ff212778._.js:965:74)
+    at performUnitOfWork (http://localhost:3000/_next/static/chunks/dd884_next_dist_compiled_react-dom_ff212778._.js:9562:97)
+    at workLoopSync (http://localhost:3000/_next/static/chunks/dd884_next_dist_compiled_react-dom_ff212778._.js:9456:40)
+    at renderRootSync (http://localhost:3000/_next/static/chunks/dd884_next_dist_compiled_react-dom_ff212778._.js:9440:13)
+    at performWorkOnRoot (http://localhost:3000/_next/static/chunks/dd884_next_dist_compiled_react-dom_ff212778._.js:9105:47)
+    at performWorkOnRootViaSchedulerTask (http://localhost:3000/_next/static/chunks/dd884_next_dist_compiled_react-dom_ff212778._.js:10230:9)
+    at MessagePort.performWorkUntilDeadline (http://localhost:3000/_next/static/chunks/dd884_next_dist_compiled_8268c86a._.js:2647:64)
+[ 2242253ms] [WARNING] [Fast Refresh] performing full reload because your application had an unrecoverable error @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 2242695ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3001/api/v1/cognitive/stats:0
+[ 2242696ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3001/api/v1/cognitive/stats:0
+[ 2244310ms] [WARNING] [gateway-client] Auth rejected by gateway, attempting token refresh... @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 2245287ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3001/api/v1/auth/refresh:0
+[ 2246541ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3001/api/v1/auth/refresh:0
+[ 2246542ms] [WARNING] [gateway-client] Token refresh failed, forcing logout @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 7288698ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:3001/api/v1/onboarding/chat:0
+[ 7388208ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:3001/api/v1/onboarding/chat:0
+[ 7421021ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:3001/api/v1/sidebar/my-world:0
+[ 7438648ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:3001/api/v1/sidebar/my-world:0
+[ 7446645ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:3001/api/v1/sidebar/my-world:0
+[ 7452471ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:3001/api/v1/sidebar/my-world:0
+[ 7889667ms] [ERROR] WebSocket connection to 'ws://localhost:3001/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/_next/static/chunks/features_chat_d659f97b._.js:65
+[ 7897741ms] [ERROR] WebSocket connection to 'ws://localhost:3001/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/_next/static/chunks/features_chat_d659f97b._.js:65
+[ 7917658ms] [ERROR] WebSocket connection to 'ws://localhost:3001/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/_next/static/chunks/features_chat_d659f97b._.js:65
+[ 8251801ms] [ERROR] WebSocket connection to 'ws://localhost:3001/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/_next/static/chunks/features_chat_d659f97b._.js:65
+[ 8259834ms] [ERROR] WebSocket connection to 'ws://localhost:3001/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/_next/static/chunks/features_chat_d659f97b._.js:65
+[ 8273856ms] [ERROR] WebSocket connection to 'ws://localhost:3001/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/_next/static/chunks/features_chat_d659f97b._.js:65
+[ 8297889ms] [WARNING] [gateway-client] Auth rejected by gateway, attempting token refresh... @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 9041397ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:3001/api/v1/goals/08e11711-5151-4ba1-9acf-c50f92fe9f57/health:0
+[ 9041532ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:3001/api/v1/goals/08e11711-5151-4ba1-9acf-c50f92fe9f57/health:0
+[ 9059427ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:3001/api/v1/goals/c61999c6-e8b1-4960-ad66-ee793f0873c7/health:0
+[ 9059632ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:3001/api/v1/goals/c61999c6-e8b1-4960-ad66-ee793f0873c7/health:0
+[ 9174675ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:3001/api/v1/onboarding/chat:0
+[ 9278301ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:3001/api/v1/onboarding/chat:0
+[ 9377501ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:3001/api/v1/goals/8d567e99-aa55-4e43-b533-b4f517ca6eeb/health:0
+[ 9377625ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:3001/api/v1/goals/8d567e99-aa55-4e43-b533-b4f517ca6eeb/health:0
+[ 9387879ms] [WARNING] [gateway-client] Not connected, message queued @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 9407698ms] [WARNING] [gateway-client] Not connected, message queued @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 9415627ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:3001/api/v1/daily/evening-summary:0
+[ 9416036ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:3001/api/v1/daily/evening-summary:0
+[ 9417778ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:3001/api/v1/daily/evening-summary:0
+[10185411ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:3001/api/v1/daily/evening-summary:0
+[10185657ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:3001/api/v1/daily/evening-summary:0
+[10201013ms] [WARNING] [gateway-client] Not connected, message queued @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[10327838ms] [WARNING] [gateway-client] Not connected, message queued @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[10364477ms] [ERROR] Failed to load resource: net::ERR_TIMED_OUT @ https://fonts.gstatic.com/s/notosanssc/v40/k3kXo84MPvpLmixcA63oeALhLOCT-xWNm8Hqd37g1OkDRZe7lR4sg1IzSy-MNbE9VH8V.101.woff2:0
+[10364478ms] [ERROR] Failed to load resource: net::ERR_TIMED_OUT @ https://fonts.gstatic.com/s/notosanssc/v40/k3kXo84MPvpLmixcA63oeALhLOCT-xWNm8Hqd37g1OkDRZe7lR4sg1IzSy-MNbE9VH8V.88.woff2:0
+[10364478ms] [ERROR] Failed to load resource: net::ERR_TIMED_OUT @ https://fonts.gstatic.com/s/notosanssc/v40/k3kXo84MPvpLmixcA63oeALhLOCT-xWNm8Hqd37g1OkDRZe7lR4sg1IzSy-MNbE9VH8V.91.woff2:0
+[11433151ms] [ERROR] WebSocket connection to 'ws://localhost:3001/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/_next/static/chunks/features_chat_d659f97b._.js:65
+[11433618ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3001/api/v1/records:0
+[11438586ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3001/api/v1/records:0
+[11441215ms] [ERROR] WebSocket connection to 'ws://localhost:3001/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/_next/static/chunks/features_chat_d659f97b._.js:65
+[11443597ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3001/api/v1/records:0
+[11448593ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3001/api/v1/records:0
+[11453605ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3001/api/v1/records:0
+[11455255ms] [ERROR] WebSocket connection to 'ws://localhost:3001/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/_next/static/chunks/features_chat_d659f97b._.js:65
+[11458586ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3001/api/v1/records:0
+[11479274ms] [WARNING] [gateway-client] Auth rejected by gateway, attempting token refresh... @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297

@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { api } from '@/shared/lib/api'
-import { toast } from 'sonner'
+import { fabNotify } from '@/shared/lib/fab-notify'
 
 interface SourceTypeBadgeProps {
   recordId: string
@@ -18,7 +18,7 @@ export function SourceTypeBadge({ recordId, currentType }: SourceTypeBadgeProps)
     api.patch(`/api/v1/records/${recordId}/source-type`, { source_type: newType })
       .catch(() => {
         setType(type) // rollback
-        toast.error('切换失败')
+        fabNotify.error('切换失败')
       })
   }
 

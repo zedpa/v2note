@@ -21,6 +21,8 @@ function makeStrike(overrides = {}) {
         is_cluster: false,
         level: null,
         origin: null,
+        domain: null,
+        embedding: null,
         created_at: new Date().toISOString(),
         digested_at: null,
         ...overrides,

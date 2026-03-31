@@ -1,0 +1,4 @@
+[    6924ms] [WARNING] [gateway-client] Not connected, message queued @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[  579637ms] [WARNING] [gateway-client] Not connected, message queued @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[  584819ms] [WARNING] WebSocket connection to 'ws://localhost:3001/' failed: WebSocket is closed before the connection is established. @ http://localhost:3000/_next/static/chunks/features_chat_d659f97b._.js:195
+[  584820ms] [WARNING] [gateway-client] Not connected, message queued @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297

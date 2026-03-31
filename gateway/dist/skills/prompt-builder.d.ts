@@ -1,5 +1,5 @@
 import type { Skill } from "./types.js";
-import type { ContextTier, ContextBuildOptions } from "../context/tiers.js";
+import type { ContextTier, ContextBuildOptions, AgentRole } from "../context/tiers.js";
 /**
  * Build tiered context for chat/briefing prompt assembly.
  *
@@ -17,6 +17,7 @@ export declare function buildSystemPrompt(opts: {
     userProfile?: string;
     memory?: string[];
     mode?: "chat" | "briefing";
+    agent?: AgentRole;
     mcpTools?: Array<{
         name: string;
         description: string;

@@ -36,7 +36,7 @@ export async function regenerateSummary(deviceId, notebook, date, userId) {
             role: "user",
             content: entry.full_content,
         },
-    ], { temperature: 0.3 });
+    ], { temperature: 0.3, tier: "background" });
     await aiDiaryRepo.updateSummary(entry.id, result.content);
     console.log(`[diary] Summary regenerated for ${notebook}/${date}`);
 }
@@ -67,7 +67,7 @@ export async function extractToMemory(deviceId, dateRange, userId) {
             role: "user",
             content: diaryContent,
         },
-    ], { temperature: 0.3 });
+    ], { temperature: 0.3, tier: "background" });
     const lines = result.content
         .split("\n")
         .map((l) => l.trim())

@@ -1,7 +1,7 @@
 /**
  * Hybrid retrieval module for cognitive engine.
  *
- * Combines semantic (embedding) and structured (tag/person/temporal/polarity)
+ * Combines semantic (pgvector) and structured (tag/person/temporal/polarity)
  * channels to find relevant historical Strikes for a given new Strike.
  */
 import type { StrikeEntry } from "../db/repositories/strike.js";

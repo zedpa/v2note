@@ -14,7 +14,7 @@ import { registerUser, loginUser, logoutUser } from "@/shared/lib/api/auth";
 import { getDeviceId } from "@/shared/lib/device";
 import { setApiDeviceId } from "@/shared/lib/api";
 import type { AppUser } from "@/shared/lib/types";
-import { toast } from "sonner";
+import { fabNotify } from "@/shared/lib/fab-notify";
 
 export function useAuth() {
   const [loggedIn, setLoggedIn] = useState(false);
@@ -36,9 +36,9 @@ export function useAuth() {
       setLoggedIn(false);
       setUser(null);
       if (reason === "token_expired") {
-        toast.error("登录已过期，请重新登录");
+        fabNotify.error("登录已过期，请重新登录");
       } else if (reason === "ws_auth_failed") {
-        toast.error("连接认证失败，请重新登录");
+        fabNotify.error("连接认证失败，请重新登录");
       }
     });
   }, []);

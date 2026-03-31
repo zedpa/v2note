@@ -9,7 +9,7 @@ import type { TreeYear, TreeMonth, TreeWeek, TreeDay } from "@/features/notes/ho
 import type { NoteItem, Review } from "@/shared/lib/types";
 import { NoteCard } from "./note-card";
 import type { Note } from "./note-card";
-import { toast } from "sonner";
+import { fabNotify } from "@/shared/lib/fab-notify";
 
 interface NotesTreeProps {
   activeFilter?: string;
@@ -46,9 +46,9 @@ export function NotesTree({ activeFilter, onNoteClick }: NotesTreeProps) {
     async (period: Review["period"], start: string, end: string) => {
       try {
         await generateReview(period, start, end);
-        toast("盘点已生成");
+        fabNotify.info("盘点已生成");
       } catch (err: any) {
-        toast.error(err.message ?? "生成失败");
+        fabNotify.error(err.message ?? "生成失败");
       }
     },
     [generateReview],

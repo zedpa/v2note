@@ -1,0 +1,15 @@
+[   13873ms] [WARNING] [gateway-client] Not connected, message queued @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[   46120ms] [WARNING] [gateway-client] Not connected, message queued @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[   75250ms] [WARNING] WebSocket connection to 'ws://localhost:3001/' failed: WebSocket is closed before the connection is established. @ http://localhost:3000/_next/static/chunks/features_chat_d659f97b._.js:195
+[   75252ms] [WARNING] [gateway-client] Not connected, message queued @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[  176480ms] [WARNING] [gateway-client] Not connected, message queued @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[  185949ms] [WARNING] WebSocket connection to 'ws://localhost:3001/' failed: WebSocket is closed before the connection is established. @ http://localhost:3000/_next/static/chunks/features_chat_d659f97b._.js:195
+[  185952ms] [WARNING] [gateway-client] Not connected, message queued @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 1120493ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3001/api/v1/records:0
+[ 1122525ms] [ERROR] WebSocket connection to 'ws://localhost:3001/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/_next/static/chunks/features_chat_d659f97b._.js:65
+[ 1128545ms] [WARNING] [gateway-client] Auth rejected by gateway, attempting token refresh... @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 1503395ms] [WARNING] [gateway-client] Not connected, message queued @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 2579665ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:3001/api/v1/records:0
+[ 2599979ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:3001/api/v1/records:0
+[ 2937779ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3001/api/v1/records:0
+[ 2938358ms] [WARNING] [gateway-client] Auth rejected by gateway, attempting token refresh... @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297

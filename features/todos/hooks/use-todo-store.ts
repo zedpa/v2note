@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { getDeviceId } from "@/shared/lib/device";
+import { on } from "@/features/recording/lib/events";
 import {
   listTodos,
   listProjects,
@@ -49,6 +50,9 @@ export function useTodoStore() {
 
   useEffect(() => {
     refresh();
+    // digest 处理完成后自动刷新待办（冷启动/新输入都会触发）
+    const unsub = on("recording:processed", () => refresh());
+    return unsub;
   }, [refresh]);
 
   // ===== 派生数据 =====

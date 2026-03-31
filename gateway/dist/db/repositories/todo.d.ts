@@ -30,6 +30,8 @@ export interface Todo {
     cluster_id?: string | null;
     /** 状态（level>=1 时使用）：active/paused/completed/abandoned/progressing/blocked/suggested/dismissed（DB DEFAULT 'active'） */
     status?: string;
+    /** 父目标名称（JOIN 得到，非 DB 列） */
+    goal_title?: string | null;
 }
 export declare function findByDevice(deviceId: string): Promise<Todo[]>;
 export declare function findByUser(userId: string): Promise<Todo[]>;
@@ -49,6 +51,8 @@ export declare function create(fields: {
     user_id?: string;
     device_id?: string;
     parent_id?: string;
+    level?: number;
+    status?: string;
 }): Promise<Todo>;
 export declare function createMany(items: Array<{
     record_id: string;
@@ -68,6 +72,8 @@ export declare function update(id: string, fields: {
     ai_action_plan?: string[] | null;
     goal_id?: string | null;
     strike_id?: string | null;
+    level?: number;
+    status?: string;
 }): Promise<void>;
 export declare function del(id: string): Promise<void>;
 export declare function toggle(id: string): Promise<Todo | null>;
@@ -79,6 +85,13 @@ export declare function countByUserDateRange(userId: string, start: string, end:
     total: number;
     done: number;
 }>;
+/**
+ * 计算连续记录天数（从昨天往前数，一次 SQL 查出近 30 天有 todo 的日期）
+ */
+export declare function getStreak(opts: {
+    userId?: string;
+    deviceId?: string;
+}): Promise<number>;
 export declare function findPendingByDevice(deviceId: string): Promise<Todo[]>;
 export declare function findRelayByDevice(deviceId: string): Promise<Todo[]>;
 export declare function findRelayByUser(userId: string): Promise<Todo[]>;
@@ -111,12 +124,12 @@ export declare function createWithDedup(params: {
     todo: Todo;
     action: "created" | "matched" | "suggested";
 }>;
-/** 创建目标/项目级 todo（替代 goalRepo.create） */
+/** 创建 todo（level 0=行动, 1=目标, 2=项目） */
 export declare function createGoalAsTodo(fields: {
     user_id: string;
     device_id: string;
     text: string;
-    level: 1 | 2;
+    level: 0 | 1 | 2;
     source?: string;
     status?: string;
     cluster_id?: string;
@@ -135,9 +148,24 @@ export declare function findActiveGoalsByUser(userId: string): Promise<Todo[]>;
 export declare function findActiveGoalsByDevice(deviceId: string): Promise<Todo[]>;
 /** 按 parent_id 查找子 todo（替代 goalRepo.findWithTodos） */
 export declare function findChildTodos(parentId: string): Promise<Todo[]>;
-/** 侧边栏：按 domain 分组统计（支持 user_id 或 device_id） */
+/** 侧边栏：按 domain 分组统计（支持 user_id 或 device_id）
+ * @deprecated 使用 getMyWorldData 替代
+ */
 export declare function getDimensionSummary(userId: string | null, deviceId?: string): Promise<Array<{
     domain: string;
     pending_count: number;
     goal_count: number;
 }>>;
+export interface MyWorldNode {
+    id: string;
+    type: "l2_cluster" | "l1_cluster" | "goal" | "action";
+    title: string;
+    memberCount?: number;
+    subtaskTotal?: number;
+    subtaskDone?: number;
+    status?: string;
+    done?: boolean;
+    children: MyWorldNode[];
+}
+/** 侧边栏"我的世界"：组装三级树结构 */
+export declare function getMyWorldData(userId: string): Promise<MyWorldNode[]>;

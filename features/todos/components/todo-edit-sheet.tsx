@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { updateTodo, deleteTodo } from "@/shared/lib/api/todos";
 import type { TodoDTO } from "../lib/todo-types";
+import { localTzOffset } from "../lib/time-slots";
 
 interface TodoEditSheetProps {
   todo: TodoDTO | null;
@@ -36,8 +37,9 @@ export function TodoEditSheet({ todo, open, onClose, onUpdated, onAskAI }: TodoE
     setText(t.text);
     if (t.scheduled_start) {
       const d = new Date(t.scheduled_start);
-      setDate(d.toISOString().split("T")[0]);
-      setTime(d.toTimeString().slice(0, 5));
+      const pad = (n: number) => String(n).padStart(2, "0");
+      setDate(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`);
+      setTime(`${pad(d.getHours())}:${pad(d.getMinutes())}`);
     } else {
       setDate("");
       setTime("");
@@ -68,16 +70,16 @@ export function TodoEditSheet({ todo, open, onClose, onUpdated, onAskAI }: TodoE
       if (text !== todo.text) updates.text = text;
 
       if (date && time) {
-        updates.scheduled_start = `${date}T${time}:00`;
+        const tz = localTzOffset();
+        updates.scheduled_start = `${date}T${time}:00${tz}`;
         if (duration) {
           const end = new Date(updates.scheduled_start);
           end.setMinutes(end.getMinutes() + duration);
-          // 使用本地时间格式，修复时区 bug
           const pad = (n: number) => String(n).padStart(2, "0");
-          updates.scheduled_end = `${end.getFullYear()}-${pad(end.getMonth() + 1)}-${pad(end.getDate())}T${pad(end.getHours())}:${pad(end.getMinutes())}:00`;
+          updates.scheduled_end = `${end.getFullYear()}-${pad(end.getMonth() + 1)}-${pad(end.getDate())}T${pad(end.getHours())}:${pad(end.getMinutes())}:00${tz}`;
         }
       } else if (date) {
-        updates.scheduled_start = `${date}T09:00:00`;
+        updates.scheduled_start = `${date}T09:00:00${localTzOffset()}`;
       }
 
       if (duration) updates.estimated_minutes = duration;

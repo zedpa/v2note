@@ -4,6 +4,7 @@ import { appendToDiary } from "../diary/manager.js";
 import { recordRepo, summaryRepo } from "../db/repositories/index.js";
 import { classifyVoiceIntent, executeVoiceAction, type VoiceAction, type ActionExecResult } from "./voice-action.js";
 import { getSession } from "../session/manager.js";
+import { safeParseJson } from "../lib/text-utils.js";
 
 export interface LocalConfigPayload {
   soul?: { content: string };
@@ -180,8 +181,8 @@ export async function processEntry(payload: ProcessPayload): Promise<ProcessResu
       result.error = "AI returned empty response";
     } else {
       try {
-        const parsed = JSON.parse(response.content);
-        result.summary = typeof parsed.summary === "string" ? parsed.summary : undefined;
+        const parsed = safeParseJson<{ summary?: string }>(response.content);
+        result.summary = typeof parsed?.summary === "string" ? parsed.summary : undefined;
         console.log(`[process] Parsed: summary: ${result.summary ? 'yes' : 'no'}`);
 
         /* MOVED TO DIGEST — intent/todo/tag/relay extraction

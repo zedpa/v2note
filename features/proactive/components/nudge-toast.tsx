@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { toast } from "sonner";
+import { fabNotify } from "@/shared/lib/fab-notify";
 import { getGatewayClient, type GatewayResponse } from "@/features/chat/lib/gateway-client";
 
 interface NudgeAction {
@@ -25,62 +25,29 @@ export function useProactiveNudge(opts?: {
     const unsub = client.onMessage((msg: GatewayResponse) => {
       switch (msg.type) {
         case "proactive.message": {
-          const { text, action } = msg.payload;
-          toast(text, {
-            duration: 10000,
-            action: action === "schedule"
-              ? {
-                  label: "去安排",
-                  onClick: () => opts?.onOpenTodayTodo?.(),
-                }
-              : undefined,
-          });
+          const { text } = msg.payload;
+          fabNotify.info(text);
           break;
         }
 
         case "proactive.todo_nudge": {
-          const { text, suggestion } = msg.payload;
-          toast(suggestion, {
-            duration: 15000,
-            description: text,
-            action: {
-              label: "查看待办",
-              onClick: () => opts?.onOpenTodos?.(),
-            },
-          });
+          const { suggestion } = msg.payload;
+          fabNotify.info(suggestion);
           break;
         }
 
         case "proactive.morning_briefing": {
-          toast(msg.payload.text, {
-            duration: 15000,
-            action: {
-              label: "查看简报",
-              onClick: () => opts?.onOpenBriefing?.(),
-            },
-          });
+          fabNotify.info(msg.payload.text);
           break;
         }
 
         case "proactive.relay_reminder": {
-          toast(msg.payload.text, {
-            duration: 12000,
-            action: {
-              label: "查看简报",
-              onClick: () => opts?.onOpenBriefing?.(),
-            },
-          });
+          fabNotify.info(msg.payload.text);
           break;
         }
 
         case "proactive.evening_summary": {
-          toast(msg.payload.text, {
-            duration: 15000,
-            action: {
-              label: "查看总结",
-              onClick: () => opts?.onOpenSummary?.(),
-            },
-          });
+          fabNotify.info(msg.payload.text);
           break;
         }
       }

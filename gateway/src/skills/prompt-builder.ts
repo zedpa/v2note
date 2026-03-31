@@ -1,17 +1,38 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Skill } from "./types.js";
-import type { ContextTier, ContextBuildOptions } from "../context/tiers.js";
+import type { ContextTier, ContextBuildOptions, AgentRole } from "../context/tiers.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+const AGENTS_DIR = join(__dirname, "../../agents");
 
-// Load AGENTS.md once at startup — AI 行为宪法
-let agentMdCore: string;
+// Load base constitution once at startup — AI 行为宪法（共享基座）
+let baseMd: string;
 try {
-  agentMdCore = readFileSync(join(__dirname, "../../AGENTS.md"), "utf-8");
+  baseMd = readFileSync(join(__dirname, "../../AGENTS.md"), "utf-8");
 } catch {
-  agentMdCore = "你是一个智能笔记助手，帮助用户整理和回顾语音/文字记录。";
+  baseMd = "你是一个智能笔记助手，帮助用户整理和回顾语音/文字记录。";
+}
+
+// Load agent-specific prompts at startup（角色化 Agent）
+const agentFileMap: Record<AgentRole, string> = {
+  chat: "chat.md",
+  briefing: "briefing.md",
+  onboarding: "onboarding.md",
+};
+
+const agentPrompts: Partial<Record<AgentRole, string>> = {};
+for (const [role, filename] of Object.entries(agentFileMap)) {
+  const filePath = join(AGENTS_DIR, filename);
+  if (existsSync(filePath)) {
+    try {
+      agentPrompts[role as AgentRole] = readFileSync(filePath, "utf-8");
+      console.log(`[prompt-builder] Agent loaded: ${filename}`);
+    } catch {
+      console.warn(`[prompt-builder] Failed to load agent: ${filename}`);
+    }
+  }
 }
 
 /**
@@ -24,17 +45,13 @@ export function buildTieredContext(opts: ContextBuildOptions): ContextTier {
   const hot: string[] = [];
   const warm: string[] = [];
 
-  // ── HOT TIER: always present (AGENTS.md 已包含对话纪律和简报纪律) ──
+  // ── HOT TIER: base constitution (AGENTS.md 共享基座) ──
 
-  hot.push(agentMdCore);
+  hot.push(baseMd);
 
-  if (opts.mode === "chat") {
-    hot.push(`\n## 任务\n你正在与用户进行复盘对话。基于记忆和用户画像，帮助用户回顾和总结。自然地对话，按需提出问题和洞察。
-
-## 工具使用规则
-- 删除类操作（delete_todo、delete_record）：**必须先用文字告知用户将要删除的内容，等用户明确回复"确认/好的/对"后才调用工具**。绝不能在用户第一句话就直接调用删除工具。
-- 创建目标（create_goal）、创建项目（create_project）：先描述方案，等用户同意后再调用。
-- 其他工具（search、create_todo、update_todo）：可以直接调用，无需确认。`);
+  // ── HOT TIER: agent-specific prompt (角色化 Agent) ──
+  if (opts.agent && agentPrompts[opts.agent]) {
+    hot.push(agentPrompts[opts.agent]!);
   }
 
   // ── WARM TIER: task-specific ──
@@ -88,6 +105,7 @@ export function buildSystemPrompt(opts: {
   userProfile?: string;
   memory?: string[];
   mode?: "chat" | "briefing";
+  agent?: AgentRole;
   mcpTools?: Array<{ name: string; description: string; parameters?: Record<string, unknown> }>;
   /** Pre-built pending intent context to inject into warm tier */
   pendingIntentContext?: string;
@@ -101,6 +119,7 @@ export function buildSystemPrompt(opts: {
     userProfile: opts.userProfile,
     memories: opts.memory,
     mcpTools: opts.mcpTools,
+    agent: opts.agent,
   });
 
   const parts = [tiered.hot, tiered.warm];

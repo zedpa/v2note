@@ -11,7 +11,7 @@ import { getSettings } from "@/shared/lib/local-config";
 import { executeCommand, getCommandNames, getCommandDefs } from "@/features/commands/lib/registry";
 import type { CommandContext } from "@/features/commands/lib/registry";
 import { createManualNote } from "@/features/notes/lib/manual-note";
-import { toast } from "sonner";
+import { fabNotify } from "@/shared/lib/fab-notify";
 
 type InputMode = "voice" | "text";
 type VoicePhase = "idle" | "pressing" | "recording" | "locked";
@@ -110,14 +110,14 @@ export function InputBar({ onStartReview, onCommandDetected, commandContext }: I
         case "asr.error":
           setConfirmedText("");
           setPartialText("");
-          toast.error(`识别错误: ${msg.payload.message}`);
+          fabNotify.error(`识别错误: ${msg.payload.message}`);
           break;
         case "process.result":
           // AI processing done in background
           emit("recording:processed");
           break;
         case "todo.created":
-          toast.success(`已创建待办：${(msg.payload as any).text?.slice(0, 30)}`);
+          fabNotify.success(`已创建待办：${(msg.payload as any).text?.slice(0, 30)}`);
           emit("recording:processed"); // 刷新待办列表
           break;
         case "command.detected":
@@ -142,7 +142,7 @@ export function InputBar({ onStartReview, onCommandDetected, commandContext }: I
       const client = getGatewayClient();
       client.send({ type: "asr.stop", payload: { deviceId, forceCommand } });
     } catch (err: any) {
-      toast.error(`录音保存失败: ${err.message}`);
+      fabNotify.error(`录音保存失败: ${err.message}`);
     } finally {
       setConfirmedText("");
       setPartialText("");
@@ -192,7 +192,7 @@ export function InputBar({ onStartReview, onCommandDetected, commandContext }: I
                 client.sendBinary(chunk);
               },
               onError: (err) => {
-                toast.error(`录音错误: ${err.message}`);
+                fabNotify.error(`录音错误: ${err.message}`);
                 setVoicePhase("idle");
               },
             });
@@ -202,7 +202,7 @@ export function InputBar({ onStartReview, onCommandDetected, commandContext }: I
             setPartialText("");
             startTimers();
           } catch (err: any) {
-            toast.error(`无法开始录音: ${err.message}`);
+            fabNotify.error(`无法开始录音: ${err.message}`);
             setVoicePhase("idle");
             isPressingRef.current = false;
           }
@@ -276,7 +276,7 @@ export function InputBar({ onStartReview, onCommandDetected, commandContext }: I
     };
     const cmdResult = executeCommand(trimmed, ctx);
     if (cmdResult) {
-      if (cmdResult.message) toast(cmdResult.message);
+      if (cmdResult.message) fabNotify.info(cmdResult.message);
       setText("");
       return;
     }
@@ -285,10 +285,10 @@ export function InputBar({ onStartReview, onCommandDetected, commandContext }: I
     setText("");
     try {
       await createManualNote({ content: trimmed, useAi: true });
-      toast.success("已保存");
+      fabNotify.success("已保存");
       emit("recording:processed");
     } catch (err: any) {
-      toast.error(`保存失败: ${err.message}`);
+      fabNotify.error(`保存失败: ${err.message}`);
     }
   }, [text, commandContext, onStartReview]);
 

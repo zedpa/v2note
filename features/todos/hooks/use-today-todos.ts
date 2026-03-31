@@ -17,13 +17,20 @@ export function useTodayTodos() {
       await getDeviceId();
       const data = await listTodos();
 
-      const today = new Date().toISOString().split("T")[0];
+      const now = new Date();
+      const pad = (n: number) => String(n).padStart(2, "0");
+      const today = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+
+      const toLocalDate = (ts: string) => {
+        const d = new Date(ts);
+        return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+      };
 
       // Filter for today's todos (created today or scheduled for today)
       const todayItems: TodayTodo[] = data
         .filter((t: any) => {
-          const createdDate = t.created_at?.split("T")[0];
-          const scheduledDate = t.scheduled_start?.split("T")[0];
+          const createdDate = t.created_at ? toLocalDate(t.created_at) : null;
+          const scheduledDate = t.scheduled_start ? toLocalDate(t.scheduled_start) : null;
           return (
             !t.done &&
             (createdDate === today || scheduledDate === today)

@@ -24,6 +24,7 @@ export interface ProcessPayload {
     recordId: string;
     notebook?: string;
     localConfig?: LocalConfigPayload;
+    forceCommand?: boolean;
 }
 export interface RelayExtract {
     text: string;
@@ -41,8 +42,6 @@ export interface ProcessResult {
     todos?: string[];
     intents?: IntentSignal[];
     pending_followups?: number;
-    customer_requests?: string[];
-    setting_changes?: string[];
     tags?: string[];
     relays?: RelayExtract[];
     summary?: string;
@@ -51,6 +50,11 @@ export interface ProcessResult {
     action_results?: ActionExecResult[];
     /** voice-action: 意图类型 (record/action/mixed) */
     voice_intent_type?: "record" | "action" | "mixed";
+    /** voice-action: 高风险操作等待用户确认的 ID */
+    pending_confirm?: {
+        confirm_id: string;
+        summary: string;
+    };
 }
 /**
  * Process a single diary entry: clean transcript text, save summary, trigger digest.

@@ -5,24 +5,42 @@
  * 跨 Strike 关系由 Tier2 批量分析统一处理。
  */
 import { chatCompletion } from "../ai/provider.js";
-import { strikeRepo, bondRepo, strikeTagRepo, recordRepo, transcriptRepo, summaryRepo, snapshotRepo, } from "../db/repositories/index.js";
+import { strikeRepo, bondRepo, strikeTagRepo, tagRepo, recordRepo, transcriptRepo, summaryRepo, snapshotRepo, } from "../db/repositories/index.js";
 import { buildDigestPrompt } from "./digest-prompt.js";
 import { projectIntendStrike } from "../cognitive/todo-projector.js";
 import { linkNewStrikesToGoals } from "../cognitive/goal-auto-link.js";
 import { getSession } from "../session/manager.js";
 import { updateSoul } from "../soul/manager.js";
 import { updateProfile } from "../profile/manager.js";
-import { maySoulUpdate, mayProfileUpdate } from "../lib/text-utils.js";
+import { maySoulUpdate, mayProfileUpdate, safeParseJson } from "../lib/text-utils.js";
 import { TIER2_STRIKE_THRESHOLD } from "../cognitive/batch-analyze.js";
+import { writeStrikeEmbedding } from "../cognitive/embed-writer.js";
 /**
  * Main digest entry point.
  * Tier1: 1 次 AI 调用分解 Strike + 内部 Bond。
  */
 export async function digestRecords(recordIds, context) {
-    const userId = context.userId ?? context.deviceId;
+    // userId 必须是 app_user.id；如果未传入，从 record/device 表查找
+    let userId = context.userId;
+    if (!userId) {
+        const rec = recordIds[0] ? await recordRepo.findById(recordIds[0]) : null;
+        userId = rec?.user_id ?? undefined;
+        if (!userId) {
+            // 从 device 表查找关联的 user_id
+            const { queryOne: qo } = await import("../db/pool.js");
+            const dev = await qo(`SELECT user_id FROM device WHERE id = $1`, [context.deviceId]).catch(() => null);
+            userId = dev?.user_id ?? undefined;
+        }
+        if (!userId) {
+            console.warn(`[digest] No userId for device ${context.deviceId}, skipping digest`);
+            return;
+        }
+    }
     try {
+        const dt0 = Date.now();
         // ── Step 0: 原子抢占 — 防止并发 digest 同一 record ────────
         const claimedIds = await recordRepo.claimForDigest(recordIds);
+        console.log(`[digest][⏱ claim] ${Date.now() - dt0}ms — claimed ${claimedIds.length}/${recordIds.length}`);
         if (claimedIds.length === 0) {
             console.log("[digest] All records already claimed, skipping");
             return;
@@ -61,28 +79,29 @@ export async function digestRecords(recordIds, context) {
             return;
         }
         const combinedText = textParts.join("\n\n---\n\n");
+        console.log(`[digest][⏱ load-text] ${Date.now() - dt0}ms — text: ${combinedText.length} chars`);
         // ── Step 2: AI decomposition (1 次调用) ─────────────────────
         const digestMessages = [
             { role: "system", content: buildDigestPrompt() },
             { role: "user", content: combinedText },
         ];
+        const dtAi = Date.now();
         const digestResp = await chatCompletion(digestMessages, {
             json: true,
             temperature: 0.3,
+            tier: "fast",
         });
+        console.log(`[digest][⏱ ai-call] ${Date.now() - dtAi}ms — response: ${digestResp.content.length} chars`);
         let rawStrikes;
         let rawBonds;
-        try {
-            const parsed = JSON.parse(digestResp.content);
-            rawStrikes = parsed.strikes ?? [];
-            rawBonds = parsed.bonds ?? [];
-        }
-        catch (e) {
-            console.error("[digest] Failed to parse AI response as JSON:", e);
-            // 回滚：解析失败时恢复 digested 状态，允许重试
+        const parsed = safeParseJson(digestResp.content);
+        if (!parsed) {
+            console.error("[digest] Failed to parse AI response as JSON:", digestResp.content.slice(0, 300));
             await unclaimRecords(claimedIds);
             return;
         }
+        rawStrikes = parsed.strikes ?? [];
+        rawBonds = parsed.bonds ?? [];
         if (rawStrikes.length === 0) {
             console.log("[digest] AI returned no strikes, skipping");
             // record 已在 Step 0 被 claimForDigest 标记为 digested
@@ -90,6 +109,7 @@ export async function digestRecords(recordIds, context) {
         }
         // ── Step 3: Write Strikes to DB（含去重）─────────────────────
         const idxToId = new Map();
+        const intendEntries = [];
         for (let i = 0; i < rawStrikes.length; i++) {
             const s = rawStrikes[i];
             try {
@@ -110,26 +130,42 @@ export async function digestRecords(recordIds, context) {
                     source_type: strikeSourceType,
                 });
                 idxToId.set(i, entry.id);
-                // Write tags
+                // 异步写入 embedding（不阻塞主流程）
+                void writeStrikeEmbedding(entry.id, s.nucleus);
+                // Write tags to strike_tag + record_tag（标签立刻在前端可见）
                 if (s.tags && s.tags.length > 0) {
                     await strikeTagRepo.createMany(s.tags.map((label) => ({
                         strike_id: entry.id,
                         label,
                     })));
+                    // 同步写 record_tag，让时间线立刻展示标签
+                    if (validIds[0]) {
+                        for (const label of s.tags) {
+                            try {
+                                const tag = await tagRepo.upsert(label);
+                                await tagRepo.addToRecord(validIds[0], tag.id);
+                            }
+                            catch (_e) {
+                                // record_tag 写入失败不阻塞主流程
+                            }
+                        }
+                    }
                 }
-                // intend Strike 自动投影为 todo/goal
+                // 收集 intend Strike，后面并行投影
                 if (s.polarity === "intend") {
-                    try {
-                        await projectIntendStrike(entry, userId);
-                    }
-                    catch (e) {
-                        console.error(`[digest] Failed to project intend strike ${entry.id} to todo:`, e);
-                    }
+                    intendEntries.push({ entry, idx: i });
                 }
             }
             catch (e) {
                 console.error(`[digest] Failed to write strike ${i}:`, e);
             }
+        }
+        console.log(`[digest][⏱ write-strikes] ${Date.now() - dt0}ms — ${idxToId.size} strikes, ${intendEntries.length} intend`);
+        // intend Strike 并行投影为 todo/goal
+        if (intendEntries.length > 0) {
+            const dtProj = Date.now();
+            await Promise.all(intendEntries.map(({ entry }) => projectIntendStrike(entry, userId).catch((e) => console.error(`[digest] Failed to project intend strike ${entry.id} to todo:`, e))));
+            console.log(`[digest][⏱ project-intend] ${Date.now() - dtProj}ms — ${intendEntries.length} items`);
         }
         // ── Step 4: Write internal Bonds ─────────────────────────────
         const bondsToInsert = rawBonds
@@ -150,6 +186,7 @@ export async function digestRecords(recordIds, context) {
             }
         }
         // ── Step 5: 新 Strike 自动关联已有目标 ─────────────────────
+        const dtGoalLink = Date.now();
         try {
             const newStrikesForGoalLink = Array.from(idxToId.entries()).map(([_idx, id]) => ({
                 id,
@@ -160,6 +197,7 @@ export async function digestRecords(recordIds, context) {
         catch (e) {
             console.error("[digest] Goal auto-link failed:", e);
         }
+        console.log(`[digest][⏱ goal-link] ${Date.now() - dtGoalLink}ms`);
         // Step 6 已移除：record 在 Step 0 由 claimForDigest 原子标记
         // ── Step 7: 记忆/Soul/Profile 更新（Mem0 两阶段） ──────────
         try {
@@ -182,7 +220,11 @@ export async function digestRecords(recordIds, context) {
         // ── Step 8: 检查是否触发 Tier2 批量分析 ─────────────────────
         try {
             const newCount = await snapshotRepo.countNewStrikes(userId);
-            if (newCount >= TIER2_STRIKE_THRESHOLD) {
+            // 冷启动加速：总 Strike < 20 时阈值降为 2，让新用户尽快看到聚类
+            const totalStrikes = await snapshotRepo.countTotalStrikes(userId);
+            const threshold = totalStrikes < 20 ? 2 : TIER2_STRIKE_THRESHOLD;
+            if (newCount >= threshold) {
+                console.log(`[digest][⏱ tier2-trigger] newStrikes=${newCount} >= ${threshold} (total=${totalStrikes}, coldStart=${totalStrikes < 20}), launching batch-analyze`);
                 const { runBatchAnalyze } = await import("../cognitive/batch-analyze.js");
                 runBatchAnalyze(userId).catch((e) => console.warn("[digest] Tier2 batch-analyze failed:", e.message));
             }
@@ -190,6 +232,7 @@ export async function digestRecords(recordIds, context) {
         catch (e) {
             console.warn("[digest] Tier2 trigger check failed:", e);
         }
+        console.log(`[digest][⏱ total] ${Date.now() - dt0}ms — pipeline done for ${claimedIds.length} records`);
     }
     catch (e) {
         console.error("[digest] Pipeline failed:", e);

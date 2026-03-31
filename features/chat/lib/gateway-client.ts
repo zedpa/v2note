@@ -31,6 +31,7 @@ export type GatewayMessage =
         dateRange: { start: string; end: string };
         initialMessage?: string;
         assistantPreamble?: string;
+        skill?: string;
         localConfig?: Pick<LocalConfigPayload, "soul" | "skills">;
       };
     }

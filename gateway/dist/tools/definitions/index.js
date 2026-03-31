@@ -12,6 +12,7 @@ import { createGoalTool } from "./create-goal.js";
 import { updateGoalTool } from "./update-goal.js";
 import { updateRecordTool } from "./update-record.js";
 import { deleteRecordTool } from "./delete-record.js";
+import { deleteTodoTool } from "./delete-todo.js";
 import { createProjectTool } from "./create-project.js";
 import { createLinkTool } from "./create-link.js";
 import { searchTool } from "./search.js";
@@ -29,6 +30,7 @@ export const ALL_TOOL_DEFINITIONS = [
     updateGoalTool,
     updateRecordTool,
     deleteRecordTool,
+    deleteTodoTool,
     createProjectTool,
     // 链接
     createLinkTool,

@@ -7,7 +7,7 @@ import {
   deleteNotebook,
   type Notebook,
 } from "@/shared/lib/api/notebooks";
-import { toast } from "sonner";
+import { fabNotify } from "@/shared/lib/fab-notify";
 
 interface NotebookManagerProps {
   notebook: Notebook;
@@ -52,22 +52,22 @@ export function NotebookManager({ notebook, position, onClose, onRefresh }: Note
     if (!name) return;
     try {
       await updateNotebook(notebook.id, { name });
-      toast.success("已重命名");
+      fabNotify.success("已重命名");
       onRefresh();
       onClose();
     } catch {
-      toast.error("重命名失败");
+      fabNotify.error("重命名失败");
     }
   }, [notebook.id, editName, onRefresh, onClose]);
 
   const handleDelete = useCallback(async () => {
     try {
       await deleteNotebook(notebook.id);
-      toast.success("已删除");
+      fabNotify.success("已删除");
       onRefresh();
       onClose();
     } catch {
-      toast.error("删除失败");
+      fabNotify.error("删除失败");
     }
   }, [notebook.id, onRefresh, onClose]);
 

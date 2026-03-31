@@ -33,7 +33,7 @@ export function registerActionPanelRoutes(router) {
         }
         const url = new URL(req.url ?? "", "http://localhost");
         const days = parseInt(url.searchParams.get("days") ?? "14", 10);
-        const stats = await getActionStats(userId, days);
+        const stats = await getActionStats({ userId }, days);
         sendJson(res, stats);
     });
     // 跳过 alert（供前端或 daily-loop 使用）
@@ -43,7 +43,7 @@ export function registerActionPanelRoutes(router) {
             sendError(res, "Unauthorized", 401);
             return;
         }
-        const alerts = await getSkipAlerts(userId);
+        const alerts = await getSkipAlerts({ userId });
         sendJson(res, alerts);
     });
     router.post("/api/v1/chat/decision", async (req, res) => {
@@ -58,7 +58,7 @@ export function registerActionPanelRoutes(router) {
         const response = await chatCompletion([
             { role: "system", content: prompt },
             { role: "user", content: question },
-        ], { temperature: 0.7 });
+        ], { temperature: 0.7, tier: "report" });
         sendJson(res, { content: response.content });
     });
 }

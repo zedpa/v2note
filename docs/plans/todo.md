@@ -223,14 +223,26 @@ Digest 使用 fast 层（qwen-plus），但 13s 仍然偏慢。可能原因：
 - [x] Migration `041_backfill_todo_ownership.sql`（回填历史孤儿 todo）
 
 ### 前端体验
+- [x] **FAB 胶囊通知系统** — 移除 Sonner toast，全部通知通过 FAB 变形胶囊展示（success/error/info 三色）
+  - `shared/lib/fab-notify.ts`：轻量事件总线，23+ 文件迁移
+  - `features/recording/components/fab.tsx`：idle 态渲染通知胶囊，2s 自动消失
+- [x] **待办时区修复** — 创建/编辑/显示/过滤全链路统一本地时区
+  - 根因：`scheduled_start` 构建不带时区，Supabase `timestamptz` 当作 UTC 存储，读回本地 +8h 偏移
+  - `time-slots.ts`：新增 `localTzOffset()` 工具函数
+  - `todo-create-sheet.tsx` / `todo-edit-sheet.tsx` / `todo-detail-sheet.tsx`：保存时附带 `+08:00`
+  - `todo-edit-sheet.tsx` / `todo-detail-sheet.tsx`：读取时用 `getFullYear/getMonth/getDate` 取本地日期（替代 `toISOString().split("T")[0]`）
+  - `todo-grouping.ts`：`filterByDate()` 用 `new Date()` 取本地日期
+  - `use-today-todos.ts`：今天日期和待办日期均用本地时间计算
+- [x] **时间视图添加按钮修复** — 时间块有待办时仍显示 `+` 按钮（原来只在空时段显示）
+  - `time-block.tsx`：非空时段在任务列表底部追加圆形 `+` 按钮
 - [ ] 工具执行结果 Toast 反馈（"已创建待办：xxx"、"已更新时间：xxx"）
 - [ ] 首屏加载优化：skeleton screen 替代 loading spinner
 
 ### 录音链路可靠性
 - [x] ASR 初始 chunk 缓冲 + Python spawn 后 flush（修复首段音频丢失）
 - [x] Digest userId 查找链（record → device → skip，修复 FK 违反）
+- [x] 前端录音→日记生成验证 — 修复 Python ASR 缺失 `dashscope` 依赖 + 端到端验证通过
 - [ ] ASR session 竞态：用户快速重录时 close 事件可能被忽略（需验证修复效果）
-- [ ] 前端录音→日记生成验证（gateway 侧已修复，需用户端重测）
 
 ### 代码清理
 - [ ] 移除 `batch-analyze.ts` 调试日志（AI raw response / Parsed / cluster skip 的 console.log）

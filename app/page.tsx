@@ -4,11 +4,13 @@ import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
 import { initStatusBar } from "@/shared/lib/status-bar";
-import { WorkspaceHeader, type WorkspaceTab, type TopicFilter, type DimensionFilter } from "@/features/workspace/components/workspace-header";
+import { WorkspaceHeader, type WorkspaceTab, type TopicFilter } from "@/features/workspace/components/workspace-header";
 import { NotesTimeline } from "@/features/notes/components/notes-timeline";
 import { TodoWorkspace } from "@/features/todos/components/todo-workspace";
 import { TopicLifecycleView } from "@/features/workspace/components/topic-lifecycle-view";
 import { FAB } from "@/features/recording/components/fab";
+import { emit } from "@/features/recording/lib/events";
+import { api } from "@/shared/lib/api";
 import { SidebarDrawer } from "@/features/sidebar/components/sidebar-drawer";
 import { SearchView } from "@/features/search/components/search-view";
 import { ChatView } from "@/features/chat/components/chat-view";
@@ -23,7 +25,7 @@ import { OnboardingSeed } from "@/features/cognitive/components/onboarding-seed"
 import { GoalDetailOverlay } from "@/features/goals/components/goal-detail-overlay";
 import { ProjectDetailOverlay } from "@/features/goals/components/project-detail-overlay";
 import { GoalList } from "@/features/goals/components/goal-list";
-import { toast } from "sonner";
+import { fabNotify } from "@/shared/lib/fab-notify";
 import { getCommandDefs } from "@/features/commands/lib/registry";
 import { on } from "@/features/recording/lib/events";
 import { useBackHandler } from "@/shared/hooks/use-back-handler";
@@ -65,21 +67,13 @@ export default function Page() {
   } | null>(null);
   const [chatInitialMessage, setChatInitialMessage] = useState<string | undefined>();
   const [chatMode, setChatMode] = useState<"review" | "command" | "insight">("review");
+  const [chatSkill, setChatSkill] = useState<string | undefined>();
   const [selectedGoalId, setSelectedGoalId] = useState<string | null>(null);
   // 主题筛选（场景 10: localStorage 持久化）
   const [topicFilter, setTopicFilter] = useState<TopicFilter | null>(() => {
     if (typeof window === "undefined") return null;
     try {
       const stored = localStorage.getItem("v2note:topicFilter");
-      return stored ? JSON.parse(stored) : null;
-    } catch { return null; }
-  });
-
-  // 维度筛选（L3 全局 domain 过滤）
-  const [dimensionFilter, setDimensionFilter] = useState<DimensionFilter | null>(() => {
-    if (typeof window === "undefined") return null;
-    try {
-      const stored = localStorage.getItem("v2note:dimensionFilter");
       return stored ? JSON.parse(stored) : null;
     } catch { return null; }
   });
@@ -91,14 +85,6 @@ export default function Page() {
       localStorage.removeItem("v2note:topicFilter");
     }
   }, [topicFilter]);
-
-  useEffect(() => {
-    if (dimensionFilter) {
-      localStorage.setItem("v2note:dimensionFilter", JSON.stringify(dimensionFilter));
-    } else {
-      localStorage.removeItem("v2note:dimensionFilter");
-    }
-  }, [dimensionFilter]);
 
   // Workspace: Segment tab (日记 | 待办)
   const [activeTab, setActiveTab] = useState<WorkspaceTab>(() => {
@@ -114,11 +100,15 @@ export default function Page() {
   /** null = voice notes timeline, string = diary notebook name */
   const [activeNotebook, setActiveNotebook] = useState<string | null>(null);
 
-  // Onboarding state
-  const [isFirstTime, setIsFirstTime] = useState(() => {
-    if (typeof window === "undefined") return false;
-    return localStorage.getItem("v2note:onboarded") !== "true";
-  });
+  // Onboarding state — 按用户维度判断，旧设备新用户也能触发冷启动
+  const [isFirstTime, setIsFirstTime] = useState(false);
+  useEffect(() => {
+    if (!loggedIn || !user?.id) return;
+    const key = `v2note:onboarded:${user.id}`;
+    if (localStorage.getItem(key) !== "true") {
+      setIsFirstTime(true);
+    }
+  }, [loggedIn, user?.id]);
 
   useEffect(() => {
     initStatusBar();
@@ -172,6 +162,16 @@ export default function Page() {
     const today = new Date().toISOString().split("T")[0];
     setChatDateRange({ start: today, end: today });
     setChatInitialMessage(initialText);
+    setChatSkill(undefined);
+    setChatMode("command");
+    setActiveOverlay("chat");
+  }, []);
+
+  const handleOpenSkillChat = useCallback((skillName: string) => {
+    const today = new Date().toISOString().split("T")[0];
+    setChatDateRange({ start: today, end: today });
+    setChatInitialMessage(undefined);
+    setChatSkill(skillName);
     setChatMode("command");
     setActiveOverlay("chat");
   }, []);
@@ -183,11 +183,11 @@ export default function Page() {
   const showHelp = useCallback(() => {
     const commands = getCommandDefs();
     const helpText = commands.map((c) => `/${c.name} — ${c.description}`).join("\n");
-    toast(helpText, { duration: 8000 });
+    fabNotify.info(helpText);
   }, []);
 
   const handleExport = useCallback((_format: string) => {
-    toast("导出功能开发中...");
+    fabNotify.info("导出功能开发中...");
   }, []);
 
   const handleNotificationNavigate = useCallback((type: AppNotification["type"]) => {
@@ -282,12 +282,22 @@ export default function Page() {
     return (
       <OnboardingSeed
         onComplete={() => {
+          if (user?.id) localStorage.setItem(`v2note:onboarded:${user.id}`, "true");
           localStorage.setItem("v2note:onboarded", "true");
           setIsFirstTime(false);
+          // 确保欢迎日记存在（Q5 正常完成时后端已创建，此处兜底）
+          api.post("/api/v1/onboarding/welcome-seed", {}).catch(() => {});
+          setTimeout(() => emit("recording:processed"), 500);
         }}
         onSkip={() => {
+          if (user?.id) localStorage.setItem(`v2note:onboarded:${user.id}`, "true");
           localStorage.setItem("v2note:onboarded", "true");
           setIsFirstTime(false);
+          // 跳过时前端主动创建欢迎日记
+          api.post("/api/v1/onboarding/welcome-seed", {})
+            .then(() => emit("recording:processed"))
+            .catch(() => {});
+          setTimeout(() => emit("recording:processed"), 500);
         }}
       />
     );
@@ -313,16 +323,10 @@ export default function Page() {
           setTopicFilter({ clusterId, title });
           setActiveTab("todo");
         }}
-        onSelectDimension={(domain) => {
-          setDimensionFilter({ domain });
-          setTopicFilter(null);
-        }}
         onSelectToday={() => {
-          setDimensionFilter(null);
           setTopicFilter(null);
           setActiveTab("todo");
         }}
-        activeDimension={dimensionFilter?.domain}
         onLogout={logout}
         userName={user?.displayName}
         userPhone={user?.phone}
@@ -335,13 +339,12 @@ export default function Page() {
         activeTab={activeTab}
         onTabChange={setActiveTab}
         onAvatarClick={() => setShowSidebar(true)}
+        onChatClick={() => handleOpenCommandChat()}
         onSearchClick={() => setActiveOverlay("search")}
         onNotificationClick={() => setActiveOverlay("notifications")}
         userName={user?.displayName}
         topicFilter={topicFilter}
         onClearTopicFilter={() => setTopicFilter(null)}
-        dimensionFilter={dimensionFilter}
-        onClearDimensionFilter={() => setDimensionFilter(null)}
       />
 
       {/* 工作区内容: 日记 or 待办 (swipeable) — 保持双 tab 挂载避免切换重载 */}
@@ -354,7 +357,7 @@ export default function Page() {
           <NotesTimeline
             notebook={activeNotebook}
             clusterId={topicFilter?.clusterId}
-            domainFilter={dimensionFilter?.domain}
+            domainFilter={undefined}
             onOpenChat={handleOpenCommandChat}
             onOpenOverlay={openOverlay}
           />
@@ -383,6 +386,7 @@ export default function Page() {
         }}
         onCommandDetected={handleCommandDetected}
         onOpenCommandChat={handleOpenCommandChat}
+        onOpenSkillChat={handleOpenSkillChat}
         commandContext={{
           setTheme,
           exportData: handleExport,
@@ -403,10 +407,12 @@ export default function Page() {
           onClose={() => {
             closeOverlay();
             setChatInitialMessage(undefined);
+            setChatSkill(undefined);
             setChatMode("review");
           }}
           initialMessage={chatInitialMessage}
           mode={chatMode}
+          skill={chatSkill}
           commandContext={{
             setTheme,
             exportData: handleExport,

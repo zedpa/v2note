@@ -21,9 +21,15 @@ export async function findByUser(userId: string): Promise<Soul | null> {
   );
 }
 
-export async function upsertByUser(userId: string, content: string): Promise<void> {
-  // Use the partial unique index idx_soul_user_id_unique
-  const existing = await findByUser(userId);
+export async function upsertByUser(userId: string, content: string, deviceId?: string): Promise<void> {
+  let existing = await findByUser(userId);
+  // 按 device_id 查找旧数据并补绑 user_id
+  if (!existing && deviceId) {
+    existing = await findByDevice(deviceId);
+    if (existing) {
+      await execute(`UPDATE soul SET user_id = $1 WHERE id = $2`, [userId, existing.id]);
+    }
+  }
   if (existing) {
     await execute(
       `UPDATE soul SET content = $1, updated_at = now() WHERE id = $2`,
@@ -31,16 +37,24 @@ export async function upsertByUser(userId: string, content: string): Promise<voi
     );
   } else {
     await execute(
-      `INSERT INTO soul (user_id, content) VALUES ($1, $2)`,
-      [userId, content],
+      `INSERT INTO soul (user_id, device_id, content) VALUES ($1, $2, $3)`,
+      [userId, deviceId ?? null, content],
     );
   }
 }
 
+/** @deprecated 使用 upsertByUser 替代 */
 export async function upsert(deviceId: string, content: string): Promise<void> {
-  await execute(
-    `INSERT INTO soul (device_id, content) VALUES ($1, $2)
-     ON CONFLICT (device_id) DO UPDATE SET content = $2, updated_at = now()`,
-    [deviceId, content],
-  );
+  const existing = await findByDevice(deviceId);
+  if (existing) {
+    await execute(
+      `UPDATE soul SET content = $1, updated_at = now() WHERE id = $2`,
+      [content, existing.id],
+    );
+  } else {
+    await execute(
+      `INSERT INTO soul (device_id, content) VALUES ($1, $2)`,
+      [deviceId, content],
+    );
+  }
 }

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { X, Save } from "lucide-react";
-import { toast } from "sonner";
+import { fabNotify } from "@/shared/lib/fab-notify";
 import {
   getUserProfile,
   setUserProfile,
@@ -69,20 +69,20 @@ export function ProfileEditor({ onClose }: ProfileEditorProps) {
           updatedAt: now,
         };
         await setUserProfile(user);
-        toast("用户信息已保存");
+        fabNotify.info("用户信息已保存");
       } else if (tab === "tools") {
         try {
           const servers: LocalToolServer[] = JSON.parse(toolsConfig);
           await setTools({ servers, updatedAt: now });
-          toast("工具配置已保存");
+          fabNotify.info("工具配置已保存");
         } catch {
-          toast.error("JSON 格式错误");
+          fabNotify.error("JSON 格式错误");
           setSaving(false);
           return;
         }
       }
     } catch (err: any) {
-      toast.error(`保存失败: ${err.message}`);
+      fabNotify.error(`保存失败: ${err.message}`);
     }
     setSaving(false);
   };

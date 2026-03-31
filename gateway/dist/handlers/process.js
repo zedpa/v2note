@@ -3,6 +3,8 @@ import { chatCompletion } from "../ai/provider.js";
 import { appendToDiary } from "../diary/manager.js";
 import { recordRepo, summaryRepo } from "../db/repositories/index.js";
 import { classifyVoiceIntent, executeVoiceAction } from "./voice-action.js";
+import { getSession } from "../session/manager.js";
+import { safeParseJson } from "../lib/text-utils.js";
 const CLEANUP_SYSTEM_PROMPT = `你是一个转写文本清理工具。对以下语音转写文本进行最小化清理：
 - 移除口语填充词（嗯、啊、那个、就是说等）
 - 修正错别字和语音识别错误
@@ -15,23 +17,38 @@ const CLEANUP_SYSTEM_PROMPT = `你是一个转写文本清理工具。对以下�
 export async function processEntry(payload) {
     const result = {};
     try {
+        const t0 = Date.now();
         console.log(`[process] Starting for record ${payload.recordId}, text length: ${payload.text.length}`);
         // ── Step 0: Voice action — 意图分类（记录/指令/混合） ──────────
-        // 文本长度 > 10 才做分类（太短的不判断）
+        // forceCommand=true（上滑手势）时跳过关键词预筛，强制走 AI 分类
+        // 文本长度 > 4 才做分类（太短的不判断）
         if (payload.text.length > 4) {
             try {
-                const intentResult = await classifyVoiceIntent(payload.text);
+                const t1 = Date.now();
+                const intentResult = await classifyVoiceIntent(payload.text, payload.forceCommand);
+                console.log(`[process][⏱ intent-classify] ${Date.now() - t1}ms → ${intentResult.type}`);
                 result.voice_intent_type = intentResult.type;
                 if (intentResult.type === "action" || intentResult.type === "mixed") {
-                    const actionResults = [];
-                    for (const action of intentResult.actions) {
-                        const execResult = await executeVoiceAction(action, {
-                            userId: payload.userId,
-                            deviceId: payload.deviceId,
-                        });
-                        actionResults.push(execResult);
-                    }
+                    const actionResults = await Promise.all(intentResult.actions.map((action) => executeVoiceAction(action, {
+                        userId: payload.userId,
+                        deviceId: payload.deviceId,
+                        recordId: payload.recordId,
+                    })));
                     result.action_results = actionResults;
+                    // 高风险操作需要用户确认：存入 Session，前端展示确认卡片
+                    const confirmNeeded = actionResults.find((r) => r.needs_confirm && r.todo_id);
+                    if (confirmNeeded) {
+                        const confirmId = crypto.randomUUID();
+                        const session = getSession(payload.deviceId);
+                        session.pendingConfirms.set(confirmId, {
+                            confirmId,
+                            action: confirmNeeded.action,
+                            todoId: confirmNeeded.todo_id,
+                            summary: confirmNeeded.confirm_summary ?? "确认执行此操作吗？",
+                            expiresAt: Date.now() + 30_000,
+                        });
+                        result.pending_confirm = { confirm_id: confirmId, summary: confirmNeeded.confirm_summary ?? "确认执行此操作吗？" };
+                    }
                     // 纯指令型：执行完就返回，不走 Digest 管道
                     if (intentResult.type === "action") {
                         console.log(`[process] Pure action intent, skipping digest. Results: ${actionResults.length}`);
@@ -85,7 +102,9 @@ export async function processEntry(payload) {
         // 2. Call AI
         const dynamicTimeout = Math.min(300_000, 60_000 + Math.floor(payload.text.length / 1000) * 20_000);
         console.log(`[process] Calling AI for text cleanup... (timeout: ${dynamicTimeout}ms, text: ${payload.text.length} chars)`);
-        const response = await chatCompletion(messages, { json: true, temperature: 0.3, timeout: dynamicTimeout });
+        const tCleanup = Date.now();
+        const response = await chatCompletion(messages, { json: true, temperature: 0.3, timeout: dynamicTimeout, tier: "fast" });
+        console.log(`[process][⏱ cleanup-ai] ${Date.now() - tCleanup}ms`);
         if (!response) {
             throw new Error("AI provider returned null response");
         }
@@ -97,8 +116,8 @@ export async function processEntry(payload) {
         }
         else {
             try {
-                const parsed = JSON.parse(response.content);
-                result.summary = typeof parsed.summary === "string" ? parsed.summary : undefined;
+                const parsed = safeParseJson(response.content);
+                result.summary = typeof parsed?.summary === "string" ? parsed.summary : undefined;
                 console.log(`[process] Parsed: summary: ${result.summary ? 'yes' : 'no'}`);
                 /* MOVED TO DIGEST — intent/todo/tag/relay extraction
                 if (Array.isArray(parsed.intents)) {
@@ -111,12 +130,6 @@ export async function processEntry(payload) {
                   result.intents = result.todos.map((t) => ({ type: "task" as const, text: t }));
                 }
         
-                result.customer_requests = Array.isArray(parsed.customer_requests)
-                  ? parsed.customer_requests
-                  : [];
-                result.setting_changes = Array.isArray(parsed.setting_changes)
-                  ? parsed.setting_changes
-                  : [];
                 result.tags = Array.isArray(parsed.tags) ? parsed.tags : [];
                 result.relays = Array.isArray(parsed.relays) ? parsed.relays : [];
         
@@ -257,7 +270,9 @@ export async function processEntry(payload) {
             console.error(`[process] DB write error: ${err.message}`);
         }
         // 5. Update record status
+        const tStatus = Date.now();
         await recordRepo.updateStatus(payload.recordId, "completed");
+        console.log(`[process][⏱ db-status] ${Date.now() - tStatus}ms`);
         console.log(`[process] Record ${payload.recordId} marked as completed`);
         /* MOVED TO DIGEST — todo enrichment
         if (result.todos.length > 0) {
@@ -347,6 +362,7 @@ export async function processEntry(payload) {
             : 999;
         const isColdStart = recordCount < 20;
         if (shouldDigestImmediately(result, payload.text.length, isColdStart)) {
+            console.log(`[process][⏱ total-sync] ${Date.now() - t0}ms — now firing digest async`);
             digestRecords([payload.recordId], {
                 deviceId: payload.deviceId,
                 userId: payload.userId,

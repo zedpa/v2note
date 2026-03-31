@@ -10,6 +10,7 @@ export interface AiDiary {
 }
 /**
  * Upsert a diary entry — append content to today's entry.
+ * 优先按 user_id 维度去重，无 user_id 时回退到 device_id。
  */
 export declare function upsertEntry(deviceId: string, notebook: string, date: string, content: string, userId?: string): Promise<AiDiary>;
 export declare function findByUser(userId: string, notebook: string, date: string): Promise<AiDiary | null>;

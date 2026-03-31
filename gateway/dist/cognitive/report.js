@@ -5,14 +5,18 @@
  */
 import { query } from "../db/pool.js";
 const today = () => new Date().toISOString().split("T")[0];
-export async function generateCognitiveReport(userId) {
+export async function generateCognitiveReport(opts) {
     const todayStr = today();
+    // 支持 userId 或 deviceId 查询（无登录用户时走 device 路径）
+    const [strikeWhere, todoWhere, params] = opts.userId
+        ? ["user_id = $1", "user_id = $1", [opts.userId]]
+        : ["source_id IN (SELECT id FROM record WHERE device_id = $1)", "device_id = $1", [opts.deviceId]];
     // 1. 今日极性分布（只统计 think）
     const polarityRows = await query(`SELECT polarity, COUNT(*) as count FROM strike
-     WHERE user_id = $1 AND status = 'active'
+     WHERE ${strikeWhere} AND status = 'active'
        AND COALESCE(source_type, 'think') != 'material'
        AND created_at::date = $2::date
-     GROUP BY polarity`, [userId, todayStr]);
+     GROUP BY polarity`, [...params, todayStr]);
     const polarityMap = {};
     for (const row of polarityRows) {
         polarityMap[row.polarity] = parseInt(row.count, 10);
@@ -29,10 +33,10 @@ export async function generateCognitiveReport(userId) {
      FROM bond b
      JOIN strike sa ON sa.id = b.source_strike_id
      JOIN strike sb ON sb.id = b.target_strike_id
-     WHERE sa.user_id = $1 AND b.type = 'contradiction'
+     WHERE sa.${strikeWhere} AND b.type = 'contradiction'
        AND b.created_at::date = $2::date
      ORDER BY b.strength DESC
-     LIMIT 5`, [userId, todayStr]);
+     LIMIT 5`, [...params, todayStr]);
     const contradictions = contradictionRows.slice(0, 5).map((r) => ({
         strikeA_nucleus: r.a_nucleus,
         strikeB_nucleus: r.b_nucleus,
@@ -40,8 +44,8 @@ export async function generateCognitiveReport(userId) {
     }));
     // 3. Cluster 变化（今日新建的）
     const newClusters = await query(`SELECT nucleus FROM strike
-     WHERE user_id = $1 AND is_cluster = true AND status = 'active'
-       AND created_at::date = $2::date`, [userId, todayStr]);
+     WHERE ${strikeWhere} AND is_cluster = true AND status = 'active'
+       AND created_at::date = $2::date`, [...params, todayStr]);
     const cluster_changes = newClusters.map((c) => ({
         name: c.nucleus,
         type: "created",
@@ -51,7 +55,7 @@ export async function generateCognitiveReport(userId) {
        COUNT(*)::text as total,
        COUNT(*) FILTER (WHERE done = true)::text as done
      FROM todo
-     WHERE user_id = $1 AND created_at::date = $2::date`, [userId, todayStr]);
+     WHERE ${todoWhere} AND created_at::date = $2::date`, [...params, todayStr]);
     const totalTodos = parseInt(todoStats[0]?.total ?? "0", 10);
     const doneTodos = parseInt(todoStats[0]?.done ?? "0", 10);
     const behavior_drift = {

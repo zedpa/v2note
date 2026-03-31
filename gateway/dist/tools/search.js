@@ -2,52 +2,77 @@
  * 统一搜索工具
  *
  * 合并 records/goals/todos/clusters 搜索为一个 search 工具，
- * LLM 只需选 scope 参数即可，降低工具选择压力。
+ * 支持 filters（status/date/date_from/date_to/goal_id/domain）结构化过滤。
  */
-import { recordRepo, goalRepo, todoRepo, summaryRepo } from "../db/repositories/index.js";
+import { recordRepo, summaryRepo } from "../db/repositories/index.js";
 import { query as dbQuery } from "../db/pool.js";
-/**
- * 统一搜索 — 跨 records/goals/todos 搜索
- * clusters 搜索预留，待 cluster repository 完善后接入
- */
 export async function unifiedSearch(params, ctx) {
     const { query, scope, limit = 10 } = params;
+    // time_range 兼容：映射到 filters.date_from/date_to
+    const filters = { ...params.filters };
+    if (params.time_range && !filters.date_from && !filters.date_to) {
+        filters.date_from = params.time_range.from;
+        filters.date_to = params.time_range.to;
+    }
     const results = [];
     const scopes = scope === "all"
         ? ["records", "goals", "todos", "clusters"]
         : [scope];
-    // 并行搜索所有目标 scope
     const promises = [];
-    if (scopes.includes("records")) {
-        promises.push(searchRecords(query, ctx, results));
-    }
-    if (scopes.includes("goals")) {
-        promises.push(searchGoals(query, ctx, results));
-    }
-    if (scopes.includes("todos")) {
-        promises.push(searchTodos(query, ctx, results));
-    }
-    if (scopes.includes("clusters")) {
+    if (scopes.includes("records"))
+        promises.push(searchRecords(query, filters, ctx, results));
+    if (scopes.includes("goals"))
+        promises.push(searchGoals(query, filters, ctx, results));
+    if (scopes.includes("todos"))
+        promises.push(searchTodos(query, filters, ctx, results));
+    if (scopes.includes("clusters"))
         promises.push(searchClusters(query, ctx, results));
-    }
     await Promise.all(promises);
-    // 按相关性排序后截断
     results.sort((a, b) => b.score - a.score);
     return results.slice(0, limit);
 }
-/** 搜索日记/记录 — 通过 summary 补充标题和摘要 */
-async function searchRecords(query, ctx, results) {
+// ── 日期解析 ────────────────────────────────────────────────────────────────
+function resolveDate(dateStr) {
+    const now = new Date();
+    if (dateStr === "today")
+        return now.toISOString().split("T")[0];
+    if (dateStr === "tomorrow") {
+        const d = new Date(now);
+        d.setDate(d.getDate() + 1);
+        return d.toISOString().split("T")[0];
+    }
+    if (dateStr === "yesterday") {
+        const d = new Date(now);
+        d.setDate(d.getDate() - 1);
+        return d.toISOString().split("T")[0];
+    }
+    if (/^\d{4}-\d{2}-\d{2}/.test(dateStr))
+        return dateStr.split("T")[0];
+    return null;
+}
+// ── 日记搜索 ────────────────────────────────────────────────────────────────
+async function searchRecords(query, filters, ctx, results) {
     try {
+        // 解析时间范围
+        const dateFrom = filters.date_from ? resolveDate(filters.date_from) : null;
+        const dateTo = filters.date_to ? resolveDate(filters.date_to) : null;
         const records = ctx.userId
             ? await recordRepo.searchByUser(ctx.userId, query)
             : await recordRepo.search(ctx.deviceId, query);
-        // 批量加载 summaries 以获取 title/short_summary
         const recordIds = records.map((r) => r.id);
         const summaries = recordIds.length > 0
             ? await summaryRepo.findByRecordIds(recordIds)
             : [];
         const summaryMap = new Map(summaries.map((s) => [s.record_id, s]));
         for (const r of records) {
+            // 时间范围过滤
+            if (dateFrom || dateTo) {
+                const createdDate = r.created_at?.split("T")[0];
+                if (dateFrom && createdDate && createdDate < dateFrom)
+                    continue;
+                if (dateTo && createdDate && createdDate > dateTo)
+                    continue;
+            }
             const summary = summaryMap.get(r.id);
             results.push({
                 id: r.id,
@@ -63,14 +88,31 @@ async function searchRecords(query, ctx, results) {
         console.warn("[search] records search failed:", err);
     }
 }
-/** 搜索目标 — 客户端过滤匹配 */
-async function searchGoals(query, ctx, results) {
+// ── 目标搜索 ────────────────────────────────────────────────────────────────
+async function searchGoals(query, filters, ctx, results) {
     try {
-        const goals = ctx.userId
-            ? await goalRepo.findActiveByUser(ctx.userId)
-            : await goalRepo.findActiveByDevice(ctx.deviceId);
+        const statusFilter = filters.status ?? "active";
+        const userId = ctx.userId ?? ctx.deviceId;
+        // 根据 status 决定查询范围
+        let rows;
+        if (statusFilter === "all") {
+            rows = await dbQuery(`SELECT id, text AS title, status, created_at FROM todo
+         WHERE user_id = $1 AND level >= 1
+         ORDER BY created_at DESC`, [userId]);
+        }
+        else if (statusFilter === "completed") {
+            rows = await dbQuery(`SELECT id, text AS title, status, created_at FROM todo
+         WHERE user_id = $1 AND level >= 1 AND status = 'completed'
+         ORDER BY created_at DESC`, [userId]);
+        }
+        else {
+            // active（默认）
+            rows = await dbQuery(`SELECT id, text AS title, status, created_at FROM todo
+         WHERE user_id = $1 AND level >= 1 AND status != 'completed' AND done = false
+         ORDER BY created_at DESC`, [userId]);
+        }
         const queryLower = query.toLowerCase();
-        for (const g of goals) {
+        for (const g of rows) {
             if (g.title?.toLowerCase().includes(queryLower)) {
                 results.push({
                     id: g.id,
@@ -87,31 +129,84 @@ async function searchGoals(query, ctx, results) {
         console.warn("[search] goals search failed:", err);
     }
 }
-/** 搜索待办 — 客户端过滤匹配 */
-async function searchTodos(query, ctx, results) {
+// ── 待办搜索 ────────────────────────────────────────────────────────────────
+async function searchTodos(query, filters, ctx, results) {
     try {
-        const todos = ctx.userId
-            ? await todoRepo.findPendingByUser(ctx.userId)
-            : await todoRepo.findPendingByDevice(ctx.deviceId);
+        const statusFilter = filters.status ?? "active";
+        const userId = ctx.userId ?? ctx.deviceId;
+        // 动态构建 WHERE 子句
+        const conditions = ["(t.user_id = $1 OR t.device_id = $1)", "t.level = 0"];
+        const params = [userId];
+        let paramIdx = 2;
+        // status 过滤
+        if (statusFilter === "active") {
+            conditions.push("t.done = false");
+        }
+        else if (statusFilter === "completed") {
+            conditions.push("t.done = true");
+        }
+        // "all" 不加 done 过滤
+        // goal_id 过滤（parent_id）
+        if (filters.goal_id) {
+            conditions.push(`t.parent_id = $${paramIdx++}`);
+            params.push(filters.goal_id);
+        }
+        // domain 过滤
+        if (filters.domain) {
+            conditions.push(`t.domain = $${paramIdx++}`);
+            params.push(filters.domain);
+        }
+        // date 快捷键（今天/明天/昨天）解析为 date_from + date_to 精确匹配
+        let dateFrom = null;
+        let dateTo = null;
+        if (filters.date) {
+            const d = resolveDate(filters.date);
+            if (d) {
+                dateFrom = d;
+                dateTo = d;
+            }
+        }
+        else {
+            dateFrom = filters.date_from ? resolveDate(filters.date_from) : null;
+            dateTo = filters.date_to ? resolveDate(filters.date_to) : null;
+        }
+        // 有日期过滤时，只查有 scheduled_start 的待办
+        if (dateFrom || dateTo) {
+            conditions.push("t.scheduled_start IS NOT NULL");
+            if (dateFrom) {
+                conditions.push(`DATE(t.scheduled_start) >= $${paramIdx++}`);
+                params.push(dateFrom);
+            }
+            if (dateTo) {
+                conditions.push(`DATE(t.scheduled_start) <= $${paramIdx++}`);
+                params.push(dateTo);
+            }
+        }
+        const sql = `SELECT t.id, t.text, t.done, t.scheduled_start, t.domain, t.parent_id, t.created_at
+                 FROM todo t
+                 WHERE ${conditions.join(" AND ")}
+                 ORDER BY t.created_at DESC
+                 LIMIT 100`;
+        const todos = await dbQuery(sql, params);
         const queryLower = query.toLowerCase();
         for (const t of todos) {
-            if (t.text?.toLowerCase().includes(queryLower)) {
-                results.push({
-                    id: t.id,
-                    type: "todo",
-                    title: t.text,
-                    score: 0.8,
-                    status: t.done ? "completed" : "pending",
-                    created_at: t.created_at,
-                });
-            }
+            if (!t.text?.toLowerCase().includes(queryLower))
+                continue;
+            results.push({
+                id: t.id,
+                type: "todo",
+                title: t.text,
+                score: 0.8,
+                status: t.done ? "completed" : "pending",
+                created_at: t.created_at,
+            });
         }
     }
     catch (err) {
         console.warn("[search] todos search failed:", err);
     }
 }
-/** 搜索 Cluster — 在 nucleus 中模糊匹配 */
+// ── Cluster 搜索 ────────────────────────────────────────────────────────────
 async function searchClusters(query, ctx, results) {
     try {
         const userId = ctx.userId ?? ctx.deviceId;
@@ -120,7 +215,6 @@ async function searchClusters(query, ctx, results) {
          AND nucleus ILIKE $2
        ORDER BY created_at DESC LIMIT 10`, [userId, `%${query}%`]);
         for (const c of clusters) {
-            // 提取方括号内的名称
             const nameMatch = c.nucleus.match(/^\[(.+?)\]/);
             const name = nameMatch ? nameMatch[1] : c.nucleus;
             results.push({

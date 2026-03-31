@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { getDeviceId } from "@/shared/lib/device";
 import type { Soul } from "@/shared/lib/types";
 import { getSoul, updateSoul as apiUpdateSoul } from "@/shared/lib/api/soul";
-import { toast } from "sonner";
+import { fabNotify } from "@/shared/lib/fab-notify";
 
 export function useSoul() {
   const [soul, setSoul] = useState<Soul | null>(null);
@@ -39,9 +39,9 @@ export function useSoul() {
           ? { ...prev, content, updated_at: new Date().toISOString() }
           : { id: "", device_id: "", content, updated_at: new Date().toISOString() },
       );
-      toast("AI 人格已更新");
+      fabNotify.info("AI 人格已更新");
     } catch {
-      toast.error("保存失败");
+      fabNotify.error("保存失败");
     } finally {
       setSaving(false);
     }

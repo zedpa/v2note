@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { getDeviceId } from "@/shared/lib/device";
 import { on } from "@/features/recording/lib/events";
-import { toast } from "sonner";
+import { fabNotify } from "@/shared/lib/fab-notify";
 import type { NoteItem } from "@/shared/lib/types";
 import { getCachedNotes, setCachedNotes } from "@/features/workspace/lib/cache";
 import { listRecords, deleteRecords as apiDeleteRecords, updateRecord } from "@/shared/lib/api/records";
@@ -157,9 +157,9 @@ export function useNotes(notebook?: string | null, clusterId?: string | null) {
       try {
         await apiDeleteRecords(ids);
         setNotes((prev) => prev.filter((n) => !ids.includes(n.id)));
-        toast(`已删除 ${ids.length} 条笔记`);
+        fabNotify.info(`已删除 ${ids.length} 条笔记`);
       } catch (e: any) {
-        toast.error(`删除失败: ${e.message}`);
+        fabNotify.error(`删除失败: ${e.message}`);
       }
     },
     [],
@@ -172,9 +172,9 @@ export function useNotes(notebook?: string | null, clusterId?: string | null) {
           await updateRecord(id, { archived: true });
         }
         setNotes((prev) => prev.filter((n) => !ids.includes(n.id)));
-        toast(`已归档 ${ids.length} 条笔记`);
+        fabNotify.info(`已归档 ${ids.length} 条笔记`);
       } catch (e: any) {
-        toast.error(`归档失败: ${e.message}`);
+        fabNotify.error(`归档失败: ${e.message}`);
       }
     },
     [],
@@ -189,9 +189,9 @@ export function useNotes(notebook?: string | null, clusterId?: string | null) {
             n.id === id ? { ...n, short_summary: fields.short_summary } : n,
           ),
         );
-        toast("已保存");
+        fabNotify.info("已保存");
       } catch (e: any) {
-        toast.error(`保存失败: ${e.message}`);
+        fabNotify.error(`保存失败: ${e.message}`);
       }
     },
     [],

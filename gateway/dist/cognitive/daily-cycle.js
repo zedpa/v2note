@@ -32,16 +32,27 @@ export async function runDailyCognitiveCycle(userId, opts) {
     catch (err) {
         console.error("[cognitive] Maintenance failed:", err);
     }
+    // Step 2.5: 周度 L2 涌现（每周日运行，或 batch-analyze 产出 3+ L1 时自动触发）
+    if (new Date().getDay() === 0) {
+        try {
+            const { runEmergence } = await import("./emergence.js");
+            const emergence = await runEmergence(userId);
+            console.log(`[cognitive] Weekly emergence: ${emergence.higherOrderClusters} L2 created`);
+        }
+        catch (err) {
+            console.error("[cognitive] L2 emergence failed:", err);
+        }
+    }
     // Step 3: 认知报告
     try {
-        report = await generateCognitiveReport(userId);
+        report = await generateCognitiveReport({ userId, deviceId: opts?.deviceId });
         console.log(`[cognitive] Report: empty=${report.is_empty}`);
     }
     catch (err) {
         console.error("[cognitive] Report generation failed:", err);
     }
-    // 写入 AI 日记
-    const deviceId = opts?.deviceId ?? userId;
+    // 写入 AI 日记（deviceId 仅作设备标记，不可用 userId 替代）
+    const deviceId = opts?.deviceId;
     try {
         const digestLines = [];
         if (batchResult && batchResult.success) {
@@ -58,7 +69,7 @@ export async function runDailyCognitiveCycle(userId, opts) {
                 digestLines.push(`${batchResult.goals}个涌现目标建议`);
             }
         }
-        if (digestLines.length > 0) {
+        if (digestLines.length > 0 && deviceId) {
             await appendToDiary(deviceId, "ai-self", `[认知摘要] ${digestLines.join("；")}`, userId);
             console.log("[cognitive] Cognitive digest saved to ai-self diary");
         }

@@ -7,6 +7,7 @@ export interface SkillConfig {
 }
 export declare function findByDevice(deviceId: string): Promise<SkillConfig[]>;
 export declare function findByUser(userId: string): Promise<SkillConfig[]>;
+/** @deprecated 使用 upsertByUser 替代 */
 export declare function upsert(fields: {
     device_id: string;
     user_id?: string;

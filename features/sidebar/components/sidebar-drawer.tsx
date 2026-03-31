@@ -1,28 +1,21 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import {
-  X, Zap, Target, Settings, LogOut,
-  ChevronDown, ChevronRight, TreePine, CalendarDays,
-  Briefcase, Home, BookOpen, Heart, Users, Coins, Sparkles,
+  X, Zap, Settings, LogOut,
+  ChevronDown, ChevronRight, Target, CalendarDays,
+  Sparkles, Compass, Plus, Pencil, Trash2, FolderOpen,
 } from "lucide-react";
+import { fabNotify } from "@/shared/lib/fab-notify";
 import { cn } from "@/lib/utils";
-import { listGoals, listDimensions, type DimensionSummary } from "@/shared/lib/api/goals";
-import type { Goal } from "@/shared/lib/types";
-
-/** 维度 → 图标映射 */
-const DOMAIN_ICONS: Record<string, React.ReactNode> = {
-  "工作": <Briefcase size={18} />,
-  "生活": <Home size={18} />,
-  "学习": <BookOpen size={18} />,
-  "健康": <Heart size={18} />,
-  "社交": <Users size={18} />,
-  "投资": <Coins size={18} />,
-};
-
-function getDomainIcon(domain: string) {
-  return DOMAIN_ICONS[domain] ?? <Sparkles size={18} />;
-}
+import {
+  getMyWorld,
+  createGoal,
+  updateGoal,
+  updateCluster,
+  dissolveCluster,
+  type MyWorldNode,
+} from "@/shared/lib/api/goals";
 
 interface SidebarDrawerProps {
   open: boolean;
@@ -34,12 +27,10 @@ interface SidebarDrawerProps {
   onViewSearch?: () => void;
   onViewGoal?: (goalId: string) => void;
   onViewGoals?: () => void;
-  onSelectDimension?: (domain: string) => void;
   onSelectToday?: () => void;
   onLogout?: () => void;
   userName?: string | null;
   userPhone?: string | null;
-  activeDimension?: string | null;
   onViewProfile?: () => void;
   onSelectTopic?: (clusterId: string, title: string) => void;
   onOpenChat?: (initialMsg: string) => void;
@@ -51,35 +42,41 @@ export function SidebarDrawer({
   onViewBriefing,
   onViewEvening,
   onViewSettings,
-  onViewReview,
-  onViewSearch,
   onViewGoal,
   onViewGoals,
-  onSelectDimension,
   onSelectToday,
   onLogout,
   userName,
   userPhone,
-  activeDimension,
   onViewProfile,
   onSelectTopic,
   onOpenChat,
 }: SidebarDrawerProps) {
-  const [goals, setGoals] = useState<Goal[]>([]);
-  const [dimensions, setDimensions] = useState<DimensionSummary[]>([]);
-  const [expandedDimensions, setExpandedDimensions] = useState<Set<string>>(new Set());
-  const [goalsExpanded, setGoalsExpanded] = useState(true);
+  const [nodes, setNodes] = useState<MyWorldNode[]>([]);
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
 
-  // 加载目标列表 + 维度统计
+  // 加载 My World 数据
   useEffect(() => {
     if (!open) return;
-    listGoals()
-      .then((g) => setGoals(g || []))
-      .catch(() => {});
-    listDimensions()
-      .then((d) => setDimensions(d || []))
+    getMyWorld()
+      .then((res) => setNodes(res.nodes || []))
       .catch(() => {});
   }, [open]);
+
+  const toggleExpand = useCallback((id: string) => {
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  }, []);
+
+  // 刷新数据
+  const refresh = useCallback(() => {
+    getMyWorld()
+      .then((res) => setNodes(res.nodes || []))
+      .catch(() => {});
+  }, []);
 
   const initial = userName?.charAt(0)?.toUpperCase() || "U";
 
@@ -153,162 +150,49 @@ export function SidebarDrawer({
             <div className="flex-1 h-px bg-border/40" />
           </div>
 
-          {/* ── 维度列表 ── */}
-          {dimensions.length > 0 ? (
+          {/* ── 树结构 ── */}
+          {nodes.length > 0 ? (
             <nav className="space-y-0.5">
-              {dimensions.map((dim) => {
-                const isExpanded = expandedDimensions.has(dim.domain);
-                const isActive = activeDimension === dim.domain;
-                // 该维度下的目标：按 domain 严格匹配
-                const dimGoals = goals.filter(
-                  (g) =>
-                    (g as any).domain === dim.domain &&
-                    (g.status === "active" || g.status === "progressing"),
-                );
-                const totalCount = dim.pending_count + dim.goal_count;
-
-                return (
-                  <div key={dim.domain}>
-                    {/* 维度行 */}
-                    <div
-                      className={cn(
-                        "flex items-center gap-3 w-full px-3 py-2.5 rounded-xl transition-colors",
-                        isActive
-                          ? "bg-deer/10"
-                          : "hover:bg-surface/60 active:bg-surface/80",
-                      )}
-                    >
-                      {/* 图标 + 名称：点击 = 全局筛选 */}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          onClose();
-                          onSelectDimension?.(dim.domain);
-                        }}
-                        className="flex items-center gap-3 flex-1 min-w-0 text-left"
-                      >
-                        <span className={cn("shrink-0", isActive ? "text-deer" : "text-muted-accessible")}>
-                          {getDomainIcon(dim.domain)}
-                        </span>
-                        <span className={cn("text-sm flex-1 truncate", isActive ? "text-deer font-medium" : "text-on-surface")}>
-                          {dim.domain}
-                        </span>
-                      </button>
-
-                      {/* 计数 */}
-                      <span className="text-xs text-muted-accessible">
-                        ({totalCount})
-                      </span>
-
-                      {/* 展开/收起箭头 */}
-                      {dimGoals.length > 0 && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setExpandedDimensions((prev) => {
-                              const next = new Set(prev);
-                              next.has(dim.domain) ? next.delete(dim.domain) : next.add(dim.domain);
-                              return next;
-                            });
-                          }}
-                          className="p-1 rounded-md hover:bg-surface/80 transition-colors"
-                        >
-                          {isExpanded ? (
-                            <ChevronDown size={14} className="text-muted-accessible" />
-                          ) : (
-                            <ChevronRight size={14} className="text-muted-accessible" />
-                          )}
-                        </button>
-                      )}
-                    </div>
-
-                    {/* 展开后显示该维度下的目标 */}
-                    {isExpanded && dimGoals.length > 0 && (
-                      <nav className="pl-8 space-y-0.5">
-                        {dimGoals.slice(0, 8).map((goal) => (
-                          <SidebarItem
-                            key={goal.id}
-                            icon={goal.cluster_id ? <TreePine size={16} /> : <Target size={16} />}
-                            label={goal.title}
-                            badge={
-                              (goal as any).child_count > 0
-                                ? `(${(goal as any).child_count})`
-                                : undefined
-                            }
-                            onClick={() => {
-                              onClose();
-                              onViewGoal?.(goal.id);
-                            }}
-                          />
-                        ))}
-                      </nav>
-                    )}
-                  </div>
-                );
-              })}
+              {nodes.map((node) => (
+                <MyWorldTreeNode
+                  key={node.id}
+                  node={node}
+                  depth={0}
+                  expandedIds={expandedIds}
+                  onToggle={toggleExpand}
+                  onViewGoal={(id) => { onClose(); onViewGoal?.(id); }}
+                  onRefresh={refresh}
+                />
+              ))}
             </nav>
           ) : (
-            /* 无维度时回退到原有的目标列表 */
-            <div>
-              <div
-                role="button"
-                tabIndex={0}
-                onClick={() => setGoalsExpanded(!goalsExpanded)}
-                onKeyDown={(e) => e.key === "Enter" && setGoalsExpanded(!goalsExpanded)}
-                className="flex items-center justify-between w-full mb-2 cursor-pointer"
-              >
-                <span className="font-serif text-sm text-on-surface">我的目标</span>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onClose();
-                      onViewGoals?.();
-                    }}
-                    className="text-[10px] text-muted-accessible hover:text-deer transition-colors"
-                  >
-                    查看全部
-                  </button>
-                  {goalsExpanded ? (
-                    <ChevronDown size={14} className="text-muted-accessible" />
-                  ) : (
-                    <ChevronRight size={14} className="text-muted-accessible" />
-                  )}
-                </div>
-              </div>
-
-              {goalsExpanded && (
-                <nav className="space-y-1">
-                  {goals.length === 0 && (
-                    <p className="text-xs text-muted-accessible px-3 py-2">
-                      持续记录后，AI 会发现你的关注方向
-                    </p>
-                  )}
-                  {goals
-                    .filter((g) => g.status === "active" && !g.parent_id)
-                    .slice(0, 10)
-                    .map((goal) => (
-                      <SidebarItem
-                        key={goal.id}
-                        icon={<Target size={18} />}
-                        label={goal.title}
-                        onClick={() => {
-                          onClose();
-                          onViewGoal?.(goal.id);
-                        }}
-                      />
-                    ))}
-                </nav>
-              )}
+            <div className="px-3 py-4">
+              <p className="text-xs text-muted-accessible leading-relaxed">
+                持续记录想法，结构会自然浮现
+              </p>
             </div>
           )}
+
+          {/* + 新建目标 */}
+          <NewGoalInline onCreated={refresh} />
 
           {/* ── 分隔线 ── */}
           <div className="my-5 h-px bg-border/40" />
 
-          {/* ── 第三组: 每日回顾 + 设置 ── */}
+          {/* ── 第三组: 发现(灰色) + 每日回顾 + 设置 ── */}
           <nav className="space-y-0.5">
+            {/* 发现 — 灰色，点击提示开发中 */}
+            <button
+              type="button"
+              onClick={() => {
+                fabNotify.info("更多功能还在路上 🚀 认知地图 · 大师视角 · 行动复盘 · Skills · MCP · Tools", 3000);
+              }}
+              className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-left opacity-40 cursor-pointer"
+            >
+              <span className="shrink-0 text-muted-foreground"><Compass size={18} /></span>
+              <span className="text-sm text-muted-foreground">发现</span>
+            </button>
+
             {(onViewBriefing || onViewEvening) && (
               <SidebarItem
                 icon={<CalendarDays size={18} />}
@@ -352,6 +236,454 @@ export function SidebarDrawer({
         </div>
       </div>
     </>
+  );
+}
+
+/* ── 树节点渲染 ── */
+
+const NODE_ICONS: Record<MyWorldNode["type"], React.ReactNode> = {
+  l2_cluster: <FolderOpen size={16} />,
+  l1_cluster: <Sparkles size={16} />,
+  goal: <Target size={16} />,
+  action: <div className="w-3.5 h-3.5 rounded-full border-2 border-muted-accessible/50" />,
+};
+
+function MyWorldTreeNode({
+  node,
+  depth,
+  expandedIds,
+  onToggle,
+  onViewGoal,
+  onRefresh,
+}: {
+  node: MyWorldNode;
+  depth: number;
+  expandedIds: Set<string>;
+  onToggle: (id: string) => void;
+  onViewGoal: (id: string) => void;
+  onRefresh: () => void;
+}) {
+  const isExpanded = expandedIds.has(node.id);
+  const hasChildren = node.children.length > 0;
+  const isCluster = node.type === "l1_cluster" || node.type === "l2_cluster";
+  const isAction = node.type === "action";
+
+  // 长按管理
+  const [showMenu, setShowMenu] = useState(false);
+  const [menuPos, setMenuPos] = useState({ x: 0, y: 0 });
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const touchMoved = useRef(false);
+
+  // inline 编辑
+  const [editing, setEditing] = useState(false);
+  const [editText, setEditText] = useState("");
+  const editRef = useRef<HTMLInputElement>(null);
+
+  // inline 新建子项
+  const [creating, setCreating] = useState(false);
+  const [createText, setCreateText] = useState("");
+  const createRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (editing) editRef.current?.focus();
+  }, [editing]);
+
+  useEffect(() => {
+    if (creating) createRef.current?.focus();
+  }, [creating]);
+
+  const handleLongPressStart = (e: React.TouchEvent | React.MouseEvent) => {
+    touchMoved.current = false;
+    const clientX = "touches" in e ? e.touches[0].clientX : e.clientX;
+    const clientY = "touches" in e ? e.touches[0].clientY : e.clientY;
+    longPressTimer.current = setTimeout(() => {
+      if (!touchMoved.current) {
+        setMenuPos({ x: clientX, y: clientY });
+        setShowMenu(true);
+      }
+    }, 500);
+  };
+
+  const handleLongPressEnd = () => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+  };
+
+  const handleTouchMove = () => {
+    touchMoved.current = true;
+    handleLongPressEnd();
+  };
+
+  const handleClick = () => {
+    if (showMenu) return;
+    if (hasChildren) {
+      onToggle(node.id);
+    } else if (node.type === "goal") {
+      onViewGoal(node.id);
+    }
+  };
+
+  // 编辑保存
+  const handleEditSave = async () => {
+    const trimmed = editText.trim();
+    if (!trimmed || trimmed === node.title) {
+      setEditing(false);
+      return;
+    }
+    try {
+      if (isCluster) {
+        await updateCluster(node.id, { name: trimmed });
+      } else {
+        await updateGoal(node.id, { title: trimmed });
+      }
+      onRefresh();
+    } catch {
+      fabNotify.error("保存失败");
+    }
+    setEditing(false);
+  };
+
+  // 删除/解散
+  const handleDelete = async () => {
+    const label = isCluster ? "解散" : "删除";
+    if (!confirm(`确定${label}「${node.title}」？`)) return;
+    try {
+      if (isCluster) {
+        await dissolveCluster(node.id);
+      } else {
+        await updateGoal(node.id, { status: "archived" });
+      }
+      onRefresh();
+    } catch {
+      fabNotify.error(`${label}失败`);
+    }
+    setShowMenu(false);
+  };
+
+  // 新建子项保存
+  const handleCreateSave = async () => {
+    const trimmed = createText.trim();
+    if (!trimmed) {
+      setCreating(false);
+      return;
+    }
+    try {
+      if (isCluster) {
+        await createGoal({ title: trimmed, cluster_id: node.id });
+      } else {
+        await createGoal({ title: trimmed, parent_id: node.id });
+      }
+      onRefresh();
+      // 确保展开
+      if (!expandedIds.has(node.id)) onToggle(node.id);
+    } catch {
+      fabNotify.error("创建失败");
+    }
+    setCreating(false);
+    setCreateText("");
+  };
+
+  // 进度文字
+  const progressText = node.subtaskTotal != null && node.subtaskTotal > 0
+    ? `${node.subtaskDone ?? 0}/${node.subtaskTotal}`
+    : node.memberCount != null && node.memberCount > 0
+      ? `${node.memberCount}`
+      : null;
+
+  const paddingLeft = 12 + depth * 16;
+
+  return (
+    <div>
+      {/* 节点行 */}
+      <div
+        className={cn(
+          "flex items-center gap-2 w-full rounded-xl transition-colors cursor-pointer",
+          "hover:bg-surface/60 active:bg-surface/80",
+          isAction && node.done && "opacity-50 line-through",
+        )}
+        style={{ paddingLeft, paddingRight: 12, paddingTop: 8, paddingBottom: 8 }}
+        onClick={handleClick}
+        onTouchStart={handleLongPressStart}
+        onTouchEnd={handleLongPressEnd}
+        onTouchMove={handleTouchMove}
+        onContextMenu={(e) => {
+          e.preventDefault();
+          setMenuPos({ x: e.clientX, y: e.clientY });
+          setShowMenu(true);
+        }}
+      >
+        {/* 展开箭头或图标 */}
+        {hasChildren ? (
+          <span className="shrink-0 text-muted-accessible w-4 flex justify-center">
+            {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+          </span>
+        ) : (
+          <span className="shrink-0 text-muted-accessible w-4 flex justify-center">
+            {NODE_ICONS[node.type]}
+          </span>
+        )}
+
+        {/* 文字 */}
+        {editing ? (
+          <input
+            ref={editRef}
+            type="text"
+            value={editText}
+            onChange={(e) => setEditText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") handleEditSave();
+              if (e.key === "Escape") setEditing(false);
+            }}
+            onBlur={handleEditSave}
+            className="flex-1 min-w-0 text-sm bg-transparent border-b border-deer/50 outline-none text-on-surface py-0.5"
+            onClick={(e) => e.stopPropagation()}
+          />
+        ) : (
+          <span className={cn(
+            "flex-1 min-w-0 text-sm truncate",
+            isCluster ? "font-medium text-on-surface" : "text-on-surface",
+          )}>
+            {node.title}
+          </span>
+        )}
+
+        {/* 计数 */}
+        {progressText && !editing && (
+          <span className="text-[11px] text-muted-accessible font-mono shrink-0">
+            {progressText}
+          </span>
+        )}
+      </div>
+
+      {/* 展开子节点 */}
+      {isExpanded && hasChildren && depth < 2 && (
+        <div>
+          {node.children.map((child) => (
+            <MyWorldTreeNode
+              key={child.id}
+              node={child}
+              depth={depth + 1}
+              expandedIds={expandedIds}
+              onToggle={onToggle}
+              onViewGoal={onViewGoal}
+              onRefresh={onRefresh}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* 新建子项 inline 输入 */}
+      {creating && (
+        <div
+          className="flex items-center gap-2 rounded-xl"
+          style={{ paddingLeft: paddingLeft + 20, paddingRight: 12, paddingTop: 6, paddingBottom: 6 }}
+        >
+          <Plus size={14} className="text-muted-accessible shrink-0" />
+          <input
+            ref={createRef}
+            type="text"
+            value={createText}
+            onChange={(e) => setCreateText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") handleCreateSave();
+              if (e.key === "Escape") { setCreating(false); setCreateText(""); }
+            }}
+            onBlur={() => { if (!createText.trim()) setCreating(false); }}
+            placeholder={isCluster ? "新建目标..." : "新建子项..."}
+            className="flex-1 min-w-0 text-sm bg-transparent border-b border-deer/30 outline-none text-on-surface placeholder:text-muted-accessible/50 py-0.5"
+          />
+        </div>
+      )}
+
+      {/* 长按管理菜单 */}
+      {showMenu && (
+        <LongPressMenu
+          node={node}
+          isCluster={isCluster}
+          position={menuPos}
+          onClose={() => setShowMenu(false)}
+          onEdit={() => {
+            setEditText(node.title);
+            setEditing(true);
+            setShowMenu(false);
+          }}
+          onDelete={handleDelete}
+          onCreate={() => {
+            setCreating(true);
+            setShowMenu(false);
+          }}
+          onToggleDone={isAction ? async () => {
+            try {
+              await updateGoal(node.id, { done: !node.done } as any);
+              onRefresh();
+            } catch { fabNotify.error("操作失败"); }
+            setShowMenu(false);
+          } : undefined}
+        />
+      )}
+    </div>
+  );
+}
+
+/* ── 长按菜单 ── */
+
+function LongPressMenu({
+  node,
+  isCluster,
+  position,
+  onClose,
+  onEdit,
+  onDelete,
+  onCreate,
+  onToggleDone,
+}: {
+  node: MyWorldNode;
+  isCluster: boolean;
+  position: { x: number; y: number };
+  onClose: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
+  onCreate: () => void;
+  onToggleDone?: () => void;
+}) {
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent | TouchEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        onClose();
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    document.addEventListener("touchstart", handler);
+    return () => {
+      document.removeEventListener("mousedown", handler);
+      document.removeEventListener("touchstart", handler);
+    };
+  }, [onClose]);
+
+  // 确保菜单在视口内
+  const top = Math.min(position.y, window.innerHeight - 200);
+  const left = Math.min(position.x, window.innerWidth - 160);
+
+  return (
+    <div
+      ref={menuRef}
+      className="fixed z-[60] bg-surface-high border border-border/50 rounded-xl shadow-lg py-1 min-w-[140px] animate-in fade-in zoom-in-95 duration-100"
+      style={{ top, left }}
+    >
+      <MenuBtn icon={<Pencil size={14} />} label="编辑" onClick={onEdit} />
+      {node.type !== "action" && (
+        <MenuBtn
+          icon={<Plus size={14} />}
+          label={isCluster ? "新建目标" : "新建子项"}
+          onClick={onCreate}
+        />
+      )}
+      {onToggleDone && (
+        <MenuBtn
+          icon={<Target size={14} />}
+          label={node.done ? "标记未完成" : "标记完成"}
+          onClick={onToggleDone}
+        />
+      )}
+      <MenuBtn
+        icon={<Trash2 size={14} />}
+        label={isCluster ? "解散" : "删除"}
+        onClick={onDelete}
+        danger
+      />
+    </div>
+  );
+}
+
+function MenuBtn({
+  icon,
+  label,
+  onClick,
+  danger,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  onClick: () => void;
+  danger?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "flex items-center gap-2.5 w-full px-3 py-2 text-sm transition-colors",
+        danger
+          ? "text-maple hover:bg-maple/10"
+          : "text-on-surface hover:bg-surface/60",
+      )}
+    >
+      <span className="shrink-0">{icon}</span>
+      {label}
+    </button>
+  );
+}
+
+/* ── 底部新建目标 ── */
+
+function NewGoalInline({ onCreated }: { onCreated: () => void }) {
+  const [active, setActive] = useState(false);
+  const [text, setText] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (active) inputRef.current?.focus();
+  }, [active]);
+
+  const handleSave = async () => {
+    const trimmed = text.trim();
+    if (!trimmed) {
+      setActive(false);
+      return;
+    }
+    try {
+      await createGoal({ title: trimmed });
+      onCreated();
+      setText("");
+      setActive(false);
+    } catch {
+      fabNotify.error("创建失败");
+    }
+  };
+
+  if (!active) {
+    return (
+      <button
+        type="button"
+        onClick={() => setActive(true)}
+        className="flex items-center gap-2 w-full px-3 py-2 mt-1 text-xs text-muted-accessible/60 hover:text-muted-accessible transition-colors rounded-xl"
+      >
+        <Plus size={14} />
+        新建目标
+      </button>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-2 px-3 py-2 mt-1">
+      <Plus size={14} className="text-deer shrink-0" />
+      <input
+        ref={inputRef}
+        type="text"
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") handleSave();
+          if (e.key === "Escape") { setActive(false); setText(""); }
+        }}
+        onBlur={handleSave}
+        placeholder="输入目标名称..."
+        className="flex-1 min-w-0 text-sm bg-transparent border-b border-deer/30 outline-none text-on-surface placeholder:text-muted-accessible/50 py-0.5"
+      />
+    </div>
   );
 }
 

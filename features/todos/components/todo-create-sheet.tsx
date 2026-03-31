@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useRef, useEffect } from "react";
 import { Calendar, Clock } from "lucide-react";
-import { TIME_SLOTS, getDefaultHourForSlot, type TimeSlot } from "../lib/time-slots";
+import { TIME_SLOTS, getDefaultHourForSlot, localTzOffset, type TimeSlot } from "../lib/time-slots";
 
 interface TodoCreateSheetProps {
   open: boolean;
@@ -48,12 +48,12 @@ export function TodoCreateSheet({
 
     setSubmitting(true);
     try {
-      // 构建 scheduled_start
+      // 构建 scheduled_start（附带本地时区偏移，避免被当作 UTC）
       let scheduledStart: string | undefined;
       if (defaultDate && defaultSlot) {
         const hour = getDefaultHourForSlot(defaultSlot);
         if (hour !== null) {
-          scheduledStart = `${defaultDate}T${String(hour).padStart(2, "0")}:00:00`;
+          scheduledStart = `${defaultDate}T${String(hour).padStart(2, "0")}:00:00${localTzOffset()}`;
         }
       }
 

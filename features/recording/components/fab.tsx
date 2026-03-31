@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useCallback, useEffect, useMemo } from "react";
-import { Mic, X, Command, Lock, Send, Sparkles } from "lucide-react";
+import { Mic, X, Command, Lock, Send, Sparkles, Check, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { usePCMRecorder } from "@/features/recording/hooks/use-pcm-recorder";
 import { useFabGestures } from "@/features/recording/hooks/use-fab-gestures";
@@ -15,7 +15,8 @@ import { getSettings } from "@/shared/lib/local-config";
 import { TextBottomSheet } from "./text-bottom-sheet";
 import { RecordingImmersive } from "./recording-immersive";
 import type { CommandContext } from "@/features/commands/lib/registry";
-import { toast } from "sonner";
+import { fabNotify, onFabNotify, type FabNotification } from "@/shared/lib/fab-notify";
+import { startAiPipeline, renewAiPipeline, endAiPipeline } from "@/shared/lib/ai-processing";
 
 function formatDuration(s: number) {
   const m = Math.floor(s / 60);
@@ -35,6 +36,7 @@ interface FABProps {
   onStartReview?: (dateRange: { start: string; end: string }) => void;
   onCommandDetected?: (command: string, args?: string[]) => void;
   onOpenCommandChat?: (initialText: string) => void;
+  onOpenSkillChat?: (skillName: string) => void;
   commandContext?: Partial<CommandContext>;
   activeNotebook?: string | null;
 }
@@ -43,6 +45,7 @@ export function FAB({
   onStartReview,
   onCommandDetected,
   onOpenCommandChat,
+  onOpenSkillChat,
   commandContext,
   activeNotebook,
 }: FABProps) {
@@ -54,6 +57,9 @@ export function FAB({
   const [lockedPaused, setLockedPaused] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [wittyText, setWittyText] = useState("");
+  const [capsuleNotify, setCapsuleNotify] = useState<FabNotification | null>(null);
+  const capsuleTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const pipelineIdRef = useRef<string | null>(null);
 
   const recorder = usePCMRecorder();
   const timerRef = useRef<NodeJS.Timeout | null>(null);
@@ -101,6 +107,18 @@ export function FAB({
     setWaveHeights(Array(32).fill(8));
   }, []);
 
+  // 监听全局 fabNotify 事件，显示胶囊通知
+  useEffect(() => {
+    return onFabNotify((n) => {
+      if (capsuleTimerRef.current) clearTimeout(capsuleTimerRef.current);
+      setCapsuleNotify(n);
+      capsuleTimerRef.current = setTimeout(() => {
+        setCapsuleNotify(null);
+        capsuleTimerRef.current = null;
+      }, n.duration ?? 2000);
+    });
+  }, []);
+
   useEffect(() => {
     const client = getGatewayClient();
     if (!client.connected) client.connect();
@@ -135,11 +153,13 @@ export function FAB({
                 Math.floor(Math.random() * WITTY_PROCESSING.length)
               ],
             );
+            // 全局管道状态：开始
+            pipelineIdRef.current = startAiPipeline();
           }
           break;
         }
         case "asr.error":
-          toast.error(`识别错误: ${msg.payload.message}`);
+          fabNotify.error(`识别错误: ${msg.payload.message}`);
           stopTimers();
           setDisplayDuration(0);
           setConfirmedText("");
@@ -150,19 +170,28 @@ export function FAB({
           setProcessing(false);
           setWittyText("");
           resetRef.current();
+          if (pipelineIdRef.current) { endAiPipeline(pipelineIdRef.current); pipelineIdRef.current = null; }
           break;
         case "process.result":
           emit("recording:processed");
-          toast.success("处理完成");
+          fabNotify.success("处理完成");
           setProcessing(false);
           setWittyText("");
+          // 全局管道：续期（digest + todo 投影还在跑）
+          if (pipelineIdRef.current) renewAiPipeline(pipelineIdRef.current);
+          break;
+        case "todo.created":
+          emit("recording:processed");
+          // 全局管道：终态
+          if (pipelineIdRef.current) { endAiPipeline(pipelineIdRef.current); pipelineIdRef.current = null; }
           break;
         case "error":
           setProcessing((was) => {
-            if (was) toast.error("处理失败");
+            if (was) fabNotify.error("处理失败");
             return false;
           });
           setWittyText("");
+          if (pipelineIdRef.current) { endAiPipeline(pipelineIdRef.current); pipelineIdRef.current = null; }
           break;
         case "command.detected":
           onCommandDetected?.(msg.payload.command, msg.payload.args);
@@ -211,7 +240,7 @@ export function FAB({
           }
         },
         onError: (err) => {
-          toast.error(`录音错误: ${err.message}`);
+          fabNotify.error(`录音错误: ${err.message}`);
           resetRef.current();
         },
       });
@@ -250,7 +279,7 @@ export function FAB({
         client.connect();
         const ready = await client.waitForReady();
         if (!ready) {
-          toast.error("无法连接服务器，请检查网络");
+          fabNotify.error("无法连接服务器，请检查网络");
           stopPreCapture();
           return;
         }
@@ -280,7 +309,7 @@ export function FAB({
             volumeRef.current = Math.min(1, rms * 5);
           },
           onError: (err) => {
-            toast.error(`录音错误: ${err.message}`);
+            fabNotify.error(`录音错误: ${err.message}`);
             resetRef.current();
           },
         });
@@ -292,9 +321,9 @@ export function FAB({
     } catch (err: any) {
       const msg = err.message ?? "";
       if (msg.includes("fetch") || msg.includes("network")) {
-        toast.error("无法连接服务器，请检查网络");
+        fabNotify.error("无法连接服务器，请检查网络");
       } else {
-        toast.error(`无法开始录音: ${msg}`);
+        fabNotify.error(`无法开始录音: ${msg}`);
       }
       stopTimers();
       stopPreCapture();
@@ -328,7 +357,7 @@ export function FAB({
         }
       } catch (err: any) {
         commandReleaseRef.current = false;
-        toast.error(`录音结束失败: ${err.message}`);
+        fabNotify.error(`录音结束失败: ${err.message}`);
       }
     },
     [recorder, stopTimers],
@@ -635,7 +664,7 @@ export function FAB({
           transition: phase === "recording" ? "none" : "transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)",
         }}
       >
-        {/* Processing capsule */}
+        {/* Processing capsule / Notify capsule */}
         {processing && phase === "idle" ? (
           <div
             className="flex items-center gap-2 h-12 px-4 rounded-full text-white animate-bubble-enter"
@@ -643,6 +672,25 @@ export function FAB({
           >
             <Sparkles className="w-5 h-5 animate-spin-slow shrink-0" />
             <span className="text-sm font-medium whitespace-nowrap">{wittyText}</span>
+          </div>
+        ) : capsuleNotify && phase === "idle" ? (
+          <div
+            className="flex items-center gap-1.5 h-10 px-3.5 rounded-full text-white animate-bubble-enter"
+            style={{
+              background: capsuleNotify.level === "error"
+                ? "linear-gradient(135deg, #9B2C2C, #C53030)"
+                : capsuleNotify.level === "success"
+                  ? "linear-gradient(135deg, #276749, #38A169)"
+                  : "linear-gradient(135deg, #89502C, #C8845C)",
+              boxShadow: "0 8px 24px rgba(28, 28, 24, 0.06)",
+            }}
+          >
+            {capsuleNotify.level === "error" ? (
+              <AlertTriangle className="w-4 h-4 shrink-0" />
+            ) : capsuleNotify.level === "success" ? (
+              <Check className="w-4 h-4 shrink-0" />
+            ) : null}
+            <span className="text-sm font-medium whitespace-nowrap">{capsuleNotify.text}</span>
           </div>
         ) : (
           <>
@@ -714,6 +762,10 @@ export function FAB({
         onCommandMode={(text) => {
           setShowTextSheet(false);
           onOpenCommandChat?.(text);
+        }}
+        onSkillSelect={(skillName) => {
+          setShowTextSheet(false);
+          onOpenSkillChat?.(skillName);
         }}
         commandContext={commandContext}
         activeNotebook={activeNotebook}

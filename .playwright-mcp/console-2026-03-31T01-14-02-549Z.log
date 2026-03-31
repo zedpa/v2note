@@ -1,1 +1,55 @@
 [   30022ms] [ERROR] Failed to load resource: net::ERR_TIMED_OUT @ https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700;900&family=Noto+Sans+SC:wght@300;400;500;600;700&display=swap:0
+[  882452ms] [ERROR] WebSocket connection to 'ws://localhost:3001/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/_next/static/chunks/features_chat_d659f97b._.js:65
+[ 1332562ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3001/api/v1/cognitive/stats:0
+[ 1332564ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3001/api/v1/cognitive/stats:0
+[ 1333677ms] [WARNING] [gateway-client] Auth rejected by gateway, attempting token refresh... @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 1333946ms] [WARNING] Construction of MediaStreamAudioSourceNode is not useful when context is closed. @ http://localhost:3000/_next/static/chunks/features_recording_5b391212._.js:95
+[ 1334841ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3001/api/v1/auth/refresh:0
+[ 1334842ms] [WARNING] [gateway-client] Token refresh failed, forcing logout @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 1391309ms] [ERROR] Failed to load resource: net::ERR_TIMED_OUT @ https://fonts.gstatic.com/s/notoserifsc/v35/H4chBXePl9DZ0Xe7gG9cyOj7oqP0dTpxZbB9E9gjjmzKvaeKHUTtJDWv3z-us4bxD8F5og.119.woff2:0
+[ 1391309ms] [ERROR] Failed to load resource: net::ERR_TIMED_OUT @ https://fonts.gstatic.com/s/notoserifsc/v35/H4chBXePl9DZ0Xe7gG9cyOj7oqP0dTpxZbB9E9gjjmzKvaeKHUTtJDWv3z-us4bxD8F5og.117.woff2:0
+[ 1391309ms] [ERROR] Failed to load resource: net::ERR_TIMED_OUT @ https://fonts.gstatic.com/s/notoserifsc/v35/H4chBXePl9DZ0Xe7gG9cyOj7oqP0dTpxZbB9E9gjjmzKvaeKHUTtJDWv3z-us4bxD8F5og.114.woff2:0
+[ 1524276ms] [WARNING] Construction of MediaStreamAudioSourceNode is not useful when context is closed. @ http://localhost:3000/_next/static/chunks/features_recording_5b391212._.js:95
+[ 1539089ms] [WARNING] Construction of MediaStreamAudioSourceNode is not useful when context is closed. @ http://localhost:3000/_next/static/chunks/features_recording_5b391212._.js:95
+[ 2011892ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 2067140ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 2125234ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 2187158ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 2236266ms] [WARNING] [HMR] Invalid message: {"isTrusted":true}
+TypeError: Cannot convert undefined or null to object
+    at Object.keys (<anonymous>)
+    at extractModulesFromTurbopackMessage (http://localhost:3000/_next/static/chunks/dd884_next_dist_client_60b8acd9._.js:11210:39)
+    at TurbopackHmr.onTurbopackMessage (http://localhost:3000/_next/static/chunks/dd884_next_dist_client_60b8acd9._.js:11157:32)
+    at processMessage (http://localhost:3000/_next/static/chunks/dd884_next_dist_client_60b8acd9._.js:11589:30)
+    at WebSocket.handleMessage (http://localhost:3000/_next/static/chunks/dd884_next_dist_client_60b8acd9._.js:10914:52) @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 2236783ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:3000/:0
+[ 2236902ms] ReferenceError: Toaster is not defined
+    at RootLayout (about://React/Server/E:%5CAI%5Cworkspace-coding%5Cv2note%5C.next%5Cdev%5Cserver%5Cchunks%5Cssr%5C%5Broot-of-the-server%5D__9a357b4e._.js?0:199:378)
+    at resolveErrorDev (http://localhost:3000/_next/static/chunks/dd884_next_dist_compiled_react-server-dom-turbopack_558a2e49._.js:1894:106)
+    at processFullStringRow (http://localhost:3000/_next/static/chunks/dd884_next_dist_compiled_react-server-dom-turbopack_558a2e49._.js:2402:29)
+    at processFullBinaryRow (http://localhost:3000/_next/static/chunks/dd884_next_dist_compiled_react-server-dom-turbopack_558a2e49._.js:2361:9)
+    at processBinaryChunk (http://localhost:3000/_next/static/chunks/dd884_next_dist_compiled_react-server-dom-turbopack_558a2e49._.js:2470:221)
+    at progress (http://localhost:3000/_next/static/chunks/dd884_next_dist_compiled_react-server-dom-turbopack_558a2e49._.js:2640:13)
+[10648957ms] [WARNING] Construction of MediaStreamAudioSourceNode is not useful when context is closed. @ http://localhost:3000/_next/static/chunks/features_recording_5b391212._.js:95
+[10668562ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3001/api/v1/cognitive/stats:0
+[10668563ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3001/api/v1/cognitive/stats:0
+[10668642ms] [WARNING] [gateway-client] Auth rejected by gateway, attempting token refresh... @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[10669653ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3001/api/v1/auth/refresh:0
+[10669654ms] [WARNING] [gateway-client] Token refresh failed, forcing logout @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[10742977ms] [ERROR] Failed to load resource: net::ERR_TIMED_OUT @ https://fonts.gstatic.com/s/notosanssc/v40/k3kXo84MPvpLmixcA63oeALhLOCT-xWNm8Hqd37g1OkDRZe7lR4sg1IzSy-MNbE9VH8V.103.woff2:0
+[11416661ms] [WARNING] Construction of MediaStreamAudioSourceNode is not useful when context is closed. @ http://localhost:3000/_next/static/chunks/features_recording_5b391212._.js:95
+[11455930ms] [ERROR] Failed to load resource: net::ERR_TIMED_OUT @ https://fonts.gstatic.com/s/notosanssc/v40/k3kXo84MPvpLmixcA63oeALhLOCT-xWNm8Hqd37g1OkDRZe7lR4sg1IzSy-MNbE9VH8V.103.woff2:0
+[11527144ms] [ERROR] Failed to load resource: net::ERR_TIMED_OUT @ https://fonts.gstatic.com/s/notoserifsc/v35/H4chBXePl9DZ0Xe7gG9cyOj7oqP0dTpxZbB9E9gjjmzKvaeKHUTtJDWv3z-us4bxD8F5og.118.woff2:0
+[11639475ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[11639899ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3001/api/v1/cognitive/stats:0
+[11639899ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3001/api/v1/cognitive/stats:0
+[11641211ms] [WARNING] [gateway-client] Auth rejected by gateway, attempting token refresh... @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[11642238ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3001/api/v1/auth/refresh:0
+[11642239ms] [WARNING] [gateway-client] Token refresh failed, forcing logout @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[15747779ms] [WARNING] [gateway-client] Auth rejected by gateway, attempting token refresh... @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[15968129ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[17109919ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3001/api/v1/records/e2dc6948-a76d-4907-a81e-627287f5adb1/related:0
+[18353313ms] [ERROR] WebSocket connection to 'ws://localhost:3001/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/_next/static/chunks/features_chat_d659f97b._.js:65
+[18359330ms] [WARNING] [gateway-client] Auth rejected by gateway, attempting token refresh... @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[18478780ms] [ERROR] WebSocket connection to 'ws://localhost:3001/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/_next/static/chunks/features_chat_d659f97b._.js:65
+[23526709ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3001/api/v1/auth/login:0

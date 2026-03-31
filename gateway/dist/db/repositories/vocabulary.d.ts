@@ -30,5 +30,7 @@ export declare function findByAliases(deviceId: string, text: string): Promise<V
 export declare function create(input: CreateVocabularyInput): Promise<VocabularyEntry>;
 /** 删除词汇条目 */
 export declare function deleteById(id: string): Promise<number>;
+/** 删除词汇条目（校验所有权：属于该用户或该设备） */
+export declare function deleteByIdOwned(id: string, deviceId: string, userId?: string | null): Promise<number>;
 /** 增加使用频率 */
 export declare function incrementFrequency(id: string): Promise<void>;

@@ -10,6 +10,7 @@ import { query, queryOne, execute } from "../pool.js";
 export interface Goal {
   id: string;
   device_id: string;
+  user_id?: string;
   title: string;
   parent_id: string | null;
   status: "active" | "paused" | "completed" | "abandoned" | "progressing" | "blocked" | "suggested" | "dismissed";
@@ -21,7 +22,7 @@ export interface Goal {
 
 /** SQL: todo → Goal 字段映射 */
 const SELECT_AS_GOAL = `
-  SELECT id, device_id, text AS title, parent_id, status,
+  SELECT id, device_id, user_id, text AS title, parent_id, status,
          COALESCE(category, 'speech') AS source, cluster_id,
          created_at, COALESCE(updated_at, created_at) AS updated_at
   FROM todo

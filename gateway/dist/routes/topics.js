@@ -1,6 +1,7 @@
 import { sendJson, sendError, getUserId } from "../lib/http-helpers.js";
 import { query, queryOne } from "../db/pool.js";
 import { strikeRepo, bondRepo, goalRepo } from "../db/repositories/index.js";
+import { writeStrikeEmbedding } from "../cognitive/embed-writer.js";
 export function registerTopicRoutes(router) {
     // ── GET /api/v1/topics ──
     // 返回聚合后的主题列表（Cluster + Goal + Strike 统计）
@@ -153,9 +154,10 @@ export function registerTopicRoutes(router) {
     });
     // ── POST /api/v1/goals/:id/harvest ──
     // 收获：目标完成时生成一条 review Strike
-    router.post("/api/v1/goals/:id/harvest", async (_req, res, params) => {
+    router.post("/api/v1/goals/:id/harvest", async (req, res, params) => {
         try {
             const goalId = params.id;
+            const userId = getUserId(req);
             // 1. 获取目标
             const goal = await goalRepo.findById(goalId);
             if (!goal) {
@@ -164,13 +166,14 @@ export function registerTopicRoutes(router) {
             }
             // 2. 创建 review strike (polarity=judge)
             const reviewStrike = await strikeRepo.create({
-                user_id: goal.device_id, // 使用 goal 的 device_id 作为 user_id
+                user_id: userId ?? goal.user_id ?? goal.device_id,
                 nucleus: `${goal.title} 已完成`,
                 polarity: "judge",
                 source_type: "system",
                 confidence: 1.0,
                 salience: 1.0,
             });
+            void writeStrikeEmbedding(reviewStrike.id, `${goal.title} 已完成`);
             // 3. 如果 goal 有 cluster_id，创建 bond 关联到 cluster
             if (goal.cluster_id) {
                 await bondRepo.create({

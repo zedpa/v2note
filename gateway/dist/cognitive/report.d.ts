@@ -27,4 +27,7 @@ export interface CognitiveReport {
     };
     is_empty: boolean;
 }
-export declare function generateCognitiveReport(userId: string): Promise<CognitiveReport>;
+export declare function generateCognitiveReport(opts: {
+    userId?: string;
+    deviceId?: string;
+}): Promise<CognitiveReport>;

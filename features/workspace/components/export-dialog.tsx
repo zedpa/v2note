@@ -4,7 +4,7 @@ import { useState } from "react";
 import { X, FileJson, FileText, FileDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { exportData, downloadBlob, type ExportFormat } from "@/shared/lib/export";
-import { toast } from "sonner";
+import { fabNotify } from "@/shared/lib/fab-notify";
 
 interface ExportDialogProps {
   open: boolean;
@@ -27,10 +27,10 @@ export function ExportDialog({ open, onClose }: ExportDialogProps) {
       setExporting(true);
       const result = await exportData(format);
       downloadBlob(result.content, result.filename, result.mimeType);
-      toast("导出成功！");
+      fabNotify.info("导出成功！");
       onClose();
     } catch (err: any) {
-      toast.error(`导出失败: ${err.message}`);
+      fabNotify.error(`导出失败: ${err.message}`);
     } finally {
       setExporting(false);
     }

@@ -6,7 +6,11 @@ function formatDate(dateStr) {
     const d = new Date(dateStr);
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
-export async function generateAlerts(userId) {
+export async function generateAlerts(opts) {
+    // 支持 userId 或 deviceId（无登录用户走 device 路径）
+    const [where, params] = opts.userId
+        ? ["sa.user_id = $1", [opts.userId]]
+        : ["sa.source_id IN (SELECT id FROM record WHERE device_id = $1)", [opts.deviceId]];
     // Find contradiction bonds created in the last 7 days, with both strikes' info
     const rows = await query(`SELECT b.*,
             sa.id as a_id, sa.nucleus as a_nucleus, sa.polarity as a_polarity, sa.created_at as a_created_at,
@@ -14,12 +18,12 @@ export async function generateAlerts(userId) {
      FROM bond b
      JOIN strike sa ON sa.id = b.source_strike_id
      JOIN strike sb ON sb.id = b.target_strike_id
-     WHERE sa.user_id = $1
+     WHERE ${where}
        AND b.type = 'contradiction'
        AND b.created_at >= NOW() - INTERVAL '7 days'
        AND COALESCE(sa.source_type, 'think') != 'material'
        AND COALESCE(sb.source_type, 'think') != 'material'
-     ORDER BY b.created_at DESC`, [userId]);
+     ORDER BY b.created_at DESC`, params);
     return rows.map((r) => ({
         type: "contradiction",
         strikeA: { id: r.a_id, nucleus: r.a_nucleus, polarity: r.a_polarity },

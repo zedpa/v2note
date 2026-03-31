@@ -78,7 +78,7 @@ export async function extractPersonPatterns(personId) {
             role: "user",
             content: strikes.map((s) => `[${s.polarity}] ${s.nucleus}`).join("\n"),
         },
-    ], { json: true, temperature: 0.3 });
+    ], { json: true, temperature: 0.3, tier: "background" });
     const parsed = JSON.parse(resp.content);
     const patterns = parsed.patterns ?? [];
     // 保存到 person

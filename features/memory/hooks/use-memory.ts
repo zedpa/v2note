@@ -8,7 +8,7 @@ import {
   deleteMemory as apiDeleteMemory,
   updateMemory as apiUpdateMemory,
 } from "@/shared/lib/api/memory";
-import { toast } from "sonner";
+import { fabNotify } from "@/shared/lib/fab-notify";
 
 export function useMemory() {
   const [memories, setMemories] = useState<MemoryEntry[]>([]);
@@ -43,9 +43,9 @@ export function useMemory() {
     try {
       await apiDeleteMemory(id);
       setMemories((prev) => prev.filter((m) => m.id !== id));
-      toast("记忆已删除");
+      fabNotify.info("记忆已删除");
     } catch {
-      toast.error("删除失败");
+      fabNotify.error("删除失败");
     }
   }, []);
 
@@ -56,9 +56,9 @@ export function useMemory() {
         setMemories((prev) =>
           prev.map((m) => (m.id === id ? { ...m, ...fields } : m)),
         );
-        toast("已更新");
+        fabNotify.info("已更新");
       } catch {
-        toast.error("更新失败");
+        fabNotify.error("更新失败");
       }
     },
     [],

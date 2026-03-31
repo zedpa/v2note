@@ -1,4 +1,4 @@
-import { readBody, sendJson, sendError } from "../lib/http-helpers.js";
+import { readBody, sendJson, sendError, getDeviceId } from "../lib/http-helpers.js";
 import { hashPassword, verifyPassword } from "../auth/passwords.js";
 import { signAccessToken, signRefreshToken, verifyRefreshToken } from "../auth/jwt.js";
 import { getAuthContext } from "../auth/middleware.js";
@@ -100,7 +100,7 @@ export function registerAuthRoutes(router) {
         }
         // Rotate: delete old, issue new
         await refreshTokenRepo.deleteByHash(tokenHash);
-        const deviceId = stored.device_id ?? payload.userId; // fallback
+        const deviceId = stored.device_id ?? getDeviceId(req); // 从 stored 或请求头取设备 ID
         const tokens = await issueTokens(payload.userId, deviceId);
         sendJson(res, tokens);
     });

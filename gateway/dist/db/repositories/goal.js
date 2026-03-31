@@ -8,7 +8,7 @@
 import { query, queryOne, execute } from "../pool.js";
 /** SQL: todo → Goal 字段映射 */
 const SELECT_AS_GOAL = `
-  SELECT id, device_id, text AS title, parent_id, status,
+  SELECT id, device_id, user_id, text AS title, parent_id, status,
          COALESCE(category, 'speech') AS source, cluster_id,
          created_at, COALESCE(updated_at, created_at) AS updated_at
   FROM todo
@@ -84,5 +84,13 @@ export async function updateClusterRef(oldClusterId, newClusterId) {
 }
 export async function findWithTodos(goalId) {
     return query(`SELECT id, text, done FROM todo WHERE parent_id = $1 AND level = 0 ORDER BY created_at`, [goalId]);
+}
+/** 批量查询多个目标的子 todo（一次 SQL 替代 N 次查询） */
+export async function findTodosByGoalIds(goalIds) {
+    if (goalIds.length === 0)
+        return [];
+    return query(`SELECT parent_id, id, text, done, completed_at
+     FROM todo WHERE parent_id = ANY($1) AND level = 0
+     ORDER BY created_at`, [goalIds]);
 }
 //# sourceMappingURL=goal.js.map

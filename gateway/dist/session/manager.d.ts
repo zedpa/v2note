@@ -1,5 +1,12 @@
 import { SessionContext } from "./context.js";
 import { MemoryManager } from "../memory/manager.js";
+export interface PendingConfirm {
+    confirmId: string;
+    action: string;
+    todoId?: string;
+    summary: string;
+    expiresAt: number;
+}
 export interface Session {
     id: string;
     deviceId: string;
@@ -7,6 +14,7 @@ export interface Session {
     context: SessionContext;
     mode: "idle" | "process" | "chat";
     memoryManager: MemoryManager;
+    pendingConfirms: Map<string, PendingConfirm>;
     createdAt: Date;
     lastActivity: Date;
 }

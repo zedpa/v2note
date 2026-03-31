@@ -7,14 +7,25 @@ import { executeCommand, getCommandDefs } from "@/features/commands/lib/registry
 import type { CommandContext } from "@/features/commands/lib/registry";
 import { createManualNote } from "@/features/notes/lib/manual-note";
 import { emit } from "@/features/recording/lib/events";
-import { toast } from "sonner";
+import { fabNotify } from "@/shared/lib/fab-notify";
 import { api } from "@/shared/lib/api";
+import { startAiPipeline, renewAiPipeline } from "@/shared/lib/ai-processing";
+
+/** 可用技能定义（用于技能面板） */
+const AVAILABLE_SKILLS = [
+  { name: "review-guide", label: "复盘", description: "深度复盘引导" },
+  { name: "todo-management", label: "拆解待办", description: "目标/项目拆解为待办" },
+  { name: "munger-review", label: "芒格视角", description: "芒格决策框架分析" },
+  { name: "meta-question", label: "元问题", description: "深度分析问题本质" },
+  { name: "second-order-thinking", label: "二阶思考", description: "分析问题背后的问题" },
+];
 
 interface TextBottomSheetProps {
   open: boolean;
   onClose: () => void;
   onStartReview?: (dateRange: { start: string; end: string }) => void;
   onCommandMode?: (text: string) => void;
+  onSkillSelect?: (skillName: string) => void;
   commandContext?: Partial<CommandContext>;
   activeNotebook?: string | null;
   /** Called when mic button is tapped — closes sheet and starts recording */
@@ -38,6 +49,7 @@ export function TextBottomSheet({
   onClose,
   onStartReview,
   onCommandMode,
+  onSkillSelect,
   commandContext,
   activeNotebook,
   onRecordPress,
@@ -47,6 +59,7 @@ export function TextBottomSheet({
   const [submitting, setSubmitting] = useState(false);
   const [bottomOffset, setBottomOffset] = useState(0);
   const [showActions, setShowActions] = useState(false);
+  const [showSkillPanel, setShowSkillPanel] = useState(false);
   const [detectedUrl, setDetectedUrl] = useState<string | null>(null);
   const [attachment, setAttachment] = useState<{ name: string; file: File } | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -84,6 +97,7 @@ export function TextBottomSheet({
       setText("");
       setSuggestions([]);
       setShowActions(false);
+      setShowSkillPanel(false);
       setDetectedUrl(null);
       setAttachment(null);
     }
@@ -121,17 +135,17 @@ export function TextBottomSheet({
     const value = e.target.value;
     setText(value);
 
-    // "/" alone → command mode
+    // "/" alone → 打开技能面板
     if (/^\/\s*$/.test(value)) {
-      onCommandMode?.("/");
-      onClose();
+      setText("");
+      setShowSkillPanel(true);
       return;
     }
 
     const ta = e.target;
     ta.style.height = "auto";
     ta.style.height = Math.min(ta.scrollHeight, 160) + "px";
-  }, [onCommandMode, onClose]);
+  }, []);
 
   const handleSubmit = useCallback(async () => {
     const trimmed = text.trim();
@@ -140,6 +154,7 @@ export function TextBottomSheet({
     if (attachment) {
       setSubmitting(true);
       onClose();
+      const pid = startAiPipeline();
       try {
         const base64 = await fileToBase64(attachment.file);
         const isImage = attachment.file.type.startsWith("image/");
@@ -149,7 +164,7 @@ export function TextBottomSheet({
             file_base64: base64,
             source_type: "material",
           });
-          toast("图片已收录");
+          fabNotify.info("图片已收录");
         } else {
           await api.post("/api/v1/ingest", {
             type: "file",
@@ -158,11 +173,12 @@ export function TextBottomSheet({
             mimeType: attachment.file.type,
             source_type: "material",
           });
-          toast(`${attachment.name} 已收录`);
+          fabNotify.info(`${attachment.name} 已收录`);
         }
+        renewAiPipeline(pid); // 后台 digest 可能还在跑
         emit("recording:processed");
       } catch {
-        toast.error("上传失败");
+        fabNotify.error("上传失败");
       } finally {
         setSubmitting(false);
       }
@@ -171,10 +187,10 @@ export function TextBottomSheet({
 
     if (!trimmed || submitting) return;
 
-    // "/" alone → command mode
+    // "/" alone → 打开技能面板
     if (/^\/\s*$/.test(trimmed) || trimmed === "/") {
-      onCommandMode?.("/");
-      onClose();
+      setText("");
+      setShowSkillPanel(true);
       return;
     }
 
@@ -184,7 +200,7 @@ export function TextBottomSheet({
     };
     const cmdResult = executeCommand(trimmed, ctx);
     if (cmdResult) {
-      if (cmdResult.message) toast(cmdResult.message);
+      if (cmdResult.message) fabNotify.info(cmdResult.message);
       setText("");
       onClose();
       return;
@@ -194,12 +210,14 @@ export function TextBottomSheet({
     setSubmitting(true);
     setText("");
     onClose();
+    const pid = startAiPipeline();
     try {
       await createManualNote({ content: trimmed, useAi: true, notebook: activeNotebook ?? undefined });
-      toast.success("已保存");
+      fabNotify.success("已保存");
+      renewAiPipeline(pid); // 后台 process + digest + todo 投影还在跑
       emit("recording:processed");
     } catch (err: any) {
-      toast.error(`保存失败: ${err.message}`);
+      fabNotify.error(`保存失败: ${err.message}`);
     } finally {
       setSubmitting(false);
     }
@@ -209,13 +227,15 @@ export function TextBottomSheet({
     if (!detectedUrl) return;
     setSubmitting(true);
     onClose();
+    const pid = startAiPipeline();
     api
       .post("/api/v1/ingest", { type: "url", content: detectedUrl, source_type: "material" })
       .then(() => {
-        toast("链接已收录");
+        fabNotify.info("链接已收录");
+        renewAiPipeline(pid);
         emit("recording:processed");
       })
-      .catch(() => toast.error("链接提取失败"))
+      .catch(() => fabNotify.error("链接提取失败"))
       .finally(() => setSubmitting(false));
   }, [detectedUrl, onClose]);
 
@@ -331,8 +351,30 @@ export function TextBottomSheet({
         </div>
 
         <div className="px-4 pt-1 pb-4 pb-safe">
+          {/* Skill panel — "/" 触发 */}
+          {showSkillPanel && (
+            <div className="mb-3">
+              <p className="text-xs text-muted-foreground mb-2">选择技能开始对话</p>
+              <div className="flex gap-2 flex-wrap">
+                {AVAILABLE_SKILLS.map((skill) => (
+                  <button
+                    key={skill.name}
+                    type="button"
+                    onClick={() => {
+                      setShowSkillPanel(false);
+                      onSkillSelect?.(skill.name);
+                    }}
+                    className="px-3 py-1.5 rounded-full bg-deer/10 text-deer text-xs font-medium hover:bg-deer/20 transition-colors"
+                  >
+                    {skill.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Command suggestions */}
-          {suggestions.length > 0 && (
+          {suggestions.length > 0 && !showSkillPanel && (
             <div className="flex gap-1.5 flex-wrap mb-3">
               {suggestions.map((cmd) => (
                 <button

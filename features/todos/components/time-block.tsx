@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, Plus } from "lucide-react";
 import type { TimeSlotConfig } from "../lib/time-slots";
 import type { TimeSlotGroup } from "../lib/todo-types";
 import type { TodoDTO } from "../lib/todo-types";
@@ -74,6 +74,14 @@ export function TimeBlock({ config, group, onToggle, onPress, onAdd }: TimeBlock
                   ))}
                 </div>
               )}
+
+              {/* 添加按钮 */}
+              <button
+                onClick={onAdd}
+                className="flex h-8 w-8 items-center justify-center rounded-full border border-dashed border-border text-muted-foreground transition-colors active:bg-card/60"
+              >
+                <Plus className="h-4 w-4" />
+              </button>
             </div>
           )}
         </>

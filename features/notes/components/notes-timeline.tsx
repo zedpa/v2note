@@ -7,9 +7,10 @@ import { cn } from "@/lib/utils";
 import { useNotes } from "@/features/notes/hooks/use-notes";
 import { useNoteDetail } from "@/features/notes/hooks/use-note-detail";
 import { MiniAudioPlayer } from "./mini-audio-player";
-import { toast } from "sonner";
+import { fabNotify } from "@/shared/lib/fab-notify";
 import type { NoteItem } from "@/shared/lib/types";
 import { InsightCard } from "./insight-card";
+import { MarkdownContent } from "@/shared/components/markdown-content";
 import { api } from "@/shared/lib/api";
 import { fetchCognitiveStats, type CognitiveStats } from "@/shared/lib/api/cognitive";
 
@@ -347,7 +348,7 @@ function TimelineCard({
 
   const handleCopy = useCallback(() => {
     const text = note.short_summary || note.title;
-    navigator.clipboard.writeText(text).then(() => toast("已复制"));
+    navigator.clipboard.writeText(text).then(() => fabNotify.info("已复制"));
     setMenuPos(null);
   }, [note.short_summary, note.title]);
 
@@ -499,12 +500,14 @@ function TimelineCard({
               </div>
             </div>
           ) : (
-            <p className={cn(
+            <div className={cn(
               "text-[15px] leading-[1.7] text-foreground",
               !expanded && "line-clamp-4",
             )}>
-              {note.short_summary || note.title}
-            </p>
+              <MarkdownContent className="text-[15px] leading-[1.7]">
+                {note.short_summary || note.title || ""}
+              </MarkdownContent>
+            </div>
           )}
 
           {/* Audio player */}
@@ -524,14 +527,24 @@ function TimelineCard({
                 </div>
               ) : detail && (
                 <>
-                  {/* Transcript — only show for voice recordings */}
-                  {detail.transcript?.text && note.duration_seconds != null && note.duration_seconds > 0 && (
-                    <div>
-                      <h4 className="text-xs font-medium text-muted-foreground mb-1">原文</h4>
-                      <p className="text-sm text-foreground/70 leading-relaxed whitespace-pre-wrap">
-                        {detail.transcript.text}
-                      </p>
-                    </div>
+                  {/* Transcript / full content */}
+                  {detail.transcript?.text && (
+                    note.duration_seconds != null && note.duration_seconds > 0 ? (
+                      /* 语音记录：显示"原文"标题 */
+                      <div>
+                        <h4 className="text-xs font-medium text-muted-foreground mb-1">原文</h4>
+                        <MarkdownContent className="text-sm text-foreground/70 leading-relaxed">
+                          {detail.transcript.text}
+                        </MarkdownContent>
+                      </div>
+                    ) : detail.transcript.text !== (note.short_summary || note.title) ? (
+                      /* 文字记录：当 transcript 与摘要不同时显示完整内容 */
+                      <div>
+                        <MarkdownContent className="text-sm text-foreground/70 leading-relaxed">
+                          {detail.transcript.text}
+                        </MarkdownContent>
+                      </div>
+                    ) : null
                   )}
                   {/* Todos */}
                   {detail.todos.length > 0 && (

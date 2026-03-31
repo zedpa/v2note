@@ -1,6 +1,7 @@
 export interface Record {
     id: string;
     device_id: string;
+    user_id: string | null;
     status: string;
     source: string;
     audio_path: string | null;
@@ -64,4 +65,8 @@ export declare function markDigested(id: string): Promise<void>;
 export declare function claimForDigest(ids: string[]): Promise<string[]>;
 /** 回滚：digest 失败时恢复 digested=false，允许下次重试 */
 export declare function unclaimDigest(id: string): Promise<void>;
+/** 按 user_id + source 查询（用于幂等检查，如欢迎日记判重） */
+export declare function findByUserAndSource(userId: string, source: string): Promise<Record[]>;
+/** 更新 created_at（用于控制欢迎日记排序） */
+export declare function updateCreatedAt(id: string, createdAt: string): Promise<void>;
 export declare function findByDeviceAndDateRange(deviceId: string, start: string, end: string): Promise<Record[]>;

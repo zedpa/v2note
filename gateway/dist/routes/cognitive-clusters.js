@@ -89,6 +89,37 @@ export function registerCognitiveClusterRoutes(router) {
             intents,
         });
     });
+    // Update cluster name
+    router.patch("/api/v1/cognitive/clusters/:id", async (req, res, params) => {
+        const body = await readBody(req);
+        if (!body.name?.trim()) {
+            sendError(res, "name is required");
+            return;
+        }
+        const cluster = await strikeRepo.findById(params.id);
+        if (!cluster || !cluster.is_cluster) {
+            sendError(res, "Cluster not found", 404);
+            return;
+        }
+        // 保留描述部分，只更新名称
+        const descPart = cluster.nucleus.replace(/^\[.+?\]\s*/, "");
+        const newNucleus = `[${body.name.trim()}] ${descPart}`.trim();
+        await query(`UPDATE strike SET nucleus = $1 WHERE id = $2`, [newNucleus, params.id]);
+        sendJson(res, { ok: true });
+    });
+    // Dissolve cluster（解散：不删除 strike，只取消 is_cluster；关联目标变独立）
+    router.delete("/api/v1/cognitive/clusters/:id", async (req, res, params) => {
+        const cluster = await strikeRepo.findById(params.id);
+        if (!cluster || !cluster.is_cluster) {
+            sendError(res, "Cluster not found", 404);
+            return;
+        }
+        // 1. 取消聚类标记
+        await query(`UPDATE strike SET is_cluster = false WHERE id = $1`, [params.id]);
+        // 2. 关联目标的 cluster_id 置 null
+        await query(`UPDATE todo SET cluster_id = NULL WHERE cluster_id = $1`, [params.id]);
+        sendJson(res, { ok: true });
+    });
     // Create a manual bond between two strikes/clusters
     router.post("/api/v1/cognitive/bonds", async (req, res) => {
         const body = await readBody(req);

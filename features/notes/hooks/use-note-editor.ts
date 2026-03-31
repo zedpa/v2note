@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { toast } from "sonner";
+import { fabNotify } from "@/shared/lib/fab-notify";
 import type { NoteDetail } from "@/shared/lib/types";
 import { api } from "@/shared/lib/api";
 import { addTagToRecord, removeTagFromRecord } from "@/shared/lib/api/tags";
@@ -21,7 +21,7 @@ export function useNoteEditor(detail: NoteDetail | null, refetch: () => void) {
       setEditing(null);
       refetch();
     } catch {
-      toast.error("保存失败");
+      fabNotify.error("保存失败");
     }
   }, [detail, refetch]);
 
@@ -35,7 +35,7 @@ export function useNoteEditor(detail: NoteDetail | null, refetch: () => void) {
       setEditing(null);
       refetch();
     } catch {
-      toast.error("保存失败");
+      fabNotify.error("保存失败");
     }
   }, [detail, refetch]);
 

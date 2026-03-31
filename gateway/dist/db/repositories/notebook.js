@@ -6,19 +6,36 @@ export async function findByUser(userId) {
     return query(`SELECT * FROM notebook WHERE user_id = $1 ORDER BY is_system DESC, created_at`, [userId]);
 }
 export async function findOrCreateByUser(userId, deviceId, name, description, isSystem = false, color) {
+    // 优先按 user_id + name 查找
+    const existing = await queryOne(`SELECT * FROM notebook WHERE user_id = $1 AND name = $2`, [userId, name]);
+    if (existing) {
+        // 更新最后使用的设备
+        if (existing.device_id !== deviceId) {
+            await execute(`UPDATE notebook SET device_id = $1 WHERE id = $2`, [deviceId, existing.id]);
+        }
+        return existing;
+    }
+    // 按 device_id 查找旧数据并补绑 user_id
+    const byDevice = await queryOne(`SELECT * FROM notebook WHERE device_id = $1 AND name = $2 AND user_id IS NULL`, [deviceId, name]);
+    if (byDevice) {
+        await execute(`UPDATE notebook SET user_id = $1 WHERE id = $2`, [userId, byDevice.id]);
+        return { ...byDevice, user_id: userId };
+    }
     const row = await queryOne(`INSERT INTO notebook (user_id, device_id, name, description, is_system, color)
      VALUES ($1, $2, $3, $4, $5, $6)
-     ON CONFLICT (device_id, name) DO UPDATE SET user_id = $1
      RETURNING *`, [userId, deviceId, name, description ?? null, isSystem, color ?? "#6366f1"]);
     return row;
 }
 export async function findById(id) {
     return queryOne(`SELECT * FROM notebook WHERE id = $1`, [id]);
 }
+/** @deprecated 使用 findOrCreateByUser 替代 */
 export async function findOrCreate(deviceId, name, description, isSystem = false, color) {
+    const existing = await queryOne(`SELECT * FROM notebook WHERE device_id = $1 AND name = $2`, [deviceId, name]);
+    if (existing)
+        return existing;
     const row = await queryOne(`INSERT INTO notebook (device_id, name, description, is_system, color)
      VALUES ($1, $2, $3, $4, $5)
-     ON CONFLICT (device_id, name) DO UPDATE SET device_id = notebook.device_id
      RETURNING *`, [deviceId, name, description ?? null, isSystem, color ?? "#6366f1"]);
     return row;
 }

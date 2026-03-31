@@ -22,11 +22,15 @@ export interface CreateNotificationInput {
 export declare function findByDevice(deviceId: string, limit?: number): Promise<Notification[]>;
 /** 按用户查询最近通知 */
 export declare function findByUser(userId: string, limit?: number): Promise<Notification[]>;
-/** 查询未读数量 */
+/** 查询未读数量（按设备） */
 export declare function countUnread(deviceId: string): Promise<number>;
+/** 查询未读数量（按用户，跨设备） */
+export declare function countUnreadByUser(userId: string): Promise<number>;
 /** 创建通知 */
 export declare function create(input: CreateNotificationInput): Promise<Notification>;
 /** 标记单条已读 */
 export declare function markRead(id: string): Promise<void>;
 /** 标记设备所有通知已读 */
 export declare function markAllRead(deviceId: string): Promise<void>;
+/** 标记用户所有通知已读（跨设备） */
+export declare function markAllReadByUser(userId: string): Promise<void>;

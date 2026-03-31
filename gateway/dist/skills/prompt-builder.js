@@ -1,14 +1,34 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 const __dirname = dirname(fileURLToPath(import.meta.url));
-// Load AGENTS.md once at startup — AI 行为宪法
-let agentMdCore;
+const AGENTS_DIR = join(__dirname, "../../agents");
+// Load base constitution once at startup — AI 行为宪法（共享基座）
+let baseMd;
 try {
-    agentMdCore = readFileSync(join(__dirname, "../../AGENTS.md"), "utf-8");
+    baseMd = readFileSync(join(__dirname, "../../AGENTS.md"), "utf-8");
 }
 catch {
-    agentMdCore = "你是一个智能笔记助手，帮助用户整理和回顾语音/文字记录。";
+    baseMd = "你是一个智能笔记助手，帮助用户整理和回顾语音/文字记录。";
+}
+// Load agent-specific prompts at startup（角色化 Agent）
+const agentFileMap = {
+    chat: "chat.md",
+    briefing: "briefing.md",
+    onboarding: "onboarding.md",
+};
+const agentPrompts = {};
+for (const [role, filename] of Object.entries(agentFileMap)) {
+    const filePath = join(AGENTS_DIR, filename);
+    if (existsSync(filePath)) {
+        try {
+            agentPrompts[role] = readFileSync(filePath, "utf-8");
+            console.log(`[prompt-builder] Agent loaded: ${filename}`);
+        }
+        catch {
+            console.warn(`[prompt-builder] Failed to load agent: ${filename}`);
+        }
+    }
 }
 /**
  * Build tiered context for chat/briefing prompt assembly.
@@ -19,10 +39,11 @@ catch {
 export function buildTieredContext(opts) {
     const hot = [];
     const warm = [];
-    // ── HOT TIER: always present (AGENTS.md 已包含对话纪律和简报纪律) ──
-    hot.push(agentMdCore);
-    if (opts.mode === "chat") {
-        hot.push(`\n## 任务\n你正在与用户进行复盘对话。基于记忆和用户画像，帮助用户回顾和总结。自然地对话，按需提出问题和洞察。`);
+    // ── HOT TIER: base constitution (AGENTS.md 共享基座) ──
+    hot.push(baseMd);
+    // ── HOT TIER: agent-specific prompt (角色化 Agent) ──
+    if (opts.agent && agentPrompts[opts.agent]) {
+        hot.push(agentPrompts[opts.agent]);
     }
     // ── WARM TIER: task-specific ──
     // Soul
@@ -70,6 +91,7 @@ export function buildSystemPrompt(opts) {
         userProfile: opts.userProfile,
         memories: opts.memory,
         mcpTools: opts.mcpTools,
+        agent: opts.agent,
     });
     const parts = [tiered.hot, tiered.warm];
     if (opts.cognitiveContext) {

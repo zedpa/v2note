@@ -66,8 +66,8 @@ export async function runDailyCognitiveCycle(
     console.error("[cognitive] Report generation failed:", err);
   }
 
-  // 写入 AI 日记
-  const deviceId = opts?.deviceId ?? userId;
+  // 写入 AI 日记（deviceId 仅作设备标记，不可用 userId 替代）
+  const deviceId = opts?.deviceId;
   try {
     const digestLines: string[] = [];
     if (batchResult && batchResult.success) {
@@ -85,7 +85,7 @@ export async function runDailyCognitiveCycle(
       }
     }
 
-    if (digestLines.length > 0) {
+    if (digestLines.length > 0 && deviceId) {
       await appendToDiary(deviceId, "ai-self", `[认知摘要] ${digestLines.join("；")}`, userId);
       console.log("[cognitive] Cognitive digest saved to ai-self diary");
     }

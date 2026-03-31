@@ -45,6 +45,8 @@ export declare function upsert(userId: string, data: {
     strike_count: number;
 }): Promise<void>;
 export declare function countNewStrikes(userId: string): Promise<number>;
+/** 用户 Strike 总数（用于冷启动判断） */
+export declare function countTotalStrikes(userId: string): Promise<number>;
 export interface NewStrikeRow {
     id: string;
     nucleus: string;

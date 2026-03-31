@@ -11,6 +11,7 @@ export declare function findByDevice(deviceId: string): Promise<Notebook[]>;
 export declare function findByUser(userId: string): Promise<Notebook[]>;
 export declare function findOrCreateByUser(userId: string, deviceId: string, name: string, description?: string, isSystem?: boolean, color?: string): Promise<Notebook>;
 export declare function findById(id: string): Promise<Notebook | null>;
+/** @deprecated 使用 findOrCreateByUser 替代 */
 export declare function findOrCreate(deviceId: string, name: string, description?: string, isSystem?: boolean, color?: string): Promise<Notebook>;
 export declare function update(id: string, fields: {
     name?: string;

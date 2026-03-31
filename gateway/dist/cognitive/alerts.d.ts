@@ -16,4 +16,7 @@ export interface CognitiveAlert {
     bondId: string;
     description: string;
 }
-export declare function generateAlerts(userId: string): Promise<CognitiveAlert[]>;
+export declare function generateAlerts(opts: {
+    userId?: string;
+    deviceId?: string;
+}): Promise<CognitiveAlert[]>;

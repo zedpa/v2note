@@ -54,6 +54,7 @@ export async function generateReflection(text, deviceId, userId) {
         const response = await chatCompletion(messages, {
             temperature: 0.7,
             timeout: 30000,
+            tier: "fast",
         });
         const question = response.content.trim();
         // Filter invalid responses
@@ -82,7 +83,7 @@ export async function generateAiStatus(deviceId, userId) {
                     content: `你是用户定义的AI助手。以下是你的人设：\n${soul.content}\n\n请用一句话（10-20字）描述你现在的状态，要符合你的人设，轻松俏皮。只输出这句话，不要其他内容。`,
                 },
                 { role: "user", content: "你现在在干嘛？" },
-            ], { temperature: 0.9, timeout: 15000 });
+            ], { temperature: 0.9, timeout: 15000, tier: "fast" });
             const status = response.content.trim();
             if (status && status.length >= 3 && status.length <= 40) {
                 return status;

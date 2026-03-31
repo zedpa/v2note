@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { X } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
-import { toast } from "sonner";
+import { fabNotify } from "@/shared/lib/fab-notify";
 import {
   getSettings,
   updateSettings as saveSettings,
@@ -46,7 +46,7 @@ export function SettingsEditor({ onClose, onThemeChange }: SettingsEditorProps) 
         onThemeChange(value as string);
       }
     } catch {
-      toast.error("保存失败");
+      fabNotify.error("保存失败");
     }
   };
 
@@ -146,7 +146,7 @@ export function SettingsEditor({ onClose, onThemeChange }: SettingsEditorProps) 
                     onClick={() => {
                       clearGatewayUrl();
                       setGatewayUrlState(getGatewayWsUrl());
-                      toast.success("已恢复默认地址，重启后生效");
+                      fabNotify.success("已恢复默认地址，重启后生效");
                     }}
                     className="text-xs text-muted-foreground hover:text-foreground transition-colors"
                   >
@@ -166,7 +166,7 @@ export function SettingsEditor({ onClose, onThemeChange }: SettingsEditorProps) 
                       return;
                     }
                     setGatewayUrl(trimmed);
-                    toast.success("Gateway 地址已保存，重启后生效");
+                    fabNotify.success("Gateway 地址已保存，重启后生效");
                   }}
                   className="w-full text-sm bg-secondary/50 border border-border/50 rounded-lg px-3 py-2 outline-none font-mono"
                 />

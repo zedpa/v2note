@@ -1,7 +1,11 @@
 import { query, queryOne, execute } from "../pool.js";
 export async function create(fields) {
-    const row = await queryOne(`INSERT INTO strike (user_id, nucleus, polarity, field, source_id, source_span, source_type, confidence, salience, status, is_cluster, level, origin)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING *`, [
+    const hasEmbedding = fields.embedding && fields.embedding.length > 0;
+    const cols = "user_id, nucleus, polarity, field, source_id, source_span, source_type, confidence, salience, status, is_cluster, level, origin"
+        + (hasEmbedding ? ", embedding" : "");
+    const placeholders = "$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13"
+        + (hasEmbedding ? ", $14::vector" : "");
+    const params = [
         fields.user_id,
         fields.nucleus,
         fields.polarity,
@@ -15,7 +19,11 @@ export async function create(fields) {
         fields.is_cluster ?? false,
         fields.level ?? null,
         fields.origin ?? null,
-    ]);
+    ];
+    if (hasEmbedding) {
+        params.push(`[${fields.embedding.join(",")}]`);
+    }
+    const row = await queryOne(`INSERT INTO strike (${cols}) VALUES (${placeholders}) RETURNING *`, params);
     return row;
 }
 export async function findById(id) {

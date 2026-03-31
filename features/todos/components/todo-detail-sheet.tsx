@@ -11,6 +11,7 @@ import {
 import { cn } from "@/lib/utils";
 import { getDomainStyle } from "@/features/todos/lib/domain-config";
 import { updateTodo } from "@/shared/lib/api/todos";
+import { localTzOffset } from "../lib/time-slots";
 import type { TodoItem } from "@/shared/lib/types";
 
 interface TodoDetailSheetProps {
@@ -68,8 +69,9 @@ export function TodoDetailSheet({ todo, open, onClose, onUpdated, onAskAI }: Tod
     if (!t) return;
     if (t.scheduled_start) {
       const d = new Date(t.scheduled_start);
-      setDate(d.toISOString().split("T")[0]);
-      setTime(d.toTimeString().slice(0, 5));
+      const pad = (n: number) => String(n).padStart(2, "0");
+      setDate(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`);
+      setTime(`${pad(d.getHours())}:${pad(d.getMinutes())}`);
     } else {
       setDate("");
       setTime("");
@@ -101,13 +103,16 @@ export function TodoDetailSheet({ todo, open, onClose, onUpdated, onAskAI }: Tod
       const updates: Record<string, any> = {};
       const mins = duration === "custom" ? parseInt(customDuration) || 30 : parseInt(duration) || 30;
       if (date && time) {
-        updates.scheduled_start = `${date}T${time}:00`;
+        const tz = localTzOffset();
+        updates.scheduled_start = `${date}T${time}:00${tz}`;
         const end = new Date(updates.scheduled_start);
         end.setMinutes(end.getMinutes() + mins);
-        updates.scheduled_end = end.toISOString();
+        const pad = (n: number) => String(n).padStart(2, "0");
+        updates.scheduled_end = `${end.getFullYear()}-${pad(end.getMonth() + 1)}-${pad(end.getDate())}T${pad(end.getHours())}:${pad(end.getMinutes())}:00${tz}`;
       } else if (date) {
-        updates.scheduled_start = `${date}T09:00:00`;
-        updates.scheduled_end = `${date}T09:30:00`;
+        const tz = localTzOffset();
+        updates.scheduled_start = `${date}T09:00:00${tz}`;
+        updates.scheduled_end = `${date}T09:30:00${tz}`;
       } else {
         updates.scheduled_start = null;
         updates.scheduled_end = null;

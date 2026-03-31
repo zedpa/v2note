@@ -66,7 +66,7 @@ export async function generateReflection(
     const response = await chatCompletion(messages, {
       temperature: 0.7,
       timeout: 30000,
-      tier: "report",
+      tier: "fast",
     });
     const question = response.content.trim();
 
@@ -102,7 +102,7 @@ export async function generateAiStatus(
           },
           { role: "user", content: "你现在在干嘛？" },
         ],
-        { temperature: 0.9, timeout: 15000, tier: "report" },
+        { temperature: 0.9, timeout: 15000, tier: "fast" },
       );
       const status = response.content.trim();
       if (status && status.length >= 3 && status.length <= 40) {

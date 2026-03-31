@@ -20,7 +20,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { toast } from "sonner";
+import { fabNotify } from "@/shared/lib/fab-notify";
 import {
   getSkills,
   setSkills,
@@ -147,7 +147,7 @@ export function SkillsPage({ onClose }: SkillsPageProps) {
     );
     setSkillsState(updated);
     await persistToLocal(updated);
-    toast(`${skill.description || skill.name} 已${newEnabled ? "启用" : "停用"}`);
+    fabNotify.info(`${skill.description || skill.name} 已${newEnabled ? "启用" : "停用"}`);
   };
 
   const openCreateForm = (source: "skills" | "insights") => {
@@ -169,7 +169,7 @@ export function SkillsPage({ onClose }: SkillsPageProps) {
 
   const handleSave = async () => {
     if (!formData.name.trim() || !formData.prompt.trim()) {
-      toast.error("名称和提示词不能为空");
+      fabNotify.error("名称和提示词不能为空");
       return;
     }
 
@@ -188,7 +188,7 @@ export function SkillsPage({ onClose }: SkillsPageProps) {
         );
         setSkillsState(updated);
         await persistToLocal(updated);
-        toast("技能已更新");
+        fabNotify.info("技能已更新");
         apiUpdateSkill(editingSkill, {
           name: formData.name.trim(),
           description: formData.description.trim(),
@@ -206,7 +206,7 @@ export function SkillsPage({ onClose }: SkillsPageProps) {
         const updated = [...skills, newSkill];
         setSkillsState(updated);
         await persistToLocal(updated);
-        toast("技能已创建");
+        fabNotify.info("技能已创建");
         apiCreateSkill({
           name: formData.name.trim(),
           description: formData.description.trim(),
@@ -216,7 +216,7 @@ export function SkillsPage({ onClose }: SkillsPageProps) {
       }
       setFormOpen(false);
     } catch (err: any) {
-      toast.error(err.message ?? "操作失败");
+      fabNotify.error(err.message ?? "操作失败");
     }
     setSaving(false);
   };
@@ -226,7 +226,7 @@ export function SkillsPage({ onClose }: SkillsPageProps) {
     const updated = skills.filter((s) => s.name !== deleteTarget);
     setSkillsState(updated);
     await persistToLocal(updated);
-    toast("技能已删除");
+    fabNotify.info("技能已删除");
     apiDeleteSkill(deleteTarget).catch(() => {});
     setDeleteTarget(null);
   };

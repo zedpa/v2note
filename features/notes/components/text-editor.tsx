@@ -5,7 +5,7 @@ import { X, Tag, Send } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { createManualNote } from "@/features/notes/lib/manual-note";
 import { useTags } from "@/features/tags/hooks/use-tags";
-import { toast } from "sonner";
+import { fabNotify } from "@/shared/lib/fab-notify";
 import { SwipeBack } from "@/shared/components/swipe-back";
 
 interface TextEditorProps {
@@ -33,7 +33,7 @@ export function TextEditor({ onClose }: TextEditorProps) {
   const handleSave = useCallback(
     async (useAi: boolean) => {
       if (!content.trim()) {
-        toast.error("请输入内容");
+        fabNotify.error("请输入内容");
         return;
       }
 
@@ -44,10 +44,10 @@ export function TextEditor({ onClose }: TextEditorProps) {
           tags: selectedTags.length > 0 ? selectedTags : undefined,
           useAi,
         });
-        toast.success("笔记已创建");
+        fabNotify.success("笔记已创建");
         onClose();
       } catch (err: any) {
-        toast.error(`保存失败: ${err.message}`);
+        fabNotify.error(`保存失败: ${err.message}`);
       } finally {
         setSaving(false);
       }

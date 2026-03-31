@@ -1,0 +1,11 @@
+- generic [active] [ref=e1]:
+  - button "Open Next.js Dev Tools" [ref=e7] [cursor=pointer]:
+    - img [ref=e8]
+  - alert [ref=e11]
+  - generic [ref=e13]:
+    - img "路路 Logo" [ref=e15]
+    - generic [ref=e44]:
+      - heading "你好，我是路路" [level=1] [ref=e45]
+      - paragraph [ref=e46]: 你的每一个想法，我都帮你记住
+    - button "开始" [ref=e47] [cursor=pointer]
+    - button "跳过，直接开始" [ref=e48] [cursor=pointer]

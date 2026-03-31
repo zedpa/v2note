@@ -5,7 +5,7 @@ import { ChevronDown } from "lucide-react";
 import { getDeviceId } from "@/shared/lib/device";
 import { listSkills, toggleSkill as apiToggleSkill, getSkillDetail } from "@/shared/lib/api/skills";
 import { cn } from "@/lib/utils";
-import { toast } from "sonner";
+import { fabNotify } from "@/shared/lib/fab-notify";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -73,12 +73,12 @@ export function SkillsPanel() {
 
     try {
       await apiToggleSkill(name, newEnabled);
-      toast(`${skill.description} 已${newEnabled ? "启用" : "停用"}`);
+      fabNotify.info(`${skill.description} 已${newEnabled ? "启用" : "停用"}`);
     } catch {
       setSkills((prev) =>
         prev.map((s) => (s.name === name ? { ...s, enabled: !newEnabled } : s)),
       );
-      toast.error("操作失败");
+      fabNotify.error("操作失败");
     }
   };
 

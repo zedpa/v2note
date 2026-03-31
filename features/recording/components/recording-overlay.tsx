@@ -9,7 +9,7 @@ import { useAudioRecorder } from "@/features/recording/hooks/use-audio-recorder"
 import { uploadAudio } from "@/features/recording/lib/upload";
 import { processRecording } from "@/features/recording/lib/process";
 import { emit } from "@/features/recording/lib/events";
-import { toast } from "sonner";
+import { fabNotify } from "@/shared/lib/fab-notify";
 
 interface RecordButtonProps {
   onOpenTextEditor?: () => void;
@@ -75,14 +75,14 @@ export function RecordButton({ onOpenTextEditor }: RecordButtonProps) {
 
       // Process in background — don't await
       processRecording(uploaded.recordId, uploaded.audioUrl).then(() => {
-        toast.success("处理完成");
+        fabNotify.success("处理完成");
         emit("recording:processed");
       }).catch((err) => {
-        toast.error(`处理失败: ${err.message}`);
+        fabNotify.error(`处理失败: ${err.message}`);
         emit("recording:processed");
       });
     } catch (err: any) {
-      toast.error(`录音保存失败: ${err.message}`);
+      fabNotify.error(`录音保存失败: ${err.message}`);
     } finally {
       setUploading(false);
     }
@@ -132,7 +132,7 @@ export function RecordButton({ onOpenTextEditor }: RecordButtonProps) {
             setPhase("recording");
             startTimers();
           } catch (err: any) {
-            toast.error(`无法开始录音: ${err.message}`);
+            fabNotify.error(`无法开始录音: ${err.message}`);
             setPhase("idle");
             isPressingRef.current = false;
           }

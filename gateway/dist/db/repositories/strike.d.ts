@@ -14,6 +14,8 @@ export interface StrikeEntry {
     is_cluster: boolean;
     level: number | null;
     origin: string | null;
+    domain: string | null;
+    embedding: any | null;
     created_at: string;
     digested_at: string | null;
 }
@@ -31,6 +33,7 @@ export declare function create(fields: {
     is_cluster?: boolean;
     level?: number;
     origin?: string;
+    embedding?: number[];
 }): Promise<StrikeEntry>;
 export declare function findById(id: string): Promise<StrikeEntry | null>;
 export declare function findByUser(userId: string, opts?: {

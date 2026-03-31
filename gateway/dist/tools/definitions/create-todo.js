@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { recordRepo, todoRepo } from "../../db/repositories/index.js";
+import { writeTodoEmbedding } from "../../cognitive/embed-writer.js";
 export const createTodoTool = {
     name: "create_todo",
     description: `创建一条待办事项。
@@ -36,7 +37,15 @@ export const createTodoTool = {
             });
             recordId = rec.id;
         }
-        const todo = await todoRepo.create({ record_id: recordId, text, done: false });
+        const todo = await todoRepo.create({
+            record_id: recordId,
+            text,
+            done: false,
+            user_id: ctx.userId,
+            device_id: ctx.deviceId,
+        });
+        // 异步写入 embedding
+        void writeTodoEmbedding(todo.id, text, 0);
         // 更新可选的日程字段
         const updates = {};
         if (schedule.scheduled_start !== undefined)

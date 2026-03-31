@@ -13,6 +13,8 @@ export interface ContextTier {
     warm: string;
 }
 export type ContextMode = "chat" | "briefing";
+/** 角色化 Agent：不同场景使用不同 agent 提示词 */
+export type AgentRole = "chat" | "briefing" | "onboarding";
 export interface ContextBuildOptions {
     mode: ContextMode;
     skills: Skill[];
@@ -25,4 +27,6 @@ export interface ContextBuildOptions {
         description: string;
         parameters?: Record<string, unknown>;
     }>;
+    /** 角色化 Agent，决定注入哪个 agents/*.md */
+    agent?: AgentRole;
 }

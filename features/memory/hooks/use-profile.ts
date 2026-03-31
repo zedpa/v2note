@@ -6,7 +6,7 @@ import {
   updateProfile as apiUpdateProfile,
   type UserProfile,
 } from "@/shared/lib/api/profile";
-import { toast } from "sonner";
+import { fabNotify } from "@/shared/lib/fab-notify";
 
 export function useProfile() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -40,9 +40,9 @@ export function useProfile() {
           ? { ...prev, content, updated_at: new Date().toISOString() }
           : { device_id: "", content, updated_at: new Date().toISOString() },
       );
-      toast("用户画像已更新");
+      fabNotify.info("用户画像已更新");
     } catch {
-      toast.error("保存失败");
+      fabNotify.error("保存失败");
     } finally {
       setSaving(false);
     }

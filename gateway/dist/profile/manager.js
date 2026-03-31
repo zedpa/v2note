@@ -54,9 +54,9 @@ async function doUpdateProfile(deviceId, newInteraction, userId) {
             role: "user",
             content: `## 现有用户画像\n${currentProfile || "（空白，第一次互动）"}\n\n## 新互动内容\n${newInteraction}`,
         },
-    ], { temperature: 0.3 });
+    ], { temperature: 0.3, tier: "background" });
     if (userId) {
-        await userProfileRepo.upsertByUser(userId, result.content);
+        await userProfileRepo.upsertByUser(userId, result.content, deviceId);
     }
     else {
         await userProfileRepo.upsert(deviceId, result.content);

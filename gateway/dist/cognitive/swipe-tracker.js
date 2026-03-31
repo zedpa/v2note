@@ -1,5 +1,6 @@
 import { strikeRepo, strikeTagRepo, bondRepo, todoRepo } from "../db/repositories/index.js";
 import { query } from "../db/pool.js";
+import { writeStrikeEmbedding } from "./embed-writer.js";
 export async function recordSwipe(event) {
     const { userId, strikeId, direction, reason } = event;
     if (direction === "right") {
@@ -48,6 +49,7 @@ async function handleLeftSwipe(userId, strikeId, reason) {
                 confidence: 0.8,
                 salience: 0.6,
             });
+            void writeStrikeEmbedding(feelStrike.id, feelStrike.nucleus);
             // Bond it to the original
             await bondRepo.create({
                 source_strike_id: strikeId,

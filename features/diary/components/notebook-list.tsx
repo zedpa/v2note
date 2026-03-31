@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { ArrowLeft, Plus, MoreVertical, Mic, Shield } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SwipeBack } from "@/shared/components/swipe-back";
-import { toast } from "sonner";
+import { fabNotify } from "@/shared/lib/fab-notify";
 import {
   listNotebooks,
   createNotebook,
@@ -77,11 +77,11 @@ export function NotebookList({ onClose, onSelect, activeNotebook }: NotebookList
       setNewName("");
       setNewColor(PRESET_COLORS[4]);
       setShowCreate(false);
-      toast.success("笔记本已创建");
+      fabNotify.success("笔记本已创建");
       loadNotebooks();
     } catch (err) {
       console.error("创建笔记本失败:", err);
-      toast.error("创建失败，请检查 Gateway 连接");
+      fabNotify.error("创建失败，请检查 Gateway 连接");
     } finally {
       setCreating(false);
     }

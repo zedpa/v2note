@@ -87,6 +87,17 @@ export function assignTimeSlot(scheduledStart: string | null | undefined): TimeS
 }
 
 /**
+ * 返回当前本地时区偏移字符串，如 "+08:00"
+ * 用于构建带时区的 ISO 时间字符串，避免被数据库当作 UTC
+ */
+export function localTzOffset(): string {
+  const m = new Date().getTimezoneOffset(); // e.g. -480 for UTC+8
+  const sign = m <= 0 ? "+" : "-";
+  const abs = Math.abs(m);
+  return `${sign}${String(Math.floor(abs / 60)).padStart(2, "0")}:${String(abs % 60).padStart(2, "0")}`;
+}
+
+/**
  * 根据时段获取默认的 scheduled_start 小时
  * 用于创建待办时预填时间
  */

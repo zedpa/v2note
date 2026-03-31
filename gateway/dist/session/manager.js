@@ -14,6 +14,7 @@ export function getSession(deviceId) {
             context: new SessionContext(),
             mode: "idle",
             memoryManager: new MemoryManager(),
+            pendingConfirms: new Map(),
             createdAt: new Date(),
             lastActivity: new Date(),
         };

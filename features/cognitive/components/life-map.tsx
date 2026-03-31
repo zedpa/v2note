@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowLeft, Link2 } from "lucide-react";
 import { LuluLogo } from "@/components/brand/lulu-logo";
-import { toast } from "sonner";
+import { fabNotify } from "@/shared/lib/fab-notify";
 import { cn } from "@/lib/utils";
 import { useCognitiveMap } from "../hooks/use-cognitive-map";
 import { createBond } from "@/shared/lib/api/cognitive";
@@ -136,9 +136,9 @@ export function LifeMap({ isOpen, onClose, onSelectCluster }: LifeMapProps) {
           targetStrikeId: clusterId,
           type: "manual",
         });
-        toast.success("已建立连接");
+        fabNotify.success("已建立连接");
       } catch {
-        toast.error("连接创建失败");
+        fabNotify.error("连接创建失败");
       }
       setConnectingFrom(null);
     },

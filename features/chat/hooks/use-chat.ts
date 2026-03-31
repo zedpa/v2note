@@ -24,6 +24,8 @@ export interface ChatMessage {
 interface UseChatOptions {
   mode?: "review" | "command" | "insight";
   initialMessage?: string;
+  /** 显式指定 skill（技能面板或 "/" 快捷键触发） */
+  skill?: string;
 }
 
 function buildCommandListMessage(): string {
@@ -293,6 +295,7 @@ export function useChat(
         mode,
         dateRange,
         initialMessage: options?.initialMessage,
+        skill: options?.skill,
         localConfig,
       },
     });
@@ -301,6 +304,7 @@ export function useChat(
     dateRange,
     options?.mode,
     options?.initialMessage,
+    options?.skill,
     armResponseTimeout,
     clearResponseTimeout,
     handleGatewayMessage,

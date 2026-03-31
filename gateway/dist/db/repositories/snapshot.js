@@ -61,6 +61,11 @@ export async function countNewStrikes(userId) {
        AND created_at > (SELECT created_at FROM strike WHERE id = $2)`, [userId, snapshot.last_analyzed_strike_id]);
     return parseInt(row?.count ?? "0", 10);
 }
+/** 用户 Strike 总数（用于冷启动判断） */
+export async function countTotalStrikes(userId) {
+    const row = await queryOne(`SELECT COUNT(*)::text as count FROM strike WHERE user_id = $1 AND status = 'active'`, [userId]);
+    return parseInt(row?.count ?? "0", 10);
+}
 export async function getNewStrikes(userId, lastStrikeId, limit = 300) {
     if (!lastStrikeId) {
         // 冷启动：取最早的 limit 条（ASC，方便分批推进）

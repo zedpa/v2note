@@ -1,6 +1,7 @@
 export interface Goal {
     id: string;
     device_id: string;
+    user_id?: string;
     title: string;
     parent_id: string | null;
     status: "active" | "paused" | "completed" | "abandoned" | "progressing" | "blocked" | "suggested" | "dismissed";
@@ -34,4 +35,12 @@ export declare function findWithTodos(goalId: string): Promise<{
     id: string;
     text: string;
     done: boolean;
+}[]>;
+/** 批量查询多个目标的子 todo（一次 SQL 替代 N 次查询） */
+export declare function findTodosByGoalIds(goalIds: string[]): Promise<{
+    parent_id: string;
+    id: string;
+    text: string;
+    done: boolean;
+    completed_at: string | null;
 }[]>;

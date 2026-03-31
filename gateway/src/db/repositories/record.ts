@@ -283,6 +283,22 @@ export async function unclaimDigest(id: string): Promise<void> {
   );
 }
 
+/** 按 user_id + source 查询（用于幂等检查，如欢迎日记判重） */
+export async function findByUserAndSource(userId: string, source: string): Promise<Record[]> {
+  return query<Record>(
+    `SELECT * FROM record WHERE user_id = $1 AND source = $2 ORDER BY created_at ASC`,
+    [userId, source],
+  );
+}
+
+/** 更新 created_at（用于控制欢迎日记排序） */
+export async function updateCreatedAt(id: string, createdAt: string): Promise<void> {
+  await execute(
+    `UPDATE record SET created_at = $2, updated_at = now() WHERE id = $1`,
+    [id, createdAt],
+  );
+}
+
 export async function findByDeviceAndDateRange(
   deviceId: string,
   start: string,

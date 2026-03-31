@@ -77,7 +77,7 @@ async function doUpdateSoul(
   );
 
   if (userId) {
-    await soulRepo.upsertByUser(userId, result.content);
+    await soulRepo.upsertByUser(userId, result.content, deviceId);
   } else {
     await soulRepo.upsert(deviceId, result.content);
   }

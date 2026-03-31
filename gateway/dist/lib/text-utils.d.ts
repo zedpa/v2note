@@ -16,4 +16,14 @@ export declare const PROFILE_KEYWORDS: string[];
 export declare function maySoulUpdate(text: string): boolean;
 /** Check if text likely contains profile-relevant content */
 export declare function mayProfileUpdate(text: string): boolean;
+/**
+ * 清理 AI 返回的 JSON 字符串：去除 markdown 代码块包裹、思考过程文本等。
+ * DashScope qwen3 系列经常返回 ```json ... ``` 或 <think>...</think> 包裹的 JSON。
+ */
+export declare function cleanJsonResponse(raw: string): string;
+/**
+ * 安全解析 AI 返回的 JSON：先清理再解析。
+ * 失败时返回 null 而不是抛异常。
+ */
+export declare function safeParseJson<T = any>(raw: string): T | null;
 export declare function extractKeywords(text: string): Set<string>;

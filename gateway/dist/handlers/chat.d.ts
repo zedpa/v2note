@@ -10,6 +10,8 @@ export interface ChatStartPayload {
     };
     initialMessage?: string;
     assistantPreamble?: string;
+    /** 前端显式指定的 skill（从技能面板或 "/skill" 触发） */
+    skill?: string;
     localConfig?: {
         soul?: {
             content: string;

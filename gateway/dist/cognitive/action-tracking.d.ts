@@ -25,7 +25,10 @@ export interface ActionStats {
 /**
  * 统计过去 N 天的行动事件。
  */
-export declare function getActionStats(userId: string, days?: number): Promise<ActionStats>;
+export declare function getActionStats(opts: {
+    userId?: string;
+    deviceId?: string;
+}, days?: number): Promise<ActionStats>;
 export interface SkipAlert {
     todoId: string;
     todoText: string;
@@ -36,7 +39,10 @@ export interface SkipAlert {
 /**
  * 获取 skip_count >= 3 的待办 alert（用于每日回顾注入）。
  */
-export declare function getSkipAlerts(userId: string): Promise<SkipAlert[]>;
+export declare function getSkipAlerts(opts: {
+    userId?: string;
+    deviceId?: string;
+}): Promise<SkipAlert[]>;
 export interface ResultTrackingPrompt {
     todoId: string;
     todoText: string;
@@ -48,4 +54,7 @@ export interface ResultTrackingPrompt {
 /**
  * 查找完成 7+ 天、关联 goal 仍 active 的 todo → 生成追踪提示。
  */
-export declare function getResultTrackingPrompts(userId: string): Promise<ResultTrackingPrompt[]>;
+export declare function getResultTrackingPrompts(opts: {
+    userId?: string;
+    deviceId?: string;
+}): Promise<ResultTrackingPrompt[]>;

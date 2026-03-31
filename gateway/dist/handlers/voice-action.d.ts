@@ -34,8 +34,9 @@ export interface ActionExecResult {
 interface ActionContext {
     userId?: string;
     deviceId: string;
+    recordId?: string;
 }
-export declare function classifyVoiceIntent(text: string): Promise<VoiceIntentResult>;
+export declare function classifyVoiceIntent(text: string, forceAction?: boolean): Promise<VoiceIntentResult>;
 export declare function matchTodoByHint(hint: string, ctx: ActionContext): Promise<{
     id: string;
     text: string;

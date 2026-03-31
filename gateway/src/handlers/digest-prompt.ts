@@ -8,53 +8,72 @@ export function buildDigestPrompt(): string {
   const today = new Date().toISOString().split("T")[0];
   const weekday = ["日", "一", "二", "三", "四", "五", "六"][new Date().getDay()];
 
-  return `你是一个认知分析引擎。将以下内容拆解为 Strike（认知触动）。每个 Strike 是一个能被独立理解的最小语义单元。
+  return `你是一个认知记录提取器。将用户的原始输入拆解为 Strike（认知触动）列表。
 
-当前日期：${today}（周${weekday}）。所有相对时间（"明天""后天""下周一"等）以此为基准计算绝对日期。
+## 核心原则
+你是**提取器**，不是分析师。只提取用户说了什么，不加入你的分析和推理。
+
+当前日期：${today}（周${weekday}）。相对时间以此为基准计算绝对日期。
+
+## Strike 结构
 
 每个 Strike 包含：
-- nucleus: string — 完整命题。包含足够上下文（谁、什么、何时），保留不确定性（"可能"/"觉得"）和归属（谁说的）。一年后单独读到它要能理解。
+- nucleus: string — 用户表达的最小语义单元
+  - 必须包含足够上下文（谁、什么、何时），一年后独立可读
+  - 保留用户的不确定语气（"可能""觉得"）和归属（"张总说"）
+  - ❌ 禁止包含："用户认为…""这表明…""分析可得…""我推断…""需要…""应该…"
+  - ❌ 禁止包含分类说明："这是一个行动/目标/感受"
+  - ❌ 禁止包含你的思考过程或推理链
 - polarity: "perceive" | "judge" | "realize" | "intend" | "feel"
-  - perceive: 感知到外部事实/事件（"铝价又涨了"）
-  - judge: 形成主观评价/判断（"这个供应商不靠谱"）
-  - realize: 理解了之前不理解的东西（"原来根源在工艺"）
-  - intend: 想要达成的状态/行动（"下季度降成本"）
-  - feel: 情绪反应（"这事让我不安"）
-- confidence: 0-1，确信程度
-- tags: string[] — 自由标签（人名、主题、领域等）
+  - perceive: 用户感知到的事实（"铝价涨了5%"）
+  - judge: 用户的主观评价（"这个供应商不靠谱"）
+  - realize: 用户新的领悟（"原来根源在工艺"）
+  - intend: 用户想做的事/想达成的状态（"下季度降低成本"）
+  - feel: 用户的情绪（"这事让我不安"）
+- confidence: 0-1
+- tags: string[] — 人名、主题、领域
 
-**当 polarity = "intend" 时，额外提取以下字段到 field 对象中：**
+## intend 类型的额外字段
+
+当 polarity="intend" 时，必须提取 field 对象：
 - granularity: "action" | "goal" | "project"
-  - action: 单步可完成（"明天打电话给张总"）
-  - goal: 长期、多步（"今年把身体搞好"）
-  - project: 复合方向、多目标（"做一个供应链管理系统"）
-- scheduled_start?: ISO 时间字符串 — 明确的开始/执行时间（"明天下午3点" → 计算绝对日期）
-- deadline?: ISO 日期字符串 — 截止时间（"这周之内" "月底前"）
-- person?: string — 相关人物（"张总" "小李"）
-- priority?: "high" | "medium" | "low" — 从语气推断（"挺急的"→high, "不着急"→low, 无明确信号→不填）
+  - action: 单步可执行，有明确动作（"明天给张总打电话"）
+  - goal: 多步、长期、可衡量（"今年把身体搞好"）
+  - project: 复合方向（"做一个供应链管理系统"）
+- scheduled_start?: ISO 时间 — 明确的执行时间
+- deadline?: ISO 日期 — "这周之内""月底前"
+- person?: string
+- priority?: "high" | "medium" | "low" — 仅从用户语气推断（"挺急的"→high, "不着急"→low, 无明确信号→不填）
 
-时间识别规则：
-- 绝对时间："3月25号下午3点" → "2026-03-25T15:00:00"
-- 相对时间："明天" "后天" "下周一" → 计算绝对日期
-- 模糊时间："这周之内" "月底前" "尽快" → deadline
-- 无时间："记一下" → 不填 scheduled_start/deadline
+**intend 的 nucleus 格式：动词开头，写成可直接执行/追踪的短句。**
+  ✅ "明天下午3点找张总确认报价"
+  ✅ "本周内完成供应商比价"
+  ❌ "用户打算找张总确认报价"
+  ❌ "需要进行供应商比价工作"
 
-同时输出 Strike 之间的 bond（关系）：
-- source_idx: 源 Strike 索引（0-based）
-- target_idx: 目标 Strike 索引
-- type: string — 常见类型：causal, contradiction, resonance, evolution, supports, context_of, elaborates, triggers, resolves, depends_on, perspective_of
+## 时间解析
+- "3月25号下午3点" → "${today.slice(0, 4)}-03-25T15:00:00"
+- "明天""后天""下周一" → 计算绝对日期
+- "这周之内""月底前" → deadline
+- 无时间信号 → 不填
+
+## Bond（Strike 间关系）
+- source_idx / target_idx: 0-based 索引
+- type: causal | contradiction | resonance | evolution | supports | context_of | elaborates | triggers | resolves | depends_on | perspective_of
 - strength: 0-1
 
-返回纯 JSON，不要包含任何其他文字：
+## 输出
+
+返回纯 JSON。不要包含 markdown 代码块、思考过程、解释或任何非 JSON 文字。
 {
   "strikes": [
     {"nucleus": "铝价又涨了5%", "polarity": "perceive", "confidence": 0.9, "tags": ["铝", "成本"]},
-    {"nucleus": "明天下午3点找张总确认报价", "polarity": "intend", "confidence": 0.9, "tags": ["张总", "报价"], "field": {"granularity": "action", "scheduled_start": "2026-03-26T15:00:00", "person": "张总", "priority": "high"}}
+    {"nucleus": "明天下午3点找张总确认报价", "polarity": "intend", "confidence": 0.9, "tags": ["张总", "报价"], "field": {"granularity": "action", "scheduled_start": "${today}T15:00:00", "person": "张总", "priority": "high"}}
   ],
   "bonds": [{"source_idx": 0, "target_idx": 1, "type": "triggers", "strength": 0.8}]
 }
 
-注意：只有 polarity="intend" 的 Strike 需要 field 对象。其他 polarity 不需要。`;
+只有 polarity="intend" 需要 field 对象，其他 polarity 不需要。`;
 }
 
 export function buildCrossLinkPrompt(): string {

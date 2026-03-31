@@ -1,296 +1,184 @@
 /**
- * Level 3 weekly emergence engine.
+ * L2 涌现引擎 — 将关联紧密的 L1 Cluster 聚合为 L2 主题
  *
- * Discovers higher-order structures from cluster relationships,
- * detects cluster evolution, finds resonance, and extracts cognitive patterns.
+ * 触发时机：
+ *  - batch-analyze 完成后，若本批新建 3+ 个 L1 cluster，立即调用
+ *  - 每周定期调度（daily-cycle 中每 7 天运行一次）
+ *
+ * 流程：
+ *  1. 查出用户所有 L1 cluster
+ *  2. 查出 L1 之间的 bond（context_of / related）
+ *  3. 找出互相有 bond 的 L1 组（强度 > 0.5）
+ *  4. AI 判断这些 L1 是否属于同一 L2 主题
+ *  5. 创建 L2 cluster，用 cluster_member bond 关联 L1
+ *  6. 继承 L1 间跨组 bond 到 L2 层级
  */
-import { chatCompletion } from "../ai/provider.js";
 import { strikeRepo, bondRepo } from "../db/repositories/index.js";
-import { query, execute } from "../db/pool.js";
-// ---------------------------------------------------------------------------
-// Main entry
-// ---------------------------------------------------------------------------
+import { query, queryOne } from "../db/pool.js";
+import { chatCompletion } from "../ai/provider.js";
+import { writeStrikeEmbedding } from "./embed-writer.js";
+const MIN_GROUP_SIZE = 2;
+const BOND_STRENGTH_THRESHOLD = 0.5;
+/**
+ * 运行 L2 涌现：发现 L1 之间的高阶关联，合并为 L2 主题
+ */
 export async function runEmergence(userId) {
-    const result = {
-        higherOrderClusters: 0,
-        evolutionDetected: 0,
-        resonanceDiscovered: 0,
-        patternsExtracted: 0,
-    };
-    try {
-        // Load all clusters
-        const clusters = await query(`SELECT * FROM strike WHERE user_id = $1 AND is_cluster = true AND status = 'active'`, [userId]);
-        if (clusters.length < 2) {
-            console.log("[emergence] Not enough clusters for emergence analysis");
-            return result;
-        }
-        // Load cluster members
-        const clusterMembers = new Map();
-        for (const c of clusters) {
-            const members = await query(`SELECT s.* FROM strike s
-         JOIN cluster_member cm ON cm.member_strike_id = s.id
-         WHERE cm.cluster_strike_id = $1 AND s.status = 'active'`, [c.id]);
-            clusterMembers.set(c.id, members);
-        }
-        // Step 1: Cross-cluster bond analysis
-        result.higherOrderClusters = await buildCrossClusterBonds(clusters, clusterMembers);
-        // Step 2: Evolution detection
-        result.evolutionDetected = await detectEvolution(clusters, clusterMembers);
-        // Step 3: Resonance discovery
-        result.resonanceDiscovered = await discoverResonance(userId, clusters, clusterMembers);
-        // Step 4: Pattern extraction
-        result.patternsExtracted = await extractPatterns(userId);
+    const result = { higherOrderClusters: 0, bondInheritance: 0 };
+    // 1. 查出所有 L1 cluster（未被 L2 吸收的）
+    const l1Clusters = await query(`SELECT s.* FROM strike s
+     WHERE s.user_id = $1 AND s.is_cluster = true AND s.level = 1
+       AND NOT EXISTS (
+         SELECT 1 FROM bond b
+         WHERE b.target_strike_id = s.id AND b.type = 'cluster_member'
+           AND EXISTS (SELECT 1 FROM strike p WHERE p.id = b.source_strike_id AND p.level = 2)
+       )
+     ORDER BY s.created_at DESC`, [userId]);
+    if (l1Clusters.length < MIN_GROUP_SIZE) {
+        console.log(`[emergence] Only ${l1Clusters.length} free L1 clusters, skipping`);
+        return result;
     }
-    catch (err) {
-        console.error("[emergence] Fatal error:", err);
+    // 2. 查出 L1 之间的 bond
+    const clusterIds = l1Clusters.map((c) => c.id);
+    const interClusterBonds = await query(`SELECT * FROM bond
+     WHERE source_strike_id = ANY($1) AND target_strike_id = ANY($1)
+       AND type != 'cluster_member'
+       AND strength >= $2`, [clusterIds, BOND_STRENGTH_THRESHOLD]);
+    // 3. 构建邻接图，找连通分量
+    const adj = new Map();
+    for (const c of l1Clusters)
+        adj.set(c.id, new Set());
+    for (const b of interClusterBonds) {
+        adj.get(b.source_strike_id)?.add(b.target_strike_id);
+        adj.get(b.target_strike_id)?.add(b.source_strike_id);
     }
-    return result;
-}
-// ---------------------------------------------------------------------------
-// Step 1: Cross-cluster bonds
-// ---------------------------------------------------------------------------
-async function buildCrossClusterBonds(clusters, clusterMembers) {
-    let created = 0;
-    for (let i = 0; i < clusters.length; i++) {
-        for (let j = i + 1; j < clusters.length; j++) {
-            const cA = clusters[i];
-            const cB = clusters[j];
-            const membersA = clusterMembers.get(cA.id) ?? [];
-            const membersB = clusterMembers.get(cB.id) ?? [];
-            if (membersA.length === 0 || membersB.length === 0)
-                continue;
-            // Check existing bond between clusters
-            const existing = await query(`SELECT id FROM bond
-         WHERE (source_strike_id = $1 AND target_strike_id = $2)
-            OR (source_strike_id = $2 AND target_strike_id = $1)
-         LIMIT 1`, [cA.id, cB.id]);
-            if (existing.length > 0)
-                continue;
-            // Count cross-member bonds
-            const idsA = membersA.map((m) => m.id);
-            const idsB = membersB.map((m) => m.id);
-            const crossBonds = await query(`SELECT type, COUNT(*) as cnt FROM bond
-         WHERE (source_strike_id = ANY($1) AND target_strike_id = ANY($2))
-            OR (source_strike_id = ANY($2) AND target_strike_id = ANY($1))
-         GROUP BY type ORDER BY cnt DESC`, [idsA, idsB]);
-            const totalCross = crossBonds.reduce((s, r) => s + parseInt(r.cnt), 0);
-            if (totalCross < 2)
-                continue;
-            // Create cluster-level bond with most common type
-            const dominantType = crossBonds[0]?.type ?? "context_of";
-            const strength = Math.min(1.0, totalCross * 0.15);
-            await bondRepo.create({
-                source_strike_id: cA.id,
-                target_strike_id: cB.id,
-                type: dominantType,
-                strength,
-                created_by: "emergence",
-            });
-            created++;
-        }
-    }
-    return created;
-}
-// ---------------------------------------------------------------------------
-// Step 2: Evolution detection
-// ---------------------------------------------------------------------------
-async function detectEvolution(clusters, clusterMembers) {
-    let detected = 0;
-    for (const cluster of clusters) {
-        const members = clusterMembers.get(cluster.id) ?? [];
-        if (members.length < 3)
+    const visited = new Set();
+    const groups = [];
+    for (const cId of clusterIds) {
+        if (visited.has(cId))
             continue;
-        // Check recent growth
-        const recentCount = members.filter((m) => {
-            const age = Date.now() - new Date(m.created_at).getTime();
-            return age < 7 * 86400000; // 7 days
-        }).length;
-        const olderCount = members.length - recentCount;
-        const weeklyAvg = olderCount > 0 ? olderCount / 4 : 0; // rough avg over ~4 weeks
-        if (recentCount > weeklyAvg * 2 && recentCount >= 3) {
-            // Significant growth — tag the cluster
+        const component = [];
+        const stack = [cId];
+        while (stack.length > 0) {
+            const node = stack.pop();
+            if (visited.has(node))
+                continue;
+            visited.add(node);
+            component.push(node);
+            for (const neighbor of adj.get(node) ?? []) {
+                if (!visited.has(neighbor))
+                    stack.push(neighbor);
+            }
+        }
+        if (component.length >= MIN_GROUP_SIZE) {
+            groups.push(component);
+        }
+    }
+    if (groups.length === 0) {
+        console.log("[emergence] No L1 groups found for L2 emergence");
+        return result;
+    }
+    // 4. 对每个候选组，AI 判断是否属于同一 L2 主题
+    const clusterMap = new Map(l1Clusters.map((c) => [c.id, c]));
+    for (const group of groups) {
+        const members = group.map((id) => clusterMap.get(id)).filter(Boolean);
+        if (members.length < MIN_GROUP_SIZE)
+            continue;
+        const memberDescriptions = members
+            .map((m) => `- ${m.nucleus}`)
+            .join("\n");
+        try {
+            const aiResponse = await chatCompletion([
+                {
+                    role: "system",
+                    content: `你是一个认知主题分析器。判断以下主题聚类是否属于同一个更高层级的大主题。
+回复 JSON:
+- merge: true/false（是否合并）
+- name: 如果 merge=true，给一个 2-6 字中文名称
+- reason: 简短理由`,
+                },
+                {
+                    role: "user",
+                    content: `以下 L1 主题是否属于同一个 L2 大主题？\n\n${memberDescriptions}`,
+                },
+            ], { json: true, temperature: 0.3, tier: "report" });
+            let parsed;
             try {
-                await execute(`INSERT INTO strike_tag (strike_id, label, confidence, created_by)
-           VALUES ($1, 'growing', 0.8, 'emergence')
-           ON CONFLICT DO NOTHING`, [cluster.id]);
-                detected++;
-                console.log(`[emergence] Cluster "${cluster.nucleus.slice(0, 30)}" is growing rapidly`);
+                parsed = JSON.parse(aiResponse.content);
             }
             catch {
-                // tag might already exist
-            }
-        }
-        if (recentCount === 0 && members.length > 5) {
-            // No new members — stagnant
-            try {
-                await execute(`INSERT INTO strike_tag (strike_id, label, confidence, created_by)
-           VALUES ($1, 'stagnant', 0.6, 'emergence')
-           ON CONFLICT DO NOTHING`, [cluster.id]);
-                detected++;
-            }
-            catch {
-                // ignore
-            }
-        }
-    }
-    return detected;
-}
-// ---------------------------------------------------------------------------
-// Step 3: Resonance discovery
-// ---------------------------------------------------------------------------
-async function discoverResonance(userId, clusters, clusterMembers) {
-    let discovered = 0;
-    // Find cluster pairs with cross bonds but different themes
-    const clusterPairs = [];
-    for (let i = 0; i < clusters.length; i++) {
-        for (let j = i + 1; j < clusters.length; j++) {
-            const membersA = clusterMembers.get(clusters[i].id) ?? [];
-            const membersB = clusterMembers.get(clusters[j].id) ?? [];
-            if (membersA.length === 0 || membersB.length === 0)
+                console.error("[emergence] Failed to parse AI response:", aiResponse.content);
                 continue;
-            const idsA = membersA.map((m) => m.id);
-            const idsB = membersB.map((m) => m.id);
-            const [{ count }] = await query(`SELECT COUNT(*) as count FROM bond
-         WHERE (source_strike_id = ANY($1) AND target_strike_id = ANY($2))
-            OR (source_strike_id = ANY($2) AND target_strike_id = ANY($1))`, [idsA, idsB]);
-            if (parseInt(count) >= 2) {
-                clusterPairs.push({
-                    a: clusters[i],
-                    b: clusters[j],
-                    crossCount: parseInt(count),
-                });
             }
-        }
-    }
-    if (clusterPairs.length === 0)
-        return 0;
-    // AI batch review for resonance (max 5 pairs)
-    const batch = clusterPairs.slice(0, 5);
-    const pairDescriptions = batch.map((p, idx) => {
-        const membersA = (clusterMembers.get(p.a.id) ?? [])
-            .slice(0, 5)
-            .map((m) => m.nucleus)
-            .join("; ");
-        const membersB = (clusterMembers.get(p.b.id) ?? [])
-            .slice(0, 5)
-            .map((m) => m.nucleus)
-            .join("; ");
-        return `对 ${idx}: 聚类A「${p.a.nucleus}」(成员: ${membersA}) — 聚类B「${p.b.nucleus}」(成员: ${membersB}) — 跨聚类关联: ${p.crossCount}条`;
-    });
-    try {
-        const resp = await chatCompletion([
-            {
-                role: "system",
-                content: `以下是几对主题不同的聚类，但它们的成员之间有关联。判断每对是否有深层共振关系（表面不同但指向同一个更深层认知模式）。
-
-返回 JSON 数组：
-[{pair_idx: 0, resonance: true/false, pattern: "深层模式描述", confidence: 0.0-1.0}]`,
-            },
-            { role: "user", content: pairDescriptions.join("\n\n") },
-        ], { json: true, temperature: 0.3 });
-        const results = JSON.parse(resp.content);
-        if (!Array.isArray(results))
-            return 0;
-        for (const r of results) {
-            if (!r.resonance || r.pair_idx >= batch.length)
+            if (!parsed.merge || !parsed.name)
                 continue;
-            const pair = batch[r.pair_idx];
-            // Check no existing resonance bond
-            const existing = await query(`SELECT id FROM bond
-         WHERE type = 'resonance'
-           AND ((source_strike_id = $1 AND target_strike_id = $2)
-             OR (source_strike_id = $2 AND target_strike_id = $1))
-         LIMIT 1`, [pair.a.id, pair.b.id]);
-            if (existing.length > 0)
-                continue;
-            await bondRepo.create({
-                source_strike_id: pair.a.id,
-                target_strike_id: pair.b.id,
-                type: "resonance",
-                strength: r.confidence ?? 0.7,
-                created_by: "emergence",
-            });
-            discovered++;
-            console.log(`[emergence] Resonance: "${pair.a.nucleus.slice(0, 20)}" ↔ "${pair.b.nucleus.slice(0, 20)}" → ${r.pattern}`);
-        }
-    }
-    catch (err) {
-        console.error("[emergence] Resonance AI call failed:", err);
-    }
-    return discovered;
-}
-// ---------------------------------------------------------------------------
-// Step 4: Cognitive pattern extraction
-// ---------------------------------------------------------------------------
-async function extractPatterns(userId) {
-    // Load all Judge strikes grouped by tag
-    const judges = await query(`SELECT s.*, string_agg(st.label, ',') as labels
-     FROM strike s
-     LEFT JOIN strike_tag st ON st.strike_id = s.id
-     WHERE s.user_id = $1 AND s.status = 'active' AND s.polarity = 'judge'
-     GROUP BY s.id
-     ORDER BY s.created_at DESC
-     LIMIT 50`, [userId]);
-    if (judges.length < 5)
-        return 0;
-    // Check if we recently extracted patterns (within 7 days)
-    const recent = await query(`SELECT id FROM strike
-     WHERE user_id = $1 AND source_type = 'inference' AND polarity = 'realize'
-       AND created_at > now() - interval '7 days'
-     LIMIT 1`, [userId]);
-    if (recent.length > 0)
-        return 0;
-    try {
-        const judgeList = judges.map((j, i) => `${i}. [${j.labels ?? ""}] ${j.nucleus}`);
-        const resp = await chatCompletion([
-            {
-                role: "system",
-                content: `以下是用户在不同时间做出的判断。找出反复出现的决策模式或思维习惯。
-
-对每个模式输出：
-- pattern: 描述这个模式（一句话）
-- evidence_indices: 支持这个模式的判断索引
-- confidence: 0-1
-
-返回 JSON: {"patterns": [{"pattern": "...", "evidence_indices": [0,3,7], "confidence": 0.8}]}
-如果没有明显模式，返回 {"patterns": []}`,
-            },
-            { role: "user", content: judgeList.join("\n") },
-        ], { json: true, temperature: 0.3 });
-        const parsed = JSON.parse(resp.content);
-        const patterns = parsed.patterns ?? [];
-        let created = 0;
-        for (const p of patterns) {
-            if (!p.pattern || p.confidence < 0.5)
-                continue;
-            // Create pattern Strike
-            const patternStrike = await strikeRepo.create({
+            // 5. 创建 L2 cluster
+            const domain = members[0].domain ?? undefined;
+            const l2 = await strikeRepo.create({
                 user_id: userId,
-                nucleus: p.pattern,
-                polarity: "realize",
-                confidence: p.confidence,
-                source_type: "inference",
+                nucleus: `[${parsed.name}] ${parsed.reason ?? ""}`,
+                polarity: "perceive",
+                is_cluster: true,
+                confidence: 0.6,
+                salience: 0.9,
+                source_type: "clustering",
+                level: 2,
+                origin: "emerged",
             });
-            // Link to evidence
-            for (const idx of p.evidence_indices ?? []) {
-                if (idx < judges.length) {
-                    await bondRepo.create({
-                        source_strike_id: patternStrike.id,
-                        target_strike_id: judges[idx].id,
-                        type: "abstracted_from",
-                        strength: 0.8,
-                        created_by: "emergence",
-                    });
+            // 异步写入 embedding
+            void writeStrikeEmbedding(l2.id, `[${parsed.name}] ${parsed.reason ?? ""}`);
+            // 设置 domain（继承成员中最常见的 domain）
+            if (domain) {
+                await queryOne(`UPDATE strike SET domain = $1 WHERE id = $2`, [domain, l2.id]);
+            }
+            // 创建 cluster_member bonds（L2 → L1）
+            await bondRepo.createMany(members.map((m) => ({
+                source_strike_id: l2.id,
+                target_strike_id: m.id,
+                type: "cluster_member",
+                strength: 1.0,
+                created_by: "emergence",
+            })));
+            result.higherOrderClusters++;
+            console.log(`[emergence] Created L2: "${parsed.name}" (${members.length} L1 members)`);
+        }
+        catch (e) {
+            console.error("[emergence] AI call failed for group:", e);
+        }
+    }
+    // 6. Bond 继承：L2 之间继承子级 bond
+    if (result.higherOrderClusters >= 2) {
+        const l2Clusters = await query(`SELECT * FROM strike WHERE user_id = $1 AND is_cluster = true AND level = 2
+       ORDER BY created_at DESC LIMIT 20`, [userId]);
+        for (let i = 0; i < l2Clusters.length; i++) {
+            for (let j = i + 1; j < l2Clusters.length; j++) {
+                const l2a = l2Clusters[i];
+                const l2b = l2Clusters[j];
+                // 查询 L2a 的 L1 成员和 L2b 的 L1 成员之间是否有 bond
+                const crossBonds = await query(`SELECT AVG(b.strength)::text AS avg_strength FROM bond b
+           WHERE b.source_strike_id IN (
+             SELECT target_strike_id FROM bond WHERE source_strike_id = $1 AND type = 'cluster_member'
+           ) AND b.target_strike_id IN (
+             SELECT target_strike_id FROM bond WHERE source_strike_id = $2 AND type = 'cluster_member'
+           ) AND b.type != 'cluster_member'`, [l2a.id, l2b.id]);
+                const avgStrength = Number(crossBonds[0]?.avg_strength ?? 0);
+                if (avgStrength > 0.3) {
+                    // 检查是否已存在 L2 之间的 bond
+                    const existing = await query(`SELECT id FROM bond WHERE source_strike_id = $1 AND target_strike_id = $2 LIMIT 1`, [l2a.id, l2b.id]);
+                    if (existing.length === 0) {
+                        await bondRepo.create({
+                            source_strike_id: l2a.id,
+                            target_strike_id: l2b.id,
+                            type: "context_of",
+                            strength: avgStrength,
+                            created_by: "emergence",
+                        });
+                        result.bondInheritance++;
+                    }
                 }
             }
-            created++;
-            console.log(`[emergence] Pattern: "${p.pattern}" (${(p.evidence_indices ?? []).length} evidence)`);
         }
-        return created;
     }
-    catch (err) {
-        console.error("[emergence] Pattern extraction failed:", err);
-        return 0;
-    }
+    console.log(`[emergence] Done: ${result.higherOrderClusters} L2 created, ${result.bondInheritance} bonds inherited`);
+    return result;
 }
 //# sourceMappingURL=emergence.js.map

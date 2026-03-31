@@ -36,10 +36,20 @@ export interface ToolDefinition {
     /** 工具执行函数 */
     handler: (args: any, ctx: ToolContext) => Promise<ToolCallResult>;
 }
+/** 搜索过滤条件 */
+export interface SearchFilters {
+    status?: "active" | "completed" | "all";
+    date?: string;
+    date_from?: string;
+    date_to?: string;
+    goal_id?: string;
+    domain?: string;
+}
 /** 统一搜索参数 */
 export interface SearchParams {
     query: string;
     scope: "all" | "records" | "goals" | "todos" | "clusters";
+    filters?: SearchFilters;
     time_range?: {
         from: string;
         to: string;
