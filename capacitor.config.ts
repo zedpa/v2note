@@ -2,7 +2,7 @@ import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'com.v2note.app',
-  appName: 'VoiceNote',
+  appName: '念念有路',
   webDir: 'out',
   server: {
     androidScheme: 'https',
