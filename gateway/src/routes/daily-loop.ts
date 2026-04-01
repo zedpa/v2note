@@ -10,7 +10,9 @@ export function registerDailyLoopRoutes(router: Router) {
     try {
       const deviceId = getDeviceId(req);
       const userId = getUserId(req);
-      const briefing = await generateMorningBriefing(deviceId, userId ?? undefined);
+      const url = new URL(req.url ?? "", `http://${req.headers.host}`);
+      const forceRefresh = url.searchParams.get("refresh") === "true";
+      const briefing = await generateMorningBriefing(deviceId, userId ?? undefined, forceRefresh);
       sendJson(res, briefing);
     } catch (err: any) {
       const status = err instanceof HttpError ? err.status : 500;
@@ -24,7 +26,9 @@ export function registerDailyLoopRoutes(router: Router) {
     try {
       const deviceId = getDeviceId(req);
       const userId = getUserId(req);
-      const summary = await generateEveningSummary(deviceId, userId ?? undefined);
+      const url = new URL(req.url ?? "", `http://${req.headers.host}`);
+      const forceRefresh = url.searchParams.get("refresh") === "true";
+      const summary = await generateEveningSummary(deviceId, userId ?? undefined, forceRefresh);
       sendJson(res, summary);
     } catch (err: any) {
       const status = err instanceof HttpError ? err.status : 500;

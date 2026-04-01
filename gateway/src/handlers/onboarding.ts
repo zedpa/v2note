@@ -12,7 +12,6 @@ import { userProfileRepo, todoRepo, strikeRepo } from "../db/repositories/index.
 import { chatCompletion } from "../ai/provider.js";
 import { seedWelcomeDiaries } from "./welcome-seed.js";
 import { updateProfile } from "../profile/manager.js";
-import { updateSoul } from "../soul/manager.js";
 import {
   buildOnboardingSystemPrompt,
   buildOnboardingMessages,
@@ -268,7 +267,21 @@ async function seedGoals(
     return;
   }
 
-  for (const title of titles.slice(0, 6)) {
+  // 查已有目标，避免跨步骤重复创建
+  const existing = userId
+    ? await todoRepo.findByUser(userId)
+    : await todoRepo.findByDevice(deviceId);
+  const existingTexts = new Set(
+    existing.filter((t) => (t.level ?? 0) >= 1).map((t) => t.text),
+  );
+
+  const newTitles = titles.slice(0, 6).filter((t) => !existingTexts.has(t));
+  if (newTitles.length === 0) {
+    console.log("[onboarding] All seed goals already exist, skipping");
+    return;
+  }
+
+  for (const title of newTitles) {
     // 创建 level=1 目标
     await todoRepo.createGoalAsTodo({
       user_id: userId,
@@ -290,7 +303,7 @@ async function seedGoals(
     });
   }
 
-  console.log(`[onboarding] Seeded ${titles.length} goals + strikes: ${titles.join(", ")}`);
+  console.log(`[onboarding] Seeded ${newTitles.length} goals + strikes: ${newTitles.join(", ")}`);
 }
 
 /** Onboarding 完成：标记 done + 欢迎日记 + Profile/Soul 初始化 */
@@ -316,27 +329,31 @@ async function finishOnboarding(
     console.error("[onboarding] Welcome seed failed:", e);
   }
 
-  // 拼接全部对话内容，写入 UserProfile.content + 触发 Profile/Soul 初始化
-  const allUserMessages = history
-    .filter((m) => m.role === "user")
-    .map((m) => m.text);
-  if (lastAnswer) allUserMessages.push(lastAnswer);
-  const fullConversation = allUserMessages.join("\n");
+  // 拼接完整对话（含 AI 问题），让 Profile 更新能正确理解上下文
+  const conversationParts: string[] = [];
+  for (const m of history) {
+    const prefix = m.role === "ai" ? "AI" : "用户";
+    conversationParts.push(`${prefix}：${m.text}`);
+  }
+  if (lastAnswer) conversationParts.push(`用户：${lastAnswer}`);
+  const fullConversation = conversationParts.join("\n");
 
   if (fullConversation.trim()) {
-    // 写入 UserProfile.content
+    // 写入 UserProfile.content（只存用户回答的摘要）
+    const userAnswers = history
+      .filter((m) => m.role === "user")
+      .map((m) => m.text);
+    if (lastAnswer) userAnswers.push(lastAnswer);
     try {
-      await userProfileRepo.upsertByUser(userId, fullConversation);
+      await userProfileRepo.upsertByUser(userId, userAnswers.join("\n"));
     } catch {
       // 可能 user 还没有 profile 行（由前面的 upsertOnboardingField 创建）
     }
 
-    // Fire-and-forget: Profile + Soul 初始化
+    // Fire-and-forget: 仅 Profile 初始化
+    // 冷启动五问全是用户信息（名字、职业、焦点），不涉及 AI 身份，不触发 Soul 更新
     updateProfile(deviceId, fullConversation, userId).catch((e) =>
       console.warn("[onboarding] Profile init failed:", e.message),
-    );
-    updateSoul(deviceId, fullConversation, userId).catch((e) =>
-      console.warn("[onboarding] Soul init failed:", e.message),
     );
   }
 

@@ -46,13 +46,14 @@ export function useDailyBriefing() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchBriefing = useCallback(async () => {
+  const fetchBriefing = useCallback(async (forceRefresh?: boolean) => {
     setLoading(true);
     setError(null);
     try {
       const deviceId = await getDeviceId();
       const baseUrl = getGatewayHttpUrl();
-      const res = await fetch(`${baseUrl}/api/v1/daily/briefing`, {
+      const qs = forceRefresh ? "?refresh=true" : "";
+      const res = await fetch(`${baseUrl}/api/v1/daily/briefing${qs}`, {
         headers: { "X-Device-Id": deviceId },
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -77,13 +78,14 @@ export function useEveningSummary() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchSummary = useCallback(async () => {
+  const fetchSummary = useCallback(async (forceRefresh?: boolean) => {
     setLoading(true);
     setError(null);
     try {
       const deviceId = await getDeviceId();
       const baseUrl = getGatewayHttpUrl();
-      const res = await fetch(`${baseUrl}/api/v1/daily/evening-summary`, {
+      const qs = forceRefresh ? "?refresh=true" : "";
+      const res = await fetch(`${baseUrl}/api/v1/daily/evening-summary${qs}`, {
         headers: { "X-Device-Id": deviceId },
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);

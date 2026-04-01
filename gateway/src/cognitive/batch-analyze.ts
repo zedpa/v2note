@@ -530,11 +530,26 @@ export async function runBatchAnalyze(userId: string): Promise<BatchAnalyzeResul
         `patterns=${result.patterns} goals=${result.goals} supersedes=${result.supersedes}`,
     );
 
-    // L2 涌现：当本批新建 3+ 个 L1 cluster 时，尝试合并为 L2
-    if (result.newClusters >= 3) {
-      import("./emergence.js")
-        .then(({ runEmergence }) => runEmergence(userId))
-        .then((er) => console.log(`[batch-analyze] L2 emergence: ${er.higherOrderClusters} created`))
+    // L2 涌现：本批有新 cluster 产出且用户总 L1 >= 3 时，尝试合并为 L2
+    if (result.newClusters >= 1) {
+      import("../db/pool.js")
+        .then(({ query }) =>
+          query<{ cnt: number }>(
+            `SELECT COUNT(*)::int AS cnt FROM strike
+             WHERE user_id = $1 AND is_cluster = true AND level = 1 AND status = 'active'`,
+            [userId],
+          ),
+        )
+        .then((rows) => {
+          const totalL1 = rows[0]?.cnt ?? 0;
+          if (totalL1 >= 3) {
+            return import("./emergence.js").then(({ runEmergence }) => runEmergence(userId));
+          }
+          return null;
+        })
+        .then((er) => {
+          if (er) console.log(`[batch-analyze] L2 emergence: ${er.higherOrderClusters} created`);
+        })
         .catch((e) => console.error("[batch-analyze] L2 emergence failed:", e));
     }
 

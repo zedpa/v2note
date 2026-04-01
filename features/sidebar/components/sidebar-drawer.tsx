@@ -135,10 +135,10 @@ export function SidebarDrawer({
           <nav className="space-y-0.5">
             <SidebarItem
               icon={<Zap size={18} />}
-              label="今日"
+              label="每日回顾"
               onClick={() => {
                 onClose();
-                onSelectToday?.();
+                onViewEvening?.();
               }}
             />
           </nav>
@@ -179,7 +179,7 @@ export function SidebarDrawer({
           {/* ── 分隔线 ── */}
           <div className="my-5 h-px bg-border/40" />
 
-          {/* ── 第三组: 发现(灰色) + 每日回顾 + 设置 ── */}
+          {/* ── 第三组: 发现(灰色) + 今日简报 + 设置 ── */}
           <nav className="space-y-0.5">
             {/* 发现 — 灰色，点击提示开发中 */}
             <button
@@ -196,18 +196,11 @@ export function SidebarDrawer({
             {(onViewBriefing || onViewEvening) && (
               <SidebarItem
                 icon={<CalendarDays size={18} />}
-                label="每日回顾"
+                label="今日简报"
                 showDot
                 onClick={() => {
                   onClose();
-                  const hour = new Date().getHours();
-                  if (hour >= 18 && onViewEvening) {
-                    onViewEvening();
-                  } else if (onViewBriefing) {
-                    onViewBriefing();
-                  } else {
-                    onViewEvening?.();
-                  }
+                  onViewBriefing?.();
                 }}
               />
             )}
@@ -458,7 +451,7 @@ function MyWorldTreeNode({
       </div>
 
       {/* 展开子节点 */}
-      {isExpanded && hasChildren && depth < 2 && (
+      {isExpanded && hasChildren && depth < 3 && (
         <div>
           {node.children.map((child) => (
             <MyWorldTreeNode

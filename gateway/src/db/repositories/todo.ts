@@ -661,7 +661,7 @@ export async function getMyWorldData(userId: string): Promise<MyWorldNode[]> {
   const goalsByCluster = new Map<string, typeof goals>();
   const orphanGoals: typeof goals = [];
   for (const g of goals) {
-    const cid = (g as any).cluster_id;
+    const cid = g.cluster_id;
     if (cid && allClusterIds.includes(cid)) {
       const list = goalsByCluster.get(cid) ?? [];
       list.push(g);

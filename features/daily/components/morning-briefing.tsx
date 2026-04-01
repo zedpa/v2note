@@ -200,7 +200,7 @@ export function MorningBriefing({ onClose }: MorningBriefingProps) {
             <span className="text-sm text-muted-foreground">{dateStr}</span>
             <button
               type="button"
-              onClick={refresh}
+              onClick={() => refresh(true)}
               className="p-1.5 rounded-full hover:bg-secondary/60 transition-colors"
               disabled={loading}
             >

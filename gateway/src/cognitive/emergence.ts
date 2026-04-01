@@ -27,18 +27,22 @@ export interface EmergenceResult {
 }
 
 const MIN_GROUP_SIZE = 2;
-const BOND_STRENGTH_THRESHOLD = 0.5;
+const MIN_FREE_L1 = 3;
+const SIMILARITY_THRESHOLD = 0.75;
 
 /**
  * 运行 L2 涌现：发现 L1 之间的高阶关联，合并为 L2 主题
+ *
+ * 使用 embedding 余弦相似度发现 L1 聚类之间的关联（不再依赖预先存在的 bond）。
  */
 export async function runEmergence(userId: string): Promise<EmergenceResult> {
   const result: EmergenceResult = { higherOrderClusters: 0, bondInheritance: 0 };
 
-  // 1. 查出所有 L1 cluster（未被 L2 吸收的）
+  // 1. 查出所有自由 L1 cluster（未被 L2 吸收的，且有 embedding）
   const l1Clusters = await query<StrikeEntry>(
     `SELECT s.* FROM strike s
      WHERE s.user_id = $1 AND s.is_cluster = true AND s.level = 1
+       AND s.embedding IS NOT NULL
        AND NOT EXISTS (
          SELECT 1 FROM bond b
          WHERE b.target_strike_id = s.id AND b.type = 'cluster_member'
@@ -48,27 +52,31 @@ export async function runEmergence(userId: string): Promise<EmergenceResult> {
     [userId],
   );
 
-  if (l1Clusters.length < MIN_GROUP_SIZE) {
-    console.log(`[emergence] Only ${l1Clusters.length} free L1 clusters, skipping`);
+  if (l1Clusters.length < MIN_FREE_L1) {
+    console.log(`[emergence] Only ${l1Clusters.length} free L1 clusters (need ${MIN_FREE_L1}), skipping`);
     return result;
   }
 
-  // 2. 查出 L1 之间的 bond
+  // 2. 用 pgvector 余弦相似度查找 L1 之间的关联对
   const clusterIds = l1Clusters.map((c) => c.id);
-  const interClusterBonds = await query<BondEntry>(
-    `SELECT * FROM bond
-     WHERE source_strike_id = ANY($1) AND target_strike_id = ANY($1)
-       AND type != 'cluster_member'
-       AND strength >= $2`,
-    [clusterIds, BOND_STRENGTH_THRESHOLD],
+  const similarPairs = await query<{ id_a: string; id_b: string; similarity: number }>(
+    `SELECT a.id AS id_a, b.id AS id_b,
+            1 - (a.embedding <=> b.embedding) AS similarity
+     FROM strike a, strike b
+     WHERE a.id = ANY($1) AND b.id = ANY($1) AND a.id < b.id
+       AND a.embedding IS NOT NULL AND b.embedding IS NOT NULL
+       AND 1 - (a.embedding <=> b.embedding) >= $2`,
+    [clusterIds, SIMILARITY_THRESHOLD],
   );
+
+  console.log(`[emergence] Found ${similarPairs.length} similar L1 pairs (threshold ${SIMILARITY_THRESHOLD})`);
 
   // 3. 构建邻接图，找连通分量
   const adj = new Map<string, Set<string>>();
   for (const c of l1Clusters) adj.set(c.id, new Set());
-  for (const b of interClusterBonds) {
-    adj.get(b.source_strike_id)?.add(b.target_strike_id);
-    adj.get(b.target_strike_id)?.add(b.source_strike_id);
+  for (const p of similarPairs) {
+    adj.get(p.id_a)?.add(p.id_b);
+    adj.get(p.id_b)?.add(p.id_a);
   }
 
   const visited = new Set<string>();
@@ -82,8 +90,11 @@ export async function runEmergence(userId: string): Promise<EmergenceResult> {
       if (visited.has(node)) continue;
       visited.add(node);
       component.push(node);
-      for (const neighbor of adj.get(node) ?? []) {
-        if (!visited.has(neighbor)) stack.push(neighbor);
+      const neighbors = adj.get(node);
+      if (neighbors) {
+        neighbors.forEach((neighbor) => {
+          if (!visited.has(neighbor)) stack.push(neighbor);
+        });
       }
     }
     if (component.length >= MIN_GROUP_SIZE) {

@@ -87,7 +87,7 @@ export function TodoPanel({ open, onClose, onNoteClick, onAskAI }: TodoPanelProp
         {/* Tabs */}
         <div className="flex border-b border-border">
           {([
-            { key: "today" as Tab, label: "今日", icon: Clock },
+            { key: "today" as Tab, label: "每日回顾", icon: Clock },
             { key: "all" as Tab, label: "全部", icon: Briefcase },
             { key: "goals" as Tab, label: "目标", icon: Target },
           ]).map(({ key, label, icon: Icon }) => (

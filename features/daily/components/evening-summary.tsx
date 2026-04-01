@@ -35,11 +35,11 @@ export function EveningSummary({ onClose, onOpenChat }: EveningSummaryProps) {
       <div className="flex flex-col min-h-dvh bg-surface pt-safe">
         {/* Header — Glass & Soul */}
         <div className="flex items-center justify-between px-4 py-3 bg-surface/80 backdrop-blur-[12px]">
-          <h1 className="text-lg font-serif text-on-surface">日终总结</h1>
+          <h1 className="text-lg font-serif text-on-surface">每日回顾</h1>
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={refresh}
+              onClick={() => refresh(true)}
               className="p-1.5 rounded-full hover:bg-surface-low transition-colors"
               disabled={loading}
             >
