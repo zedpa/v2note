@@ -80,11 +80,21 @@ export function buildOnboardingMessages(systemPrompt, history, currentAnswer) {
         { role: "system", content: systemPrompt },
     ];
     // 转换历史对话
+    // assistant 消息包装为 JSON，与 system prompt 要求的输出格式一致，
+    // 避免 AI 看到纯文本 assistant 历史后输出 "文本+JSON" 混合格式
     for (const msg of history) {
-        messages.push({
-            role: msg.role === "ai" ? "assistant" : "user",
-            content: msg.text,
-        });
+        if (msg.role === "ai") {
+            messages.push({
+                role: "assistant",
+                content: JSON.stringify({ reply: msg.text, extracted_fields: {}, skip_to: null }),
+            });
+        }
+        else {
+            messages.push({
+                role: "user",
+                content: msg.text,
+            });
+        }
     }
     // 当前用户回答
     messages.push({ role: "user", content: currentAnswer });

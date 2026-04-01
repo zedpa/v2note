@@ -32,16 +32,14 @@ export async function runDailyCognitiveCycle(userId, opts) {
     catch (err) {
         console.error("[cognitive] Maintenance failed:", err);
     }
-    // Step 2.5: 周度 L2 涌现（每周日运行，或 batch-analyze 产出 3+ L1 时自动触发）
-    if (new Date().getDay() === 0) {
-        try {
-            const { runEmergence } = await import("./emergence.js");
-            const emergence = await runEmergence(userId);
-            console.log(`[cognitive] Weekly emergence: ${emergence.higherOrderClusters} L2 created`);
-        }
-        catch (err) {
-            console.error("[cognitive] L2 emergence failed:", err);
-        }
+    // Step 2.5: L2 涌现（每日运行，检查是否有可合并的 L1 聚类）
+    try {
+        const { runEmergence } = await import("./emergence.js");
+        const emergence = await runEmergence(userId);
+        console.log(`[cognitive] Emergence: ${emergence.higherOrderClusters} L2 created`);
+    }
+    catch (err) {
+        console.error("[cognitive] L2 emergence failed:", err);
     }
     // Step 3: 认知报告
     try {

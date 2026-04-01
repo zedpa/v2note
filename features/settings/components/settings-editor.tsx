@@ -20,6 +20,7 @@ interface SettingsEditorProps {
 export function SettingsEditor({ onClose, onThemeChange }: SettingsEditorProps) {
   const [settings, setSettings] = useState<LocalSettings | null>(null);
   const [loading, setLoading] = useState(true);
+
   useEffect(() => {
     async function load() {
       const s = await getSettings();
@@ -84,7 +85,7 @@ export function SettingsEditor({ onClose, onThemeChange }: SettingsEditorProps) 
                     key={field.key}
                     className="flex items-center justify-between p-3 rounded-xl bg-card border border-border/50"
                   >
-                    <span className={`text-sm ${"disabled" in field && (field as any).disabled ? "text-muted-foreground/50" : "text-foreground"}`}>{field.label}</span>
+                    <span className="text-sm text-foreground">{field.label}</span>
 
                     {field.type === "toggle" && (
                       <Switch
@@ -99,8 +100,7 @@ export function SettingsEditor({ onClose, onThemeChange }: SettingsEditorProps) 
                         onChange={(e) =>
                           handleChange(field.key, e.target.value === "null" ? null : e.target.value)
                         }
-                        disabled={"disabled" in field && Boolean((field as any).disabled)}
-                        className={`text-sm bg-secondary/50 border border-border/50 rounded-lg px-2 py-1.5 outline-none ${"disabled" in field && (field as any).disabled ? "opacity-40 cursor-not-allowed" : ""}`}
+                        className="text-sm bg-secondary/50 border border-border/50 rounded-lg px-2 py-1.5 outline-none"
                       >
                         {"options" in field && (field.options as string[]).map((opt, idx) => {
                           const labels = "optionLabels" in field ? (field as any).optionLabels as string[] : null;

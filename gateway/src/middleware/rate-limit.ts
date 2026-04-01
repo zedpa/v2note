@@ -7,6 +7,11 @@ interface Bucket {
   lastRefill: number;
 }
 
+export interface RateLimitResult {
+  allowed: boolean;
+  retryAfter?: number; // 秒，仅 allowed=false 时有值（向上取整）
+}
+
 const buckets = new Map<string, Bucket>();
 
 // 每 5 分钟清理过期桶，防止内存泄漏
@@ -24,13 +29,13 @@ setInterval(() => {
 
 /**
  * 检查是否允许请求
- * @returns true = 允许，false = 超限
+ * @returns RateLimitResult，包含 allowed 和可选的 retryAfter（秒）
  */
 export function checkRateLimit(
   deviceId: string,
   maxTokens: number = 5,
   refillRate: number = 5, // 每秒补充数
-): boolean {
+): RateLimitResult {
   const now = Date.now();
   let bucket = buckets.get(deviceId);
 
@@ -45,16 +50,19 @@ export function checkRateLimit(
   bucket.lastRefill = now;
 
   if (bucket.tokens < 1) {
-    return false;
+    // 计算需要等待多少秒才能补充到 1 个 token
+    const deficit = 1 - bucket.tokens;
+    const retryAfter = Math.ceil(deficit / refillRate);
+    return { allowed: false, retryAfter };
   }
 
   bucket.tokens -= 1;
-  return true;
+  return { allowed: true };
 }
 
 /**
  * WebSocket 消息速率限制（每设备每秒 10 条）
  */
-export function checkWsRateLimit(deviceId: string): boolean {
+export function checkWsRateLimit(deviceId: string): RateLimitResult {
   return checkRateLimit(`ws:${deviceId}`, 10, 10);
 }

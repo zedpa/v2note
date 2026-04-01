@@ -12,6 +12,10 @@ export interface Record {
     archived: boolean;
     digested: boolean;
     digested_at: string | null;
+    hierarchy_tags?: Array<{
+        label: string;
+        level: number;
+    }>;
     created_at: string;
     updated_at: string;
 }
@@ -69,4 +73,9 @@ export declare function unclaimDigest(id: string): Promise<void>;
 export declare function findByUserAndSource(userId: string, source: string): Promise<Record[]>;
 /** 更新 created_at（用于控制欢迎日记排序） */
 export declare function updateCreatedAt(id: string, createdAt: string): Promise<void>;
+/** 更新层级标签（L1/L2/L3 涌现结构反向标注） */
+export declare function updateHierarchyTags(id: string, tags: Array<{
+    label: string;
+    level: number;
+}>): Promise<void>;
 export declare function findByDeviceAndDateRange(deviceId: string, start: string, end: string): Promise<Record[]>;

@@ -182,7 +182,12 @@ export async function projectIntendStrike(
     device_id: deviceId,
   };
 
-  const todo = await todoRepo.create(createFields);
+  const { todo, action: dedupAction } = await todoRepo.dedupCreate(createFields);
+
+  if (dedupAction === "matched") {
+    console.log(`[todo-projector] Dedup: "${strike.nucleus.slice(0, 30)}" matched existing todo ${todo.id}`);
+    return todo;
+  }
 
   // 异步写入 embedding
   void writeTodoEmbedding(todo.id, strike.nucleus, 0);
@@ -233,9 +238,11 @@ async function linkNewGoalToCluster(goalId: string, userId: string): Promise<voi
   try {
     const matches = await query<{ id: string; similarity: number }>(
       `SELECT s.id,
-              1 - (s.embedding <=> (SELECT embedding FROM strike WHERE id = (SELECT strike_id FROM todo WHERE goal_id = $1 LIMIT 1))) as similarity
-       FROM strike s
-       WHERE s.user_id = $2 AND s.is_cluster = true AND s.status = 'active'
+              1 - (s.embedding <=> ge.embedding) as similarity
+       FROM strike s, goal_embedding ge
+       WHERE ge.goal_id = $1
+         AND s.user_id = $2 AND s.is_cluster = true AND s.status = 'active'
+         AND s.embedding IS NOT NULL AND ge.embedding IS NOT NULL
        ORDER BY similarity DESC
        LIMIT 1`,
       [goalId, userId],
@@ -243,6 +250,7 @@ async function linkNewGoalToCluster(goalId: string, userId: string): Promise<voi
 
     if (matches.length > 0 && matches[0].similarity >= BACKFILL_SIMILARITY_THRESHOLD) {
       await goalRepo.update(goalId, { cluster_id: matches[0].id });
+      console.log(`[todo-projector] Linked goal ${goalId} → cluster ${matches[0].id} (sim=${matches[0].similarity.toFixed(3)})`);
     }
   } catch {
     // embedding 不可用时静默跳过
@@ -336,6 +344,10 @@ export async function backfillTodoStrikes(
 
 // ── goal 关联 Cluster ─────────────────────────────────────────────────
 
+/**
+ * 回填：扫描所有无 cluster_id 的活跃目标，用 embedding 匹配最近的活跃集群。
+ * batch-analyze 后调用，确保新建集群能吸收已有孤立目标。
+ */
 export async function linkGoalsToClusters(
   userId: string,
 ): Promise<{ linked: number }> {
@@ -350,9 +362,11 @@ export async function linkGoalsToClusters(
     try {
       const matches = await query<{ id: string; similarity: number }>(
         `SELECT s.id,
-                1 - (s.embedding <=> (SELECT embedding FROM goal_embedding WHERE goal_id = $1)) as similarity
-         FROM strike s
-         WHERE s.user_id = $2 AND s.is_cluster = true AND s.status = 'active'
+                1 - (s.embedding <=> ge.embedding) as similarity
+         FROM strike s, goal_embedding ge
+         WHERE ge.goal_id = $1
+           AND s.user_id = $2 AND s.is_cluster = true AND s.status = 'active'
+           AND s.embedding IS NOT NULL AND ge.embedding IS NOT NULL
          ORDER BY similarity DESC
          LIMIT 1`,
         [goal.id, userId],
@@ -361,6 +375,7 @@ export async function linkGoalsToClusters(
       if (matches.length > 0 && matches[0].similarity >= BACKFILL_SIMILARITY_THRESHOLD) {
         await goalRepo.update(goal.id, { cluster_id: matches[0].id });
         linked++;
+        console.log(`[cluster-backfill] Linked goal "${goal.title}" → cluster ${matches[0].id} (sim=${matches[0].similarity.toFixed(3)})`);
       }
     } catch {
       // embedding 表可能不存在，跳过

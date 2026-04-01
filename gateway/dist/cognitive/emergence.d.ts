@@ -1,23 +1,23 @@
 /**
- * L2 涌现引擎 — 将关联紧密的 L1 Cluster 聚合为 L2 主题
+ * L2 涌现引擎 — L1 Cluster 的全生命周期管理
  *
- * 触发时机：
- *  - batch-analyze 完成后，若本批新建 3+ 个 L1 cluster，立即调用
- *  - 每周定期调度（daily-cycle 中每 7 天运行一次）
- *
- * 流程：
- *  1. 查出用户所有 L1 cluster
- *  2. 查出 L1 之间的 bond（context_of / related）
- *  3. 找出互相有 bond 的 L1 组（强度 > 0.5）
- *  4. AI 判断这些 L1 是否属于同一 L2 主题
- *  5. 创建 L2 cluster，用 cluster_member bond 关联 L1
- *  6. 继承 L1 间跨组 bond 到 L2 层级
+ * 6 阶段流程：
+ *  1. 吸纳：自由 L1 → 现有 L2
+ *  2. 释放：语义漂移的 L1 ← L2
+ *  3. 清理：空 L2 自动 dissolved
+ *  4. 创建：自由 L1 → 新 L2（pgvector 相似度 + AI 判断）
+ *  5. 合并：语义重叠的 L2 → 合并
+ *  6. Bond 继承：L2 间继承子级 bond
  */
 export interface EmergenceResult {
     higherOrderClusters: number;
     bondInheritance: number;
+    absorbed: number;
+    released: number;
+    dissolved: number;
+    merged: number;
 }
 /**
- * 运行 L2 涌现：发现 L1 之间的高阶关联，合并为 L2 主题
+ * 运行 L2 涌现全生命周期
  */
 export declare function runEmergence(userId: string): Promise<EmergenceResult>;

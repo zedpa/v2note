@@ -27,12 +27,12 @@ export interface EmergenceResult {
 }
 
 // ── 阈值 ────────────────────────────────────────────────────
-const ABSORB_THRESHOLD = 0.70;
+const ABSORB_THRESHOLD = 0.60;
 const RELEASE_THRESHOLD = 0.50;
 const L2_MERGE_THRESHOLD = 0.80;
 const MIN_GROUP_SIZE = 2;
 const MIN_FREE_L1 = 3;
-const SIMILARITY_THRESHOLD = 0.75;
+const SIMILARITY_THRESHOLD = 0.60;
 
 // ── 自由 L1 查询（排除被 active L2 吸收的） ─────────────────
 const FREE_L1_SQL = `

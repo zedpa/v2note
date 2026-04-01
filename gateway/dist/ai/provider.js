@@ -21,9 +21,19 @@
  */
 import { createOpenAI } from "@ai-sdk/openai";
 import { generateText, streamText, generateObject } from "ai";
-import { Semaphore } from "../lib/semaphore.js";
-// DashScope LLM 并发控制：非流式调用最多 5 个同时进行
-const llmSemaphore = new Semaphore(5);
+import { Semaphore, Priority } from "../lib/semaphore.js";
+// DashScope LLM 并发控制（DashScope API 支持 1000 并发，此处限制单 worker 上限防止内存暴涨）
+const llmSemaphore = new Semaphore(50);
+/** 根据 ModelTier 映射默认优先级 */
+function tierPriority(tier) {
+    switch (tier) {
+        case "chat":
+        case "agent":
+            return Priority.HIGH;
+        default:
+            return Priority.NORMAL;
+    }
+}
 // ── 推理模型检测 ─────────────────────────────────────────────
 /** 匹配推理系列模型名 */
 const REASONING_MODEL_PATTERNS = [/qwen3\.\d/, /qwen3-/, /qwen3\.5/];
@@ -117,8 +127,8 @@ function buildProviderOptions(model, reasoning, json, thinkingBudget) {
  * @param tier - 模型层级（默认 "fast"）
  */
 export async function chatCompletion(messages, opts) {
+    const tier = opts?.tier ?? "fast";
     return llmSemaphore.acquire(async () => {
-        const tier = opts?.tier ?? "fast";
         const { provider, config } = getTier(tier);
         const effectiveTimeout = opts?.timeout ?? config.timeout;
         const providerOptions = buildProviderOptions(config.model, config.reasoning, opts?.json);
@@ -135,7 +145,7 @@ export async function chatCompletion(messages, opts) {
             console.warn(`[ai][${tier}] AI returned empty content`, { model: config.model, usage: result.usage });
         }
         return { content, usage: mapUsage(result.usage) };
-    });
+    }, { priority: tierPriority(tier) });
 }
 /**
  * Streaming AI call. Yields text chunks.
@@ -199,8 +209,8 @@ export async function* chatCompletionStreamDeepThink(messages, opts) {
  * @param tier - 模型层级（默认 "fast"）
  */
 export async function generateStructured(messages, schema, opts) {
+    const tier = opts?.tier ?? "fast";
     return llmSemaphore.acquire(async () => {
-        const tier = opts?.tier ?? "fast";
         const { provider, config } = getTier(tier);
         const effectiveTimeout = opts?.timeout ?? config.timeout;
         const result = await generateObject({
@@ -214,7 +224,7 @@ export async function generateStructured(messages, schema, opts) {
             abortSignal: AbortSignal.timeout(effectiveTimeout),
         });
         return { object: result.object, usage: mapUsage(result.usage) };
-    });
+    }, { priority: tierPriority(tier) });
 }
 /**
  * AI call with native function calling (tool use).
@@ -437,5 +447,5 @@ export async function* streamWithToolsDeepThink(messages, tools, opts) {
     }
 }
 // Re-export for convenience
-export { getProvider, getTier, isReasoningModel };
+export { getProvider, getTier, isReasoningModel, Priority };
 //# sourceMappingURL=provider.js.map

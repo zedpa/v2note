@@ -161,6 +161,7 @@ export function SidebarDrawer({
                   expandedIds={expandedIds}
                   onToggle={toggleExpand}
                   onViewGoal={(id) => { onClose(); onViewGoal?.(id); }}
+                  onSelectTopic={(id, title) => { onClose(); onSelectTopic?.(id, title); }}
                   onRefresh={refresh}
                 />
               ))}
@@ -247,6 +248,7 @@ function MyWorldTreeNode({
   expandedIds,
   onToggle,
   onViewGoal,
+  onSelectTopic,
   onRefresh,
 }: {
   node: MyWorldNode;
@@ -254,6 +256,7 @@ function MyWorldTreeNode({
   expandedIds: Set<string>;
   onToggle: (id: string) => void;
   onViewGoal: (id: string) => void;
+  onSelectTopic: (id: string, title: string) => void;
   onRefresh: () => void;
 }) {
   const isExpanded = expandedIds.has(node.id);
@@ -313,6 +316,9 @@ function MyWorldTreeNode({
     if (showMenu) return;
     if (hasChildren) {
       onToggle(node.id);
+    } else if (isCluster) {
+      // 集群无子节点时，跳转到主题视图
+      onSelectTopic(node.id, node.title);
     } else if (node.type === "goal") {
       onViewGoal(node.id);
     }
@@ -461,6 +467,7 @@ function MyWorldTreeNode({
               expandedIds={expandedIds}
               onToggle={onToggle}
               onViewGoal={onViewGoal}
+              onSelectTopic={onSelectTopic}
               onRefresh={onRefresh}
             />
           ))}

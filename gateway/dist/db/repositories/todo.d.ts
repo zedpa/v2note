@@ -124,6 +124,31 @@ export declare function createWithDedup(params: {
     todo: Todo;
     action: "created" | "matched" | "suggested";
 }>;
+/**
+ * 普通待办（level=0）去重创建。
+ * 相似度 ≥ 0.65 → 返回已有 todo（不创建）
+ * 相似度 < 0.65 或无已有 todo → 正常创建
+ * embedding 失败 → 降级直接创建
+ */
+export declare function dedupCreate(fields: {
+    record_id?: string | null;
+    text: string;
+    done?: boolean;
+    strike_id?: string;
+    domain?: string;
+    impact?: number;
+    goal_id?: string;
+    scheduled_start?: string;
+    estimated_minutes?: number;
+    user_id?: string;
+    device_id?: string;
+    parent_id?: string;
+    level?: number;
+    status?: string;
+}): Promise<{
+    todo: Todo;
+    action: "created" | "matched";
+}>;
 /** 创建 todo（level 0=行动, 1=目标, 2=项目） */
 export declare function createGoalAsTodo(fields: {
     user_id: string;

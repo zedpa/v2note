@@ -36,6 +36,10 @@ export declare function backfillTodoStrikes(userId: string): Promise<{
     linked: number;
     skipped: number;
 }>;
+/**
+ * 回填：扫描所有无 cluster_id 的活跃目标，用 embedding 匹配最近的活跃集群。
+ * batch-analyze 后调用，确保新建集群能吸收已有孤立目标。
+ */
 export declare function linkGoalsToClusters(userId: string): Promise<{
     linked: number;
 }>;

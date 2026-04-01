@@ -436,15 +436,45 @@ export async function runBatchAnalyze(userId) {
         catch (e) {
             console.error("[batch-analyze] Snapshot update failed:", e);
         }
+        // 9. 目标↔集群回填：新集群产出后，扫描孤立目标尝试关联
+        if (result.newClusters > 0 || result.mergedClusters > 0) {
+            try {
+                const { linkGoalsToClusters } = await import("./todo-projector.js");
+                const backfill = await linkGoalsToClusters(userId);
+                if (backfill.linked > 0) {
+                    console.log(`[batch-analyze] Backfill: linked ${backfill.linked} orphan goals to clusters`);
+                }
+            }
+            catch (e) {
+                console.warn("[batch-analyze] Goal-cluster backfill failed:", e);
+            }
+        }
         const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
         console.log(`[batch-analyze] Done in ${elapsed}s: strikes=${result.strikeCount} clusters=${result.newClusters} ` +
             `merged=${result.mergedClusters} bonds=${result.bonds} contradictions=${result.contradictions} ` +
             `patterns=${result.patterns} goals=${result.goals} supersedes=${result.supersedes}`);
-        // L2 涌现：当本批新建 3+ 个 L1 cluster 时，尝试合并为 L2
-        if (result.newClusters >= 3) {
-            import("./emergence.js")
-                .then(({ runEmergence }) => runEmergence(userId))
-                .then((er) => console.log(`[batch-analyze] L2 emergence: ${er.higherOrderClusters} created`))
+        // 层级标签回刷：本批所有 strike 的 source record 更新 hierarchy_tags
+        if (newStrikeRows.length > 0) {
+            import("./tag-projector.js")
+                .then(({ batchRefreshByStrikeIds }) => batchRefreshByStrikeIds(newStrikeRows.map((s) => s.id)))
+                .catch((e) => console.warn("[batch-analyze] Tag projection failed:", e));
+        }
+        // L2 涌现：本批有新 cluster 产出且用户总 L1 >= 3 时，尝试合并为 L2
+        if (result.newClusters >= 1) {
+            import("../db/pool.js")
+                .then(({ query }) => query(`SELECT COUNT(*)::int AS cnt FROM strike
+             WHERE user_id = $1 AND is_cluster = true AND level = 1 AND status = 'active'`, [userId]))
+                .then((rows) => {
+                const totalL1 = rows[0]?.cnt ?? 0;
+                if (totalL1 >= 3) {
+                    return import("./emergence.js").then(({ runEmergence }) => runEmergence(userId));
+                }
+                return null;
+            })
+                .then((er) => {
+                if (er)
+                    console.log(`[batch-analyze] L2 emergence: ${er.higherOrderClusters} created`);
+            })
                 .catch((e) => console.error("[batch-analyze] L2 emergence failed:", e));
         }
         return result;

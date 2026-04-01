@@ -1,6 +1,6 @@
 {
-  "name": "voicenote",
-  "version": "1.0.0",
+  "name": "v2note",
+  "version": "0.1.0",
   "private": true,
   "scripts": {
     "dev": "next dev",

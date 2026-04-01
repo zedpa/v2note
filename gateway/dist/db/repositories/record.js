@@ -172,6 +172,10 @@ export async function findByUserAndSource(userId, source) {
 export async function updateCreatedAt(id, createdAt) {
     await execute(`UPDATE record SET created_at = $2, updated_at = now() WHERE id = $1`, [id, createdAt]);
 }
+/** 更新层级标签（L1/L2/L3 涌现结构反向标注） */
+export async function updateHierarchyTags(id, tags) {
+    await execute(`UPDATE record SET hierarchy_tags = $1::jsonb, updated_at = now() WHERE id = $2`, [JSON.stringify(tags), id]);
+}
 export async function findByDeviceAndDateRange(deviceId, start, end) {
     return query(`SELECT * FROM record WHERE device_id = $1
      AND created_at >= $2 AND created_at <= $3

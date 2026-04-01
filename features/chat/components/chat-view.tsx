@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
-import { ArrowLeft, Send } from "lucide-react";
+import { ArrowLeft, Send, Mic, MicOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useChat } from "@/features/chat/hooks/use-chat";
 import { ChatBubble } from "./chat-bubble";
@@ -41,18 +41,24 @@ export function ChatView({ dateRange, onClose, initialMessage, title, mode: mode
       skill,
     });
   const [input, setInput] = useState("");
-  const [viewportH, setViewportH] = useState<number | undefined>();
+  const [bottomOffset, setBottomOffset] = useState(0);
   const [skillSuggestions, setSkillSuggestions] = useState<typeof CHAT_SKILLS>([]);
+  const [listening, setListening] = useState(false);
+  const recognitionRef = useRef<any>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
-  // 用 visualViewport 高度驱动容器，键盘弹出时容器缩小，输入框留在可视区内
+  // visualViewport: keep input bar above keyboard on mobile
   useEffect(() => {
     const vv = window.visualViewport;
     if (!vv) return;
-    const update = () => setViewportH(vv.height);
+    const update = () => {
+      const offset = window.innerHeight - vv.offsetTop - vv.height;
+      setBottomOffset(Math.max(0, offset));
+    };
     vv.addEventListener("resize", update);
     vv.addEventListener("scroll", update);
+    update();
     return () => {
       vv.removeEventListener("resize", update);
       vv.removeEventListener("scroll", update);
@@ -158,12 +164,39 @@ export function ChatView({ dateRange, onClose, initialMessage, title, mode: mode
     inputRef.current?.focus();
   }, [input, streaming, initialMessage, commandContext, send]);
 
+  const hasSpeechAPI =
+    typeof window !== "undefined" &&
+    !!((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition);
+
+  const toggleVoice = useCallback(() => {
+    if (listening) {
+      recognitionRef.current?.stop();
+      setListening(false);
+      return;
+    }
+    const SR =
+      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SR) return;
+    const recognition = new SR();
+    recognition.lang = "zh-CN";
+    recognition.interimResults = true;
+    recognition.continuous = false;
+    recognition.onresult = (e: any) => {
+      const transcript = Array.from(e.results as SpeechRecognitionResultList)
+        .map((r: any) => r[0].transcript)
+        .join("");
+      setInput(transcript);
+    };
+    recognition.onend = () => setListening(false);
+    recognition.onerror = () => setListening(false);
+    recognitionRef.current = recognition;
+    recognition.start();
+    setListening(true);
+  }, [listening]);
+
   return (
     <SwipeBack onClose={onClose}>
-      <div
-        className="flex flex-col bg-surface pt-safe overflow-hidden"
-        style={{ height: viewportH ? `${viewportH}px` : "100dvh" }}
-      >
+      <div className="fixed inset-0 flex flex-col bg-surface pt-safe">
         {/* Header — Glass & Soul */}
         <header
           className="flex items-center gap-3 px-4 h-[44px] bg-surface/80 backdrop-blur-[12px] shrink-0 border-b border-brand-border/40"
@@ -244,40 +277,66 @@ export function ChatView({ dateRange, onClose, initialMessage, title, mode: mode
           )}
         </div>
 
-        {/* Input bar — 留在 flex 流内，随容器高度自动贴底 */}
-        <div className="shrink-0 px-4 py-3 pb-safe bg-surface/90 backdrop-blur-xl border-t border-brand-border/40 shadow-[0_-4px_20px_var(--shadow-ambient)]">
-          {/* Skill suggestions — "/" 快捷键触发 */}
-          {skillSuggestions.length > 0 && (
-            <div className="flex gap-2 flex-wrap mb-2">
-              {skillSuggestions.map((s) => (
-                <button
-                  key={s.name}
-                  type="button"
-                  onClick={() => handleSkillChip(s.name, s.label)}
-                  className="px-3 py-1.5 rounded-full bg-deer/10 text-deer text-xs font-medium hover:bg-deer/20 transition-colors"
-                >
-                  {s.label}
-                </button>
-              ))}
-            </div>
-          )}
-          <div className="flex items-end gap-2">
-            <textarea
-              ref={inputRef}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  handleSend();
-                }
-              }}
-              placeholder="输入你的想法..."
-              rows={1}
-              className="flex-1 bg-surface-lowest rounded-xl px-4 py-2.5 text-sm text-on-surface outline-none resize-none placeholder:text-muted-accessible/50 max-h-24"
-              style={{ minHeight: "40px" }}
+        {/* Spacer so messages don't hide behind fixed input bar */}
+        <div className="shrink-0 h-[72px]" />
+      </div>
+
+      {/* Input bar — truly fixed at bottom, follows keyboard */}
+      <div
+        className="fixed left-0 right-0 z-50 px-4 py-3 pb-safe bg-surface/90 backdrop-blur-xl border-t border-brand-border/40 shadow-[0_-4px_20px_var(--shadow-ambient)]"
+        style={{ bottom: `${bottomOffset}px` }}
+      >
+        {/* Skill suggestions — "/" 快捷键触发 */}
+        {skillSuggestions.length > 0 && (
+          <div className="flex gap-2 flex-wrap mb-2">
+            {skillSuggestions.map((s) => (
+              <button
+                key={s.name}
+                type="button"
+                onClick={() => handleSkillChip(s.name, s.label)}
+                className="px-3 py-1.5 rounded-full bg-deer/10 text-deer text-xs font-medium hover:bg-deer/20 transition-colors"
+              >
+                {s.label}
+              </button>
+            ))}
+          </div>
+        )}
+        <div className="flex items-end gap-2">
+          <textarea
+            ref={inputRef}
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                handleSend();
+              }
+            }}
+            placeholder="输入你的想法..."
+            rows={1}
+            className="flex-1 bg-surface-lowest rounded-xl px-4 py-2.5 text-sm text-on-surface outline-none resize-none placeholder:text-muted-accessible/50 max-h-24"
+            style={{ minHeight: "40px" }}
+            disabled={streaming}
+          />
+          {/* 语音输入 */}
+          {hasSpeechAPI && !input.trim() && (
+            <button
+              type="button"
+              onClick={toggleVoice}
               disabled={streaming}
-            />
+              className={cn(
+                "flex items-center justify-center w-10 h-10 rounded-full transition-colors shrink-0",
+                listening
+                  ? "bg-maple/20 text-maple"
+                  : "text-muted-accessible hover:text-on-surface",
+              )}
+              aria-label={listening ? "停止语音" : "语音输入"}
+            >
+              {listening ? <MicOff size={18} /> : <Mic size={18} />}
+            </button>
+          )}
+          {/* 发送按钮 — 有文字时显示 */}
+          {(input.trim() || !hasSpeechAPI) && (
             <button
               type="button"
               onClick={handleSend}
@@ -297,7 +356,7 @@ export function ChatView({ dateRange, onClose, initialMessage, title, mode: mode
             >
               <Send size={16} />
             </button>
-          </div>
+          )}
         </div>
       </div>
     </SwipeBack>

@@ -42,6 +42,10 @@ const mockTodoFindPendingByUser = vi.fn().mockResolvedValue([]);
 
 vi.mock("../db/repositories/todo.js", () => ({
   create: (...args: any[]) => mockTodoCreate(...args),
+  dedupCreate: async (...args: any[]) => {
+    const todo = await mockTodoCreate(...args);
+    return { todo, action: "created" };
+  },
   update: (...args: any[]) => mockTodoUpdate(...args),
   findPendingByUser: (...args: any[]) => mockTodoFindPendingByUser(...args),
   findByUser: vi.fn().mockResolvedValue([]),

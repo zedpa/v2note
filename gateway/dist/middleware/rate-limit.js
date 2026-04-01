@@ -15,7 +15,7 @@ setInterval(() => {
 }, CLEANUP_INTERVAL);
 /**
  * 检查是否允许请求
- * @returns true = 允许，false = 超限
+ * @returns RateLimitResult，包含 allowed 和可选的 retryAfter（秒）
  */
 export function checkRateLimit(deviceId, maxTokens = 5, refillRate = 5) {
     const now = Date.now();
@@ -29,10 +29,13 @@ export function checkRateLimit(deviceId, maxTokens = 5, refillRate = 5) {
     bucket.tokens = Math.min(maxTokens, bucket.tokens + elapsed * refillRate);
     bucket.lastRefill = now;
     if (bucket.tokens < 1) {
-        return false;
+        // 计算需要等待多少秒才能补充到 1 个 token
+        const deficit = 1 - bucket.tokens;
+        const retryAfter = Math.ceil(deficit / refillRate);
+        return { allowed: false, retryAfter };
     }
     bucket.tokens -= 1;
-    return true;
+    return { allowed: true };
 }
 /**
  * WebSocket 消息速率限制（每设备每秒 10 条）

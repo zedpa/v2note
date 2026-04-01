@@ -16,7 +16,7 @@ const memCache = new Map<string, number[]>();
 const MAX_MEM_CACHE = 100;
 
 // DashScope embedding 并发控制
-const embeddingSemaphore = new Semaphore(5);
+const embeddingSemaphore = new Semaphore(30);
 
 function memCacheSet(key: string, value: number[]) {
   // LRU：删除再插入，保证最新的在末尾

@@ -192,7 +192,9 @@ function parseAIResponse(content: string): {
   // 清理可能的 markdown code block
   const cleaned = content.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
 
-  // 尝试直接解析
+  const defaults = { extracted_fields: {} as ExtractedFields, skip_to: null as number | null };
+
+  // 1. 尝试直接解析完整 JSON
   try {
     const parsed = JSON.parse(cleaned);
     return {
@@ -201,29 +203,39 @@ function parseAIResponse(content: string): {
       skip_to: parsed.skip_to ?? null,
     };
   } catch {
-    // AI 可能输出了 "文本 + JSON" 混合格式，尝试提取 JSON 部分
-    const jsonStart = cleaned.indexOf('{"reply"');
-    if (jsonStart > 0) {
-      try {
-        const parsed = JSON.parse(cleaned.slice(jsonStart));
-        return {
-          reply: parsed.reply ?? "",
-          extracted_fields: parsed.extracted_fields ?? {},
-          skip_to: parsed.skip_to ?? null,
-        };
-      } catch {
-        // 提取也失败，走 fallback
+    // not valid JSON — continue
+  }
+
+  // 2. AI 可能输出 "文本 + JSON" 混合格式，用 regex 找 JSON 块（兼容 `{ "reply"` 有空格）
+  const jsonMatch = cleaned.match(/\{\s*"reply"\s*:/);
+  if (jsonMatch?.index !== undefined) {
+    const jsonStr = cleaned.slice(jsonMatch.index);
+    // 2a. 尝试完整解析 JSON 块
+    try {
+      const parsed = JSON.parse(jsonStr);
+      return {
+        reply: parsed.reply ?? "",
+        extracted_fields: parsed.extracted_fields ?? {},
+        skip_to: parsed.skip_to ?? null,
+      };
+    } catch {
+      // 2b. JSON 可能被截断，用 regex 提取 reply 字段值
+      const replyMatch = jsonStr.match(/"reply"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+      if (replyMatch) {
+        const reply = replyMatch[1].replace(/\\"/g, '"').replace(/\\n/g, "\n");
+        return { reply, ...defaults };
       }
     }
-
-    // 最终 fallback：去掉可能混入的 JSON 碎片，只保留纯文本
-    const textOnly = cleaned.replace(/\{[\s\S]*$/, "").trim();
-    return {
-      reply: textOnly || cleaned.slice(0, 100),
-      extracted_fields: {},
-      skip_to: null,
-    };
   }
+
+  // 3. 最终 fallback：去掉可能混入的 JSON 碎片，只保留纯文本
+  const textOnly = cleaned.replace(/\{[\s\S]*$/, "").trim();
+  if (textOnly) {
+    return { reply: textOnly, ...defaults };
+  }
+
+  // 4. 全部失败：返回原始内容前 100 字（去掉 JSON 碎片）
+  return { reply: cleaned.replace(/[{}"\[\]]/g, "").slice(0, 100).trim(), ...defaults };
 }
 
 /** 按 step 存储提取的字段到 UserProfile */

@@ -17,18 +17,22 @@ import { aiDiaryRepo } from "../db/repositories/index.js";
 import { autoCollectVocabulary } from "../cognitive/auto-vocabulary.js";
 import { safeParseJson } from "../lib/text-utils.js";
 // ── Morning Briefing ──
-export async function generateMorningBriefing(deviceId, userId) {
+export async function generateMorningBriefing(deviceId, userId, forceRefresh) {
     const today = new Date().toISOString().split("T")[0];
-    // Check cache first (2-hour TTL)
-    try {
-        const cached = await briefingRepo.findFresh(deviceId, today, "morning", 2, userId);
-        if (cached) {
-            console.log(`[daily-loop] Using cached morning briefing for ${userId ?? deviceId}`);
-            return cached.content;
+    // 当日持久缓存（仅 forceRefresh 时跳过）
+    if (!forceRefresh) {
+        try {
+            const cached = userId
+                ? await briefingRepo.findByUserAndDate(userId, today, "morning")
+                : await briefingRepo.findByDeviceAndDate(deviceId, today, "morning");
+            if (cached) {
+                console.log(`[daily-loop] Using cached morning briefing for ${userId ?? deviceId}`);
+                return cached.content;
+            }
         }
-    }
-    catch (err) {
-        console.warn(`[daily-loop] Briefing cache check failed: ${err.message}`);
+        catch (err) {
+            console.warn(`[daily-loop] Briefing cache check failed: ${err.message}`);
+        }
     }
     const now = new Date();
     const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000)
@@ -234,21 +238,25 @@ ${aiActionableContext}
     }
 }
 // ── Evening Summary ──
-export async function generateEveningSummary(deviceId, userId) {
+export async function generateEveningSummary(deviceId, userId, forceRefresh) {
     const today = new Date().toISOString().split("T")[0];
     const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000)
         .toISOString()
         .split("T")[0];
-    // Check cache
-    try {
-        const cached = await briefingRepo.findFresh(deviceId, today, "evening", 2, userId);
-        if (cached) {
-            console.log(`[daily-loop] Using cached evening summary for ${userId ?? deviceId}`);
-            return cached.content;
+    // 当日持久缓存（仅 forceRefresh 时跳过）
+    if (!forceRefresh) {
+        try {
+            const cached = userId
+                ? await briefingRepo.findByUserAndDate(userId, today, "evening")
+                : await briefingRepo.findByDeviceAndDate(deviceId, today, "evening");
+            if (cached) {
+                console.log(`[daily-loop] Using cached evening summary for ${userId ?? deviceId}`);
+                return cached.content;
+            }
         }
-    }
-    catch (err) {
-        console.warn(`[daily-loop] Evening cache check failed: ${err.message}`);
+        catch (err) {
+            console.warn(`[daily-loop] Evening cache check failed: ${err.message}`);
+        }
     }
     // 1. 今日完成的待办
     const allTodos = userId

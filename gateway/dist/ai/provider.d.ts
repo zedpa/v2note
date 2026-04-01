@@ -21,6 +21,7 @@
  */
 import { createOpenAI } from "@ai-sdk/openai";
 import type { z } from "zod";
+import { Priority } from "../lib/semaphore.js";
 export interface ChatMessage {
     role: "system" | "user" | "assistant";
     content: string;
@@ -143,4 +144,4 @@ export declare function streamWithToolsDeepThink(messages: ChatMessage[], tools:
     maxSteps?: number;
     thinkingBudget?: number;
 }): AsyncGenerator<DeepThinkChunk, void, undefined>;
-export { getProvider, getTier, isReasoningModel };
+export { getProvider, getTier, isReasoningModel, Priority };

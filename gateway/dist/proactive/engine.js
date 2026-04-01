@@ -17,7 +17,6 @@ import * as dailyBriefingRepo from "../db/repositories/daily-briefing.js";
 import { regenerateSummary, extractToMemory } from "../diary/manager.js";
 import { digestRecords } from "../handlers/digest.js";
 import { runDailyCognitiveCycle } from "../cognitive/daily-cycle.js";
-import { runBatchAnalyze } from "../cognitive/batch-analyze.js";
 export class ProactiveEngine {
     devices = new Map();
     intervalMs = 30 * 60 * 1000; // 30 minutes
@@ -387,10 +386,11 @@ export class ProactiveEngine {
                 return;
             }
             console.log(`[proactive:emergence] Processing ${rows.length} user(s)`);
+            const { runEmergence } = await import("../cognitive/emergence.js");
             for (const row of rows) {
                 try {
-                    const result = await runBatchAnalyze(row.user_id);
-                    console.log(`[proactive:batch-analyze] User ${row.user_id}:`, result);
+                    const result = await runEmergence(row.user_id);
+                    console.log(`[proactive:emergence] User ${row.user_id}: ${result.higherOrderClusters} L2 created`);
                 }
                 catch (err) {
                     console.error(`[proactive:emergence] Failed for user ${row.user_id}:`, err.message);

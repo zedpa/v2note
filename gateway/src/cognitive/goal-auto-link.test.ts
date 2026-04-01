@@ -1,6 +1,6 @@
 /**
  * goal-auto-link spec 测试
- * 场景 1: 全量关联 | 场景 2: 增量关联 | 场景 4: 项目进度汇总
+ * 场景 1: 全量关联 | 场景 2: 孤立目标自动关联集群 | 场景 4: 项目进度汇总
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { Goal } from "../db/repositories/goal.js";
@@ -71,82 +71,81 @@ const { goalAutoLink, linkNewStrikesToGoals, getProjectProgress } = await import
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mockQuery.mockResolvedValue([]);
   mockGoalFindActiveByUser.mockResolvedValue([]);
+  mockGoalFindByUser.mockResolvedValue([]);
   mockGoalFindWithTodos.mockResolvedValue([]);
+  mockQuery.mockResolvedValue([]);
 });
 
-describe("场景 1: 目标创建后全量关联扫描", () => {
-  it("should_link_goal_to_matching_cluster", async () => {
-    const goalId = "goal-1";
-    // goal 没有 cluster_id → 需要关联
-    mockGoalFindById.mockResolvedValue(makeGoal({ id: goalId, cluster_id: null }));
+describe("场景 1: 目标创建后全量关联", () => {
+  it("should_link_to_matching_cluster", async () => {
+    const goal = makeGoal({ id: "goal-1", cluster_id: null });
+    mockGoalFindById.mockResolvedValue(goal);
 
-    // goalAutoLink 调用顺序:
-    // query 1: cluster 匹配
-    // query 2: 相关记录
-    // query 3: 相关 todo
-    mockQuery
-      .mockResolvedValueOnce([{ id: "cluster-1", similarity: 0.85 }])
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([]);
+    // 1. cluster embedding 匹配
+    mockQuery.mockResolvedValueOnce([{ id: "cluster-1", similarity: 0.8 }]);
+    // 2. 相关记录统计
+    mockQuery.mockResolvedValueOnce([{ id: "rec-1" }, { id: "rec-2" }]);
+    // 3. pending todo 匹配
+    mockQuery.mockResolvedValueOnce([{ id: "todo-1", text: "联系供应商", similarity: 0.7 }]);
 
-    const result = await goalAutoLink(goalId, "user-1");
+    const result = await goalAutoLink("goal-1", "user-1");
 
     expect(result.clusterLinked).toBe(true);
-    expect(mockGoalUpdate).toHaveBeenCalledWith(goalId, expect.objectContaining({
-      cluster_id: "cluster-1",
-    }));
-  });
-
-  it("should_link_related_todos_to_goal", async () => {
-    const goalId = "goal-2";
-    // goal 已有 cluster → 跳过 cluster 关联
-    mockGoalFindById.mockResolvedValue(makeGoal({ id: goalId, title: "供应链优化", cluster_id: "c1" }));
-
-    // goalAutoLink 调用顺序（cluster 已有，跳过 query 1）:
-    // query 1: 相关记录
-    // query 2: 相关 todo
-    mockQuery
-      .mockResolvedValueOnce([]) // 相关记录
-      .mockResolvedValueOnce([
-        { id: "todo-1", text: "找供应商报价", similarity: 0.75 },
-      ]);
-
-    const result = await goalAutoLink(goalId, "user-1");
-
+    expect(mockGoalUpdate).toHaveBeenCalledWith("goal-1", { cluster_id: "cluster-1" });
+    expect(result.recordsFound).toBe(2);
     expect(result.todosLinked).toBe(1);
-    expect(mockTodoUpdate).toHaveBeenCalledWith("todo-1", { goal_id: goalId });
   });
 
-  it("should_count_related_records", async () => {
-    const goalId = "goal-3";
-    // goal 已有 cluster
-    mockGoalFindById.mockResolvedValue(makeGoal({ id: goalId, cluster_id: "c1" }));
+  it("should_not_link_cluster_if_similarity_below_threshold", async () => {
+    const goal = makeGoal({ id: "goal-1" });
+    mockGoalFindById.mockResolvedValue(goal);
 
-    // 跳过 cluster query，直接:
-    // query 1: 相关记录（3条）
-    // query 2: 相关 todo
-    mockQuery
-      .mockResolvedValueOnce([{ id: "rec-1" }, { id: "rec-2" }, { id: "rec-3" }])
-      .mockResolvedValueOnce([]);
+    // cluster 匹配度低
+    mockQuery.mockResolvedValueOnce([{ id: "cluster-1", similarity: 0.5 }]);
+    mockQuery.mockResolvedValueOnce([]);
+    mockQuery.mockResolvedValueOnce([]);
 
-    const result = await goalAutoLink(goalId, "user-1");
+    const result = await goalAutoLink("goal-1", "user-1");
 
-    expect(result.recordsFound).toBe(3);
+    expect(result.clusterLinked).toBe(false);
+    expect(mockGoalUpdate).not.toHaveBeenCalled();
+  });
+
+  it("should_skip_if_goal_already_has_cluster", async () => {
+    const goal = makeGoal({ id: "goal-1", cluster_id: "existing-cluster" });
+    mockGoalFindById.mockResolvedValue(goal);
+
+    mockQuery.mockResolvedValueOnce([]);
+    mockQuery.mockResolvedValueOnce([]);
+
+    const result = await goalAutoLink("goal-1", "user-1");
+
+    expect(result.clusterLinked).toBe(true);
+    expect(mockGoalUpdate).not.toHaveBeenCalled();
+  });
+
+  it("should_handle_missing_goal_gracefully", async () => {
+    mockGoalFindById.mockResolvedValue(null);
+
+    const result = await goalAutoLink("nonexistent", "user-1");
+
+    expect(result.clusterLinked).toBe(false);
+    expect(result.recordsFound).toBe(0);
   });
 });
 
-describe("场景 2: 新日记自动关联已有目标", () => {
-  it("should_link_new_strike_to_matching_goal_cluster", async () => {
+describe("场景 2: digest 后孤立目标自动关联集群", () => {
+  it("should_link_orphan_goal_to_matching_cluster", async () => {
+    // 孤立目标（无 cluster_id）
     const activeGoals = [
-      makeGoal({ id: "goal-1", title: "评估供应商", cluster_id: "cluster-1" }),
+      makeGoal({ id: "goal-1", title: "评估供应商", cluster_id: null }),
     ];
     mockGoalFindActiveByUser.mockResolvedValue(activeGoals);
 
-    // query: Strike vs goal cluster embedding 匹配
+    // query: goal embedding vs cluster embedding 匹配
     mockQuery.mockResolvedValueOnce([
-      { goal_id: "goal-1", similarity: 0.72 },
+      { cluster_id: "cluster-1", similarity: 0.72 },
     ]);
 
     const result = await linkNewStrikesToGoals(
@@ -155,17 +154,18 @@ describe("场景 2: 新日记自动关联已有目标", () => {
     );
 
     expect(result.linked).toBe(1);
+    expect(mockGoalUpdate).toHaveBeenCalledWith("goal-1", { cluster_id: "cluster-1" });
   });
 
   it("should_not_link_when_similarity_below_threshold", async () => {
     const activeGoals = [
-      makeGoal({ id: "goal-1", title: "评估供应商", cluster_id: "cluster-1" }),
+      makeGoal({ id: "goal-1", title: "评估供应商", cluster_id: null }),
     ];
     mockGoalFindActiveByUser.mockResolvedValue(activeGoals);
 
     // 匹配度低于 0.6
     mockQuery.mockResolvedValueOnce([
-      { goal_id: "goal-1", similarity: 0.4 },
+      { cluster_id: "cluster-1", similarity: 0.4 },
     ]);
 
     const result = await linkNewStrikesToGoals(
@@ -174,52 +174,67 @@ describe("场景 2: 新日记自动关联已有目标", () => {
     );
 
     expect(result.linked).toBe(0);
+    expect(mockGoalUpdate).not.toHaveBeenCalled();
   });
 
-  it("should_skip_strikes_without_source_id", async () => {
+  it("should_skip_when_all_goals_already_have_cluster", async () => {
     const activeGoals = [
       makeGoal({ id: "goal-1", cluster_id: "cluster-1" }),
     ];
     mockGoalFindActiveByUser.mockResolvedValue(activeGoals);
 
     const result = await linkNewStrikesToGoals(
-      [{ id: "strike-orphan", source_id: null }],
+      [{ id: "strike-new", source_id: "record-1" }],
       "user-1",
     );
 
     expect(result.linked).toBe(0);
     expect(mockQuery).not.toHaveBeenCalled();
   });
+
+  it("should_return_zero_for_empty_strikes", async () => {
+    const result = await linkNewStrikesToGoals([], "user-1");
+    expect(result.linked).toBe(0);
+  });
 });
 
-describe("场景 4: 项目级子目标进度汇总", () => {
-  it("should_aggregate_child_goals_with_todo_progress", async () => {
-    const projectId = "project-1";
-    // 3 个子目标
-    mockGoalFindByUser.mockResolvedValue([
-      makeGoal({ id: "sub-1", parent_id: projectId, title: "评估供应商", status: "progressing" as any }),
-      makeGoal({ id: "sub-2", parent_id: projectId, title: "谈判合同", status: "blocked" as any }),
-      makeGoal({ id: "sub-3", parent_id: projectId, title: "供应商切换", status: "active" }),
-    ]);
+describe("场景 4: 项目进度汇总", () => {
+  it("should_aggregate_child_goal_progress", async () => {
+    const childGoals = [
+      makeGoal({ id: "child-1", title: "子目标1", parent_id: "project-1" }),
+      makeGoal({ id: "child-2", title: "子目标2", parent_id: "project-1" }),
+    ];
+    mockGoalFindByUser.mockResolvedValue(childGoals);
 
-    // sub-1: 2/3 完成
+    // child-1 的 todos
     mockGoalFindWithTodos
       .mockResolvedValueOnce([
-        { id: "t1", done: true }, { id: "t2", done: true }, { id: "t3", done: false },
+        { id: "t1", done: true },
+        { id: "t2", done: false },
       ])
-      // sub-2: 0/1 完成
+      // child-2 的 todos
       .mockResolvedValueOnce([
-        { id: "t4", done: false },
-      ])
-      // sub-3: 无 todo
-      .mockResolvedValueOnce([]);
+        { id: "t3", done: true },
+        { id: "t4", done: true },
+        { id: "t5", done: false },
+      ]);
 
-    const progress = await getProjectProgress(projectId, "user-1");
+    const progress = await getProjectProgress("project-1", "user-1");
 
-    expect(progress.children).toHaveLength(3);
-    expect(progress.children[0].completionPercent).toBe(67); // 2/3
-    expect(progress.children[1].status).toBe("blocked");
-    expect(progress.totalTodos).toBe(4);
-    expect(progress.completedTodos).toBe(2);
+    expect(progress.children).toHaveLength(2);
+    expect(progress.totalTodos).toBe(5);
+    expect(progress.completedTodos).toBe(3);
+    expect(progress.overallPercent).toBe(60);
+    expect(progress.children[0].completionPercent).toBe(50);
+    expect(progress.children[1].completionPercent).toBe(67);
+  });
+
+  it("should_handle_no_children", async () => {
+    mockGoalFindByUser.mockResolvedValue([]);
+
+    const progress = await getProjectProgress("project-1", "user-1");
+
+    expect(progress.children).toHaveLength(0);
+    expect(progress.overallPercent).toBe(0);
   });
 });

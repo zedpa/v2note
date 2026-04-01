@@ -38,13 +38,20 @@ export const createTodoTool: ToolDefinition = {
       recordId = rec.id;
     }
 
-    const todo = await todoRepo.create({
+    const { todo, action } = await todoRepo.dedupCreate({
       record_id: recordId,
       text,
       done: false,
       user_id: ctx.userId,
       device_id: ctx.deviceId,
     });
+    if (action === "matched") {
+      return {
+        success: true,
+        message: `已有相似待办: "${todo.text}"，无需重复创建`,
+        data: { todo_id: todo.id, record_id: recordId, deduplicated: true },
+      };
+    }
 
     // 异步写入 embedding
     void writeTodoEmbedding(todo.id, text, 0);

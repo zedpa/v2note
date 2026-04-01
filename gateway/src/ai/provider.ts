@@ -23,10 +23,21 @@
 import { createOpenAI } from "@ai-sdk/openai";
 import { generateText, streamText, generateObject, type ModelMessage } from "ai";
 import type { z } from "zod";
-import { Semaphore } from "../lib/semaphore.js";
+import { Semaphore, Priority } from "../lib/semaphore.js";
 
-// DashScope LLM 并发控制：非流式调用最多 5 个同时进行
-const llmSemaphore = new Semaphore(5);
+// DashScope LLM 并发控制（DashScope API 支持 1000 并发，此处限制单 worker 上限防止内存暴涨）
+const llmSemaphore = new Semaphore(50);
+
+/** 根据 ModelTier 映射默认优先级 */
+function tierPriority(tier: ModelTier): Priority {
+  switch (tier) {
+    case "chat":
+    case "agent":
+      return Priority.HIGH;
+    default:
+      return Priority.NORMAL;
+  }
+}
 
 // ── Types ──────────────────────────────────────────────────────
 
@@ -177,8 +188,8 @@ export async function chatCompletion(
   messages: ChatMessage[],
   opts?: { json?: boolean; temperature?: number; timeout?: number; tier?: ModelTier },
 ): Promise<AIResponse> {
+  const tier = opts?.tier ?? "fast";
   return llmSemaphore.acquire(async () => {
-    const tier = opts?.tier ?? "fast";
     const { provider, config } = getTier(tier);
     const effectiveTimeout = opts?.timeout ?? config.timeout;
 
@@ -199,7 +210,7 @@ export async function chatCompletion(
     }
 
     return { content, usage: mapUsage(result.usage) };
-  });
+  }, { priority: tierPriority(tier) });
 }
 
 /**
@@ -278,8 +289,8 @@ export async function generateStructured<T>(
   schema: z.ZodType<T>,
   opts?: { temperature?: number; timeout?: number; schemaName?: string; schemaDescription?: string; tier?: ModelTier },
 ): Promise<{ object: T; usage?: { prompt_tokens: number; completion_tokens: number } }> {
+  const tier = opts?.tier ?? "fast";
   return llmSemaphore.acquire(async () => {
-    const tier = opts?.tier ?? "fast";
     const { provider, config } = getTier(tier);
     const effectiveTimeout = opts?.timeout ?? config.timeout;
 
@@ -295,7 +306,7 @@ export async function generateStructured<T>(
     });
 
     return { object: result.object, usage: mapUsage(result.usage) };
-  });
+  }, { priority: tierPriority(tier) });
 }
 
 /**
@@ -545,4 +556,4 @@ export async function* streamWithToolsDeepThink(
 }
 
 // Re-export for convenience
-export { getProvider, getTier, isReasoningModel };
+export { getProvider, getTier, isReasoningModel, Priority };

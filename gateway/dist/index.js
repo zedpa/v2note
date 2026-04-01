@@ -111,9 +111,14 @@ function startWorker() {
         // Rate limit (by IP or auth header)
         const clientIp = req.headers["x-forwarded-for"]?.split(",")[0]?.trim()
             ?? req.socket.remoteAddress ?? "unknown";
-        if (!checkRateLimit(clientIp)) {
-            res.writeHead(429, { "Content-Type": "application/json" });
-            res.end(JSON.stringify({ error: "Too Many Requests" }));
+        const rateResult = checkRateLimit(clientIp);
+        if (!rateResult.allowed) {
+            const retryAfter = rateResult.retryAfter ?? 1;
+            res.writeHead(429, {
+                "Content-Type": "application/json",
+                "Retry-After": String(retryAfter),
+            });
+            res.end(JSON.stringify({ error: "rate_limited", retryAfter }));
             return;
         }
         // Health check (before router for speed)
@@ -222,9 +227,12 @@ function startWorker() {
                 }
                 // ── WebSocket 速率限制 ──
                 const wsDeviceId = connectionDeviceMap.get(ws);
-                if (wsDeviceId && !checkWsRateLimit(wsDeviceId)) {
-                    send(ws, { type: "error", payload: { message: "Rate limit exceeded" } });
-                    return;
+                if (wsDeviceId) {
+                    const wsRateResult = checkWsRateLimit(wsDeviceId);
+                    if (!wsRateResult.allowed) {
+                        send(ws, { type: "error", payload: { message: "rate_limited", code: "rate_limited", retryAfter: wsRateResult.retryAfter ?? 1 } });
+                        return;
+                    }
                 }
                 // ── 认证门控：非 auth 消息必须已认证，禁止游客操作 ──
                 if (!connectionUserMap.has(ws)) {

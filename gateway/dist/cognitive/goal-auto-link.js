@@ -92,35 +92,31 @@ export async function goalAutoLink(goalId, userId) {
     return result;
 }
 /**
- * digest 后检查新 Strike 是否和已有目标的 Cluster 语义匹配。
- * 匹配度 > 0.6 时将记录标记为目标相关。
+ * digest 后检查无 cluster_id 的活跃目标，尝试匹配新 Strike 所属的集群。
+ * 如果目标 embedding 与某集群相似度 > 阈值，设置 todo.cluster_id。
  */
 export async function linkNewStrikesToGoals(newStrikes, userId) {
     const result = { linked: 0 };
     if (newStrikes.length === 0)
         return result;
-    // 获取所有有 cluster 的 active 目标
-    const goals = await goalRepo.findActiveByUser(userId);
-    const goalsWithCluster = goals.filter((g) => g.cluster_id);
-    if (goalsWithCluster.length === 0)
+    // 获取无 cluster_id 的活跃目标（统一模型：todo 表 level>=1）
+    const allGoals = await goalRepo.findActiveByUser(userId);
+    const orphanGoals = allGoals.filter((g) => !g.cluster_id);
+    if (orphanGoals.length === 0)
         return result;
-    // 批量检查新 Strike 和 goal cluster 的匹配度
-    for (const strike of newStrikes) {
-        if (!strike.source_id)
-            continue;
+    // 对每个孤立目标，用 embedding 匹配最近的活跃集群
+    for (const goal of orphanGoals) {
         try {
-            const matches = await query(`SELECT g.id as goal_id,
-                1 - (cs.embedding <=> s.embedding) as similarity
-         FROM goal g
-         JOIN strike cs ON cs.id = g.cluster_id
-         JOIN strike s ON s.id = $1
-         WHERE g.user_id = $2
-           AND g.status IN ('active', 'progressing')
-           AND cs.embedding IS NOT NULL
-           AND s.embedding IS NOT NULL
+            const matches = await query(`SELECT s.id as cluster_id,
+                1 - (s.embedding <=> ge.embedding) as similarity
+         FROM strike s, goal_embedding ge
+         WHERE ge.goal_id = $1
+           AND s.user_id = $2 AND s.is_cluster = true AND s.status = 'active'
+           AND s.embedding IS NOT NULL AND ge.embedding IS NOT NULL
          ORDER BY similarity DESC
-         LIMIT 1`, [strike.id, userId]);
+         LIMIT 1`, [goal.id, userId]);
             if (matches.length > 0 && matches[0].similarity >= STRIKE_GOAL_LINK_THRESHOLD) {
+                await goalRepo.update(goal.id, { cluster_id: matches[0].cluster_id });
                 result.linked++;
             }
         }

@@ -280,6 +280,45 @@ export async function createWithDedup(params) {
     console.log(`[todo-dedup] Created: "${params.text}"`);
     return { todo, action: "created" };
 }
+const TODO_DEDUP_THRESHOLD = 0.65;
+/**
+ * 普通待办（level=0）去重创建。
+ * 相似度 ≥ 0.65 → 返回已有 todo（不创建）
+ * 相似度 < 0.65 或无已有 todo → 正常创建
+ * embedding 失败 → 降级直接创建
+ */
+export async function dedupCreate(fields) {
+    const userId = fields.user_id;
+    if (!userId) {
+        const todo = await create(fields);
+        return { todo, action: "created" };
+    }
+    // 查询用户未完成的 level=0 待办
+    const existing = await query(`SELECT * FROM todo WHERE user_id = $1 AND done = false AND (level = 0 OR level IS NULL)`, [userId]);
+    if (existing.length > 0) {
+        try {
+            const newEmb = await getEmbedding(fields.text);
+            let bestMatch = null;
+            for (const ex of existing) {
+                const exEmb = await getEmbedding(ex.text);
+                const sim = cosineSimilarity(newEmb, exEmb);
+                if (!bestMatch || sim > bestMatch.similarity) {
+                    bestMatch = { todo: ex, similarity: sim };
+                }
+            }
+            if (bestMatch && bestMatch.similarity >= TODO_DEDUP_THRESHOLD) {
+                console.log(`[todo-dedup-l0] Matched: "${fields.text}" → "${bestMatch.todo.text}" (sim=${bestMatch.similarity.toFixed(3)})`);
+                return { todo: bestMatch.todo, action: "matched" };
+            }
+        }
+        catch (e) {
+            console.warn(`[todo-dedup-l0] Embedding failed, creating without dedup: ${e.message}`);
+        }
+    }
+    const todo = await create(fields);
+    console.log(`[todo-dedup-l0] Created: "${fields.text}"`);
+    return { todo, action: "created" };
+}
 /** 创建 todo（level 0=行动, 1=目标, 2=项目） */
 export async function createGoalAsTodo(fields) {
     const row = await queryOne(`INSERT INTO todo (user_id, device_id, text, level, status, cluster_id, parent_id, domain, done)

@@ -30,21 +30,41 @@ export function registerTodoRoutes(router: Router) {
     }>(_req);
     const userId = getUserId(_req) ?? undefined;
     const deviceId = getDeviceId(_req);
-    const todo = await todoRepo.create({
-      record_id: body.record_id || null,
-      text: body.text,
-      domain: body.domain,
-      impact: body.impact,
-      goal_id: body.goal_id,
-      scheduled_start: body.scheduled_start,
-      estimated_minutes: body.estimated_minutes,
-      parent_id: body.parent_id,
-      level: body.level,
-      status: body.status,
-      user_id: userId,
-      device_id: deviceId,
-    });
-    sendJson(res, { id: todo.id }, 201);
+    // level=0 走去重，level>=1 走 createWithDedup
+    const isGoal = (body.level ?? 0) >= 1;
+    if (isGoal) {
+      const todo = await todoRepo.create({
+        record_id: body.record_id || null,
+        text: body.text,
+        domain: body.domain,
+        impact: body.impact,
+        goal_id: body.goal_id,
+        scheduled_start: body.scheduled_start,
+        estimated_minutes: body.estimated_minutes,
+        parent_id: body.parent_id,
+        level: body.level,
+        status: body.status,
+        user_id: userId,
+        device_id: deviceId,
+      });
+      sendJson(res, { id: todo.id }, 201);
+    } else {
+      const { todo, action } = await todoRepo.dedupCreate({
+        record_id: body.record_id || null,
+        text: body.text,
+        domain: body.domain,
+        impact: body.impact,
+        goal_id: body.goal_id,
+        scheduled_start: body.scheduled_start,
+        estimated_minutes: body.estimated_minutes,
+        parent_id: body.parent_id,
+        level: body.level,
+        status: body.status,
+        user_id: userId,
+        device_id: deviceId,
+      });
+      sendJson(res, { id: todo.id, deduplicated: action === "matched" }, action === "matched" ? 200 : 201);
+    }
   });
 
   // Get subtasks of a todo

@@ -523,6 +523,19 @@ export async function runBatchAnalyze(userId: string): Promise<BatchAnalyzeResul
       console.error("[batch-analyze] Snapshot update failed:", e);
     }
 
+    // 9. 目标↔集群回填：新集群产出后，扫描孤立目标尝试关联
+    if (result.newClusters > 0 || result.mergedClusters > 0) {
+      try {
+        const { linkGoalsToClusters } = await import("./todo-projector.js");
+        const backfill = await linkGoalsToClusters(userId);
+        if (backfill.linked > 0) {
+          console.log(`[batch-analyze] Backfill: linked ${backfill.linked} orphan goals to clusters`);
+        }
+      } catch (e) {
+        console.warn("[batch-analyze] Goal-cluster backfill failed:", e);
+      }
+    }
+
     const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
     console.log(
       `[batch-analyze] Done in ${elapsed}s: strikes=${result.strikeCount} clusters=${result.newClusters} ` +

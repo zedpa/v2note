@@ -40,16 +40,20 @@ export const confirmTool = {
                 status: "completed",
                 source: "chat_tool",
             });
-            const todo = await todoRepo.create({
+            const { todo, action: dedupAction } = await todoRepo.dedupCreate({
                 record_id: record.id,
                 text: intent.text,
                 done: false,
+                user_id: ctx.userId,
+                device_id: ctx.deviceId,
             });
             await pendingIntentRepo.updateStatus(intent_id, "promoted", todo.id);
             return {
                 success: true,
-                message: `已将「${intent.text}」转为待办`,
-                data: { todo_id: todo.id },
+                message: dedupAction === "matched"
+                    ? `「${intent.text}」已有相似待办，已关联`
+                    : `已将「${intent.text}」转为待办`,
+                data: { todo_id: todo.id, deduplicated: dedupAction === "matched" },
             };
         }
         // dismiss

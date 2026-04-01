@@ -294,7 +294,7 @@ async function executeCreateTodo(action, ctx) {
             summary: "没有提取到待办内容",
         };
     }
-    const todo = await todoRepo.create({
+    const { todo, action: dedupAction } = await todoRepo.dedupCreate({
         record_id: ctx.recordId ?? undefined,
         text,
         done: false,
@@ -305,7 +305,9 @@ async function executeCreateTodo(action, ctx) {
     return {
         action: "create_todo",
         success: true,
-        summary: `已创建待办"${text.slice(0, 20)}"`,
+        summary: dedupAction === "matched"
+            ? `已有相似待办"${todo.text.slice(0, 20)}"`
+            : `已创建待办"${text.slice(0, 20)}"`,
         todo_id: todoId,
     };
 }

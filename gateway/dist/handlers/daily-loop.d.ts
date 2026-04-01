@@ -60,5 +60,5 @@ export interface SummaryResult {
         follow_up: string[];
     };
 }
-export declare function generateMorningBriefing(deviceId: string, userId?: string): Promise<BriefingResult>;
-export declare function generateEveningSummary(deviceId: string, userId?: string): Promise<SummaryResult>;
+export declare function generateMorningBriefing(deviceId: string, userId?: string, forceRefresh?: boolean): Promise<BriefingResult>;
+export declare function generateEveningSummary(deviceId: string, userId?: string, forceRefresh?: boolean): Promise<SummaryResult>;

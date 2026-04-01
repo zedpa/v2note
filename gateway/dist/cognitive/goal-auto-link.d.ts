@@ -20,8 +20,8 @@ export interface IncrementalLinkResult {
     linked: number;
 }
 /**
- * digest 后检查新 Strike 是否和已有目标的 Cluster 语义匹配。
- * 匹配度 > 0.6 时将记录标记为目标相关。
+ * digest 后检查无 cluster_id 的活跃目标，尝试匹配新 Strike 所属的集群。
+ * 如果目标 embedding 与某集群相似度 > 阈值，设置 todo.cluster_id。
  */
 export declare function linkNewStrikesToGoals(newStrikes: Array<{
     id: string;

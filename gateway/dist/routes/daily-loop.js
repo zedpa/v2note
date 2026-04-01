@@ -8,7 +8,9 @@ export function registerDailyLoopRoutes(router) {
         try {
             const deviceId = getDeviceId(req);
             const userId = getUserId(req);
-            const briefing = await generateMorningBriefing(deviceId, userId ?? undefined);
+            const url = new URL(req.url ?? "", `http://${req.headers.host}`);
+            const forceRefresh = url.searchParams.get("refresh") === "true";
+            const briefing = await generateMorningBriefing(deviceId, userId ?? undefined, forceRefresh);
             sendJson(res, briefing);
         }
         catch (err) {
@@ -22,7 +24,9 @@ export function registerDailyLoopRoutes(router) {
         try {
             const deviceId = getDeviceId(req);
             const userId = getUserId(req);
-            const summary = await generateEveningSummary(deviceId, userId ?? undefined);
+            const url = new URL(req.url ?? "", `http://${req.headers.host}`);
+            const forceRefresh = url.searchParams.get("refresh") === "true";
+            const summary = await generateEveningSummary(deviceId, userId ?? undefined, forceRefresh);
             sendJson(res, summary);
         }
         catch (err) {

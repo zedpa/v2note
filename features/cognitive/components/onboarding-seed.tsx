@@ -65,25 +65,30 @@ export function OnboardingSeed({ onComplete, onSkip }: OnboardingSeedProps) {
   const [showTypingDot, setShowTypingDot] = useState(false);
   const [inputEnabled, setInputEnabled] = useState(true);
   const [listening, setListening] = useState(false);
-  const [viewportH, setViewportH] = useState<number | undefined>();
+  const [bottomOffset, setBottomOffset] = useState(0);
   const recognitionRef = useRef<any>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // 用 visualViewport 跟踪键盘高度，避免内容被推走
+  const { displayText, isTyping, type: typeText } = useTypewriter(35);
+
+  // visualViewport: 键盘弹出时输入框跟随键盘
   useEffect(() => {
+    if (showWelcome) return;
     const vv = window.visualViewport;
     if (!vv) return;
-    const update = () => setViewportH(vv.height);
+    const update = () => {
+      const offset = window.innerHeight - vv.offsetTop - vv.height;
+      setBottomOffset(Math.max(0, offset));
+    };
     vv.addEventListener("resize", update);
     vv.addEventListener("scroll", update);
+    update();
     return () => {
       vv.removeEventListener("resize", update);
       vv.removeEventListener("scroll", update);
     };
-  }, []);
-
-  const { displayText, isTyping, type: typeText } = useTypewriter(35);
+  }, [showWelcome]);
 
   // 已完成的消息列表（不含正在打字的消息）
   const [messages, setMessages] = useState<Array<{ role: "ai" | "user"; text: string }>>([]);
@@ -111,25 +116,39 @@ export function OnboardingSeed({ onComplete, onSkip }: OnboardingSeedProps) {
     }
   }, [showWelcome]);
 
+  /** 显示 AI 回复（typing indicator → 打字机效果） */
+  const showAIReply = useCallback(
+    async (text: string) => {
+      setInputEnabled(false);
+      // 显示 ··· 气泡
+      setShowTypingDot(true);
+      await new Promise((r) => setTimeout(r, 500));
+      setShowTypingDot(false);
+      // 打字机效果
+      setTypingMsgIdx(messages.length + 1); // +1 因为 user msg 刚加入
+      await typeText(text);
+      // 打字完成，加入消息列表
+      setMessages((prev) => [...prev, { role: "ai", text }]);
+      setTypingMsgIdx(-1);
+      setInputEnabled(true);
+    },
+    [messages.length, typeText],
+  );
+
   const handleSubmit = useCallback(async () => {
     const answer = inputText.trim();
     if (!answer || submitting || !inputEnabled) return;
 
     setSubmitting(true);
     setInputText("");
-    setInputEnabled(false);
 
     // 加入用户消息
-    const updatedMessages = [...messages, { role: "user" as const, text: answer }];
-    setMessages(updatedMessages);
+    setMessages((prev) => [...prev, { role: "user", text: answer }]);
 
     // 记住名字
     if (step === 1) {
       setName(answer);
     }
-
-    // 立即显示加载动画（不等 API）
-    setShowTypingDot(true);
 
     try {
       // 调用 AI 对话 API
@@ -141,18 +160,13 @@ export function OnboardingSeed({ onComplete, onSkip }: OnboardingSeedProps) {
       }>("/api/v1/onboarding/chat", {
         step,
         answer,
-        history: updatedMessages,
+        history: [...messages, { role: "user", text: answer }],
       });
 
       const { reply, nextStep, done } = res;
 
-      // API 返回后：关闭 typing dot → 打字机效果
-      setShowTypingDot(false);
-      setTypingMsgIdx(updatedMessages.length);
-      await typeText(reply);
-      setMessages((prev) => [...prev, { role: "ai", text: reply }]);
-      setTypingMsgIdx(-1);
-      setInputEnabled(true);
+      // 显示 AI 回复
+      await showAIReply(reply);
 
       if (done) {
         setTimeout(onComplete, 1500);
@@ -160,7 +174,6 @@ export function OnboardingSeed({ onComplete, onSkip }: OnboardingSeedProps) {
         setStep(nextStep);
       }
     } catch {
-      setShowTypingDot(false);
       // API 失败：用 fallback 回复
       const fallbacks: Record<number, string> = {
         1: `${answer}，你好！你平时主要在忙什么呢？`,
@@ -170,11 +183,7 @@ export function OnboardingSeed({ onComplete, onSkip }: OnboardingSeedProps) {
         5: `好的${name || answer}，我们开始吧 ✨`,
       };
       const fallback = fallbacks[step] ?? "我们继续吧";
-      setTypingMsgIdx(updatedMessages.length);
-      await typeText(fallback);
-      setMessages((prev) => [...prev, { role: "ai", text: fallback }]);
-      setTypingMsgIdx(-1);
-      setInputEnabled(true);
+      await showAIReply(fallback);
 
       if (step >= 5) {
         setTimeout(onComplete, 1500);
@@ -184,15 +193,12 @@ export function OnboardingSeed({ onComplete, onSkip }: OnboardingSeedProps) {
     }
 
     setSubmitting(false);
-  }, [inputText, submitting, inputEnabled, step, name, messages, typeText, onComplete]);
+  }, [inputText, submitting, inputEnabled, step, name, messages, showAIReply, onComplete]);
 
   const handleSkip = useCallback(async () => {
     if (step < 3) return; // Q1 Q2 不允许跳过
 
-    const updatedMessages = [...messages, { role: "user" as const, text: "（跳过）" }];
-    setMessages(updatedMessages);
-    setInputEnabled(false);
-    setShowTypingDot(true);
+    setMessages((prev) => [...prev, { role: "user", text: "（跳过）" }]);
 
     try {
       const res = await api.post<{
@@ -202,15 +208,10 @@ export function OnboardingSeed({ onComplete, onSkip }: OnboardingSeedProps) {
       }>("/api/v1/onboarding/chat", {
         step,
         answer: "",
-        history: updatedMessages,
+        history: messages,
       });
 
-      setShowTypingDot(false);
-      setTypingMsgIdx(updatedMessages.length);
-      await typeText(res.reply);
-      setMessages((prev) => [...prev, { role: "ai", text: res.reply }]);
-      setTypingMsgIdx(-1);
-      setInputEnabled(true);
+      await showAIReply(res.reply);
 
       if (res.done) {
         setTimeout(onComplete, 1500);
@@ -218,15 +219,13 @@ export function OnboardingSeed({ onComplete, onSkip }: OnboardingSeedProps) {
         setStep(res.nextStep);
       }
     } catch {
-      setShowTypingDot(false);
-      setInputEnabled(true);
       if (step >= 5) {
         onComplete();
       } else {
         setStep(step + 1);
       }
     }
-  }, [step, messages, typeText, onComplete]);
+  }, [step, messages, showAIReply, onComplete]);
 
   const toggleVoice = useCallback(() => {
     if (listening) {
@@ -302,13 +301,10 @@ export function OnboardingSeed({ onComplete, onSkip }: OnboardingSeedProps) {
       : "说点什么...";
 
   return (
-    <div
-      className="bg-surface flex flex-col overflow-hidden"
-      style={{ height: viewportH ? `${viewportH}px` : "100dvh" }}
-    >
-      <div className="w-full max-w-sm mx-auto flex-1 flex flex-col overflow-hidden px-6">
-        {/* 头部 */}
-        <div className="flex items-center gap-3 py-6 shrink-0">
+    <div className="fixed inset-0 bg-surface flex flex-col">
+      {/* 头部 */}
+      <div className="shrink-0 px-6 pt-safe">
+        <div className="flex items-center gap-3 py-4">
           <LuluLogo size={40} variant="color" />
           <div>
             <h1 className="font-serif text-lg text-on-surface">路路</h1>
@@ -317,125 +313,118 @@ export function OnboardingSeed({ onComplete, onSkip }: OnboardingSeedProps) {
             </p>
           </div>
         </div>
-
-        {/* 对话消息 */}
-        <div className="flex-1 flex flex-col gap-3 overflow-y-auto pb-4">
-          {messages.map((msg, i) => (
-            <div
-              key={i}
-              className={cn(
-                "flex",
-                msg.role === "user" ? "justify-end" : "justify-start",
-              )}
-            >
-              <div
-                className={cn(
-                  "max-w-[80%] w-fit rounded-2xl px-4 py-2.5 text-sm animate-bubble-enter",
-                  msg.role === "ai"
-                    ? "bg-surface-low text-on-surface"
-                    : "bg-deer/15 text-on-surface",
-                )}
-              >
-                {msg.text}
-              </div>
-            </div>
-          ))}
-
-          {/* Typing indicator ··· */}
-          {showTypingDot && (
-            <div className="flex justify-start">
-              <div className="w-fit rounded-2xl px-4 py-2.5 text-sm bg-surface-low text-on-surface animate-bubble-enter">
-                <span className="inline-flex gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-muted-accessible/50 animate-bounce" style={{ animationDelay: "0ms" }} />
-                  <span className="w-1.5 h-1.5 rounded-full bg-muted-accessible/50 animate-bounce" style={{ animationDelay: "150ms" }} />
-                  <span className="w-1.5 h-1.5 rounded-full bg-muted-accessible/50 animate-bounce" style={{ animationDelay: "300ms" }} />
-                </span>
-              </div>
-            </div>
-          )}
-
-          {/* 打字机效果的 AI 消息 */}
-          {isTyping && typingMsgIdx >= 0 && (
-            <div className="flex justify-start">
-              <div className="max-w-[80%] w-fit rounded-2xl px-4 py-2.5 text-sm bg-surface-low text-on-surface">
-                {displayText}
-                <span className="inline-block w-0.5 h-4 bg-on-surface/50 ml-0.5 animate-pulse align-text-bottom" />
-              </div>
-            </div>
-          )}
-
-          <div ref={messagesEndRef} />
-        </div>
       </div>
 
-      {/* 悬浮输入区 */}
-      <div className="shrink-0 bg-surface border-t border-outline/10 px-6 pb-[env(safe-area-inset-bottom,12px)] pt-3">
-        <div className="w-full max-w-sm mx-auto">
-          <div className="flex items-center gap-2">
-            {hasSpeechAPI && (
-              <button
-                type="button"
-                onClick={toggleVoice}
-                className={cn(
-                  "shrink-0 w-10 h-10 rounded-full flex items-center justify-center transition-colors",
-                  listening
-                    ? "bg-maple/20 text-maple"
-                    : "text-muted-accessible hover:text-on-surface",
-                )}
-                aria-label={listening ? "停止语音" : "语音输入"}
-              >
-                {listening ? <MicOff size={18} /> : <Mic size={18} />}
-              </button>
+      {/* 对话消息 — 可滚动区域 */}
+      <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+        {messages.map((msg, i) => (
+          <div
+            key={i}
+            className={cn(
+              "max-w-[85%] rounded-2xl px-4 py-2.5 text-sm animate-bubble-enter",
+              msg.role === "ai"
+                ? "bg-surface-low text-on-surface self-start"
+                : "bg-sky/15 text-on-surface self-end ml-auto",
             )}
-            <input
-              ref={inputRef}
-              type="text"
-              value={inputText}
-              onChange={(e) => setInputText(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
-              placeholder={placeholder}
-              disabled={!inputEnabled || submitting}
-              autoFocus
-              className="flex-1 rounded-xl bg-surface-lowest px-4 py-2.5 text-sm text-on-surface placeholder:text-muted-accessible/50 outline-none focus:ring-2 focus:ring-deer/30 disabled:opacity-50"
-            />
+          >
+            {msg.text}
+          </div>
+        ))}
+
+        {/* Typing indicator ··· */}
+        {showTypingDot && (
+          <div className="max-w-[85%] rounded-2xl px-4 py-2.5 text-sm bg-surface-low text-on-surface self-start animate-bubble-enter">
+            <span className="inline-flex gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-muted-accessible/50 animate-bounce" style={{ animationDelay: "0ms" }} />
+              <span className="w-1.5 h-1.5 rounded-full bg-muted-accessible/50 animate-bounce" style={{ animationDelay: "150ms" }} />
+              <span className="w-1.5 h-1.5 rounded-full bg-muted-accessible/50 animate-bounce" style={{ animationDelay: "300ms" }} />
+            </span>
+          </div>
+        )}
+
+        {/* 打字机效果的 AI 消息 */}
+        {isTyping && typingMsgIdx >= 0 && (
+          <div className="max-w-[85%] rounded-2xl px-4 py-2.5 text-sm bg-surface-low text-on-surface self-start">
+            {displayText}
+            <span className="inline-block w-0.5 h-4 bg-on-surface/50 ml-0.5 animate-pulse align-text-bottom" />
+          </div>
+        )}
+
+        <div ref={messagesEndRef} />
+      </div>
+
+      {/* 输入栏占位 */}
+      <div className="shrink-0 h-[72px]" />
+
+      {/* 固定底部输入区 — 跟随键盘 */}
+      <div
+        className="fixed left-0 right-0 z-50 px-6 py-3 pb-safe bg-surface/90 backdrop-blur-xl border-t border-brand-border/40"
+        style={{ bottom: `${bottomOffset}px` }}
+      >
+        <div className="flex items-center gap-2 max-w-sm mx-auto">
+          {hasSpeechAPI && (
             <button
-              onClick={handleSubmit}
-              disabled={!inputText.trim() || submitting || !inputEnabled}
-              className="shrink-0 w-10 h-10 rounded-full text-white flex items-center justify-center disabled:opacity-40 transition-opacity"
-              style={{ background: "linear-gradient(135deg, #89502C, #C8845C)" }}
-              aria-label="发送"
+              type="button"
+              onClick={toggleVoice}
+              className={cn(
+                "shrink-0 w-10 h-10 rounded-full flex items-center justify-center transition-colors",
+                listening
+                  ? "bg-maple/20 text-maple"
+                  : "text-muted-accessible hover:text-on-surface",
+              )}
+              aria-label={listening ? "停止语音" : "语音输入"}
+            >
+              {listening ? <MicOff size={18} /> : <Mic size={18} />}
+            </button>
+          )}
+          <input
+            ref={inputRef}
+            type="text"
+            value={inputText}
+            onChange={(e) => setInputText(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
+            placeholder={placeholder}
+            disabled={!inputEnabled || submitting}
+            autoFocus
+            className="flex-1 rounded-xl bg-surface-lowest px-4 py-2.5 text-sm text-on-surface placeholder:text-muted-accessible/50 outline-none focus:ring-2 focus:ring-deer/30 disabled:opacity-50"
+          />
+          <button
+            onClick={handleSubmit}
+            disabled={!inputText.trim() || submitting || !inputEnabled}
+            className="shrink-0 w-10 h-10 rounded-full text-white flex items-center justify-center disabled:opacity-40 transition-opacity"
+            style={{ background: "linear-gradient(135deg, #89502C, #C8845C)" }}
+            aria-label="发送"
+            type="button"
+          >
+            <Send size={16} />
+          </button>
+        </div>
+
+        {/* 跳过按钮 */}
+        {step >= 3 && inputEnabled && (
+          <div className="text-center pt-2 max-w-sm mx-auto">
+            <button
+              onClick={handleSkip}
+              className="text-xs text-muted-accessible/60 hover:text-muted-accessible transition-colors"
               type="button"
             >
-              <Send size={16} />
+              跳过这个问题
             </button>
           </div>
+        )}
 
-          {/* 跳过按钮 */}
-          {step >= 3 && inputEnabled && (
-            <div className="text-center pt-2 pb-1">
-              <button
-                onClick={handleSkip}
-                className="text-xs text-muted-accessible/60 hover:text-muted-accessible transition-colors"
-                type="button"
-              >
-                跳过这个问题
-              </button>
-            </div>
-          )}
-
-          {/* 全局跳过 */}
-          {step <= 2 && inputEnabled && (
-            <div className="text-center pt-1 pb-1">
-              <button
-                onClick={onSkip}
-                className="text-[11px] text-muted-accessible/40 hover:text-muted-accessible/60 transition-colors"
-                type="button"
-              >
-                跳过，直接开始
-              </button>
-            </div>
-          )}
-        </div>
+        {/* 全局跳过 */}
+        {step <= 2 && inputEnabled && (
+          <div className="text-center pt-2 max-w-sm mx-auto">
+            <button
+              onClick={onSkip}
+              className="text-[11px] text-muted-accessible/40 hover:text-muted-accessible/60 transition-colors"
+              type="button"
+            >
+              跳过，直接开始
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
