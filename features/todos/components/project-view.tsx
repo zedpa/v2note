@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, type TouchEvent } from "react";
 import type { ProjectGroup, TodoDTO } from "../lib/todo-types";
 import { ProjectCard } from "./project-card";
 import { PageDots } from "./page-dots";
@@ -36,6 +36,21 @@ export function ProjectView({
     setCurrentPage(Math.min(page, total - 1));
   }, [total]);
 
+  // 水平滑动时阻止事件冒泡，避免被外层 SwipeBack 拦截
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+  const handleCarouselTouchStart = useCallback((e: TouchEvent) => {
+    touchStartRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+  }, []);
+  const handleCarouselTouchMove = useCallback((e: TouchEvent) => {
+    if (!touchStartRef.current) return;
+    const dx = Math.abs(e.touches[0].clientX - touchStartRef.current.x);
+    const dy = Math.abs(e.touches[0].clientY - touchStartRef.current.y);
+    // 水平位移大于垂直 → 用户在横滑，阻止冒泡
+    if (dx > dy && dx > 10) {
+      e.stopPropagation();
+    }
+  }, []);
+
   const handleAdd = useCallback((parentId?: string) => {
     setCreateParentId(parentId);
     setCreateOpen(true);
@@ -58,6 +73,8 @@ export function ProjectView({
       <div
         ref={scrollRef}
         onScroll={handleScroll}
+        onTouchStart={handleCarouselTouchStart}
+        onTouchMove={handleCarouselTouchMove}
         className="flex snap-x snap-mandatory overflow-x-auto scrollbar-hide"
         style={{ scrollSnapType: "x mandatory" }}
       >

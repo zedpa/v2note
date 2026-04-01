@@ -1,0 +1,148 @@
+[    5276ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:3000/:0
+[    5392ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://localhost:3000/_next/static/chunks/5e54f_react-dom_4d21b075._.js:15305
+[    5463ms] Error: [next]/internal/font/google/geist_mono_b4ca0e5d.module.css:53:9
+Module not found: Can't resolve '@vercel/turbopack-next/internal/font/google/font'
+  51 |   font-display: swap;
+  52 |   src: url(@vercel/turbopack-next/internal/font/google/font?{%22url%22:%22https://fonts.gstatic.com/s/geistmono/v4/or3nQ6H-1_WfwkMZI_qYFrcdmhHkjko.woff2%22,%22preload%22:true,%22has_size_adjust%22:true}) format('woff2');
+> 53 |   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+     |         ^
+  54 | }
+  55 | @font-face {
+  56 |     font-family: 'Geist Mono Fallback';
+
+Import map: Resolved by import map
+
+
+Import trace:
+  Server Component:
+    [next]/internal/font/google/geist_mono_b4ca0e5d.module.css
+    [next]/internal/font/google/geist_mono_b4ca0e5d.js
+    ./app/layout.tsx
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+    at <unknown> (Error: [next]/internal/font/google/geist_mono_b4ca0e5d.module.css:53:9)
+    at <unknown> (https://nextjs.org/docs/messages/module-not-found)
+    at Object.getCompilationErrors (file://E:\AI\workspace-coding\v2note\node_modules\.pnpm\next@16.1.6_@playwright+tes_f43763d8faf5e2c81c7fa69d1441d4e7\node_modules\next\dist\server\dev\hot-reloader-turbopack.js:1008:59)
+    at DevBundlerService.getCompilationError (file://E:\AI\workspace-coding\v2note\node_modules\.pnpm\next@16.1.6_@playwright+tes_f43763d8faf5e2c81c7fa69d1441d4e7\node_modules\next\dist\server\lib\dev-bundler-service.js:44:55)
+    at DevServer.getCompilationError (file://E:\AI\workspace-coding\v2note\node_modules\.pnpm\next@16.1.6_@playwright+tes_f43763d8faf5e2c81c7fa69d1441d4e7\node_modules\next\dist\server\dev\next-dev-server.js:706:42)
+    at DevServer.findPageComponents (file://E:\AI\workspace-coding\v2note\node_modules\.pnpm\next@16.1.6_@playwright+tes_f43763d8faf5e2c81c7fa69d1441d4e7\node_modules\next\dist\server\dev\next-dev-server.js:676:43)
+    at async DevServer.renderErrorToResponseImpl (file://E:\AI\workspace-coding\v2note\node_modules\.pnpm\next@16.1.6_@playwright+tes_f43763d8faf5e2c81c7fa69d1441d4e7\node_modules\next\dist\server\base-server.js:1733:26)
+[    5461ms] [LOG] [HMR] connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_9f5861f4._.js:1206
+[    5494ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:3000/favicon.ico:0
+[    5586ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/dd884_next_dist_9f5861f4._.js:1206
+[    5622ms] [ERROR] [next]/internal/font/google/geist_mono_b4ca0e5d.module.css:53:9
+Module not found: Can't resolve '@vercel/turbopack-next/internal/font/google/font'
+  51 |   font-display: swap;
+  52 |   src: url(@vercel/turbopack-next/internal/font/google/font?{%22url%22:%22https://fonts.gstatic.com/s/geistmono/v4/or3nQ6H-1_WfwkMZI_qYFrcdmhHkjko.woff2%22,%22preload%22:true,%22has_size_adjust%22:true}) format('woff2');
+> 53 |   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+     |         ^
+  54 | }
+  55 | @font-face {
+  56 |     font-family: 'Geist Mono Fallback';
+
+Import map: Resolved by import map
+
+Import trace:
+  Server Component:
+    [next]/internal/font/google/geist_mono_b4ca0e5d.module.css
+    [next]/internal/font/google/geist_mono_b4ca0e5d.js
+    ./app/layout.tsx
+
+https://nextjs.org/docs/messages/module-not-found @ http://localhost:3000/_next/static/chunks/dd884_next_dist_9f5861f4._.js:1920
+[    5622ms] [ERROR] [next]/internal/font/google/inter_41dd558c.module.css:188:9
+Module not found: Can't resolve '@vercel/turbopack-next/internal/font/google/font'
+  186 |   font-display: swap;
+  187 |   src: url(@vercel/turbopack-next/internal/font/google/font?{%22url%22:%22https://fonts.gstatic.com/s/inter/v20/UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa1ZL7W0Q5nw.woff2%22,%22preload%22:true,%22has_size_adjust%22:true}) format('woff2');
+> 188 |   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+      |         ^
+  189 | }
+  190 | @font-face {
+  191 |     font-family: 'Inter Fallback';
+
+Import map: Resolved by import map
+
+Import trace:
+  Server Component:
+    [next]/internal/font/google/inter_41dd558c.module.css
+    [next]/internal/font/google/inter_41dd558c.js
+    ./app/layout.tsx
+
+https://nextjs.org/docs/messages/module-not-found @ http://localhost:3000/_next/static/chunks/dd884_next_dist_9f5861f4._.js:1920
+[    5622ms] [ERROR] [next]/internal/font/google/newsreader_f0af2e13.module.css:215:9
+Module not found: Can't resolve '@vercel/turbopack-next/internal/font/google/font'
+  213 |   font-display: swap;
+  214 |   src: url(@vercel/turbopack-next/internal/font/google/font?{%22url%22:%22https://fonts.gstatic.com/s/newsreader/v26/cY9VfjOCX1hbuyalUrK49dLac06G1ZGsZBtoBAbNJYQ5ayZC.woff2%22,%22preload%22:true,%22has_size_adjust%22:true}) format('woff2');
+> 215 |   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+      |         ^
+  216 | }
+  217 | @font-face {
+  218 |     font-family: 'Newsreader Fallback';
+
+Import map: Resolved by import map
+
+Import trace:
+  Server Component:
+    [next]/internal/font/google/newsreader_f0af2e13.module.css
+    [next]/internal/font/google/newsreader_f0af2e13.js
+    ./app/layout.tsx
+
+https://nextjs.org/docs/messages/module-not-found @ http://localhost:3000/_next/static/chunks/dd884_next_dist_9f5861f4._.js:1920
+[    6079ms] [ERROR] [next]/internal/font/google/geist_mono_b4ca0e5d.module.css:53:9
+Module not found: Can't resolve '@vercel/turbopack-next/internal/font/google/font'
+  51 |   font-display: swap;
+  52 |   src: url(@vercel/turbopack-next/internal/font/google/font?{%22url%22:%22https://fonts.gstatic.com/s/geistmono/v4/or3nQ6H-1_WfwkMZI_qYFrcdmhHkjko.woff2%22,%22preload%22:true,%22has_size_adjust%22:true}) format('woff2');
+> 53 |   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+     |         ^
+  54 | }
+  55 | @font-face {
+  56 |     font-family: 'Geist Mono Fallback';
+
+Import map: Resolved by import map
+
+Import trace:
+  Server Component:
+    [next]/internal/font/google/geist_mono_b4ca0e5d.module.css
+    [next]/internal/font/google/geist_mono_b4ca0e5d.js
+    ./app/layout.tsx
+
+https://nextjs.org/docs/messages/module-not-found @ http://localhost:3000/_next/static/chunks/dd884_next_dist_9f5861f4._.js:1920
+[    6079ms] [ERROR] [next]/internal/font/google/inter_41dd558c.module.css:188:9
+Module not found: Can't resolve '@vercel/turbopack-next/internal/font/google/font'
+  186 |   font-display: swap;
+  187 |   src: url(@vercel/turbopack-next/internal/font/google/font?{%22url%22:%22https://fonts.gstatic.com/s/inter/v20/UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa1ZL7W0Q5nw.woff2%22,%22preload%22:true,%22has_size_adjust%22:true}) format('woff2');
+> 188 |   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+      |         ^
+  189 | }
+  190 | @font-face {
+  191 |     font-family: 'Inter Fallback';
+
+Import map: Resolved by import map
+
+Import trace:
+  Server Component:
+    [next]/internal/font/google/inter_41dd558c.module.css
+    [next]/internal/font/google/inter_41dd558c.js
+    ./app/layout.tsx
+
+https://nextjs.org/docs/messages/module-not-found @ http://localhost:3000/_next/static/chunks/dd884_next_dist_9f5861f4._.js:1920
+[    6079ms] [ERROR] [next]/internal/font/google/newsreader_f0af2e13.module.css:215:9
+Module not found: Can't resolve '@vercel/turbopack-next/internal/font/google/font'
+  213 |   font-display: swap;
+  214 |   src: url(@vercel/turbopack-next/internal/font/google/font?{%22url%22:%22https://fonts.gstatic.com/s/newsreader/v26/cY9VfjOCX1hbuyalUrK49dLac06G1ZGsZBtoBAbNJYQ5ayZC.woff2%22,%22preload%22:true,%22has_size_adjust%22:true}) format('woff2');
+> 215 |   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+      |         ^
+  216 | }
+  217 | @font-face {
+  218 |     font-family: 'Newsreader Fallback';
+
+Import map: Resolved by import map
+
+Import trace:
+  Server Component:
+    [next]/internal/font/google/newsreader_f0af2e13.module.css
+    [next]/internal/font/google/newsreader_f0af2e13.js
+    ./app/layout.tsx
+
+https://nextjs.org/docs/messages/module-not-found @ http://localhost:3000/_next/static/chunks/dd884_next_dist_9f5861f4._.js:1920

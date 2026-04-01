@@ -1,0 +1,270 @@
+[     223ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[     330ms] [LOG] [HMR] connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[     451ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[     459ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3001/api/v1/cognitive/stats:0
+[     460ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[     464ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3001/api/v1/cognitive/stats:0
+[     525ms] [LOG] [Fast Refresh] done in 165ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[    1668ms] [WARNING] [gateway-client] Auth rejected by gateway, attempting token refresh... @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[    2712ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3001/api/v1/auth/refresh:0
+[    2713ms] [WARNING] [gateway-client] Token refresh failed, forcing logout @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[    2713ms] [LOG] [gateway-client] Auth logout detected, disconnecting @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[   29321ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3001/api/v1/auth/login:0
+[   30501ms] [ERROR] Failed to load resource: net::ERR_TIMED_OUT @ https://fonts.gstatic.com/s/notosanssc/v40/k3kXo84MPvpLmixcA63oeALhLOCT-xWNm8Hqd37g1OkDRZe7lR4sg1IzSy-MNbE9VH8V.119.woff2:0
+[   30502ms] [ERROR] Failed to load resource: net::ERR_TIMED_OUT @ https://fonts.gstatic.com/s/notosanssc/v40/k3kXo84MPvpLmixcA63oeALhLOCT-xWNm8Hqd37g1OkDRZe7lR4sg1IzSy-MNbE9VH8V.118.woff2:0
+[   30749ms] [ERROR] Failed to load resource: net::ERR_TIMED_OUT @ https://fonts.gstatic.com/s/notosanssc/v40/k3kXo84MPvpLmixcA63oeALhLOCT-xWNm8Hqd37g1OkDRZe7lR4sg1IzSy-MNbE9VH8V.117.woff2:0
+[   30750ms] [ERROR] Failed to load resource: net::ERR_TIMED_OUT @ https://fonts.gstatic.com/s/notosanssc/v40/k3kXo84MPvpLmixcA63oeALhLOCT-xWNm8Hqd37g1OkDRZe7lR4sg1IzSy-MNbE9VH8V.116.woff2:0
+[   65871ms] [ERROR] Failed to load resource: net::ERR_TIMED_OUT @ https://fonts.gstatic.com/s/notosanssc/v40/k3kXo84MPvpLmixcA63oeALhLOCT-xWNm8Hqd37g1OkDRZe7lR4sg1IzSy-MNbE9VH8V.115.woff2:0
+[   65871ms] [ERROR] Failed to load resource: net::ERR_TIMED_OUT @ https://fonts.gstatic.com/s/notosanssc/v40/k3kXo84MPvpLmixcA63oeALhLOCT-xWNm8Hqd37g1OkDRZe7lR4sg1IzSy-MNbE9VH8V.113.woff2:0
+[  247202ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3001/api/v1/auth/login:0
+[  906166ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3001/api/v1/auth/login:0
+[  954334ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 1031405ms] [ERROR] Failed to load resource: net::ERR_TIMED_OUT @ https://fonts.gstatic.com/s/notosanssc/v40/k3kXo84MPvpLmixcA63oeALhLOCT-xWNm8Hqd37g1OkDRZe7lR4sg1IzSy-MNbE9VH8V.112.woff2:0
+[ 1079554ms] [ERROR] Failed to load resource: net::ERR_TIMED_OUT @ https://fonts.gstatic.com/s/notosanssc/v40/k3kXo84MPvpLmixcA63oeALhLOCT-xWNm8Hqd37g1OkDRZe7lR4sg1IzSy-MNbE9VH8V.114.woff2:0
+[ 1126887ms] [ERROR] Failed to load resource: net::ERR_TIMED_OUT @ https://fonts.gstatic.com/s/notosanssc/v40/k3kXo84MPvpLmixcA63oeALhLOCT-xWNm8Hqd37g1OkDRZe7lR4sg1IzSy-MNbE9VH8V.109.woff2:0
+[ 1151422ms] [ERROR] Failed to load resource: the server responded with a status of 429 (Too Many Requests) @ http://localhost:3001/api/v1/records:0
+[ 1151437ms] [ERROR] Failed to load resource: the server responded with a status of 429 (Too Many Requests) @ http://localhost:3001/api/v1/records:0
+[ 1169042ms] [ERROR] Failed to load resource: net::ERR_TIMED_OUT @ https://fonts.gstatic.com/s/notosanssc/v40/k3kXo84MPvpLmixcA63oeALhLOCT-xWNm8Hqd37g1OkDRZe7lR4sg1IzSy-MNbE9VH8V.110.woff2:0
+[ 1205527ms] [WARNING] [gateway-client] Not connected, message queued @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 1205584ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 1257749ms] [ERROR] Failed to load resource: net::ERR_TIMED_OUT @ https://fonts.gstatic.com/s/notosanssc/v40/k3kXo84MPvpLmixcA63oeALhLOCT-xWNm8Hqd37g1OkDRZe7lR4sg1IzSy-MNbE9VH8V.104.woff2:0
+[ 1928027ms] [WARNING] [gateway-client] Not connected, message queued @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 2034852ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3001/api/v1/records/b42b0ce4-2b50-47db-80e6-9ae682a2e801/related:0
+[ 2067447ms] [ERROR] Failed to load resource: net::ERR_TIMED_OUT @ https://fonts.gstatic.com/s/notosanssc/v40/k3kXo84MPvpLmixcA63oeALhLOCT-xWNm8Hqd37g1OkDRZe7lR4sg1IzSy-MNbE9VH8V.48.woff2:0
+[ 2067448ms] [ERROR] Failed to load resource: net::ERR_TIMED_OUT @ https://fonts.gstatic.com/s/notosanssc/v40/k3kXo84MPvpLmixcA63oeALhLOCT-xWNm8Hqd37g1OkDRZe7lR4sg1IzSy-MNbE9VH8V.107.woff2:0
+[ 2067448ms] [ERROR] Failed to load resource: net::ERR_TIMED_OUT @ https://fonts.gstatic.com/s/notosanssc/v40/k3kXo84MPvpLmixcA63oeALhLOCT-xWNm8Hqd37g1OkDRZe7lR4sg1IzSy-MNbE9VH8V.100.woff2:0
+[ 2073453ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_CLOSED @ https://fonts.gstatic.com/s/notosanssc/v40/k3kXo84MPvpLmixcA63oeALhLOCT-xWNm8Hqd37g1OkDRZe7lR4sg1IzSy-MNbE9VH8V.69.woff2:0
+[ 2073748ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_CLOSED @ https://fonts.gstatic.com/s/notosanssc/v40/k3kXo84MPvpLmixcA63oeALhLOCT-xWNm8Hqd37g1OkDRZe7lR4sg1IzSy-MNbE9VH8V.106.woff2:0
+[ 2085601ms] [ERROR] Failed to load resource: net::ERR_TIMED_OUT @ https://fonts.gstatic.com/s/notosanssc/v40/k3kXo84MPvpLmixcA63oeALhLOCT-xWNm8Hqd37g1OkDRZe7lR4sg1IzSy-MNbE9VH8V.105.woff2:0
+[ 2097463ms] [ERROR] Failed to load resource: net::ERR_TIMED_OUT @ https://fonts.gstatic.com/s/notosanssc/v40/k3kXo84MPvpLmixcA63oeALhLOCT-xWNm8Hqd37g1OkDRZe7lR4sg1IzSy-MNbE9VH8V.102.woff2:0
+[ 2155862ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:3001/api/v1/daily/briefing:0
+[ 2156052ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:3001/api/v1/daily/briefing:0
+[ 2157455ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:3001/api/v1/daily/briefing:0
+[ 2158333ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:3001/api/v1/daily/briefing:0
+[ 2477715ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 2477758ms] [LOG] [Fast Refresh] done in 136ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 2479098ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 2479116ms] [LOG] [Fast Refresh] done in 133ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 2488925ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 2488955ms] [LOG] [Fast Refresh] done in 104ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 2500830ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 2500963ms] [LOG] [Fast Refresh] done in 237ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 2501079ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 2501164ms] [LOG] [HMR] connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 2501231ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 2511886ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 2511887ms] [LOG] [Fast Refresh] done in 106ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 3030859ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 3031337ms] [LOG] [Fast Refresh] done in 515ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 3058421ms] [LOG] [usePCMRecorder] AudioContext created. SampleRate: 16000, State: running @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 3062529ms] [LOG] [usePCMRecorder] Received chunk: 3200 bytes @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 3070356ms] [LOG] [usePCMRecorder] Already active, skipping duplicate start @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 3077048ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3001/api/v1/records/b42b0ce4-2b50-47db-80e6-9ae682a2e801/related:0
+[ 3108682ms] [ERROR] Failed to load resource: net::ERR_TIMED_OUT @ https://fonts.gstatic.com/s/notosanssc/v40/k3kXo84MPvpLmixcA63oeALhLOCT-xWNm8Hqd37g1OkDRZe7lR4sg1IzSy-MNbE9VH8V.104.woff2:0
+[ 3108985ms] [ERROR] Failed to load resource: net::ERR_TIMED_OUT @ https://fonts.gstatic.com/s/notosanssc/v40/k3kXo84MPvpLmixcA63oeALhLOCT-xWNm8Hqd37g1OkDRZe7lR4sg1IzSy-MNbE9VH8V.48.woff2:0
+[ 3108987ms] [ERROR] Failed to load resource: net::ERR_TIMED_OUT @ https://fonts.gstatic.com/s/notosanssc/v40/k3kXo84MPvpLmixcA63oeALhLOCT-xWNm8Hqd37g1OkDRZe7lR4sg1IzSy-MNbE9VH8V.110.woff2:0
+[ 3108987ms] [ERROR] Failed to load resource: net::ERR_TIMED_OUT @ https://fonts.gstatic.com/s/notosanssc/v40/k3kXo84MPvpLmixcA63oeALhLOCT-xWNm8Hqd37g1OkDRZe7lR4sg1IzSy-MNbE9VH8V.109.woff2:0
+[ 3127232ms] [ERROR] Failed to load resource: net::ERR_TIMED_OUT @ https://fonts.gstatic.com/s/notosanssc/v40/k3kXo84MPvpLmixcA63oeALhLOCT-xWNm8Hqd37g1OkDRZe7lR4sg1IzSy-MNbE9VH8V.107.woff2:0
+[ 3127232ms] [ERROR] Failed to load resource: net::ERR_TIMED_OUT @ https://fonts.gstatic.com/s/notosanssc/v40/k3kXo84MPvpLmixcA63oeALhLOCT-xWNm8Hqd37g1OkDRZe7lR4sg1IzSy-MNbE9VH8V.100.woff2:0
+[ 3138695ms] [ERROR] Failed to load resource: net::ERR_TIMED_OUT @ https://fonts.gstatic.com/s/notosanssc/v40/k3kXo84MPvpLmixcA63oeALhLOCT-xWNm8Hqd37g1OkDRZe7lR4sg1IzSy-MNbE9VH8V.69.woff2:0
+[ 3138994ms] [ERROR] Failed to load resource: net::ERR_TIMED_OUT @ https://fonts.gstatic.com/s/notosanssc/v40/k3kXo84MPvpLmixcA63oeALhLOCT-xWNm8Hqd37g1OkDRZe7lR4sg1IzSy-MNbE9VH8V.106.woff2:0
+[ 3145484ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_CLOSED @ https://fonts.gstatic.com/s/notosanssc/v40/k3kXo84MPvpLmixcA63oeALhLOCT-xWNm8Hqd37g1OkDRZe7lR4sg1IzSy-MNbE9VH8V.105.woff2:0
+[ 3157227ms] [ERROR] Failed to load resource: net::ERR_TIMED_OUT @ https://fonts.gstatic.com/s/notosanssc/v40/k3kXo84MPvpLmixcA63oeALhLOCT-xWNm8Hqd37g1OkDRZe7lR4sg1IzSy-MNbE9VH8V.102.woff2:0
+[ 3318944ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 3318962ms] [LOG] [Fast Refresh] done in 35ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 3331895ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 3331975ms] [LOG] [Fast Refresh] done in 107ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 3342975ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 3343015ms] [LOG] [Fast Refresh] done in 107ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 3351079ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 3351109ms] [LOG] [Fast Refresh] done in 67ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 3357527ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 3357549ms] [LOG] [Fast Refresh] done in 70ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 3363977ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 3363993ms] [LOG] [Fast Refresh] done in 84ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 3597266ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 3597293ms] [LOG] [Fast Refresh] done in 98ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 3609237ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 3609268ms] [LOG] [Fast Refresh] done in 93ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 3619345ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 3619345ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 3622363ms] [ERROR] WebSocket connection to 'ws://localhost:3001/' failed: Connection closed before receiving a handshake response @ http://localhost:3000/_next/static/chunks/features_chat_d659f97b._.js:65
+[ 3622364ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 3622364ms] [LOG] [gateway-client] Reconnect attempt 2/10 in 6000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 3628373ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 3630458ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 3630458ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 3633467ms] [ERROR] WebSocket connection to 'ws://localhost:3001/' failed: Connection closed before receiving a handshake response @ http://localhost:3000/_next/static/chunks/features_chat_d659f97b._.js:65
+[ 3633467ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 3633468ms] [LOG] [gateway-client] Reconnect attempt 2/10 in 6000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 3639479ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 3640366ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 3640397ms] [LOG] [Fast Refresh] done in 78ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 3642579ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 3642611ms] [LOG] [Fast Refresh] done in 63ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 3654182ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 3654212ms] [LOG] [Fast Refresh] done in 86ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 3655098ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 3655109ms] [LOG] [Fast Refresh] done in 83ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 3660705ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 3660733ms] [LOG] [Fast Refresh] done in 84ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 3667152ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 3667167ms] [LOG] [Fast Refresh] done in 104ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 3673056ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 3673094ms] [LOG] [Fast Refresh] done in 89ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 3686176ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 3686209ms] [LOG] [Fast Refresh] done in 77ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 3693964ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 3693982ms] [LOG] [Fast Refresh] done in 33ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 3744723ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 3744778ms] [LOG] [Fast Refresh] done in 164ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 3744882ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 3744960ms] [LOG] [HMR] connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 3745032ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 3953740ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 3954425ms] [LOG] [Fast Refresh] done in 787ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 4138756ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 4138772ms] [LOG] [Fast Refresh] done in 128ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 4371490ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 4371540ms] [LOG] [Fast Refresh] done in 149ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 4398292ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 4398308ms] [LOG] [Fast Refresh] done in 122ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 4451058ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 4451093ms] [LOG] [Fast Refresh] done in 135ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 4459488ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 4459488ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 4462505ms] [ERROR] WebSocket connection to 'ws://localhost:3001/' failed: Connection closed before receiving a handshake response @ http://localhost:3000/_next/static/chunks/features_chat_d659f97b._.js:65
+[ 4462505ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 4462505ms] [LOG] [gateway-client] Reconnect attempt 2/10 in 6000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 4468513ms] [ERROR] WebSocket connection to 'ws://localhost:3001/' failed: Connection closed before receiving a handshake response @ http://localhost:3000/_next/static/chunks/features_chat_d659f97b._.js:65
+[ 4468513ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 4468513ms] [LOG] [gateway-client] Reconnect attempt 3/10 in 12000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 4480521ms] [ERROR] WebSocket connection to 'ws://localhost:3001/' failed: Connection closed before receiving a handshake response @ http://localhost:3000/_next/static/chunks/features_chat_d659f97b._.js:65
+[ 4480521ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 4480521ms] [LOG] [gateway-client] Reconnect attempt 4/10 in 24000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 4504535ms] [ERROR] WebSocket connection to 'ws://localhost:3001/' failed: Connection closed before receiving a handshake response @ http://localhost:3000/_next/static/chunks/features_chat_d659f97b._.js:65
+[ 4504535ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 4504535ms] [LOG] [gateway-client] Reconnect attempt 5/10 in 48000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 4552547ms] [ERROR] WebSocket connection to 'ws://localhost:3001/' failed: Connection closed before receiving a handshake response @ http://localhost:3000/_next/static/chunks/features_chat_d659f97b._.js:65
+[ 4552547ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 4552547ms] [LOG] [gateway-client] Reconnect attempt 6/10 in 96000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 4648564ms] [ERROR] WebSocket connection to 'ws://localhost:3001/' failed: Connection closed before receiving a handshake response @ http://localhost:3000/_next/static/chunks/features_chat_d659f97b._.js:65
+[ 4648564ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 4648564ms] [LOG] [gateway-client] Reconnect attempt 7/10 in 96000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 4744571ms] [ERROR] WebSocket connection to 'ws://localhost:3001/' failed: Connection closed before receiving a handshake response @ http://localhost:3000/_next/static/chunks/features_chat_d659f97b._.js:65
+[ 4744571ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 4744571ms] [LOG] [gateway-client] Reconnect attempt 8/10 in 96000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 4840590ms] [ERROR] WebSocket connection to 'ws://localhost:3001/' failed: Connection closed before receiving a handshake response @ http://localhost:3000/_next/static/chunks/features_chat_d659f97b._.js:65
+[ 4840590ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 4840590ms] [LOG] [gateway-client] Reconnect attempt 9/10 in 96000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 4936598ms] [ERROR] WebSocket connection to 'ws://localhost:3001/' failed: Connection closed before receiving a handshake response @ http://localhost:3000/_next/static/chunks/features_chat_d659f97b._.js:65
+[ 4936598ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 4936599ms] [LOG] [gateway-client] Reconnect attempt 10/10 in 96000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5032619ms] [ERROR] WebSocket connection to 'ws://localhost:3001/' failed: Connection closed before receiving a handshake response @ http://localhost:3000/_next/static/chunks/features_chat_d659f97b._.js:65
+[ 5032619ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5032619ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5035633ms] [ERROR] WebSocket connection to 'ws://localhost:3001/' failed: Connection closed before receiving a handshake response @ http://localhost:3000/_next/static/chunks/features_chat_d659f97b._.js:65
+[ 5035633ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5035633ms] [LOG] [gateway-client] Reconnect attempt 2/10 in 6000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5041644ms] [ERROR] WebSocket connection to 'ws://localhost:3001/' failed: Connection closed before receiving a handshake response @ http://localhost:3000/_next/static/chunks/features_chat_d659f97b._.js:65
+[ 5041644ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5041645ms] [LOG] [gateway-client] Reconnect attempt 3/10 in 12000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5053651ms] [ERROR] WebSocket connection to 'ws://localhost:3001/' failed: Connection closed before receiving a handshake response @ http://localhost:3000/_next/static/chunks/features_chat_d659f97b._.js:65
+[ 5053651ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5053652ms] [LOG] [gateway-client] Reconnect attempt 4/10 in 24000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5077666ms] [ERROR] WebSocket connection to 'ws://localhost:3001/' failed: Connection closed before receiving a handshake response @ http://localhost:3000/_next/static/chunks/features_chat_d659f97b._.js:65
+[ 5077667ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5077667ms] [LOG] [gateway-client] Reconnect attempt 5/10 in 48000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5125689ms] [ERROR] WebSocket connection to 'ws://localhost:3001/' failed: Connection closed before receiving a handshake response @ http://localhost:3000/_next/static/chunks/features_chat_d659f97b._.js:65
+[ 5125689ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5125689ms] [LOG] [gateway-client] Reconnect attempt 6/10 in 96000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5221696ms] [ERROR] WebSocket connection to 'ws://localhost:3001/' failed: Connection closed before receiving a handshake response @ http://localhost:3000/_next/static/chunks/features_chat_d659f97b._.js:65
+[ 5221696ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5221697ms] [LOG] [gateway-client] Reconnect attempt 7/10 in 96000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5317717ms] [ERROR] WebSocket connection to 'ws://localhost:3001/' failed: Connection closed before receiving a handshake response @ http://localhost:3000/_next/static/chunks/features_chat_d659f97b._.js:65
+[ 5317718ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5317718ms] [LOG] [gateway-client] Reconnect attempt 8/10 in 96000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5413738ms] [ERROR] WebSocket connection to 'ws://localhost:3001/' failed: Connection closed before receiving a handshake response @ http://localhost:3000/_next/static/chunks/features_chat_d659f97b._.js:65
+[ 5413738ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5413738ms] [LOG] [gateway-client] Reconnect attempt 9/10 in 96000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5509758ms] [ERROR] WebSocket connection to 'ws://localhost:3001/' failed: Connection closed before receiving a handshake response @ http://localhost:3000/_next/static/chunks/features_chat_d659f97b._.js:65
+[ 5509759ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5509759ms] [LOG] [gateway-client] Reconnect attempt 10/10 in 96000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5605779ms] [ERROR] WebSocket connection to 'ws://localhost:3001/' failed: Connection closed before receiving a handshake response @ http://localhost:3000/_next/static/chunks/features_chat_d659f97b._.js:65
+[ 5605779ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5605779ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5608789ms] [ERROR] WebSocket connection to 'ws://localhost:3001/' failed: Connection closed before receiving a handshake response @ http://localhost:3000/_next/static/chunks/features_chat_d659f97b._.js:65
+[ 5608789ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5608790ms] [LOG] [gateway-client] Reconnect attempt 2/10 in 6000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5614806ms] [ERROR] WebSocket connection to 'ws://localhost:3001/' failed: Connection closed before receiving a handshake response @ http://localhost:3000/_next/static/chunks/features_chat_d659f97b._.js:65
+[ 5614806ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5614806ms] [LOG] [gateway-client] Reconnect attempt 3/10 in 12000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5626813ms] [ERROR] WebSocket connection to 'ws://localhost:3001/' failed: Connection closed before receiving a handshake response @ http://localhost:3000/_next/static/chunks/features_chat_d659f97b._.js:65
+[ 5626814ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5626814ms] [LOG] [gateway-client] Reconnect attempt 4/10 in 24000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5650841ms] [ERROR] WebSocket connection to 'ws://localhost:3001/' failed: Connection closed before receiving a handshake response @ http://localhost:3000/_next/static/chunks/features_chat_d659f97b._.js:65
+[ 5650841ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5650841ms] [LOG] [gateway-client] Reconnect attempt 5/10 in 48000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5698869ms] [ERROR] WebSocket connection to 'ws://localhost:3001/' failed: Connection closed before receiving a handshake response @ http://localhost:3000/_next/static/chunks/features_chat_d659f97b._.js:65
+[ 5698869ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5698869ms] [LOG] [gateway-client] Reconnect attempt 6/10 in 96000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5794883ms] [ERROR] WebSocket connection to 'ws://localhost:3001/' failed: Connection closed before receiving a handshake response @ http://localhost:3000/_next/static/chunks/features_chat_d659f97b._.js:65
+[ 5794883ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5794883ms] [LOG] [gateway-client] Reconnect attempt 7/10 in 96000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5890894ms] [ERROR] WebSocket connection to 'ws://localhost:3001/' failed: Connection closed before receiving a handshake response @ http://localhost:3000/_next/static/chunks/features_chat_d659f97b._.js:65
+[ 5890895ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5890895ms] [LOG] [gateway-client] Reconnect attempt 8/10 in 96000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5986916ms] [ERROR] WebSocket connection to 'ws://localhost:3001/' failed: Connection closed before receiving a handshake response @ http://localhost:3000/_next/static/chunks/features_chat_d659f97b._.js:65
+[ 5986916ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5986916ms] [LOG] [gateway-client] Reconnect attempt 9/10 in 96000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6082937ms] [ERROR] WebSocket connection to 'ws://localhost:3001/' failed: Connection closed before receiving a handshake response @ http://localhost:3000/_next/static/chunks/features_chat_d659f97b._.js:65
+[ 6082937ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6082938ms] [LOG] [gateway-client] Reconnect attempt 10/10 in 96000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6137847ms] [LOG] [usePCMRecorder] AudioContext created. SampleRate: 16000, State: running @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6137876ms] [WARNING] Construction of MediaStreamAudioSourceNode is not useful when context is closed. @ http://localhost:3000/_next/static/chunks/features_recording_5b391212._.js:95
+[ 6149953ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6149981ms] [LOG] [Fast Refresh] done in 96ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6169230ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6169342ms] [LOG] [Fast Refresh] done in 213ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6169423ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6169454ms] [LOG] [HMR] connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6169529ms] [ERROR] WebSocket connection to 'ws://localhost:3001/' failed: Connection closed before receiving a handshake response @ http://localhost:3000/_next/static/chunks/features_chat_d659f97b._.js:65
+[ 6169529ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6169529ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6171023ms] [LOG] [usePCMRecorder] AudioContext created. SampleRate: 16000, State: running @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6172542ms] [ERROR] WebSocket connection to 'ws://localhost:3001/' failed: Connection closed before receiving a handshake response @ http://localhost:3000/_next/static/chunks/features_chat_d659f97b._.js:65
+[ 6172542ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6172542ms] [LOG] [gateway-client] Reconnect attempt 2/10 in 6000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6178545ms] [ERROR] WebSocket connection to 'ws://localhost:3001/' failed: Connection closed before receiving a handshake response @ http://localhost:3000/_next/static/chunks/features_chat_d659f97b._.js:65
+[ 6178545ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6178545ms] [LOG] [gateway-client] Reconnect attempt 3/10 in 12000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6190559ms] [ERROR] WebSocket connection to 'ws://localhost:3001/' failed: Connection closed before receiving a handshake response @ http://localhost:3000/_next/static/chunks/features_chat_d659f97b._.js:65
+[ 6190559ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6190559ms] [LOG] [gateway-client] Reconnect attempt 4/10 in 24000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6214578ms] [ERROR] WebSocket connection to 'ws://localhost:3001/' failed: Connection closed before receiving a handshake response @ http://localhost:3000/_next/static/chunks/features_chat_d659f97b._.js:65
+[ 6214578ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6214578ms] [LOG] [gateway-client] Reconnect attempt 5/10 in 48000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6262586ms] [ERROR] WebSocket connection to 'ws://localhost:3001/' failed: Connection closed before receiving a handshake response @ http://localhost:3000/_next/static/chunks/features_chat_d659f97b._.js:65
+[ 6262586ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6262586ms] [LOG] [gateway-client] Reconnect attempt 6/10 in 96000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6358594ms] [ERROR] WebSocket connection to 'ws://localhost:3001/' failed: Connection closed before receiving a handshake response @ http://localhost:3000/_next/static/chunks/features_chat_d659f97b._.js:65
+[ 6358594ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6358594ms] [LOG] [gateway-client] Reconnect attempt 7/10 in 96000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6398352ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6398432ms] [LOG] [HMR] connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6398502ms] [ERROR] WebSocket connection to 'ws://localhost:3001/' failed: Connection closed before receiving a handshake response @ http://localhost:3000/_next/static/chunks/features_chat_d659f97b._.js:65
+[ 6398503ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6398503ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6399697ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6399747ms] [LOG] [HMR] connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6399804ms] [ERROR] WebSocket connection to 'ws://localhost:3001/' failed: Connection closed before receiving a handshake response @ http://localhost:3000/_next/static/chunks/features_chat_d659f97b._.js:65
+[ 6399807ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6399807ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6402822ms] [ERROR] WebSocket connection to 'ws://localhost:3001/' failed: Connection closed before receiving a handshake response @ http://localhost:3000/_next/static/chunks/features_chat_d659f97b._.js:65
+[ 6402822ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6402822ms] [LOG] [gateway-client] Reconnect attempt 2/10 in 6000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6407588ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6407612ms] [LOG] [HMR] connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6407690ms] [ERROR] WebSocket connection to 'ws://localhost:3001/' failed: Connection closed before receiving a handshake response @ http://localhost:3000/_next/static/chunks/features_chat_d659f97b._.js:65
+[ 6407690ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6407690ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297

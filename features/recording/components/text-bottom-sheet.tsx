@@ -287,51 +287,27 @@ export function TextBottomSheet({
             <div className="px-4 pt-1 pb-4 pb-safe space-y-1">
               <button
                 type="button"
-                onClick={() => {
-                  setShowActions(false);
-                  const input = document.createElement("input");
-                  input.type = "file";
-                  input.accept = "image/*";
-                  input.capture = "environment";
-                  input.onchange = (e) => {
-                    const file = (e.target as HTMLInputElement).files?.[0];
-                    if (file) setAttachment({ name: file.name, file });
-                  };
-                  input.click();
-                }}
-                className="flex items-center gap-3 w-full px-3 py-3 rounded-xl text-foreground hover:bg-secondary transition-colors"
+                disabled
+                className="flex items-center gap-3 w-full px-3 py-3 rounded-xl opacity-40 cursor-not-allowed"
               >
-                <Camera className="w-5 h-5 text-primary" />
-                <span className="text-sm">拍照</span>
+                <Camera className="w-5 h-5 text-muted-foreground" />
+                <span className="text-sm text-muted-foreground">拍照</span>
               </button>
               <button
                 type="button"
-                onClick={() => {
-                  setShowActions(false);
-                  const input = document.createElement("input");
-                  input.type = "file";
-                  input.accept = "image/*";
-                  input.onchange = (e) => {
-                    const file = (e.target as HTMLInputElement).files?.[0];
-                    if (file) setAttachment({ name: file.name, file });
-                  };
-                  input.click();
-                }}
-                className="flex items-center gap-3 w-full px-3 py-3 rounded-xl text-foreground hover:bg-secondary transition-colors"
+                disabled
+                className="flex items-center gap-3 w-full px-3 py-3 rounded-xl opacity-40 cursor-not-allowed"
               >
-                <Image className="w-5 h-5 text-primary" />
-                <span className="text-sm">从相册选择</span>
+                <Image className="w-5 h-5 text-muted-foreground" />
+                <span className="text-sm text-muted-foreground">从相册选择</span>
               </button>
               <button
                 type="button"
-                onClick={() => {
-                  setShowActions(false);
-                  fileInputRef.current?.click();
-                }}
-                className="flex items-center gap-3 w-full px-3 py-3 rounded-xl text-foreground hover:bg-secondary transition-colors"
+                disabled
+                className="flex items-center gap-3 w-full px-3 py-3 rounded-xl opacity-40 cursor-not-allowed"
               >
-                <FileText className="w-5 h-5 text-primary" />
-                <span className="text-sm">选择文件</span>
+                <FileText className="w-5 h-5 text-muted-foreground" />
+                <span className="text-sm text-muted-foreground">选择文件</span>
               </button>
             </div>
           </div>

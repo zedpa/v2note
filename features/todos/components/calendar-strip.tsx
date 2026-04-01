@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useCallback, useMemo } from "react";
+import { toLocalDateStr, getLocalToday } from "../lib/date-utils";
 
 interface CalendarStripProps {
   selectedDate: string; // YYYY-MM-DD
@@ -36,12 +37,12 @@ function generateWeeks(anchorDate: string): string[] {
 }
 
 function formatDate(d: Date): string {
-  return d.toISOString().split("T")[0];
+  return toLocalDateStr(d);
 }
 
 export function CalendarStrip({ selectedDate, onDateChange }: CalendarStripProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
-  const today = useMemo(() => new Date().toISOString().split("T")[0], []);
+  const today = useMemo(() => getLocalToday(), []);
 
   const days = useMemo(() => generateWeeks(selectedDate), [selectedDate]);
 

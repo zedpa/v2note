@@ -10,7 +10,6 @@ import {
   type LocalSettings,
 } from "@/shared/lib/local-config";
 import { SwipeBack } from "@/shared/components/swipe-back";
-import { getGatewayWsUrl, setGatewayUrl, clearGatewayUrl } from "@/shared/lib/gateway-url";
 import schema from "../lib/settings-schema.json";
 
 interface SettingsEditorProps {
@@ -21,13 +20,10 @@ interface SettingsEditorProps {
 export function SettingsEditor({ onClose, onThemeChange }: SettingsEditorProps) {
   const [settings, setSettings] = useState<LocalSettings | null>(null);
   const [loading, setLoading] = useState(true);
-  const [gatewayUrl, setGatewayUrlState] = useState("");
-
   useEffect(() => {
     async function load() {
       const s = await getSettings();
       setSettings(s);
-      setGatewayUrlState(getGatewayWsUrl());
       setLoading(false);
     }
     load();
@@ -88,7 +84,7 @@ export function SettingsEditor({ onClose, onThemeChange }: SettingsEditorProps) 
                     key={field.key}
                     className="flex items-center justify-between p-3 rounded-xl bg-card border border-border/50"
                   >
-                    <span className="text-sm text-foreground">{field.label}</span>
+                    <span className={`text-sm ${"disabled" in field && (field as any).disabled ? "text-muted-foreground/50" : "text-foreground"}`}>{field.label}</span>
 
                     {field.type === "toggle" && (
                       <Switch
@@ -103,7 +99,8 @@ export function SettingsEditor({ onClose, onThemeChange }: SettingsEditorProps) 
                         onChange={(e) =>
                           handleChange(field.key, e.target.value === "null" ? null : e.target.value)
                         }
-                        className="text-sm bg-secondary/50 border border-border/50 rounded-lg px-2 py-1.5 outline-none"
+                        disabled={"disabled" in field && Boolean((field as any).disabled)}
+                        className={`text-sm bg-secondary/50 border border-border/50 rounded-lg px-2 py-1.5 outline-none ${"disabled" in field && (field as any).disabled ? "opacity-40 cursor-not-allowed" : ""}`}
                       >
                         {"options" in field && (field.options as string[]).map((opt, idx) => {
                           const labels = "optionLabels" in field ? (field as any).optionLabels as string[] : null;
@@ -132,50 +129,6 @@ export function SettingsEditor({ onClose, onThemeChange }: SettingsEditorProps) 
             </div>
           ))}
 
-          {/* Gateway server URL */}
-          <div className="mb-6">
-            <h3 className="text-xs font-semibold text-muted-foreground uppercase mb-3">
-              服务器
-            </h3>
-            <div className="space-y-3">
-              <div className="p-3 rounded-xl bg-card border border-border/50">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm text-foreground">Gateway 地址</span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      clearGatewayUrl();
-                      setGatewayUrlState(getGatewayWsUrl());
-                      fabNotify.success("已恢复默认地址，重启后生效");
-                    }}
-                    className="text-xs text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    恢复默认
-                  </button>
-                </div>
-                <input
-                  type="text"
-                  value={gatewayUrl}
-                  placeholder="ws://192.168.x.x:3001"
-                  onChange={(e) => setGatewayUrlState(e.target.value)}
-                  onBlur={() => {
-                    const trimmed = gatewayUrl.trim();
-                    if (!trimmed) {
-                      clearGatewayUrl();
-                      setGatewayUrlState(getGatewayWsUrl());
-                      return;
-                    }
-                    setGatewayUrl(trimmed);
-                    fabNotify.success("Gateway 地址已保存，重启后生效");
-                  }}
-                  className="w-full text-sm bg-secondary/50 border border-border/50 rounded-lg px-3 py-2 outline-none font-mono"
-                />
-                <p className="text-xs text-muted-foreground mt-1.5">
-                  安卓/iOS 请填写电脑局域网 IP，如 ws://192.168.1.100:3001
-                </p>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
     </SwipeBack>

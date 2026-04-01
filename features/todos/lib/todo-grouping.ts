@@ -1,18 +1,6 @@
 import type { TodoDTO, ProjectGroup, TimeSlotGroup } from "./todo-types";
 import { assignTimeSlot, TIME_SLOTS, type TimeSlot } from "./time-slots";
-
-/**
- * 按日期过滤待办
- * - 有 scheduled_start 且日期匹配 → 包含
- * - 无 scheduled_start 且 created_at 日期匹配 → 包含
- * - 已完成且 completed 日 = 当天 → 包含（划线显示）
- */
-/** 将时间戳转为本地日期字符串 YYYY-MM-DD */
-function toLocalDate(ts: string): string {
-  const d = new Date(ts);
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-}
+import { toLocalDate } from "./date-utils";
 
 export function filterByDate(todos: TodoDTO[], dateStr: string): TodoDTO[] {
   return todos.filter((t) => {

@@ -470,7 +470,10 @@ export function FAB({
     <>
       {/* ─── RECORDING: Full-screen immersive backdrop ─── */}
       {phase === "recording" && (
-        <div className="fixed inset-0 z-30 pointer-events-none select-none">
+        <div
+          className="fixed inset-0 z-30 pointer-events-none select-none"
+          style={{ top: "calc(44px + env(safe-area-inset-top, 0px))" }}
+        >
           {/* Dark theater backdrop */}
           <div
             className="absolute inset-0 transition-opacity duration-300"
@@ -495,7 +498,7 @@ export function FAB({
           />
 
           {/* ─── TOP: Timer + status ─── */}
-          <div className="absolute top-0 left-0 right-0 pt-safe flex flex-col items-center pt-16">
+          <div className="absolute top-0 left-0 right-0 flex flex-col items-center pt-8">
             <div className="flex items-center gap-2.5 mb-3">
               <div className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse shadow-[0_0_8px_rgba(239,68,68,0.6)]" />
               <span className="text-[13px] tracking-[0.2em] text-white/50 uppercase font-medium">录音中</span>

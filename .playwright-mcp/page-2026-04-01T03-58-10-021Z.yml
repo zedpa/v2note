@@ -1,0 +1,20 @@
+- generic [ref=e1]:
+  - button "Open Next.js Dev Tools" [ref=e7] [cursor=pointer]:
+    - img [ref=e8]
+  - alert [ref=e11]
+  - generic [ref=e223]:
+    - generic [ref=e224]:
+      - generic [ref=e225]:
+        - img "路路 Logo" [ref=e226]
+        - generic [ref=e260]:
+          - heading "路路" [level=1] [ref=e261]
+          - paragraph [ref=e262]: 认识你 (1/5)
+      - generic [ref=e264]: 你好！我是路路 🦌 怎么称呼你？
+    - generic [ref=e266]:
+      - generic [ref=e267]:
+        - button "语音输入" [ref=e268] [cursor=pointer]:
+          - img [ref=e269]
+        - textbox "你的名字或昵称" [active] [ref=e272]
+        - button "发送" [disabled] [ref=e273]:
+          - img [ref=e274]
+      - button "跳过，直接开始" [ref=e278] [cursor=pointer]

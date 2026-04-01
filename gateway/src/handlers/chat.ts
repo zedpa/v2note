@@ -331,12 +331,12 @@ export async function startChat(
     if (transcriptSummary) {
       session.context.addMessage({
         role: "user",
-        content: `以下是 ${payload.dateRange.start} 到 ${payload.dateRange.end} 期间的记录内容：\n\n${transcriptSummary}\n\n请基于这些内容开始复盘对话。`,
+        content: `[系统补充上下文] 以下是 ${payload.dateRange.start} 到 ${payload.dateRange.end} 期间的记录内容：\n\n${transcriptSummary}\n\n请基于这些内容开始复盘对话。`,
       });
     } else {
       session.context.addMessage({
         role: "user",
-        content: `请开始 ${payload.dateRange.start} 到 ${payload.dateRange.end} 的复盘。这段时间暂无录音记录。`,
+        content: `[系统指令] 请开始 ${payload.dateRange.start} 到 ${payload.dateRange.end} 的复盘。这段时间暂无录音记录。`,
       });
     }
   }
@@ -673,12 +673,21 @@ export async function endChat(deviceId: string): Promise<void> {
 
   const history = session.context.getHistory();
   if (history.length > 0) {
-    const summary = history
+    // 过滤系统注入的伪 user 消息（系统指令、skill prompt、认知上下文等）
+    const isSystemInjected = (m: { role: string; content: string }) =>
+      m.role === "user" && /^\[系统[：指补]/.test(m.content);
+    const realHistory = history.filter((m) => !isSystemInjected(m));
+    const filtered = history.filter((m) => isSystemInjected(m));
+    console.log(`[chat][e2e-debug] endChat: total=${history.length}, filtered=${filtered.length}, kept=${realHistory.length}`);
+    filtered.forEach((m, i) => console.log(`[chat][e2e-debug]   FILTERED[${i}]: ${m.content.slice(0, 80)}...`));
+    realHistory.forEach((m, i) => console.log(`[chat][e2e-debug]   KEPT[${i}]: ${m.role}: ${m.content.slice(0, 80)}...`));
+
+    const summary = realHistory
       .map((m) => `${m.role}: ${m.content.slice(0, 200)}`)
       .join("\n");
 
     // Only check user messages for keyword pre-filtering
-    const userText = history
+    const userText = realHistory
       .filter(m => m.role === "user")
       .map(m => m.content)
       .join(" ");
@@ -687,7 +696,7 @@ export async function endChat(deviceId: string): Promise<void> {
     if (!userId) {
       console.warn(`[chat] endChat: session.userId is undefined for device ${deviceId}, soul/profile updates will use deviceId only`);
     }
-    if (shouldUpdateSoulStrict(history.filter(m => m.role === "user").map(m => m.content))) {
+    if (shouldUpdateSoulStrict(realHistory.filter(m => m.role === "user").map(m => m.content))) {
       updateSoul(deviceId, `[复盘对话] ${summary}`, userId).catch((e) => {
         console.warn(`[chat] Soul update failed: ${e.message}`);
       });
@@ -702,9 +711,9 @@ export async function endChat(deviceId: string): Promise<void> {
     });
 
     // 场景 5: 有价值的对话保存为日记 record，进入 Digest 管道
-    // 只保留用户消息，排除 AI 回复（避免 digest 从 AI 建议中提取虚假 intend）
-    if (history.length >= 4 && userId) {
-      const messages = history.filter(m => m.role === "user").map(m => ({ role: m.role, content: m.content }));
+    // 只保留真实用户消息，排除 AI 回复和系统注入消息
+    if (realHistory.length >= 4 && userId) {
+      const messages = realHistory.filter(m => m.role === "user").map(m => ({ role: m.role, content: m.content }));
       saveConversationAsRecord(messages, userId, deviceId).catch((e) => {
         console.warn(`[chat] Save conversation failed: ${e.message}`);
       });

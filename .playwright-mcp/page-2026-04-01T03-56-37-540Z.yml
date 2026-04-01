@@ -1,0 +1,17 @@
+- generic [active] [ref=e1]:
+  - button "Open Next.js Dev Tools" [ref=e7] [cursor=pointer]:
+    - img [ref=e8]
+  - alert [ref=e11]
+  - generic [ref=e180]:
+    - generic [ref=e181]:
+      - img "路路 Logo" [ref=e183]
+      - heading "创建账号" [level=1] [ref=e212]
+      - paragraph [ref=e213]: 注册后可跨设备同步数据
+    - generic [ref=e214]:
+      - textbox "手机号" [ref=e215]
+      - textbox "昵称（选填）" [ref=e216]
+      - textbox "密码（至少 6 位）" [ref=e217]
+      - textbox "确认密码" [ref=e218]
+      - paragraph [ref=e219]: 手机号或密码错误
+      - button "注册" [disabled] [ref=e220]
+    - button "已有账号？直接登录" [ref=e222] [cursor=pointer]

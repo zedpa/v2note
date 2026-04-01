@@ -1,0 +1,106 @@
+- generic [active] [ref=e1]:
+  - button "Open Next.js Dev Tools" [ref=e7] [cursor=pointer]:
+    - img [ref=e8]
+  - alert [ref=e11]
+  - generic [ref=e321]:
+    - banner [ref=e322]:
+      - generic [ref=e323]:
+        - button "打开侧边栏" [ref=e324] [cursor=pointer]: E
+        - generic [ref=e325]:
+          - button "日记" [ref=e326] [cursor=pointer]
+          - button "待办" [ref=e327] [cursor=pointer]
+        - generic [ref=e328]:
+          - button "AI 对话" [ref=e329] [cursor=pointer]:
+            - img "路路 Logo" [ref=e330]
+          - button "搜索" [ref=e359] [cursor=pointer]:
+            - img [ref=e360]
+          - button "通知" [ref=e363] [cursor=pointer]:
+            - img [ref=e364]
+    - main [ref=e367]:
+      - generic [ref=e369]:
+        - button "切换到项目视图" [ref=e371] [cursor=pointer]:
+          - img [ref=e372]
+        - generic [ref=e374]:
+          - generic [ref=e375]:
+            - generic [ref=e376]: 星期三
+            - generic [ref=e377]:
+              - generic [ref=e378]: 4月 2026
+              - button [ref=e379] [cursor=pointer]:
+                - img [ref=e380]
+          - generic [ref=e382]:
+            - button "一 30" [ref=e383] [cursor=pointer]:
+              - generic [ref=e384]: 一
+              - generic [ref=e386]: "30"
+            - button "二 31" [ref=e387] [cursor=pointer]:
+              - generic [ref=e388]: 二
+              - generic [ref=e390]: "31"
+            - button "三 1" [ref=e391] [cursor=pointer]:
+              - generic [ref=e392]: 三
+              - generic [ref=e394]: "1"
+            - button "四 2" [ref=e395] [cursor=pointer]:
+              - generic [ref=e396]: 四
+              - generic [ref=e398]: "2"
+            - button "五 3" [ref=e399] [cursor=pointer]:
+              - generic [ref=e400]: 五
+              - generic [ref=e402]: "3"
+            - button "六 4" [ref=e403] [cursor=pointer]:
+              - generic [ref=e404]: 六
+              - generic [ref=e406]: "4"
+            - button "日 5" [ref=e407] [cursor=pointer]:
+              - generic [ref=e408]: 日
+              - generic [ref=e410]: "5"
+          - generic [ref=e411]:
+            - button "随时 (0)" [ref=e412] [cursor=pointer]:
+              - img [ref=e413]
+              - text: 随时 (0)
+              - img [ref=e416]
+            - button "今天随时可做的事" [ref=e418] [cursor=pointer]:
+              - generic [ref=e419]: 今天随时可做的事
+              - img [ref=e421]
+          - generic [ref=e422]:
+            - button "上午 (0)" [ref=e423] [cursor=pointer]:
+              - img [ref=e424]
+              - text: 上午 (0)
+              - img [ref=e430]
+            - button "上午要做什么？" [ref=e432] [cursor=pointer]:
+              - generic [ref=e433]: 上午要做什么？
+              - img [ref=e435]
+          - generic [ref=e436]:
+            - button "下午 (0)" [ref=e437] [cursor=pointer]:
+              - img [ref=e438]
+              - text: 下午 (0)
+              - img [ref=e444]
+            - button "下午的安排" [ref=e446] [cursor=pointer]:
+              - generic [ref=e447]: 下午的安排
+              - img [ref=e449]
+          - generic [ref=e450]:
+            - button "晚上 (0)" [ref=e451] [cursor=pointer]:
+              - img [ref=e452]
+              - text: 晚上 (0)
+              - img [ref=e454]
+            - button "晚上收尾" [ref=e456] [cursor=pointer]:
+              - generic [ref=e457]: 晚上收尾
+              - img [ref=e459]
+    - button [ref=e462] [cursor=pointer]:
+      - img [ref=e463]
+    - generic [ref=e467]:
+      - banner [ref=e468]:
+        - button "返回" [ref=e469] [cursor=pointer]:
+          - img [ref=e470]
+        - generic [ref=e472]:
+          - paragraph [ref=e473]: 和路路聊聊
+          - paragraph [ref=e475]: 和路路对话
+      - generic [ref=e476]:
+        - generic [ref=e477]:
+          - generic [ref=e478]: 🦌
+          - generic [ref=e487]:
+            - paragraph [ref=e488]:
+              - text: 中午好，小潘。
+              - text: 刚看到你今早提到“下午三点找张总确认报价”，这事安排上了吗？
+            - paragraph [ref=e489]: 今天还有什么想法想丢进来，让路路帮你盯着的？
+        - paragraph [ref=e492]: 帮我加个待办：明天下午3点开产品评审会
+        - generic [ref=e494]: 🦌
+      - generic [ref=e481]:
+        - textbox "输入你的想法..." [disabled] [ref=e482]
+        - button "发送" [disabled] [ref=e483]:
+          - img [ref=e484]

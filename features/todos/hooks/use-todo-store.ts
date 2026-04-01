@@ -12,6 +12,7 @@ import {
 } from "@/shared/lib/api/todos";
 import type { TodoDTO, ProjectGroup, TimeSlotGroup } from "../lib/todo-types";
 import { filterByDate, groupByTimeSlot, buildProjectGroups } from "../lib/todo-grouping";
+import { getLocalToday } from "../lib/date-utils";
 
 /**
  * 统一待办数据源，替代 useTodos + useTodayTodos
@@ -23,7 +24,7 @@ export function useTodoStore() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<string>(
-    () => new Date().toISOString().split("T")[0],
+    () => getLocalToday(),
   );
 
   // ===== 数据获取 =====

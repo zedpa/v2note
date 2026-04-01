@@ -7,6 +7,7 @@ import { TimeViewHeader } from "./time-view-header";
 import { CalendarStrip } from "./calendar-strip";
 import { TimeBlock } from "./time-block";
 import { TodoCreateSheet } from "./todo-create-sheet";
+import { getLocalToday } from "../lib/date-utils";
 
 interface TimeViewProps {
   selectedDate: string;
@@ -33,7 +34,7 @@ export function TimeView({
   const [createSlot, setCreateSlot] = useState<TimeSlot>("anytime");
 
   const handleTodayClick = useCallback(() => {
-    onDateChange(new Date().toISOString().split("T")[0]);
+    onDateChange(getLocalToday());
   }, [onDateChange]);
 
   const handleAdd = useCallback((slot: TimeSlot) => {

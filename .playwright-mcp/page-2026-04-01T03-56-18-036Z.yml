@@ -1,0 +1,15 @@
+- generic [active] [ref=e1]:
+  - button "Open Next.js Dev Tools" [ref=e7] [cursor=pointer]:
+    - img [ref=e8]
+  - alert [ref=e11]
+  - generic [ref=e138]:
+    - generic [ref=e139]:
+      - img "路路 Logo" [ref=e141]
+      - heading "念念有路" [level=1] [ref=e170]
+      - paragraph [ref=e171]: 你的每一个想法，我都帮你记住
+    - generic [ref=e172]:
+      - textbox "手机号" [ref=e173]: zeds
+      - textbox "密码" [ref=e174]: "123456"
+      - paragraph [ref=e175]: 手机号或密码错误
+      - button "登录" [ref=e176] [cursor=pointer]
+    - button "没有账号？立即注册" [ref=e178] [cursor=pointer]

@@ -31,7 +31,10 @@ export function RecordingImmersive({
   onDone,
 }: RecordingImmersiveProps) {
   return (
-    <div className="fixed inset-0 z-50">
+    <div
+      className="fixed inset-0 z-50"
+      style={{ top: "calc(44px + env(safe-area-inset-top, 0px))" }}
+    >
       {/* Background */}
       <div className="absolute inset-0 bg-[#0a0a0f]" />
       <div
@@ -45,7 +48,7 @@ export function RecordingImmersive({
 
       <div className="absolute inset-0 flex flex-col items-center px-8">
         {/* Status badge */}
-        <div className="pt-safe mt-14 mb-6">
+        <div className="mt-8 mb-6">
           <div className="flex items-center gap-2.5 px-4 py-2 rounded-full border border-white/12 bg-white/5 animate-chip-fly-in">
             {paused ? (
               <div className="w-2 h-2 rounded-full bg-amber-500" />

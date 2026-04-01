@@ -2,6 +2,7 @@
 
 import { Check } from "lucide-react";
 import type { TodoDTO } from "../lib/todo-types";
+import { toLocalDate, getLocalToday } from "../lib/date-utils";
 
 interface TaskItemProps {
   todo: TodoDTO;
@@ -77,9 +78,9 @@ function formatRelativeDate(isoString: string): string {
   const tomorrow = new Date(today);
   tomorrow.setDate(tomorrow.getDate() + 1);
 
-  const dateStr = date.toISOString().split("T")[0];
-  const todayStr = today.toISOString().split("T")[0];
-  const tomorrowStr = tomorrow.toISOString().split("T")[0];
+  const dateStr = toLocalDate(isoString);
+  const todayStr = getLocalToday();
+  const tomorrowStr = toLocalDate(tomorrow.toISOString());
 
   if (dateStr === todayStr) return "今天";
   if (dateStr === tomorrowStr) return "明天";
