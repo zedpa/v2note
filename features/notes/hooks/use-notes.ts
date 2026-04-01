@@ -54,6 +54,7 @@ export function useNotes(notebook?: string | null, clusterId?: string | null) {
         const summary = r.summary;
         const transcript = r.transcript?.text ?? "";
         const tags = (r.tags ?? []).map((t: any) => t.name).filter(Boolean);
+        const hierarchy_tags = Array.isArray(r.hierarchy_tags) ? r.hierarchy_tags : [];
 
         const dt = new Date(r.created_at);
         const date = `${dt.getMonth() + 1}月${dt.getDate()}日`;
@@ -71,6 +72,7 @@ export function useNotes(notebook?: string | null, clusterId?: string | null) {
           title,
           short_summary,
           tags,
+          hierarchy_tags,
           date,
           time,
           location: r.location_text,

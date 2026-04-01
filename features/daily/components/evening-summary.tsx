@@ -67,7 +67,7 @@ export function EveningSummary({ onClose, onOpenChat }: EveningSummaryProps) {
           <div className="flex-1 flex items-center justify-center text-muted-accessible text-sm">
             <div className="text-center">
               <p>加载失败: {error}</p>
-              <button type="button" onClick={refresh} className="mt-2 text-deer underline">重试</button>
+              <button type="button" onClick={() => refresh()} className="mt-2 text-deer underline">重试</button>
             </div>
           </div>
         )}

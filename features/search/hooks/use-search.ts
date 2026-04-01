@@ -33,6 +33,7 @@ export function useSearch() {
           title: r.summary?.title ?? "",
           short_summary: r.summary?.short_summary ?? "",
           tags: (r.tags ?? []).map((t: any) => t.name ?? t),
+          hierarchy_tags: Array.isArray(r.hierarchy_tags) ? r.hierarchy_tags : [],
           date,
           time,
           location: r.location_text,

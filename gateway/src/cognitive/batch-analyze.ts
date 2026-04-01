@@ -530,6 +530,15 @@ export async function runBatchAnalyze(userId: string): Promise<BatchAnalyzeResul
         `patterns=${result.patterns} goals=${result.goals} supersedes=${result.supersedes}`,
     );
 
+    // 层级标签回刷：本批所有 strike 的 source record 更新 hierarchy_tags
+    if (newStrikeRows.length > 0) {
+      import("./tag-projector.js")
+        .then(({ batchRefreshByStrikeIds }) =>
+          batchRefreshByStrikeIds(newStrikeRows.map((s) => s.id)),
+        )
+        .catch((e) => console.warn("[batch-analyze] Tag projection failed:", e));
+    }
+
     // L2 涌现：本批有新 cluster 产出且用户总 L1 >= 3 时，尝试合并为 L2
     if (result.newClusters >= 1) {
       import("../db/pool.js")

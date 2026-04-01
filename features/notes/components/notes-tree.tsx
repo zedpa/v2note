@@ -22,6 +22,7 @@ function toNote(item: NoteItem): Note {
     id: item.id,
     title: item.title,
     tags: item.tags,
+    hierarchy_tags: item.hierarchy_tags,
     summary: item.short_summary,
     date: item.date,
     time: item.time,

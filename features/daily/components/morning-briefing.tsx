@@ -228,7 +228,7 @@ export function MorningBriefing({ onClose }: MorningBriefingProps) {
           <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm">
             <div className="text-center">
               <p>加载失败: {error}</p>
-              <button type="button" onClick={refresh} className="mt-2 text-primary underline">重试</button>
+              <button type="button" onClick={() => refresh()} className="mt-2 text-primary underline">重试</button>
             </div>
           </div>
         )}

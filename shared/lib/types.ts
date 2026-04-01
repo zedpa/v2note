@@ -151,12 +151,18 @@ export interface Review {
 /** @deprecated Use Review instead */
 export type WeeklyReview = Review
 
+export interface HierarchyTag {
+  label: string
+  level: number // 1=L1, 2=L2, 3=L3(domain)
+}
+
 // Composite type for note display (record + summary + tags)
 export interface NoteItem {
   id: string
   title: string
   short_summary: string
   tags: string[]
+  hierarchy_tags: HierarchyTag[]
   date: string
   time: string
   location: string | null

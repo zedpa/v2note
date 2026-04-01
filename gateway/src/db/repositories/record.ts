@@ -14,6 +14,7 @@ export interface Record {
   archived: boolean;
   digested: boolean;
   digested_at: string | null;
+  hierarchy_tags?: Array<{ label: string; level: number }>;
   created_at: string;
   updated_at: string;
 }
@@ -296,6 +297,17 @@ export async function updateCreatedAt(id: string, createdAt: string): Promise<vo
   await execute(
     `UPDATE record SET created_at = $2, updated_at = now() WHERE id = $1`,
     [id, createdAt],
+  );
+}
+
+/** 更新层级标签（L1/L2/L3 涌现结构反向标注） */
+export async function updateHierarchyTags(
+  id: string,
+  tags: Array<{ label: string; level: number }>,
+): Promise<void> {
+  await execute(
+    `UPDATE record SET hierarchy_tags = $1::jsonb, updated_at = now() WHERE id = $2`,
+    [JSON.stringify(tags), id],
   );
 }
 

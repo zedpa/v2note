@@ -71,6 +71,7 @@ export async function decayBondStrength(userId: string): Promise<number> {
     WHERE b.source_strike_id = s.id
       AND s.user_id = $1
       AND b.strength > 0.1
+      AND b.type != 'cluster_member'
       AND b.updated_at < now() - interval '30 days'
   `;
 

@@ -32,6 +32,7 @@ export function SearchView({ onClose, onNoteClick }: SearchViewProps) {
     id: n.id,
     title: n.title,
     tags: n.tags,
+    hierarchy_tags: n.hierarchy_tags,
     summary: n.short_summary,
     date: n.date,
     time: n.time,

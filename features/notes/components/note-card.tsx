@@ -6,11 +6,13 @@ import { cn } from "@/lib/utils";
 import { useStrikes } from "@/features/notes/hooks/use-strikes";
 import { useRelated } from "@/features/notes/hooks/use-related";
 import { StrikePreview, strikeSummaryText } from "./strike-preview";
+import type { HierarchyTag } from "@/shared/lib/types";
 
 export interface Note {
   id: string;
   title: string;
   tags: string[];
+  hierarchy_tags?: HierarchyTag[];
   summary: string;
   date: string;
   time: string;
@@ -225,9 +227,22 @@ export function NoteCard({
           )}
         </div>
 
-        {/* Tags */}
-        {note.tags.length > 0 && (
+        {/* Hierarchy Tags (L2/L1/L3) + Atom Tags */}
+        {((note.hierarchy_tags?.length ?? 0) > 0 || note.tags.length > 0) && (
           <div className="flex flex-wrap gap-1.5 mt-2.5">
+            {(note.hierarchy_tags ?? []).map((ht) => (
+              <span
+                key={`h-${ht.level}-${ht.label}`}
+                className={cn(
+                  "text-[10px] font-medium px-2 py-0.5 rounded-full",
+                  ht.level === 2 && "bg-deer/15 text-deer",
+                  ht.level === 1 && "border border-deer/40 text-deer",
+                  ht.level === 3 && "bg-surface-high text-muted-accessible",
+                )}
+              >
+                {ht.label}
+              </span>
+            ))}
             {note.tags.map((tag) => {
               const tagStyle = getTagStyle(tag);
               return (
