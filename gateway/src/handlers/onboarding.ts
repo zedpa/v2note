@@ -189,9 +189,11 @@ function parseAIResponse(content: string): {
   extracted_fields: ExtractedFields;
   skip_to: number | null;
 } {
+  // 清理可能的 markdown code block
+  const cleaned = content.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+
+  // 尝试直接解析
   try {
-    // 清理可能的 markdown code block
-    const cleaned = content.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
     const parsed = JSON.parse(cleaned);
     return {
       reply: parsed.reply ?? "",
@@ -199,9 +201,25 @@ function parseAIResponse(content: string): {
       skip_to: parsed.skip_to ?? null,
     };
   } catch {
-    // JSON 解析失败，把整个内容当作 reply
+    // AI 可能输出了 "文本 + JSON" 混合格式，尝试提取 JSON 部分
+    const jsonStart = cleaned.indexOf('{"reply"');
+    if (jsonStart > 0) {
+      try {
+        const parsed = JSON.parse(cleaned.slice(jsonStart));
+        return {
+          reply: parsed.reply ?? "",
+          extracted_fields: parsed.extracted_fields ?? {},
+          skip_to: parsed.skip_to ?? null,
+        };
+      } catch {
+        // 提取也失败，走 fallback
+      }
+    }
+
+    // 最终 fallback：去掉可能混入的 JSON 碎片，只保留纯文本
+    const textOnly = cleaned.replace(/\{[\s\S]*$/, "").trim();
     return {
-      reply: content.trim().slice(0, 100),
+      reply: textOnly || cleaned.slice(0, 100),
       extracted_fields: {},
       skip_to: null,
     };
