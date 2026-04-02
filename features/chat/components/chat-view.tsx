@@ -61,12 +61,10 @@ export function ChatView({ dateRange, onClose, initialMessage, title, mode: mode
 
   const handleCommandChip = useCallback((name: string) => {
     const text = `/${name}`;
-    // Try local command execution first (e.g. /todos, /search open overlays)
     if (commandContext) {
       const result = executeCommand(text, commandContext);
       if (result?.handled) return;
     }
-    // Not a local command — send to gateway
     send(text);
   }, [send, commandContext]);
 
@@ -88,8 +86,7 @@ export function ChatView({ dateRange, onClose, initialMessage, title, mode: mode
     }
   }, [input]);
 
-  const handleSkillChip = useCallback((skillName: string, label: string) => {
-    // 将 skill 激活指令作为消息发送给 AI
+  const handleSkillChip = useCallback((skillName: string, _label: string) => {
     setInput("");
     setSkillSuggestions([]);
     send(`/skill:${skillName}`);
@@ -102,6 +99,24 @@ export function ChatView({ dateRange, onClose, initialMessage, title, mode: mode
       disconnect();
     };
   }, [connect, disconnect]);
+
+  // 锁定背景滚动，防止键盘弹出时推动整个页面
+  useEffect(() => {
+    const scrollY = window.scrollY;
+    document.body.style.overflow = "hidden";
+    document.body.style.position = "fixed";
+    document.body.style.top = `-${scrollY}px`;
+    document.body.style.left = "0";
+    document.body.style.right = "0";
+    return () => {
+      document.body.style.overflow = "";
+      document.body.style.position = "";
+      document.body.style.top = "";
+      document.body.style.left = "";
+      document.body.style.right = "";
+      window.scrollTo(0, scrollY);
+    };
+  }, []);
 
   // Auto-scroll to bottom on new messages or keyboard open
   useEffect(() => {
@@ -116,12 +131,10 @@ export function ChatView({ dateRange, onClose, initialMessage, title, mode: mode
     const wasStreaming = prevStreamingRef.current;
     prevStreamingRef.current = streaming;
 
-    // Only trigger when streaming just finished
     if (wasStreaming && !streaming && commandContext) {
       const lastMsg = messages[messages.length - 1];
       if (lastMsg?.role === "assistant" && lastMsg.content) {
         const trimmed = lastMsg.content.trim();
-        // Check if the entire response is a slash command (e.g. "/settings")
         if (trimmed.startsWith("/") && trimmed.length < 50) {
           const result = executeCommand(trimmed, commandContext);
           if (result?.handled) return;
@@ -134,13 +147,10 @@ export function ChatView({ dateRange, onClose, initialMessage, title, mode: mode
     const trimmed = input.trim();
     if (!trimmed || streaming) return;
 
-    // In command mode, try to execute local commands first
     if (initialMessage && commandContext && trimmed.startsWith("/")) {
       const result = executeCommand(trimmed, commandContext);
       if (result?.handled) {
         setInput("");
-        // Don't call onClose — openOverlay already switches activeOverlay,
-        // which unmounts ChatView. Calling onClose would reset it to null.
         return;
       }
     }
@@ -182,58 +192,49 @@ export function ChatView({ dateRange, onClose, initialMessage, title, mode: mode
 
   return (
     <SwipeBack onClose={onClose}>
-      {/* Header — 独立 fixed 层，不受键盘影响 */}
-      <header
-        className="fixed top-0 left-0 right-0 z-40 flex items-center gap-3 px-4 h-[44px] bg-surface/80 backdrop-blur-[12px] border-b border-brand-border/40 pt-safe"
-      >
-        <button
-          type="button"
-          onClick={onClose}
-          className="w-9 h-9 flex items-center justify-center rounded-full text-muted-accessible hover:text-on-surface active:bg-surface/60 transition-colors select-none"
-          aria-label="返回"
-        >
-          <ArrowLeft size={20} />
-        </button>
-        <div className="flex-1 select-none">
-          <p className="text-sm font-medium text-on-surface">
-            {title ?? (resolvedMode === "insight" ? "洞察分析" : (resolvedMode === "command" || initialMessage) ? "和路路聊聊" : "复盘")}
-          </p>
-          <div className="flex items-center gap-1">
-            {resolvedMode === "insight" ? (
-              <p className="text-[10px] text-muted-accessible">
-                {dateRange.start} — {dateRange.end}
-              </p>
-            ) : (resolvedMode !== "command" && !initialMessage) ? (
-              <p className="text-[10px] text-muted-accessible">
-                {dateRange.start} - {dateRange.end}
-              </p>
-            ) : (
-              <p className="text-[10px] text-muted-accessible">
-                和路路对话
-              </p>
-            )}
-            {moodText && (
-              <p className="text-[10px] text-muted-accessible">
-                · 心情: {moodText}{deerState ? ` · ${deerState}` : ""}
-              </p>
-            )}
-          </div>
-        </div>
-        {!connected && (
-          <span className="text-[10px] text-dawn">连接中...</span>
-        )}
-      </header>
-
       {/* 主容器 — 高度跟随 visualViewport，键盘弹出时自动缩小 */}
       <div
         className="fixed inset-x-0 top-0 flex flex-col bg-surface"
         style={{ height: viewportHeight }}
       >
-        {/* Messages — pt 避让 header + safe-area */}
+        {/* ── Header: 极简 — "路路" + 呼吸状态灯 ── */}
+        <header
+          className="shrink-0 flex items-center gap-3 px-5 h-[56px] pt-safe"
+          style={{
+            background: "linear-gradient(to bottom, var(--surface) 60%, transparent)",
+          }}
+        >
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-9 h-9 flex items-center justify-center rounded-full text-muted-accessible hover:text-on-surface active:bg-surface/60 transition-colors select-none"
+            aria-label="返回"
+          >
+            <ArrowLeft size={20} />
+          </button>
+          <div className="flex items-center gap-2 select-none">
+            <span className="text-[17px] font-semibold text-on-surface">
+              {title ?? "路路"}
+            </span>
+            {/* AI 在线呼吸灯 */}
+            <span
+              className={cn(
+                "w-1.5 h-1.5 rounded-full shrink-0",
+                connected
+                  ? "bg-[#32D74B] animate-[pulse-glow_2s_ease-in-out_infinite]"
+                  : "bg-muted-accessible",
+              )}
+              style={connected ? {
+                boxShadow: "0 0 8px #32D74B",
+              } : undefined}
+            />
+          </div>
+        </header>
+
+        {/* ── Messages 消息区 ── */}
         <div
           ref={scrollRef}
-          className="flex-1 overflow-y-auto px-4 py-4"
-          style={{ paddingTop: "calc(44px + env(safe-area-inset-top, 24px))" }}
+          className="flex-1 overflow-y-auto px-5 py-4"
         >
           {messages.map((msg, i) =>
             msg.role === "plan" && msg.plan ? (
@@ -270,14 +271,18 @@ export function ChatView({ dateRange, onClose, initialMessage, title, mode: mode
           )}
 
           {/* Spacer so messages don't hide behind input bar */}
-          <div className="shrink-0 h-[72px]" />
+          <div className="shrink-0 h-[80px]" />
         </div>
       </div>
 
-      {/* Input bar — fixed 在底部，跟随键盘 */}
+      {/* ── 底部输入区: 毛玻璃控制中心 ── */}
       <div
-        className="fixed left-0 right-0 z-50 px-4 py-3 pb-safe bg-surface/90 backdrop-blur-xl border-t border-brand-border/40 shadow-[0_-4px_20px_var(--shadow-ambient)]"
-        style={{ bottom: `${bottomOffset}px` }}
+        className="fixed left-0 right-0 z-50 px-5 py-3 pb-safe bg-surface/85 backdrop-blur-[20px]"
+        style={{
+          bottom: `${bottomOffset}px`,
+          WebkitBackdropFilter: "blur(20px)",
+          borderTop: "1px solid rgba(255,255,255,0.05)",
+        }}
       >
         {/* Skill suggestions — "/" 快捷键触发 */}
         {skillSuggestions.length > 0 && (
@@ -294,7 +299,8 @@ export function ChatView({ dateRange, onClose, initialMessage, title, mode: mode
             ))}
           </div>
         )}
-        <div className="flex items-end gap-2">
+        <div className="flex items-end gap-3">
+          {/* 输入框 — 胶囊形 */}
           <textarea
             ref={inputRef}
             value={input}
@@ -308,11 +314,14 @@ export function ChatView({ dateRange, onClose, initialMessage, title, mode: mode
             placeholder="输入你的想法..."
             rows={1}
             enterKeyHint="send"
-            className="flex-1 bg-surface-lowest rounded-xl px-4 py-2.5 text-sm text-on-surface outline-none resize-none placeholder:text-muted-accessible/50 max-h-24"
-            style={{ minHeight: "40px" }}
+            className="flex-1 bg-surface-lowest rounded-full px-5 py-2.5 text-[15px] text-on-surface outline-none resize-none placeholder:text-muted-accessible/50 max-h-24"
+            style={{
+              minHeight: "44px",
+              border: "1px solid rgba(255,255,255,0.08)",
+            }}
             disabled={streaming}
           />
-          {/* 语音输入 */}
+          {/* 语音按钮 — 品牌色底板突出 */}
           {hasSpeechAPI && !input.trim() && (
             <button
               type="button"
@@ -322,14 +331,14 @@ export function ChatView({ dateRange, onClose, initialMessage, title, mode: mode
                 "flex items-center justify-center w-10 h-10 rounded-full transition-colors shrink-0",
                 listening
                   ? "bg-maple/20 text-maple"
-                  : "text-muted-accessible hover:text-on-surface",
+                  : "bg-deer/15 text-deer hover:bg-deer/30",
               )}
               aria-label={listening ? "停止语音" : "语音输入"}
             >
               {listening ? <MicOff size={18} /> : <Mic size={18} />}
             </button>
           )}
-          {/* 发送按钮 — 有文字时显示 */}
+          {/* 发送按钮 — 品牌渐变 */}
           {(input.trim() || !hasSpeechAPI) && (
             <button
               type="button"

@@ -52,8 +52,8 @@ export async function findById(id) {
     return queryOne(`SELECT * FROM record WHERE id = $1`, [id]);
 }
 export async function create(fields) {
-    const row = await queryOne(`INSERT INTO record (device_id, user_id, status, source, source_type, audio_path, duration_seconds, location_text, notebook)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`, [
+    const row = await queryOne(`INSERT INTO record (device_id, user_id, status, source, source_type, audio_path, duration_seconds, location_text, notebook, file_url, file_name)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`, [
         fields.device_id,
         fields.user_id ?? null,
         fields.status ?? "uploading",
@@ -63,6 +63,8 @@ export async function create(fields) {
         fields.duration_seconds ?? null,
         fields.location_text ?? null,
         fields.notebook ?? null,
+        fields.file_url ?? null,
+        fields.file_name ?? null,
     ]);
     return row;
 }
@@ -92,6 +94,14 @@ export async function updateFields(id, fields) {
     if (fields.audio_path !== undefined) {
         sets.push(`audio_path = $${i++}`);
         params.push(fields.audio_path);
+    }
+    if (fields.file_url !== undefined) {
+        sets.push(`file_url = $${i++}`);
+        params.push(fields.file_url);
+    }
+    if (fields.file_name !== undefined) {
+        sets.push(`file_name = $${i++}`);
+        params.push(fields.file_name);
     }
     params.push(id);
     await execute(`UPDATE record SET ${sets.join(", ")} WHERE id = $${i}`, params);

@@ -19,7 +19,7 @@
  *   RDS_HOST, RDS_DATABASE, RDS_USER, RDS_PASSWORD, RDS_PORT, RDS_SSL
  */
 
-import { readFileSync, existsSync, statSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { createHash } from "node:crypto";
 import { execSync } from "node:child_process";
@@ -141,3 +141,12 @@ console.log(`  版本: v${version} (code: ${versionCode})`);
 console.log(`  下载: ${downloadUrl}`);
 console.log(`  用户打开 App 将自动收到更新提示`);
 console.log("=========================================");
+
+// ── Step 3: 自动递增 patch 版本号 ──
+const [major, minor, patch] = version.split(".").map(Number);
+const nextVersion = `${major}.${minor}.${patch + 1}`;
+const pkgPath = join(ROOT, "package.json");
+const pkgRaw = readFileSync(pkgPath, "utf-8");
+writeFileSync(pkgPath, pkgRaw.replace(`"version": "${version}"`, `"version": "${nextVersion}"`), "utf-8");
+console.log();
+console.log(`  → package.json 版本已递增: ${version} → ${nextVersion}`);

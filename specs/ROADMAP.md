@@ -34,6 +34,69 @@ Spec: `specs/unified-daily-report.md`
 - [ ] 双视图：今日卡片 + 项目卡片
 - [ ] 新设计稿驱动（详见 memory: project_todo_redesign.md）
 
+## Chat UI Redesign (聊天界面重构)
+
+Spec: `specs/chat-ui-redesign.md`
+
+- [ ] Phase 1: 顶部极简 — "路路" + AI 呼吸状态灯，去掉副标题
+- [ ] Phase 2: 对话区质感 — 头像品牌色底板、非对称圆角气泡、1.6 行高
+- [ ] Phase 3: 底部控制中心 — 去 N 按钮、胶囊输入框、麦克风突出、毛玻璃
+- [ ] Phase 4: 滚动锁定 — 进入即锁 body，键盘不推页面
+
+## Android 状态栏适配 (全机型兼容)
+
+已知问题: 荣耀 Magic 7 全面屏模式下 App 内容侵入系统状态栏
+
+根因分析:
+- Android 15 (targetSdk 35) 强制启用 Edge-to-Edge，`overlaysWebView: false` 无效
+- `env(safe-area-inset-top)` 在 Android WebView (Chromium <140) 中返回 0
+- `.pt-safe` fallback 24px 可能不足以覆盖所有机型状态栏高度
+
+### 方案 A: 短期修复 — opt-out Edge-to-Edge（已执行）
+
+在 `android/app/src/main/res/values/styles.xml` 的 AppTheme.NoActionBar 中添加:
+```xml
+<item name="android:windowOptOutEdgeToEdgeEnforcement">true</item>
+```
+优点: 改动最小，一行 XML，下次打包即生效
+缺点: Android 未来版本可能移除此 opt-out 开关
+
+- [x] styles.xml 添加 windowOptOutEdgeToEdgeEnforcement
+- [ ] 荣耀 Magic 7 用户验证
+
+### 方案 B: 长期方案 — @capacitor-community/safe-area 插件
+
+安装 `@capacitor-community/safe-area`，由原生层注入真实 `--safe-area-inset-*` CSS 变量，
+全项目 CSS 从 `env(safe-area-inset-top)` 迁移到 `var(--safe-area-inset-top, 24px)`。
+
+- [ ] 安装插件: `pnpm add @capacitor-community/safe-area && npx cap sync`
+- [ ] globals.css: `.pt-safe` / `.pb-safe` 改用 `var(--safe-area-inset-top)` + fallback
+- [ ] 全项目 inline `env(safe-area-inset-top)` 替换为 CSS 变量
+- [ ] 移除 styles.xml 中的 opt-out（不再需要）
+- [ ] 全机型测试（荣耀/OPPO/vivo/小米/三星）
+
+## 录音功能 (暂不修复)
+
+已知问题: 聊天界面麦克风按钮点击无反应
+
+现状:
+- `ChatView` 中的 `toggleVoice()` 使用浏览器 Web Speech API (`SpeechRecognition`)
+- Android WebView 中 `SpeechRecognition` API 不可用，`hasSpeechAPI` 为 false 时按钮隐藏
+- 当 `hasSpeechAPI` 意外为 true 但实际不工作时，点击无反应
+- 与主录音功能（FAB → capacitor-voice-recorder）是不同的实现路径
+
+后续方向:
+- [ ] 聊天内语音输入改用 capacitor-voice-recorder + ASR（与主录音一致）
+- [ ] 或集成 DashScope 实时语音识别（已有 ASR handler）
+
+## Attachment Persistence (附件持久化)
+
+Spec: `specs/attachment-persistence.md`
+
+- [x] Phase 1: OSS URL + 文件名存储、timeline 图标、detail 预览
+- [ ] Phase 2: 文档分块 + RAG 检索（document_chunk 表、hybridRetrieve 扩展）
+- [ ] Phase 3: 检索增强（query rewriting、cross-encoder、多粒度索引）
+
 ## Fixes Completed (本轮已修复)
 
 - [x] Daily Briefing HTTP 500: pg Date 对象 `.startsWith()` 崩溃

@@ -16,7 +16,7 @@ import { createDefaultRegistry } from "../tools/definitions/index.js";
 import { mayProfileUpdate } from "../lib/text-utils.js";
 import { shouldUpdateSoulStrict } from "../cognitive/self-evolution.js";
 import { gatherDecisionContext, buildDecisionPrompt } from "../cognitive/decision.js";
-import { detectCognitiveQuery, loadChatCognitive, saveConversationAsRecord } from "../cognitive/advisor-context.js";
+import { detectCognitiveQuery, loadChatCognitive } from "../cognitive/advisor-context.js";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const INSIGHTS_DIR = join(__dirname, "../../insights");
 const SKILLS_DIR = join(__dirname, "../../skills");
@@ -598,14 +598,6 @@ export async function endChat(deviceId) {
         appendToDiary(deviceId, "ai-self", `[对话摘要] ${summary.slice(0, 500)}`, userId).catch((e) => {
             console.warn(`[chat] Diary append failed: ${e.message}`);
         });
-        // 场景 5: 有价值的对话保存为日记 record，进入 Digest 管道
-        // 只保留用户消息，排除 AI 回复（避免 digest 从 AI 建议中提取虚假 intend）
-        if (history.length >= 4 && userId) {
-            const messages = history.filter(m => m.role === "user").map(m => ({ role: m.role, content: m.content }));
-            saveConversationAsRecord(messages, userId, deviceId).catch((e) => {
-                console.warn(`[chat] Save conversation failed: ${e.message}`);
-            });
-        }
     }
     session.mode = "idle";
     session.context.clear();

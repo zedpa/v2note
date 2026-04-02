@@ -5,6 +5,9 @@
  */
 /** 根据环境变量创建搜索服务。无 API key 时返回 null */
 export function createSearchProvider() {
+    if (process.env.MOONSHOT_API_KEY) {
+        return new KimiProvider(process.env.MOONSHOT_API_KEY);
+    }
     if (process.env.TAVILY_API_KEY) {
         return new TavilyProvider(process.env.TAVILY_API_KEY);
     }
@@ -20,6 +23,57 @@ export function getSearchProvider() {
         _provider = createSearchProvider();
     }
     return _provider;
+}
+class KimiProvider {
+    apiKey;
+    constructor(apiKey) {
+        this.apiKey = apiKey;
+    }
+    async search(query, maxResults) {
+        const resp = await fetch("https://api.moonshot.cn/v1/chat/completions", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${this.apiKey}`,
+            },
+            body: JSON.stringify({
+                model: "kimi-latest",
+                messages: [
+                    {
+                        role: "system",
+                        content: `你是一个搜索助手。用户会给你搜索关键词，请联网搜索后返回前 ${maxResults} 条结果。每条结果用 JSON 数组格式返回：[{"title":"...","url":"...","snippet":"..."}]。只返回 JSON，不要其他文字。`,
+                    },
+                    { role: "user", content: query },
+                ],
+                tools: [{ type: "builtin_function", function: { name: "$web_search" } }],
+                temperature: 0.3,
+            }),
+            signal: AbortSignal.timeout(30000),
+        });
+        if (!resp.ok) {
+            const body = await resp.text().catch(() => "");
+            throw new Error(`Kimi API error: ${resp.status} ${body.slice(0, 200)}`);
+        }
+        const data = await resp.json();
+        const content = data.choices?.[0]?.message?.content ?? "";
+        // 从回复中提取 JSON 数组
+        const jsonMatch = content.match(/\[[\s\S]*\]/);
+        if (!jsonMatch) {
+            // 无法解析为结构化结果，返回整段文本作为单条结果
+            return [{ title: "搜索结果", url: "", snippet: content.slice(0, 500) }];
+        }
+        try {
+            const parsed = JSON.parse(jsonMatch[0]);
+            return parsed.slice(0, maxResults).map((r) => ({
+                title: r.title ?? "",
+                url: r.url ?? r.link ?? "",
+                snippet: r.snippet ?? r.content ?? r.description ?? "",
+            }));
+        }
+        catch {
+            return [{ title: "搜索结果", url: "", snippet: content.slice(0, 500) }];
+        }
+    }
 }
 class TavilyProvider {
     apiKey;

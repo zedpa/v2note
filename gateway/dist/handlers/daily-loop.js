@@ -7,6 +7,16 @@
  */
 import { chatCompletion } from "../ai/provider.js";
 import { todoRepo, recordRepo, goalRepo } from "../db/repositories/index.js";
+/** pg 驱动对 timestamp 列返回 Date 对象，需安全转为 string 以支持 startsWith 筛选 */
+export function toDateString(v) {
+    if (!v)
+        return null;
+    if (v instanceof Date)
+        return v.toISOString();
+    if (typeof v === "string")
+        return v;
+    return null;
+}
 import * as briefingRepo from "../db/repositories/daily-briefing.js";
 import { MemoryManager } from "../memory/manager.js";
 import { loadSoul } from "../soul/manager.js";
@@ -42,7 +52,7 @@ export async function generateMorningBriefing(deviceId, userId, forceRefresh) {
     const pendingTodos = userId
         ? await todoRepo.findPendingByUser(userId)
         : await todoRepo.findPendingByDevice(deviceId);
-    const todayScheduled = pendingTodos.filter((t) => t.scheduled_start?.startsWith(today));
+    const todayScheduled = pendingTodos.filter((t) => toDateString(t.scheduled_start)?.startsWith(today));
     const overdue = pendingTodos.filter((t) => t.scheduled_end ? new Date(t.scheduled_end) < now : false);
     const unscheduled = pendingTodos.filter((t) => !t.scheduled_start);
     const relayTodos = pendingTodos.filter((t) => t.category === "relay");
@@ -133,23 +143,32 @@ export async function generateMorningBriefing(deviceId, userId, forceRefresh) {
     const messages = [
         {
             role: "system",
-            content: `你是用户的个人助手，正在生成晨间简报。简报的核心目的：帮用户快速了解今天要做什么。
-${soulContent ? `你的人设：\n${soulContent}\n` : ""}${profileContent ? `用户画像：\n${profileContent}\n` : ""}
-规则：
-- 聚焦行动：今天需要做的事、需要推进的目标
-- 逾期事项放入 carry_over，提醒但不制造焦虑
-- AI 可协助的事项放入 ai_suggestions，给出具体建议
-- 不要回顾昨天的认知/思考（那是晚间回顾的事）
-- 保持简洁务实，每条不超过20字
+            content: `你是用户身边的朋友，正在生成晨间简报。
+
+核心目的：问候 + 提供情绪价值 + 显示今日安排（引导用户安排待办）。
+${soulContent ? `<user_soul>\n${soulContent}\n</user_soul>\n` : ""}${profileContent ? `<user_profile>\n${profileContent}\n</user_profile>\n` : ""}
+语言风格：
+- 口语化，短句，有呼吸感。可以用"嗯、啊、诶、确实、不过、话说回来"
+- 不要用"加油""你已经做得很好了""一切都会好的"这类空洞鼓励
+- 两句陈述配一句问句的节奏。有时候不问问题就是最好的
+- greeting 是核心——像一个了解你的朋友说的第一句话，自然、有温度、不正式
+
+内容规则：
+- greeting：个性化问候，包含日期。如果有遗留/逾期，轻描淡写提一句就好，不要制造焦虑
+- today_focus：从待办中提取最重要的 3-5 件事。如果待办很少或没有，写一句引导语如"今天想做点什么？"
+- goal_progress：有目标就列，没有就空数组。用一句自然的话说进度，不要只是数字
+- carry_over：逾期/昨日遗留。语气轻松，不是催债
+- ai_suggestions：如果有 AI 可协助的事就写，否则留空。不要硬凑建议
+- 不要建议用户"记录一下""把这个写下来"——记录是自然发生的，不是被建议的
 
 返回 JSON：
 {
-  "greeting": "个性化问候，包含日期",
-  "today_focus": ["今日最重要的3-5件事，按优先级排序"],
-  "goal_progress": [{"title":"目标名","pending_count":待办数,"today_todos":["相关待办"]}],
-  "carry_over": ["逾期/昨日遗留事项"],
+  "greeting": "一句自然的问候",
+  "today_focus": ["今日安排，3-5条，没有就写引导语"],
+  "goal_progress": [{"title":"目标名","pending_count":数字,"today_todos":["相关待办"]}],
+  "carry_over": ["遗留事项，语气轻松"],
   "relay_pending": [{"person":"人名","context":"事由","todoId":"id"}],
-  "ai_suggestions": ["AI可以帮忙做的事+建议"],
+  "ai_suggestions": ["AI可以帮忙的事，不硬凑"],
   "stats": {"yesterday_done": 数字, "yesterday_total": 数字, "streak": 数字}
 }
 空类别返回空数组。`,
@@ -262,14 +281,14 @@ export async function generateEveningSummary(deviceId, userId, forceRefresh) {
     const allTodos = userId
         ? await todoRepo.findByUser(userId)
         : await todoRepo.findByDevice(deviceId);
-    const todayDone = allTodos.filter((t) => t.done && t.completed_at && t.completed_at.startsWith(today));
+    const todayDone = allTodos.filter((t) => t.done && t.completed_at && toDateString(t.completed_at)?.startsWith(today));
     // 2. 今日新记录数
     let newRecordCount = 0;
     try {
         const records = userId
             ? await recordRepo.findByUser(userId, { limit: 100 })
             : await recordRepo.findByDevice(deviceId, { limit: 100 });
-        newRecordCount = records.filter((r) => r.created_at && r.created_at.startsWith(today)).length;
+        newRecordCount = records.filter((r) => r.created_at && toDateString(r.created_at)?.startsWith(today)).length;
     }
     catch {
         // non-critical
@@ -280,7 +299,7 @@ export async function generateEveningSummary(deviceId, userId, forceRefresh) {
         : await todoRepo.findPendingByDevice(deviceId);
     // 4. 转达状态
     const relayTodos = allTodos.filter((t) => t.category === "relay");
-    const relaysCompleted = relayTodos.filter((t) => t.done && t.completed_at && t.completed_at.startsWith(today)).length;
+    const relaysCompleted = relayTodos.filter((t) => t.done && t.completed_at && toDateString(t.completed_at)?.startsWith(today)).length;
     const relaysPending = relayTodos.filter((t) => !t.done);
     // 5. Soul + Profile
     let soulContent = "";
@@ -374,7 +393,7 @@ export async function generateEveningSummary(deviceId, userId, forceRefresh) {
             const goalLines = [];
             for (const g of topGoals) {
                 const todos = allTodosForGoals.filter((t) => t.parent_id === g.id);
-                const completedToday = todos.filter((t) => t.done && t.completed_at?.startsWith(today));
+                const completedToday = todos.filter((t) => t.done && toDateString(t.completed_at)?.startsWith(today));
                 const remaining = todos.filter((t) => !t.done);
                 goalLines.push(`- ${g.title}: 今日完成${completedToday.length}项, 剩余${remaining.length}项`);
             }
@@ -405,36 +424,55 @@ export async function generateEveningSummary(deviceId, userId, forceRefresh) {
         // non-critical
     }
     // 9. 明日排期（提前查询明日待办）
-    const tomorrowScheduled = pending.filter((t) => t.scheduled_start?.startsWith(tomorrow));
+    const tomorrowScheduled = pending.filter((t) => toDateString(t.scheduled_start)?.startsWith(tomorrow));
     const tomorrowSection = tomorrowScheduled.length > 0
         ? `\n## 明日已排期\n${tomorrowScheduled.slice(0, 5).map((t) => `- ${t.text}`).join("\n")}`
         : "";
-    // 10. 构建 AI prompt — 聚焦回顾 + 明日预告
+    // 10. 随机选择一种回顾视角
+    const perspectives = [
+        { name: "成就感", instruction: "聚焦完成了什么，让用户感受到'今天没白过'。哪怕只做了一件事，也值得被看到。" },
+        { name: "成长线", instruction: "聚焦今天的思考变化和认知发现。用户今天想明白了什么、态度有了什么转变？像朋友一样说'你今天那个想法挺有意思的'。" },
+        { name: "连接感", instruction: "聚焦今天和人的互动、转达事项。如果有和人相关的事，围绕关系来总结。没有就跳过，换成成就感视角。" },
+        { name: "节奏感", instruction: "聚焦今天的时间投入和精力分配。做了多少事、记录了多少想法、在哪个目标上花了心思。像回顾一天的'运动轨迹'。" },
+    ];
+    const todayPerspective = perspectives[new Date().getDay() % perspectives.length];
     const messages = [
         {
             role: "system",
-            content: `你是用户的个人助手，正在生成每日回顾。回顾的核心目的：帮用户理解今天发生了什么，感受进步，并为明天做准备。
-${soulContent ? `你的人设：\n${soulContent}\n` : ""}${profileContent ? `用户画像：\n${profileContent}\n` : ""}
-规则：
-- 回顾部分：完成了什么 + 思考了什么 + 目标推进了多少
-- 认知维度：将今日的思考发现、想法变化用温暖的语言转述（不用技术术语）
-- 如果有领悟(realize)类收获，重点肯定
-- attention_needed：温和提及跳过多次的事项，不要制造压力
-- tomorrow_preview：结构化的明日预告（已排期 + 遗留 + 跟进），帮用户安心入睡
-- 保持简洁，每条不超过20字
+            content: `你是用户身边的朋友，正在生成晚间回顾。
+
+核心目的：让用户感受到今天的价值 + 提供情绪价值 + 帮用户安心入睡。
+聚焦**已完成的事**，而不是未完成的。未完成的放在 tomorrow_preview 里，语气是"明天继续"而不是"你还没做完"。
+${soulContent ? `<user_soul>\n${soulContent}\n</user_soul>\n` : ""}${profileContent ? `<user_profile>\n${profileContent}\n</user_profile>\n` : ""}
+今日回顾视角：「${todayPerspective.name}」
+${todayPerspective.instruction}
+
+语言风格：
+- 口语化，短句，有呼吸感
+- 不要用"加油""你已经做得很好了""一切都会好的"这类空洞鼓励
+- 如果用户今天什么都没做——不要说"没关系明天继续"，就陪着。"今天就这样了"比"明天会更好"真诚
+- 如果用户做了很多——跟他一起开心，"卧槽今天效率真高"比"恭喜你完成了很多任务"有温度
+- 不要建议"记录一下""把这个写下来"
+- 认知发现用自然语言转述，不要用"Strike""Bond"等技术术语
+
+情绪判断：
+- 如果今日完成数>0：肯定具体的事，不要泛泛表扬
+- 如果今日完成数=0 但有记录：聚焦思考本身的价值
+- 如果什么都没有：一句简短的陪伴就够了，不要长篇大论
+- attention_needed：温和提及，不制造压力。"这个事搁了几天了"比"你需要关注这个"好
 
 返回 JSON：
 {
-  "accomplishments": ["今日完成的重要事项"],
-  "cognitive_highlights": ["今日思考收获，用温暖自然的语言"],
-  "goal_updates": [{"title":"目标名","completed_count":今日完成数,"remaining_count":剩余数,"note":"一句话总结"}],
-  "attention_needed": ["需要关注的事项（跳过多次/有阻力）"],
-  "relay_summary": ["转达事项状态"],
+  "accomplishments": ["今日完成的事，具体到事项名"],
+  "cognitive_highlights": ["今日思考/想法/发现，用朋友的口吻"],
+  "goal_updates": [{"title":"目标名","completed_count":今日完成数,"remaining_count":剩余数,"note":"一句自然的话"}],
+  "attention_needed": ["搁了几天的事，温和提及"],
+  "relay_summary": ["转达状态"],
   "stats": {"done": 数字, "new_records": 数字, "new_strikes": 数字, "relays_completed": 数字},
   "tomorrow_preview": {
-    "scheduled": ["明日已排期的事"],
-    "carry_over": ["今日遗留，明天继续"],
-    "follow_up": ["需要跟进确认结果的事"]
+    "scheduled": ["明日已排期"],
+    "carry_over": ["今天没做完的，明天继续"],
+    "follow_up": ["需要跟进的"]
   }
 }
 空类别返回空数组/空对象。`,

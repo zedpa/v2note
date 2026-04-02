@@ -13,16 +13,29 @@ export function ChatBubble({ message, streaming }: ChatBubbleProps) {
   const isUser = message.role === "user";
   const isToolStatus = message.role === "tool-status";
 
-  // 工具状态：临时 loading 卡片（streaming 结束后自动消失）
+  // 工具状态：临时 loading 卡片
   if (isToolStatus) {
     return (
-      <div className="flex gap-2.5 mb-4 flex-row">
-        <div className="w-7 h-7 rounded-full flex items-center justify-center shrink-0 text-sm mt-0.5">
+      <div className="flex gap-3 mb-6 flex-row items-start">
+        {/* AI 头像 — 品牌色渐变底板 */}
+        <div
+          className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 text-base"
+          style={{
+            background: "linear-gradient(135deg, #3A2E28, #2A201A)",
+            boxShadow: "0 4px 10px rgba(0,0,0,0.5)",
+          }}
+        >
           🦌
         </div>
-        <div className="flex items-center gap-2 rounded-2xl rounded-tl-sm bg-surface-low px-4 py-2.5">
+        <div
+          className="flex items-center gap-2 bg-surface-high px-[18px] py-[14px]"
+          style={{
+            borderRadius: "20px 20px 20px 4px",
+            border: "1px solid rgba(255,255,255,0.03)",
+          }}
+        >
           <span className="w-1.5 h-1.5 rounded-full bg-deer animate-pulse" />
-          <span className="text-sm text-muted-foreground">{message.content}</span>
+          <span className="text-sm text-muted-foreground leading-[1.6]">{message.content}</span>
         </div>
       </div>
     );
@@ -31,25 +44,35 @@ export function ChatBubble({ message, streaming }: ChatBubbleProps) {
   return (
     <div
       className={cn(
-        "flex gap-2.5 mb-4",
+        "flex gap-3 mb-6 items-start",
         isUser ? "flex-row-reverse" : "flex-row",
       )}
     >
-      {/* 头像 */}
+      {/* AI 头像 — 品牌色渐变底板 + glow */}
       {!isUser && (
-        <div className="w-7 h-7 rounded-full flex items-center justify-center shrink-0 text-sm mt-0.5">
+        <div
+          className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 text-base"
+          style={{
+            background: "linear-gradient(135deg, #3A2E28, #2A201A)",
+            boxShadow: "0 4px 10px rgba(0,0,0,0.5)",
+          }}
+        >
           🦌
         </div>
       )}
 
-      {/* 气泡 */}
+      {/* 气泡 — 非对称圆角 + 宽松内边距 */}
       <div
         className={cn(
-          "max-w-[80%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed",
-          isUser
-            ? "bg-sky/15 text-on-surface rounded-tr-sm"
-            : "bg-surface-low text-on-surface rounded-tl-sm",
+          "max-w-[85%] px-[18px] py-[14px] text-sm leading-[1.6] text-on-surface",
+          isUser ? "bg-sky/15" : "bg-surface-high",
         )}
+        style={{
+          borderRadius: isUser
+            ? "20px 20px 4px 20px"   // 用户: 右下收窄
+            : "20px 20px 20px 4px",   // AI: 左下收窄
+          border: isUser ? undefined : "1px solid rgba(255,255,255,0.03)",
+        }}
       >
         {message.content ? (
           isUser ? (

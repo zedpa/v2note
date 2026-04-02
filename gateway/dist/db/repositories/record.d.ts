@@ -12,6 +12,8 @@ export interface Record {
     archived: boolean;
     digested: boolean;
     digested_at: string | null;
+    file_url: string | null;
+    file_name: string | null;
     hierarchy_tags?: Array<{
         label: string;
         level: number;
@@ -43,6 +45,8 @@ export declare function create(fields: {
     duration_seconds?: number;
     location_text?: string;
     notebook?: string;
+    file_url?: string;
+    file_name?: string;
 }): Promise<Record>;
 export declare function updateStatus(id: string, status: string): Promise<void>;
 export declare function updateFields(id: string, fields: {
@@ -51,6 +55,8 @@ export declare function updateFields(id: string, fields: {
     duration_seconds?: number;
     source_type?: string;
     audio_path?: string;
+    file_url?: string;
+    file_name?: string;
 }): Promise<void>;
 export declare function deleteByIds(ids: string[]): Promise<number>;
 export declare function archive(id: string): Promise<void>;

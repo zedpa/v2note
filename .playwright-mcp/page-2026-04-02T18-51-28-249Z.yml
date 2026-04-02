@@ -1,0 +1,103 @@
+- generic [ref=e1]:
+  - button "Open Next.js Dev Tools" [ref=e63] [cursor=pointer]:
+    - img [ref=e64]
+  - alert [ref=e67]
+  - generic [ref=e117]:
+    - banner [ref=e118]:
+      - generic [ref=e119]:
+        - button "打开侧边栏" [ref=e120] [cursor=pointer]: E
+        - generic [ref=e121]:
+          - button "日记" [ref=e122] [cursor=pointer]
+          - button "待办" [ref=e123] [cursor=pointer]
+        - generic [ref=e124]:
+          - button "AI 对话" [active] [ref=e125] [cursor=pointer]:
+            - img "路路 Logo" [ref=e126]
+          - button "搜索" [ref=e155] [cursor=pointer]:
+            - img [ref=e156]
+          - button "通知" [ref=e159] [cursor=pointer]:
+            - img [ref=e160]
+    - main [ref=e163]:
+      - generic [ref=e165]:
+        - button "切换到项目视图" [ref=e167] [cursor=pointer]:
+          - img [ref=e168]
+        - generic [ref=e170]:
+          - generic [ref=e171]:
+            - generic [ref=e172]: 星期五
+            - generic [ref=e173]:
+              - generic [ref=e174]: 4月 2026
+              - button [ref=e175] [cursor=pointer]:
+                - img [ref=e176]
+          - generic [ref=e178]:
+            - button "一 30" [ref=e179] [cursor=pointer]:
+              - generic [ref=e180]: 一
+              - generic [ref=e181]: "30"
+            - button "二 31" [ref=e182] [cursor=pointer]:
+              - generic [ref=e183]: 二
+              - generic [ref=e184]: "31"
+            - button "三 1" [ref=e187] [cursor=pointer]:
+              - generic [ref=e188]: 三
+              - generic [ref=e189]: "1"
+            - button "四 2" [ref=e190] [cursor=pointer]:
+              - generic [ref=e191]: 四
+              - generic [ref=e192]: "2"
+            - button "五 3" [ref=e195] [cursor=pointer]:
+              - generic [ref=e196]: 五
+              - generic [ref=e197]: "3"
+            - button "六 4" [ref=e198] [cursor=pointer]:
+              - generic [ref=e199]: 六
+              - generic [ref=e200]: "4"
+            - button "日 5" [ref=e201] [cursor=pointer]:
+              - generic [ref=e202]: 日
+              - generic [ref=e203]: "5"
+          - generic [ref=e204]:
+            - button "随时 (0)" [ref=e205] [cursor=pointer]:
+              - img [ref=e206]
+              - text: 随时 (0)
+              - img [ref=e209]
+            - button "今天随时可做的事" [ref=e211] [cursor=pointer]:
+              - generic [ref=e212]: 今天随时可做的事
+              - img [ref=e214]
+          - generic [ref=e215]:
+            - button "上午 (0)" [ref=e216] [cursor=pointer]:
+              - img [ref=e217]
+              - text: 上午 (0)
+              - img [ref=e223]
+            - button "上午要做什么？" [ref=e225] [cursor=pointer]:
+              - generic [ref=e226]: 上午要做什么？
+              - img [ref=e228]
+          - generic [ref=e229]:
+            - button "下午 (0)" [ref=e230] [cursor=pointer]:
+              - img [ref=e231]
+              - text: 下午 (0)
+              - img [ref=e237]
+            - button "下午的安排" [ref=e239] [cursor=pointer]:
+              - generic [ref=e240]: 下午的安排
+              - img [ref=e242]
+          - generic [ref=e243]:
+            - button "晚上 (0)" [ref=e244] [cursor=pointer]:
+              - img [ref=e245]
+              - text: 晚上 (0)
+              - img [ref=e247]
+            - button "晚上收尾" [ref=e249] [cursor=pointer]:
+              - generic [ref=e250]: 晚上收尾
+              - img [ref=e252]
+    - button [ref=e255] [cursor=pointer]:
+      - img [ref=e256]
+    - button "Choose File" [ref=e259]
+    - generic [ref=e260]:
+      - generic [ref=e261]:
+        - banner [ref=e262]:
+          - button "返回" [ref=e263] [cursor=pointer]:
+            - img [ref=e264]
+          - generic [ref=e267]: 路路
+        - generic [ref=e270]:
+          - generic [ref=e271]: 🦌
+          - generic [ref=e273]:
+            - paragraph [ref=e274]:
+              - text: 这么晚还没睡，是在打磨念念有路的 v0.1 边界说明吗？
+              - text: 看到你昨天写：“脑子里装满了想法，但手上总是漏掉事情”——这话真戳人。
+            - paragraph [ref=e283]: 现在这个点，是又冒出什么新念头，还是被哪件事卡住了？
+      - generic [ref=e277]:
+        - textbox "输入你的想法..." [ref=e278]
+        - button "语音输入" [ref=e279] [cursor=pointer]:
+          - img [ref=e280]

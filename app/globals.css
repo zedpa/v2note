@@ -462,6 +462,12 @@
   animation: breathe 4s ease-in-out infinite;
 }
 
+/* AI 在线呼吸灯 */
+@keyframes pulse-glow {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}
+
 /* ============================================
    PC RESPONSIVE LAYOUT (>1024px)
    ============================================ */

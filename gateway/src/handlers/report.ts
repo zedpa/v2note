@@ -3,24 +3,12 @@
  * 合并晨间简报和晚间回顾，支持 auto 时段路由。
  */
 
-import { readFileSync } from "node:fs";
-import { resolve, dirname } from "node:path";
-import { fileURLToPath } from "node:url";
 import { chatCompletion, type ChatMessage } from "../ai/provider.js";
 import { todoRepo, recordRepo, goalRepo } from "../db/repositories/index.js";
 import { loadSoul } from "../soul/manager.js";
 import { loadProfile } from "../profile/manager.js";
-import { generateCognitiveReport } from "../cognitive/retrieval.js";
 import { toDateString } from "./daily-loop.js";
-
-// ── Prompt 模板加载 ──
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const PROMPTS_DIR = resolve(__dirname, "../prompts");
-
-function loadPromptTemplate(name: string): string {
-  return readFileSync(resolve(PROMPTS_DIR, `${name}.md`), "utf-8");
-}
+import { MORNING_PROMPT, EVENING_PROMPT } from "../prompts/templates.js";
 
 // ── Mode 路由 ──
 
@@ -131,9 +119,8 @@ export async function generateMorningReport(
 
   const statsText = `done: ${yesterdayStats.done}, total: ${yesterdayStats.total}, streak: ${streak}`;
 
-  // 加载并渲染 prompt
-  const template = loadPromptTemplate("morning");
-  const systemPrompt = template
+  // 渲染 prompt
+  const systemPrompt = MORNING_PROMPT
     .replace("{soulContent}", soul?.content ?? "")
     .replace("{profileContent}", profile?.content ?? "")
     .replace("{pendingTodos}", pendingText)
@@ -232,9 +219,8 @@ export async function generateEveningReport(
 
   const goalsText = activeGoals.slice(0, 5).map((g: any) => `- ${g.title} (${g.status})`).join("\n") || "无";
 
-  // 加载并渲染 prompt
-  const template = loadPromptTemplate("evening");
-  const systemPrompt = template
+  // 渲染 prompt
+  const systemPrompt = EVENING_PROMPT
     .replace("{soulContent}", soul?.content ?? "")
     .replace("{profileContent}", profile?.content ?? "")
     .replace("{perspectiveName}", perspective.name)

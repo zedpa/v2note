@@ -227,8 +227,8 @@ export default function Page() {
       const dy = e.changedTouches[0].clientY - touchStartY.current;
       // 忽略垂直滑动为主的手势
       if (Math.abs(dy) > Math.abs(dx)) return;
-      // 从左边缘（<30px）右滑超过 60px → 打开侧边栏
-      if (touchStartX.current < 30 && dx > 60) {
+      // 从屏幕左侧（30~200px，避开安卓系统返回手势区）右滑超过 60px → 打开侧边栏
+      if (touchStartX.current > 30 && touchStartX.current < 200 && dx > 60) {
         setShowSidebar(true);
         return;
       }

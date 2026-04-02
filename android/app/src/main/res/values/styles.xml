@@ -15,6 +15,8 @@
         <item name="android:background">@null</item>
         <item name="android:statusBarColor">#f8f5f0</item>
         <item name="android:windowLightStatusBar">true</item>
+        <!-- Android 15+ 强制 Edge-to-Edge 导致内容侵入状态栏，临时关闭 -->
+        <item name="android:windowOptOutEdgeToEdgeEnforcement">true</item>
     </style>
 
 

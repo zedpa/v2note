@@ -5,6 +5,8 @@
  * - 晨间简报：聚焦今天要做的事（行动导向）
  * - 晚间回顾：聚焦今天发生了什么 + 预告未完成工作（认知+行动回顾）
  */
+/** pg 驱动对 timestamp 列返回 Date 对象，需安全转为 string 以支持 startsWith 筛选 */
+export declare function toDateString(v: unknown): string | null;
 export interface BriefingResult {
     greeting: string;
     /** 今日最重要的 3-5 件事（排好优先级） */

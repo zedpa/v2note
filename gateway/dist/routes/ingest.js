@@ -73,11 +73,11 @@ export function registerIngestRoutes(router) {
                 }
                 let imageUrl;
                 const buf = Buffer.from(body.file_base64, "base64");
+                const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+                const imgFileName = `${deviceId}-${timestamp}.jpg`;
                 if (isOssConfigured()) {
                     try {
-                        const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-                        const filename = `${deviceId}-${timestamp}.jpg`;
-                        imageUrl = await uploadFile("images", filename, buf);
+                        imageUrl = await uploadFile("images", imgFileName, buf);
                     }
                     catch (err) {
                         console.error("[ingest] OSS upload failed, using data URL fallback:", err);
@@ -94,6 +94,8 @@ export function registerIngestRoutes(router) {
                     status: "completed",
                     source: "manual",
                     source_type: "material",
+                    file_url: imageUrl,
+                    file_name: imgFileName,
                 });
                 await transcriptRepo.create({
                     record_id: imgRecord.id,
@@ -130,11 +132,12 @@ export function registerIngestRoutes(router) {
                     console.warn("[ingest] file parse failed:", parseResult.error);
                 }
                 // Upload to OSS if configured
+                let fileOssUrl = null;
                 if (isOssConfigured()) {
                     try {
                         const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
                         const ossName = `${deviceId}-${timestamp}-${safeFilename}`;
-                        await uploadFile("files", ossName, fileBuf);
+                        fileOssUrl = await uploadFile("files", ossName, fileBuf);
                     }
                     catch (err) {
                         console.error("[ingest] OSS file upload failed:", err);
@@ -146,6 +149,8 @@ export function registerIngestRoutes(router) {
                     status: "completed",
                     source: "manual",
                     source_type: "material",
+                    file_url: fileOssUrl ?? undefined,
+                    file_name: safeFilename,
                 });
                 await transcriptRepo.create({
                     record_id: fileRecord.id,
