@@ -24,9 +24,11 @@ import { join, resolve } from "node:path";
 import { createHash } from "node:crypto";
 import { execSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import pg from "pg";
-import OSS from "ali-oss";
-import { config } from "dotenv";
+import { createRequire } from "node:module";
+const require = createRequire(join(fileURLToPath(new URL(".", import.meta.url)), "..", "gateway", "node_modules", "x"));
+const pg = require("pg");
+const OSS = require("ali-oss");
+const { config } = require("dotenv");
 
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
 const ROOT = resolve(__dirname, "..");
@@ -98,8 +100,10 @@ const ossClient = new OSS({
 });
 
 const ossKey = `releases/v2note-${version}-${versionCode}.apk`;
-const ossResult = await ossClient.put(ossKey, apkBuf);
-const downloadUrl = ossResult.url;
+const ossResult = await ossClient.put(ossKey, apkBuf, {
+  headers: { "x-oss-object-acl": "public-read" },
+});
+const downloadUrl = `https://oss.v2note.online/${ossKey}`;
 
 console.log(`  ✓ 上传成功: ${downloadUrl}`);
 console.log();
@@ -116,15 +120,13 @@ const pool = new pg.Pool({
   ssl: process.env.RDS_SSL === "true" ? { rejectUnauthorized: false } : false,
 });
 
-// 将同版本的旧记录标记为非活跃
-await pool.query(
-  `UPDATE app_release SET is_active = false WHERE platform = 'android' AND release_type = 'apk' AND version = $1`,
-  [version],
-);
-
 const { rows } = await pool.query(
   `INSERT INTO app_release (version, version_code, platform, release_type, bundle_url, file_size, checksum, changelog, is_mandatory, is_active)
    VALUES ($1, $2, 'android', 'apk', $3, $4, $5, $6, false, true)
+   ON CONFLICT (version, platform, release_type)
+   DO UPDATE SET version_code = EXCLUDED.version_code, bundle_url = EXCLUDED.bundle_url,
+                 file_size = EXCLUDED.file_size, checksum = EXCLUDED.checksum,
+                 changelog = EXCLUDED.changelog, is_active = true, created_at = now()
    RETURNING id, version, version_code`,
   [version, versionCode, downloadUrl, apkStat.size, checksum, changelog],
 );
