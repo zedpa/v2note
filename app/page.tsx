@@ -21,6 +21,7 @@ import { SettingsEditor } from "@/features/settings/components/settings-editor";
 import { NotebookList } from "@/features/diary/components/notebook-list";
 import { MorningBriefing } from "@/features/daily/components/morning-briefing";
 import { EveningSummary } from "@/features/daily/components/evening-summary";
+import { SmartDailyReport } from "@/features/daily/components/smart-daily-report";
 import { OnboardingSeed } from "@/features/cognitive/components/onboarding-seed";
 import { GoalDetailOverlay } from "@/features/goals/components/goal-detail-overlay";
 import { ProjectDetailOverlay } from "@/features/goals/components/project-detail-overlay";
@@ -47,6 +48,7 @@ type OverlayName =
   | "notebooks"
   | "morning-briefing"
   | "evening-summary"
+  | "daily-report"
   | "goals"
   | "goal-detail"
   | "project-detail"
@@ -56,7 +58,7 @@ type OverlayName =
 export default function Page() {
   const router = useRouter();
   const { setTheme } = useTheme();
-  const { loggedIn, user, loading: authLoading, error: authError, login, register, logout } = useAuth();
+  const { loggedIn, user, loading: authLoading, error: authError, login, register, logout, clearError } = useAuth();
   const { update, dismiss, applying } = useUpdateCheck();
   const [authMode, setAuthMode] = useState<"login" | "register">("login");
   const [showSidebar, setShowSidebar] = useState(false);
@@ -114,7 +116,7 @@ export default function Page() {
     initStatusBar();
   }, []);
 
-  // Auto-show morning briefing (7-10am, once per day)
+  // Auto-show daily report (7-10am, once per day)
   useEffect(() => {
     if (!loggedIn) return;
     const hour = new Date().getHours();
@@ -123,7 +125,7 @@ export default function Page() {
       const key = `briefing_shown_${today}`;
       if (!localStorage.getItem(key)) {
         localStorage.setItem(key, "1");
-        setActiveOverlay("morning-briefing");
+        setActiveOverlay("daily-report");
       }
     }
   }, [loggedIn]);
@@ -193,7 +195,7 @@ export default function Page() {
   const handleNotificationNavigate = useCallback((type: AppNotification["type"]) => {
     switch (type) {
       case "morning_briefing":
-        setActiveOverlay("morning-briefing");
+        setActiveOverlay("daily-report");
         break;
       case "evening_summary":
         setActiveOverlay("evening-summary");
@@ -212,14 +214,24 @@ export default function Page() {
     }
   }, []);
 
-  // Swipe between diary ↔ todo
+  // Swipe: 左边缘右滑打开侧边栏, diary ↔ todo 切换
   const touchStartX = useRef(0);
+  const touchStartY = useRef(0);
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
     touchStartX.current = e.touches[0].clientX;
+    touchStartY.current = e.touches[0].clientY;
   }, []);
   const handleTouchEnd = useCallback(
     (e: React.TouchEvent) => {
       const dx = e.changedTouches[0].clientX - touchStartX.current;
+      const dy = e.changedTouches[0].clientY - touchStartY.current;
+      // 忽略垂直滑动为主的手势
+      if (Math.abs(dy) > Math.abs(dx)) return;
+      // 从左边缘（<30px）右滑超过 60px → 打开侧边栏
+      if (touchStartX.current < 30 && dx > 60) {
+        setShowSidebar(true);
+        return;
+      }
       if (Math.abs(dx) > 80) {
         if (dx < 0 && activeTab === "diary") setActiveTab("todo"); // 左滑 → 待办
         if (dx > 0 && activeTab === "todo") setActiveTab("diary"); // 右滑 → 日记
@@ -264,7 +276,7 @@ export default function Page() {
       return (
         <RegisterPage
           onRegister={register}
-          onSwitchToLogin={() => setAuthMode("login")}
+          onSwitchToLogin={() => { clearError(); setAuthMode("login"); }}
           error={authError}
         />
       );
@@ -272,7 +284,7 @@ export default function Page() {
     return (
       <LoginPage
         onLogin={login}
-        onSwitchToRegister={() => setAuthMode("register")}
+        onSwitchToRegister={() => { clearError(); setAuthMode("register"); }}
         error={authError}
       />
     );
@@ -309,7 +321,7 @@ export default function Page() {
         open={showSidebar}
         onClose={() => setShowSidebar(false)}
         onViewProfile={() => setActiveOverlay("profile")}
-        onViewBriefing={() => setActiveOverlay("morning-briefing")}
+        onViewBriefing={() => setActiveOverlay("daily-report")}
         onViewSettings={() => setActiveOverlay("settings")}
         onViewEvening={() => setActiveOverlay("evening-summary")}
         onViewSearch={() => setActiveOverlay("search")}
@@ -444,6 +456,8 @@ export default function Page() {
         <MorningBriefing key="morning-briefing" onClose={closeOverlay} />
       ) : activeOverlay === "evening-summary" ? (
         <EveningSummary key="evening-summary" onClose={closeOverlay} />
+      ) : activeOverlay === "daily-report" ? (
+        <SmartDailyReport key="daily-report" onClose={closeOverlay} onOpenChat={(msg) => { closeOverlay(); setTimeout(() => setActiveOverlay("chat"), 100); }} />
       ) : activeOverlay === "notifications" ? (
         <NotificationCenter
           key="notifications"

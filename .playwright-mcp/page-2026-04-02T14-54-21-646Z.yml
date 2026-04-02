@@ -1,0 +1,20 @@
+- generic [active] [ref=e1]:
+  - button "Open Next.js Dev Tools" [ref=e12] [cursor=pointer]:
+    - img [ref=e13]
+  - alert [ref=e16]
+  - generic [ref=e439]:
+    - generic [ref=e440]:
+      - img "路路 Logo" [ref=e442]
+      - heading "念念有路" [level=1] [ref=e471]
+      - paragraph [ref=e472]: 你的每一个想法，我都帮你记住
+    - generic [ref=e473]:
+      - textbox "手机号" [ref=e474]: "13874917509"
+      - generic [ref=e475]:
+        - textbox "密码" [ref=e476]: test123456
+        - button [ref=e477] [cursor=pointer]:
+          - img [ref=e478]
+      - generic [ref=e481] [cursor=pointer]:
+        - checkbox "自动登录" [checked] [ref=e482]
+        - generic [ref=e483]: 自动登录
+      - button "登录" [ref=e484] [cursor=pointer]
+    - button "没有账号？立即注册" [ref=e486] [cursor=pointer]

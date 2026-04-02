@@ -40,6 +40,8 @@ export function useSearch() {
           status: r.status,
           duration_seconds: r.duration_seconds,
           audio_path: r.audio_path ?? null,
+          file_url: r.file_url ?? null,
+          file_name: r.file_name ?? null,
           created_at: r.created_at,
         };
       });

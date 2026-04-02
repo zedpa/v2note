@@ -57,6 +57,8 @@ export function SearchView({ onClose, onNoteClick }: SearchViewProps) {
               value={input}
               onChange={(e) => handleInput(e.target.value)}
               placeholder="搜索笔记..."
+              inputMode="search"
+              enterKeyHint="search"
               className="w-full pl-9 pr-8 py-2.5 rounded-xl bg-secondary text-sm text-foreground placeholder:text-muted-foreground outline-none"
             />
             {input && (

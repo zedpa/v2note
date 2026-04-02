@@ -51,6 +51,8 @@ export function useAuth() {
       const result = await loginUser(phone, password, deviceId);
       await saveAuthTokens(result);
       setApiDeviceId(deviceId);
+      // 记住账号
+      try { localStorage.setItem("voicenote:lastPhone", phone); } catch { /* ignore */ }
       setLoggedIn(true);
       setUser({
         id: result.user.id,
@@ -74,6 +76,8 @@ export function useAuth() {
       const result = await registerUser(phone, password, deviceId, displayName);
       await saveAuthTokens(result);
       setApiDeviceId(deviceId);
+      // 记住账号
+      try { localStorage.setItem("voicenote:lastPhone", phone); } catch { /* ignore */ }
       setLoggedIn(true);
       setUser({
         id: result.user.id,
@@ -104,5 +108,7 @@ export function useAuth() {
     setUser(null);
   }, []);
 
-  return { loggedIn, user, loading, error, login, register, logout };
+  const clearError = useCallback(() => setError(null), []);
+
+  return { loggedIn, user, loading, error, login, register, logout, clearError };
 }

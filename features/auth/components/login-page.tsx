@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Eye, EyeOff } from "lucide-react";
 import { LuluLogo } from "@/components/brand/lulu-logo";
 
 interface LoginPageProps {
@@ -10,9 +11,20 @@ interface LoginPageProps {
   loading?: boolean;
 }
 
+function getLastPhone(): string {
+  try { return localStorage.getItem("voicenote:lastPhone") ?? ""; } catch { return ""; }
+}
+
+function getAutoLogin(): boolean {
+  try { return localStorage.getItem("voicenote:autoLogin") !== "0"; } catch { return true; }
+}
+
 export function LoginPage({ onLogin, onSwitchToRegister, error, loading }: LoginPageProps) {
-  const [phone, setPhone] = useState("");
+  const [phone, setPhone] = useState(getLastPhone);
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [autoLogin, setAutoLogin] = useState(getAutoLogin);
+  const [failCount, setFailCount] = useState(0);
   const [submitting, setSubmitting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -20,15 +32,21 @@ export function LoginPage({ onLogin, onSwitchToRegister, error, loading }: Login
     if (!phone.trim() || !password.trim()) return;
     setSubmitting(true);
     try {
+      // 存储自动登录偏好
+      localStorage.setItem("voicenote:autoLogin", autoLogin ? "1" : "0");
       await onLogin(phone.trim(), password);
+      // 登录成功，failCount 不需要重置（页面会切走）
     } catch {
-      // error handled by parent
+      setFailCount((c) => c + 1);
     } finally {
       setSubmitting(false);
     }
   };
 
   const isLoading = loading || submitting;
+
+  const inputClass =
+    "w-full h-12 px-4 rounded-xl bg-surface-lowest text-on-surface text-base outline-none placeholder:text-muted-accessible/50 focus:ring-2 focus:ring-deer/30";
 
   return (
     <div className="min-h-dvh flex flex-col items-center justify-center px-6 bg-surface">
@@ -50,20 +68,49 @@ export function LoginPage({ onLogin, onSwitchToRegister, error, loading }: Login
             onChange={(e) => setPhone(e.target.value)}
             disabled={isLoading}
             autoComplete="tel"
-            className="w-full h-12 px-4 rounded-xl bg-surface-lowest text-on-surface text-base outline-none placeholder:text-muted-accessible/50 focus:ring-2 focus:ring-deer/30"
+            className={inputClass}
           />
-          <input
-            type="password"
-            placeholder="密码"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            disabled={isLoading}
-            autoComplete="current-password"
-            className="w-full h-12 px-4 rounded-xl bg-surface-lowest text-on-surface text-base outline-none placeholder:text-muted-accessible/50 focus:ring-2 focus:ring-deer/30"
-          />
+
+          {/* 密码框 + 显隐切换 */}
+          <div className="relative">
+            <input
+              type={showPassword ? "text" : "password"}
+              placeholder="密码"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              disabled={isLoading}
+              autoComplete="current-password"
+              className={`${inputClass} pr-12`}
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword((v) => !v)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-muted-accessible"
+              tabIndex={-1}
+            >
+              {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+            </button>
+          </div>
+
+          {/* 自动登录 */}
+          <label className="flex items-center gap-2 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={autoLogin}
+              onChange={(e) => setAutoLogin(e.target.checked)}
+              className="h-4 w-4 rounded border-border accent-deer"
+            />
+            <span className="text-xs text-muted-accessible">自动登录</span>
+          </label>
 
           {error && (
             <p className="text-sm text-maple text-center">{error}</p>
+          )}
+
+          {failCount >= 3 && (
+            <p className="text-xs text-muted-accessible text-center">
+              忘记密码？请联系客服或重新注册
+            </p>
           )}
 
           <button

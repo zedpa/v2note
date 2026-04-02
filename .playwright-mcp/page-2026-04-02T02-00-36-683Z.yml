@@ -1,0 +1,163 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - banner [ref=e3]:
+      - generic [ref=e4]:
+        - button "打开侧边栏" [ref=e5] [cursor=pointer]: 测
+        - generic [ref=e6]:
+          - button "日记" [ref=e7] [cursor=pointer]
+          - button "待办" [ref=e8] [cursor=pointer]
+        - generic [ref=e9]:
+          - button "AI 对话" [ref=e10] [cursor=pointer]:
+            - img "路路 Logo" [ref=e11]
+          - button "搜索" [ref=e40] [cursor=pointer]:
+            - img [ref=e41]
+          - button "通知" [ref=e44] [cursor=pointer]:
+            - img [ref=e45]
+    - main [ref=e48]:
+      - generic [ref=e50]:
+        - button "切换到项目视图" [ref=e67] [cursor=pointer]:
+          - img [ref=e68]
+        - generic [ref=e70]:
+          - generic [ref=e71]:
+            - generic [ref=e72]: 星期四
+            - generic [ref=e73]:
+              - generic [ref=e74]: 4月 2026
+              - button [ref=e75] [cursor=pointer]:
+                - img [ref=e76]
+          - generic [ref=e78]:
+            - button "一 30" [ref=e79] [cursor=pointer]:
+              - generic [ref=e80]: 一
+              - generic [ref=e82]: "30"
+            - button "二 31" [ref=e83] [cursor=pointer]:
+              - generic [ref=e84]: 二
+              - generic [ref=e86]: "31"
+            - button "三 1" [ref=e87] [cursor=pointer]:
+              - generic [ref=e88]: 三
+              - generic [ref=e90]: "1"
+            - button "四 2" [ref=e91] [cursor=pointer]:
+              - generic [ref=e92]: 四
+              - generic [ref=e94]: "2"
+            - button "五 3" [ref=e95] [cursor=pointer]:
+              - generic [ref=e96]: 五
+              - generic [ref=e98]: "3"
+            - button "六 4" [ref=e99] [cursor=pointer]:
+              - generic [ref=e100]: 六
+              - generic [ref=e102]: "4"
+            - button "日 5" [ref=e103] [cursor=pointer]:
+              - generic [ref=e104]: 日
+              - generic [ref=e106]: "5"
+          - generic [ref=e107]:
+            - button "随时 (0)" [ref=e108] [cursor=pointer]:
+              - img [ref=e109]
+              - text: 随时 (0)
+              - img [ref=e112]
+            - button "今天随时可做的事" [ref=e114] [cursor=pointer]:
+              - generic [ref=e115]: 今天随时可做的事
+              - img [ref=e117]
+          - generic [ref=e118]:
+            - button "上午 (0)" [ref=e119] [cursor=pointer]:
+              - img [ref=e120]
+              - text: 上午 (0)
+              - img [ref=e126]
+            - generic [ref=e128]:
+              - generic [ref=e130]:
+                - button [ref=e131] [cursor=pointer]:
+                  - img [ref=e132]
+                - generic [ref=e134] [cursor=pointer]:
+                  - generic [ref=e135]: 准备融资PPT初稿
+                  - generic [ref=e137]: 今天
+              - button [ref=e138] [cursor=pointer]:
+                - img [ref=e139]
+          - generic [ref=e140]:
+            - button "下午 (0)" [ref=e141] [cursor=pointer]:
+              - img [ref=e142]
+              - text: 下午 (0)
+              - img [ref=e148]
+            - button "下午的安排" [ref=e150] [cursor=pointer]:
+              - generic [ref=e151]: 下午的安排
+              - img [ref=e153]
+          - generic [ref=e154]:
+            - button "晚上 (0)" [ref=e155] [cursor=pointer]:
+              - img [ref=e156]
+              - text: 晚上 (0)
+              - img [ref=e158]
+            - button "晚上收尾" [ref=e160] [cursor=pointer]:
+              - generic [ref=e161]: 晚上收尾
+              - img [ref=e163]
+    - button [ref=e53] [cursor=pointer]:
+      - img [ref=e54]
+    - generic [ref=e284]:
+      - generic [ref=e285]:
+        - heading "每日回顾" [level=1] [ref=e286]
+        - generic [ref=e287]:
+          - button [ref=e288] [cursor=pointer]:
+            - img [ref=e289]
+          - button "×" [ref=e294] [cursor=pointer]
+      - generic [ref=e299]:
+        - generic [ref=e300]:
+          - button [ref=e301] [cursor=pointer]
+          - button [ref=e302] [cursor=pointer]
+          - button [ref=e303] [cursor=pointer]
+        - generic [ref=e305]:
+          - generic [ref=e307]:
+            - heading "今日行动" [level=2] [ref=e308]
+            - generic [ref=e309]:
+              - heading "完成" [level=3] [ref=e312]
+              - generic [ref=e314]:
+                - img [ref=e315]
+                - generic [ref=e318]: 准备融资PPT初稿
+            - generic [ref=e319]:
+              - heading "目标进展" [level=3] [ref=e322]
+              - generic [ref=e323]:
+                - generic [ref=e324]:
+                  - generic [ref=e325]:
+                    - img [ref=e326]
+                    - generic [ref=e330]: 产品融资
+                    - generic [ref=e331]: +0 / 余0
+                  - paragraph [ref=e332]: 暂无具体任务
+                - generic [ref=e333]:
+                  - generic [ref=e334]:
+                    - img [ref=e335]
+                    - generic [ref=e339]: 融资准备
+                    - generic [ref=e340]: +0 / 余0
+                  - paragraph [ref=e341]: PPT初稿已启动，未计入结构化任务
+                - generic [ref=e342]:
+                  - generic [ref=e343]:
+                    - img [ref=e344]
+                    - generic [ref=e348]: 产品开发
+                    - generic [ref=e349]: +0 / 余0
+                  - paragraph [ref=e350]: 聚焦在前期定义，尚未进入开发任务
+          - generic [ref=e352]:
+            - heading "路路的发现" [level=2] [ref=e353]
+            - generic [ref=e354]:
+              - heading "今日思考" [level=3] [ref=e357]
+              - generic [ref=e358]:
+                - generic [ref=e359]:
+                  - img [ref=e360]
+                  - generic [ref=e368]: 想法演进：更清晰地看到产品从概念到落地的关键路径
+                - generic [ref=e369]:
+                  - img [ref=e370]
+                  - generic [ref=e378]: 新的联系：把AI原生体验与用户信任建立逻辑串在一起
+                - generic [ref=e379]:
+                  - img [ref=e380]
+                  - generic [ref=e388]: 思路变化：开始用‘低摩擦闭环’视角看待执行障碍
+                - generic [ref=e389]:
+                  - img [ref=e390]
+                  - generic [ref=e398]: 领悟到：用户真正关心的不是功能，而是产品为何存在、能否可靠完成任务
+            - generic [ref=e399]:
+              - heading "明日预告" [level=3] [ref=e402]
+              - generic [ref=e404]:
+                - img [ref=e405]
+                - generic [ref=e408]: 完善融资PPT内容
+          - generic [ref=e410]:
+            - heading "今日数据" [level=2] [ref=e411]
+            - generic [ref=e412]:
+              - generic [ref=e413]:
+                - paragraph [ref=e414]: "1"
+                - paragraph [ref=e415]: 完成
+              - generic [ref=e416]:
+                - paragraph [ref=e417]: "3"
+                - paragraph [ref=e418]: 记录
+  - button "Open Next.js Dev Tools" [ref=e62] [cursor=pointer]:
+    - img [ref=e63]
+  - alert [ref=e66]

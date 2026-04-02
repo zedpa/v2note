@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 import { getDomainStyle } from "@/features/todos/lib/domain-config";
 import { updateTodo } from "@/shared/lib/api/todos";
 import { localTzOffset } from "../lib/time-slots";
+import { PrioritySelector } from "./priority-selector";
 import type { TodoItem } from "@/shared/lib/types";
 
 interface TodoDetailSheetProps {
@@ -62,6 +63,7 @@ export function TodoDetailSheet({ todo, open, onClose, onUpdated, onAskAI }: Tod
   const [time, setTime] = useState("");
   const [duration, setDuration] = useState("");
   const [customDuration, setCustomDuration] = useState("");
+  const [priority, setPriority] = useState(3);
   const dateRef = useRef<HTMLInputElement>(null);
   const timeRef = useRef<HTMLInputElement>(null);
 
@@ -87,6 +89,7 @@ export function TodoDetailSheet({ todo, open, onClose, onUpdated, onAskAI }: Tod
       setDuration("");
       setCustomDuration("");
     }
+    setPriority(t.priority ?? 3);
   }, []);
 
   const handleOpenChange = useCallback((isOpen: boolean) => {
@@ -120,6 +123,7 @@ export function TodoDetailSheet({ todo, open, onClose, onUpdated, onAskAI }: Tod
       if (duration || customDuration) {
         updates.estimated_minutes = mins;
       }
+      if (priority !== (todo.priority ?? 3)) updates.priority = priority;
       await updateTodo(todo.id, updates);
       onUpdated?.();
       onClose();
@@ -331,6 +335,14 @@ export function TodoDetailSheet({ todo, open, onClose, onUpdated, onAskAI }: Tod
                 )}
               </div>
             </div>
+          </div>
+
+          {/* 优先级 */}
+          <div className="space-y-2.5">
+            <label className="flex items-center gap-1.5 text-[11px] font-semibold text-muted-foreground/80 uppercase tracking-wider">
+              优先级
+            </label>
+            <PrioritySelector value={priority} onChange={setPriority} />
           </div>
 
           {/* AI action plan — sub-tasks as checkboxes */}

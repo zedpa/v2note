@@ -1,0 +1,76 @@
+- generic [ref=e1]:
+  - button "Open Next.js Dev Tools" [ref=e76] [cursor=pointer]:
+    - img [ref=e77]
+  - alert [ref=e80]
+  - generic [ref=e294]:
+    - banner [ref=e295]:
+      - generic [ref=e296]:
+        - button "打开侧边栏" [ref=e297] [cursor=pointer]: 测
+        - generic [ref=e298]:
+          - button "日记" [ref=e299] [cursor=pointer]
+          - button "待办" [ref=e300] [cursor=pointer]
+        - generic [ref=e301]:
+          - button "AI 对话" [ref=e302] [cursor=pointer]:
+            - img "路路 Logo" [ref=e303]
+          - button "搜索" [ref=e332] [cursor=pointer]:
+            - img [ref=e333]
+          - button "通知" [ref=e336] [cursor=pointer]:
+            - img [ref=e337]
+    - main [ref=e340]:
+      - generic [ref=e343]:
+        - generic [ref=e344]:
+          - generic [ref=e345]: "2"
+          - generic [ref=e346]: 4月 周四
+        - generic [ref=e347]:
+          - button "08:30 · 文字 · 版本说明 v0.1 能做什么、还不能做什么" [ref=e348] [cursor=pointer]:
+            - generic [ref=e350]:
+              - generic [ref=e351]:
+                - generic [ref=e352]: 08:30
+                - generic [ref=e353]: ·
+                - img [ref=e354]
+                - generic [ref=e356]: 文字
+                - generic [ref=e357]: ·
+                - generic [ref=e358]: 版本说明
+              - paragraph [ref=e361]: v0.1 能做什么、还不能做什么
+          - button "08:29 · 文字 · 功能介绍 录入、管理、对话——所有操作一看就会" [ref=e362] [cursor=pointer]:
+            - generic [ref=e364]:
+              - generic [ref=e365]:
+                - generic [ref=e366]: 08:29
+                - generic [ref=e367]: ·
+                - img [ref=e368]
+                - generic [ref=e370]: 文字
+                - generic [ref=e371]: ·
+                - generic [ref=e372]: 功能介绍
+              - paragraph [ref=e375]: 录入、管理、对话——所有操作一看就会
+          - button [active] [ref=e395] [cursor=pointer]:
+            - generic [ref=e378]:
+              - generic [ref=e379]:
+                - generic [ref=e380]: 08:28
+                - generic [ref=e381]: ·
+                - img [ref=e382]
+                - generic [ref=e384]: 文字
+                - generic [ref=e385]: ·
+                - generic [ref=e386]: 写给你的信
+                - button [ref=e396]:
+                  - img [ref=e397]
+              - paragraph [ref=e389]: 为什么要做这个产品
+              - generic [ref=e403]:
+                - paragraph [ref=e404]: 亲爱的朋友，
+                - paragraph [ref=e405]: 谢谢你来到念念有路。
+                - paragraph [ref=e406]: 先说句大实话：我不是程序员。大学专业和编程八竿子打不着，唯一沾边的是大一那门 C 语言——期末突击勉强及格的那种。毕业后一直在上班，做着和代码完全无关的工作。到今天，我依然是一个每天按时打卡的上班族。
+                - paragraph [ref=e407]: 念念有路，是我下班之后、周末假日，一点一点拼出来的。
+                - paragraph [ref=e408]: 做这个东西，是因为我自己有一个很痛的问题——脑子想得挺多，执行的时候总是丢三落四。很多事到了 deadline 才猛然想起来，或者领导问了、下游催了，才恍然："哦对，还有这件事！"然后手忙脚乱赶工，心里既懊悔又焦虑。
+                - paragraph [ref=e409]: 我试过各种工具。微软 To-Do、滴答清单、番茄钟，甚至用 Excel 做甘特图管理日程。没有一个坚持超过两周。不是它们不好，是它们对我这种人太重了——每天花大量时间录入、分类、调优先级，"管理自己"本身变成了比工作还大的负担。
+                - paragraph [ref=e410]: 今年 AI agent爆发，让很多原本不可能的事成为可能，我就想，为什么我不能做一个东西——我只管动动嘴，它帮我记下来、整理好、到时间提醒我？
+                - paragraph [ref=e411]: 就这样，念念有路诞生了。
+                - paragraph [ref=e412]: 名字取的是"念念不忘，必有回响；念念有路，自有方向"——每一个闪过脑海的念头，都不应该白白溜走。
+                - paragraph [ref=e413]: 后来我把它放到小红书上，没有多少人关注，那个号还因为openclaw扫数据被禁言了。就在那些一天三十几个阅读量里，竟然有人主动找来说想试试。
+                - paragraph [ref=e414]: 那一刻我真的感动。一个不会写代码也不会做内容的人，做了一个还没完工的东西，居然有人愿意相信。
+                - paragraph [ref=e415]: 后来多亏有小伙伴加入，才得以让更多人看到。
+                - paragraph [ref=e416]: 坦诚说，你现在拿到的是一个 0.1 版本。很多功能还不完善，有些地方还粗糙。但核心链路已经跑通了：你说话，AI 帮你记下来、拆成待办。更多的能力——到时间体现，知识图谱，深度复盘、行动追踪——都在路上。
+                - paragraph [ref=e417]: 我想要打造一个致力于从认知到行动的app,很多想法就算你眼前没有行动，但只要你还在持续的思考，持续累计，持续的记录，终有一天会变为行动；
+                - paragraph [ref=e418]: 如果遇到任何问题，或者有什么想法，可以在微信/小红书群里联系。
+                - paragraph [ref=e419]: 谢谢你愿意在这么早的阶段就加入。
+                - paragraph [ref=e420]: 愿你每个念头都被看到和发现， ——念念有路团队 2026 年 4 月
+    - button [ref=e391] [cursor=pointer]:
+      - img [ref=e392]

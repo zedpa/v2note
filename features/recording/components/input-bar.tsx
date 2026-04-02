@@ -12,6 +12,7 @@ import { executeCommand, getCommandNames, getCommandDefs } from "@/features/comm
 import type { CommandContext } from "@/features/commands/lib/registry";
 import { createManualNote } from "@/features/notes/lib/manual-note";
 import { fabNotify } from "@/shared/lib/fab-notify";
+import { useKeyboardOffset } from "@/shared/hooks/use-keyboard-offset";
 
 type InputMode = "voice" | "text";
 type VoicePhase = "idle" | "pressing" | "recording" | "locked";
@@ -23,6 +24,7 @@ interface InputBarProps {
 }
 
 export function InputBar({ onStartReview, onCommandDetected, commandContext }: InputBarProps) {
+  const { offset: kbOffset } = useKeyboardOffset();
   const [mode, setMode] = useState<InputMode>("voice");
   const [text, setText] = useState("");
   const [voicePhase, setVoicePhase] = useState<VoicePhase>("idle");
@@ -353,7 +355,7 @@ export function InputBar({ onStartReview, onCommandDetected, commandContext }: I
 
   // ── Inline bar ──
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-40 pb-safe">
+    <div className="fixed bottom-0 left-0 right-0 z-40 pb-safe" style={{ bottom: `${kbOffset}px` }}>
       <div className="max-w-lg mx-auto px-3 pb-2">
         {/* Command suggestions */}
         {commandSuggestions.length > 0 && (
@@ -448,6 +450,7 @@ export function InputBar({ onStartReview, onCommandDetected, commandContext }: I
                 }
               }}
               placeholder="输入文字或 /命令..."
+              enterKeyHint="send"
               rows={1}
               className="flex-1 bg-transparent resize-none text-sm outline-none placeholder:text-muted-foreground/50 max-h-24 py-1.5"
               style={{ minHeight: "28px" }}

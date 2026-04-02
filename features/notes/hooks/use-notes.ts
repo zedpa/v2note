@@ -79,6 +79,8 @@ export function useNotes(notebook?: string | null, clusterId?: string | null) {
           status: r.status,
           duration_seconds: r.duration_seconds,
           audio_path: audioPath,
+          file_url: r.file_url ?? null,
+          file_name: r.file_name ?? null,
           created_at: r.created_at,
           domain: r.domain ?? null,
         };

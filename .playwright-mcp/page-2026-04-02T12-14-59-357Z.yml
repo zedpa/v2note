@@ -1,0 +1,259 @@
+- generic:
+  - button "Open Next.js Dev Tools" [ref=e12] [cursor=pointer]:
+    - img [ref=e13]
+  - alert
+  - generic:
+    - banner:
+      - generic:
+        - button: E
+        - generic:
+          - button: 日记
+          - button: 待办
+        - generic:
+          - button:
+            - img
+          - button:
+            - img
+          - button:
+            - img
+    - main:
+      - generic:
+        - generic:
+          - generic:
+            - button:
+              - img
+          - generic:
+            - generic:
+              - generic:
+                - generic:
+                  - button:
+                    - generic: 收集箱
+                    - generic: 3/11
+                  - generic:
+                    - generic:
+                      - button
+                      - generic: 3月31日下午3点去重庆
+                      - img
+                    - generic:
+                      - button
+                      - generic: 创建3点去重庆的待办
+                    - generic:
+                      - button
+                      - generic: "2342"
+                    - generic:
+                      - button
+                      - generic: "453"
+                    - generic:
+                      - button
+                      - generic: "123"
+                    - generic: 还有 3 条
+                    - button:
+                      - img
+                      - text: 3 条已完成
+                    - generic:
+                      - button
+                      - generic: E2E测试上午待办
+                    - generic:
+                      - button
+                      - generic: ������Ŀ�ĵ�
+                    - generic:
+                      - button
+                      - generic: ���翪�����۷���
+                  - generic:
+                    - button:
+                      - img
+                      - generic: 添加任务
+    - generic:
+      - button:
+        - img
+  - dialog "收集箱" [ref=e313]:
+    - generic [ref=e314]:
+      - heading "收集箱" [level=2] [ref=e315]
+      - paragraph [ref=e316]: 项目待办详情
+    - generic [ref=e317]:
+      - generic [ref=e318]:
+        - generic [ref=e319]: 收集箱
+        - generic [ref=e320]: 3/11 已完成
+      - button [active] [ref=e321] [cursor=pointer]:
+        - img [ref=e322]
+    - generic [ref=e325]:
+      - generic [ref=e326]:
+        - generic [ref=e327]:
+          - img [ref=e328]
+          - generic [ref=e330]: 完成
+        - generic [ref=e331]:
+          - button "推迟" [ref=e332] [cursor=pointer]:
+            - img [ref=e333]
+            - text: 推迟
+          - button "删除" [ref=e336] [cursor=pointer]:
+            - img [ref=e337]
+            - text: 删除
+        - generic [ref=e341]:
+          - button [ref=e342] [cursor=pointer]
+          - generic [ref=e343] [cursor=pointer]:
+            - generic [ref=e344]: 3月31日下午3点去重庆
+            - generic [ref=e346]: 3月31日 周二
+      - generic [ref=e347]:
+        - generic [ref=e348]:
+          - img [ref=e349]
+          - generic [ref=e351]: 完成
+        - generic [ref=e352]:
+          - button "推迟" [ref=e353] [cursor=pointer]:
+            - img [ref=e354]
+            - text: 推迟
+          - button "删除" [ref=e357] [cursor=pointer]:
+            - img [ref=e358]
+            - text: 删除
+        - generic [ref=e362]:
+          - button [ref=e363] [cursor=pointer]
+          - generic [ref=e365] [cursor=pointer]: 创建3点去重庆的待办
+      - generic [ref=e366]:
+        - generic [ref=e367]:
+          - img [ref=e368]
+          - generic [ref=e370]: 完成
+        - generic [ref=e371]:
+          - button "推迟" [ref=e372] [cursor=pointer]:
+            - img [ref=e373]
+            - text: 推迟
+          - button "删除" [ref=e376] [cursor=pointer]:
+            - img [ref=e377]
+            - text: 删除
+        - generic [ref=e381]:
+          - button [ref=e382] [cursor=pointer]
+          - generic [ref=e383] [cursor=pointer]:
+            - generic [ref=e384]: "2342"
+            - generic [ref=e386]: 3月31日 周二
+      - generic [ref=e387]:
+        - generic [ref=e388]:
+          - img [ref=e389]
+          - generic [ref=e391]: 完成
+        - generic [ref=e392]:
+          - button "推迟" [ref=e393] [cursor=pointer]:
+            - img [ref=e394]
+            - text: 推迟
+          - button "删除" [ref=e397] [cursor=pointer]:
+            - img [ref=e398]
+            - text: 删除
+        - generic [ref=e402]:
+          - button [ref=e403] [cursor=pointer]
+          - generic [ref=e404] [cursor=pointer]:
+            - generic [ref=e405]: "453"
+            - generic [ref=e407]: 3月31日 周二
+      - generic [ref=e408]:
+        - generic [ref=e409]:
+          - img [ref=e410]
+          - generic [ref=e412]: 完成
+        - generic [ref=e413]:
+          - button "推迟" [ref=e414] [cursor=pointer]:
+            - img [ref=e415]
+            - text: 推迟
+          - button "删除" [ref=e418] [cursor=pointer]:
+            - img [ref=e419]
+            - text: 删除
+        - generic [ref=e423]:
+          - button [ref=e424] [cursor=pointer]
+          - generic [ref=e426] [cursor=pointer]: "123"
+      - generic [ref=e427]:
+        - generic [ref=e428]:
+          - img [ref=e429]
+          - generic [ref=e431]: 完成
+        - generic [ref=e432]:
+          - button "推迟" [ref=e433] [cursor=pointer]:
+            - img [ref=e434]
+            - text: 推迟
+          - button "删除" [ref=e437] [cursor=pointer]:
+            - img [ref=e438]
+            - text: 删除
+        - generic [ref=e442]:
+          - button [ref=e443] [cursor=pointer]
+          - generic [ref=e444] [cursor=pointer]:
+            - generic [ref=e445]: 上山打老虎
+            - generic [ref=e447]: 3月31日 周二
+      - generic [ref=e448]:
+        - generic [ref=e449]:
+          - img [ref=e450]
+          - generic [ref=e452]: 完成
+        - generic [ref=e453]:
+          - button "推迟" [ref=e454] [cursor=pointer]:
+            - img [ref=e455]
+            - text: 推迟
+          - button "删除" [ref=e458] [cursor=pointer]:
+            - img [ref=e459]
+            - text: 删除
+        - generic [ref=e463]:
+          - button [ref=e464] [cursor=pointer]
+          - generic [ref=e465] [cursor=pointer]:
+            - generic [ref=e466]: 说话者说‘明天上山打老虎’，结合当前日期2026-03-31（周二），‘明天’指2026-04-01；此句可能为字面意图，也可能引用儿歌《打老虎》的戏谑表达
+            - generic [ref=e468]: 4月1日 周三
+      - generic [ref=e469]:
+        - generic [ref=e470]:
+          - img [ref=e471]
+          - generic [ref=e473]: 完成
+        - generic [ref=e474]:
+          - button "推迟" [ref=e475] [cursor=pointer]:
+            - img [ref=e476]
+            - text: 推迟
+          - button "删除" [ref=e479] [cursor=pointer]:
+            - img [ref=e480]
+            - text: 删除
+        - generic [ref=e484]:
+          - button [ref=e485] [cursor=pointer]
+          - generic [ref=e486] [cursor=pointer]:
+            - generic [ref=e487]: E2E测试上午待办
+            - generic [ref=e488]:
+              - generic [ref=e489]: 今天
+              - generic [ref=e490]: 120分
+      - button "添加任务" [ref=e492] [cursor=pointer]:
+        - img [ref=e493]
+        - generic [ref=e494]: 添加任务
+      - generic [ref=e495]: 3 条已完成
+      - generic [ref=e496]:
+        - generic [ref=e497]:
+          - img [ref=e498]
+          - generic [ref=e500]: 完成
+        - generic [ref=e501]:
+          - button "推迟" [ref=e502] [cursor=pointer]:
+            - img [ref=e503]
+            - text: 推迟
+          - button "删除" [ref=e506] [cursor=pointer]:
+            - img [ref=e507]
+            - text: 删除
+        - generic [ref=e511]:
+          - button [ref=e512] [cursor=pointer]:
+            - img [ref=e513]
+          - generic [ref=e515] [cursor=pointer]:
+            - generic [ref=e516]: E2E测试上午待办
+            - generic [ref=e518]: 3月31日 周二
+      - generic [ref=e519]:
+        - generic [ref=e520]:
+          - img [ref=e521]
+          - generic [ref=e523]: 完成
+        - generic [ref=e524]:
+          - button "推迟" [ref=e525] [cursor=pointer]:
+            - img [ref=e526]
+            - text: 推迟
+          - button "删除" [ref=e529] [cursor=pointer]:
+            - img [ref=e530]
+            - text: 删除
+        - generic [ref=e534]:
+          - button [ref=e535] [cursor=pointer]:
+            - img [ref=e536]
+          - generic [ref=e539] [cursor=pointer]: ������Ŀ�ĵ�
+      - generic [ref=e540]:
+        - generic [ref=e541]:
+          - img [ref=e542]
+          - generic [ref=e544]: 完成
+        - generic [ref=e545]:
+          - button "推迟" [ref=e546] [cursor=pointer]:
+            - img [ref=e547]
+            - text: 推迟
+          - button "删除" [ref=e550] [cursor=pointer]:
+            - img [ref=e551]
+            - text: 删除
+        - generic [ref=e555]:
+          - button [ref=e556] [cursor=pointer]:
+            - img [ref=e557]
+          - generic [ref=e560] [cursor=pointer]: ���翪�����۷���
+    - button "Close" [ref=e561] [cursor=pointer]:
+      - img [ref=e562]
+      - generic [ref=e565]: Close

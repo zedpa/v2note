@@ -511,6 +511,44 @@
 }
 
 /* ============================================
+   NATIVE APP FEEL — WebView 原生化
+   ============================================ */
+
+/* 消除浏览器默认点击高亮（蓝色/灰色闪烁） */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* 禁止非内容区域长按弹出系统菜单 */
+body {
+  -webkit-touch-callout: none;
+}
+
+/* 内容区域保持可选可长按 */
+[contenteditable="true"],
+textarea,
+input,
+.prose,
+.whitespace-pre-wrap {
+  -webkit-touch-callout: default;
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+/* 阻止页面级橡皮筋回弹和 pull-to-refresh */
+html, body {
+  overscroll-behavior: none;
+}
+
+/* 滚动容器：包含 overscroll 不外泄，启用惯性滚动 */
+.overflow-y-auto,
+.overflow-x-auto,
+.overflow-auto {
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ============================================
    SAFE AREA UTILITIES
    ============================================ */
 

@@ -146,7 +146,7 @@ export function TodayGantt({ onClose }: TodayGanttProps) {
                     <div
                       key={todo.id}
                       className={cn(
-                        "absolute left-12 right-2 rounded-lg overflow-hidden z-5 cursor-pointer transition-all",
+                        "absolute left-12 right-2 rounded-lg overflow-hidden z-5 cursor-pointer select-none transition-all",
                         todo.done && "opacity-50",
                       )}
                       style={{
@@ -210,7 +210,7 @@ export function TodayGantt({ onClose }: TodayGanttProps) {
                         <div
                           key={todo.id}
                           className={cn(
-                            "relative flex items-center gap-2 px-3 py-2 rounded-lg border-2 cursor-pointer overflow-hidden transition-all",
+                            "relative flex items-center gap-2 px-3 py-2 rounded-lg border-2 cursor-pointer select-none overflow-hidden transition-all",
                             todo.done && "opacity-50",
                           )}
                           style={{

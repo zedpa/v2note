@@ -1,0 +1,10 @@
+[     137ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[     732ms] [LOG] [Fast Refresh] done in 703ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[     991ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[    1060ms] [LOG] [HMR] connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[    1428ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[   12131ms] [LOG] [usePCMRecorder] AudioContext created. SampleRate: 16000, State: running @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[  165035ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[  165214ms] [LOG] [Fast Refresh] done in 263ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[  180773ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[  180946ms] [LOG] [Fast Refresh] done in 259ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297

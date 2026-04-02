@@ -552,7 +552,7 @@ export default function WritePage() {
 
   return (
     <PCLayout>
-    <div className="min-h-screen bg-cream flex flex-col">
+    <div className="min-h-dvh bg-cream flex flex-col">
       <div
         className="w-full max-w-[680px] mx-auto px-6 pb-16 flex flex-col flex-1 relative"
         onDragEnter={handleDragEnter}

@@ -105,12 +105,12 @@ export function registerIngestRoutes(router: Router) {
 
         let imageUrl: string;
         const buf = Buffer.from(body.file_base64, "base64");
+        const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+        const imgFileName = `${deviceId}-${timestamp}.jpg`;
 
         if (isOssConfigured()) {
           try {
-            const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-            const filename = `${deviceId}-${timestamp}.jpg`;
-            imageUrl = await uploadFile("images", filename, buf);
+            imageUrl = await uploadFile("images", imgFileName, buf);
           } catch (err) {
             console.error("[ingest] OSS upload failed, using data URL fallback:", err);
             imageUrl = `data:image/jpeg;base64,${body.file_base64}`;
@@ -127,6 +127,8 @@ export function registerIngestRoutes(router: Router) {
           status: "completed",
           source: "manual",
           source_type: "material",
+          file_url: imageUrl,
+          file_name: imgFileName,
         });
 
         await transcriptRepo.create({
@@ -175,11 +177,12 @@ export function registerIngestRoutes(router: Router) {
         }
 
         // Upload to OSS if configured
+        let fileOssUrl: string | null = null;
         if (isOssConfigured()) {
           try {
             const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
             const ossName = `${deviceId}-${timestamp}-${safeFilename}`;
-            await uploadFile("files", ossName, fileBuf);
+            fileOssUrl = await uploadFile("files", ossName, fileBuf);
           } catch (err) {
             console.error("[ingest] OSS file upload failed:", err);
           }
@@ -191,6 +194,8 @@ export function registerIngestRoutes(router: Router) {
           status: "completed",
           source: "manual",
           source_type: "material",
+          file_url: fileOssUrl ?? undefined,
+          file_name: safeFilename,
         });
 
         await transcriptRepo.create({

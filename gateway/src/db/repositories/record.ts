@@ -14,6 +14,8 @@ export interface Record {
   archived: boolean;
   digested: boolean;
   digested_at: string | null;
+  file_url: string | null;
+  file_name: string | null;
   hierarchy_tags?: Array<{ label: string; level: number }>;
   created_at: string;
   updated_at: string;
@@ -102,10 +104,12 @@ export async function create(fields: {
   duration_seconds?: number;
   location_text?: string;
   notebook?: string;
+  file_url?: string;
+  file_name?: string;
 }): Promise<Record> {
   const row = await queryOne<Record>(
-    `INSERT INTO record (device_id, user_id, status, source, source_type, audio_path, duration_seconds, location_text, notebook)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+    `INSERT INTO record (device_id, user_id, status, source, source_type, audio_path, duration_seconds, location_text, notebook, file_url, file_name)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`,
     [
       fields.device_id,
       fields.user_id ?? null,
@@ -116,6 +120,8 @@ export async function create(fields: {
       fields.duration_seconds ?? null,
       fields.location_text ?? null,
       fields.notebook ?? null,
+      fields.file_url ?? null,
+      fields.file_name ?? null,
     ],
   );
   return row!;
@@ -130,7 +136,7 @@ export async function updateStatus(id: string, status: string): Promise<void> {
 
 export async function updateFields(
   id: string,
-  fields: { status?: string; archived?: boolean; duration_seconds?: number; source_type?: string; audio_path?: string },
+  fields: { status?: string; archived?: boolean; duration_seconds?: number; source_type?: string; audio_path?: string; file_url?: string; file_name?: string },
 ): Promise<void> {
   const sets: string[] = ["updated_at = now()"];
   const params: any[] = [];
@@ -154,6 +160,14 @@ export async function updateFields(
   if (fields.audio_path !== undefined) {
     sets.push(`audio_path = $${i++}`);
     params.push(fields.audio_path);
+  }
+  if (fields.file_url !== undefined) {
+    sets.push(`file_url = $${i++}`);
+    params.push(fields.file_url);
+  }
+  if (fields.file_name !== undefined) {
+    sets.push(`file_name = $${i++}`);
+    params.push(fields.file_name);
   }
   params.push(id);
   await execute(`UPDATE record SET ${sets.join(", ")} WHERE id = $${i}`, params);

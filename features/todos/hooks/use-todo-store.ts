@@ -104,6 +104,7 @@ export function useTodoStore() {
       text: string;
       scheduled_start?: string;
       estimated_minutes?: number;
+      priority?: number;
       domain?: string;
       parent_id?: string;
       level?: number;
@@ -119,6 +120,67 @@ export function useTodoStore() {
   const update = useCallback(
     async (id: string, params: Parameters<typeof apiUpdateTodo>[1]) => {
       await apiUpdateTodo(id, params);
+      await refresh();
+    },
+    [refresh],
+  );
+
+  /** 推迟到明天（保持同一时间，日期+1） */
+  const postpone = useCallback(
+    async (id: string) => {
+      const todo = allTodos.find((t) => t.id === id);
+      if (!todo) return;
+
+      const now = new Date();
+      const tomorrow = new Date(now);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+
+      let newStart: string;
+      if (todo.scheduled_start) {
+        // 保留原时间，日期推到明天
+        const orig = new Date(todo.scheduled_start);
+        tomorrow.setHours(orig.getHours(), orig.getMinutes(), 0, 0);
+        newStart = tomorrow.toISOString();
+      } else {
+        // 无时间则设为明天 09:00
+        tomorrow.setHours(9, 0, 0, 0);
+        newStart = tomorrow.toISOString();
+      }
+
+      // 乐观更新
+      setAllTodos((prev) =>
+        prev.map((t) =>
+          t.id === id ? { ...t, scheduled_start: newStart } : t,
+        ),
+      );
+
+      try {
+        await apiUpdateTodo(id, { scheduled_start: newStart });
+      } catch {
+        await refresh();
+      }
+    },
+    [allTodos, refresh],
+  );
+
+  /** 撤销完成（恢复为未完成） */
+  const undoToggle = useCallback(
+    async (id: string) => {
+      setAllTodos((prev) =>
+        prev.map((t) => (t.id === id ? { ...t, done: false } : t)),
+      );
+      try {
+        await apiUpdateTodo(id, { done: false });
+      } catch {
+        await refresh();
+      }
+    },
+    [refresh],
+  );
+
+  /** 撤销删除（重新创建 — 简化实现：刷新列表） */
+  const undoRemove = useCallback(
+    async () => {
       await refresh();
     },
     [refresh],
@@ -159,5 +221,8 @@ export function useTodoStore() {
     create,
     update,
     remove,
+    postpone,
+    undoToggle,
+    undoRemove,
   };
 }

@@ -1,0 +1,29 @@
+- generic [active]:
+  - button "Open Next.js Dev Tools" [ref=e76] [cursor=pointer]:
+    - img [ref=e77]
+  - alert [ref=e80]
+  - generic [ref=e208]:
+    - generic [ref=e210]:
+      - img "路路 Logo" [ref=e211]
+      - generic [ref=e245]:
+        - heading "路路" [level=1] [ref=e246]
+        - paragraph [ref=e247]: 认识你 (5/5)
+    - generic [ref=e248]:
+      - generic [ref=e249]: 你好！我是路路 🦌 怎么称呼你？
+      - generic [ref=e264]: 小明
+      - generic [ref=e265]: 小明好呀～最近在忙些什么呢？
+      - generic [ref=e269]: 我在做一个AI产品，最近在准备融资
+      - generic [ref=e273]: 做AI产品还准备融资，真厉害！过程中有遇到什么挑战吗？
+      - generic [ref=e277]: 想法太多太散，经常忘记重要的事情
+      - generic [ref=e281]: 想法太多确实容易乱，你一般什么时候整理它们？
+      - generic [ref=e285]: 一般晚上睡前会想想，但经常就忘了
+      - generic [ref=e289]: 睡前想事情容易飘走～你希望怎么留住它们？
+      - generic [ref=e293]: 希望有个工具能帮我随时记录，自动整理
+    - generic [ref=e251]:
+      - generic [ref=e252]:
+        - button "语音输入" [ref=e253] [cursor=pointer]:
+          - img [ref=e254]
+        - textbox "说点什么..." [disabled] [ref=e290]
+        - button "发送" [disabled] [ref=e258]:
+          - img [ref=e259]
+      - button "跳过这个问题" [ref=e292] [cursor=pointer]

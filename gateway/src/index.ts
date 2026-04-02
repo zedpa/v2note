@@ -11,6 +11,7 @@ import { startASR, sendAudioChunk, stopASR, cancelASR, type ASRMode } from "./ha
 import { getSession } from "./session/manager.js";
 import { Router } from "./router.js";
 import { sendJson, sendError } from "./lib/http-helpers.js";
+import { iterateStreamWithTimeout, StreamTimeoutError } from "./lib/stream-utils.js";
 import { handleCors } from "./middleware/cors.js";
 import { registerDeviceRoutes } from "./routes/devices.js";
 import { registerRecordRoutes } from "./routes/records.js";
@@ -313,16 +314,21 @@ wss.on("connection", (ws) => {
 
         case "chat.start": {
           (msg.payload as any).userId = authedUserId;
-          const stream = await startChat(msg.payload);
           let fullText = "";
-          for await (const chunk of stream) {
-            if (chunk.startsWith("\x00TOOL_STATUS:")) {
-              const parts = chunk.slice(13).split(":", 2);
-              send(ws, { type: "tool.status", payload: { toolName: parts[0], label: parts[1] } });
-              continue;
-            }
-            fullText += chunk;
-            send(ws, { type: "chat.chunk", payload: { text: chunk } });
+          try {
+            const stream = await startChat(msg.payload);
+            await iterateStreamWithTimeout(stream, (chunk) => {
+              if (chunk.startsWith("\x00TOOL_STATUS:")) {
+                const parts = chunk.slice(13).split(":", 2);
+                send(ws, { type: "tool.status", payload: { toolName: parts[0], label: parts[1] } });
+                return;
+              }
+              fullText += chunk;
+              send(ws, { type: "chat.chunk", payload: { text: chunk } });
+            });
+          } catch (streamErr: any) {
+            console.error(`[gateway] chat.start stream error:`, streamErr.message);
+            if (!fullText) fullText = "抱歉，我现在有点忙，稍后再试。";
           }
           const session = getSession(msg.payload.deviceId);
           session.context.addMessage({ role: "assistant", content: fullText });
@@ -331,19 +337,24 @@ wss.on("connection", (ws) => {
         }
 
         case "chat.message": {
-          const stream = await sendChatMessage(
-            msg.payload.deviceId,
-            msg.payload.text,
-          );
           let fullText = "";
-          for await (const chunk of stream) {
-            if (chunk.startsWith("\x00TOOL_STATUS:")) {
-              const parts = chunk.slice(13).split(":", 2);
-              send(ws, { type: "tool.status", payload: { toolName: parts[0], label: parts[1] } });
-              continue;
-            }
-            fullText += chunk;
-            send(ws, { type: "chat.chunk", payload: { text: chunk } });
+          try {
+            const stream = await sendChatMessage(
+              msg.payload.deviceId,
+              msg.payload.text,
+            );
+            await iterateStreamWithTimeout(stream, (chunk) => {
+              if (chunk.startsWith("\x00TOOL_STATUS:")) {
+                const parts = chunk.slice(13).split(":", 2);
+                send(ws, { type: "tool.status", payload: { toolName: parts[0], label: parts[1] } });
+                return;
+              }
+              fullText += chunk;
+              send(ws, { type: "chat.chunk", payload: { text: chunk } });
+            });
+          } catch (streamErr: any) {
+            console.error(`[gateway] chat.message stream error:`, streamErr.message);
+            if (!fullText) fullText = "抱歉，出了点问题，请稍后再试。";
           }
           const session = getSession(msg.payload.deviceId);
           session.context.addMessage({ role: "assistant", content: fullText });

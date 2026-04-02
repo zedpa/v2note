@@ -1,0 +1,12 @@
+[     131ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[     148ms] [LOG] [Fast Refresh] done in 121ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[     391ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[     445ms] [LOG] [HMR] connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[     828ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[  355663ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:3001/api/v1/todos/e10a6be7-ca58-4e8a-9bd7-a5c5cbf0c972:0
+[  355671ms] Error: Connection terminated due to connection timeout
+    at request (http://localhost:3000/_next/static/chunks/_225ad29f._.js:283:15)
+    at async updateTodo (http://localhost:3000/_next/static/chunks/_225ad29f._.js:726:5)
+    at async TodoEditSheet.useCallback[handleSave] (http://localhost:3000/_next/static/chunks/features_todos_3fae9005._.js:2765:21)
+[  355807ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[  355809ms] [LOG] [Fast Refresh] done in 104ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297

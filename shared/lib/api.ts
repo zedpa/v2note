@@ -20,12 +20,33 @@ async function getAuth() {
   return import("./auth");
 }
 
+/** 主动续期：token 剩余 <10 分钟时后台静默 refresh */
+async function ensureFreshToken(): Promise<void> {
+  const auth = await getAuth();
+  const token = auth.getAccessToken();
+  if (!token) return;
+  try {
+    const parts = token.split(".");
+    if (parts.length !== 3) return;
+    const payload = JSON.parse(atob(parts[1]));
+    const expiresIn = payload.exp * 1000 - Date.now();
+    if (expiresIn > 0 && expiresIn < 10 * 60 * 1000) {
+      await tryRefreshToken();
+    }
+  } catch { /* token 解析失败，跳过主动续期 */ }
+}
+
 async function request<T>(
   method: string,
   path: string,
   body?: any,
   _isRetry = false,
 ): Promise<T> {
+  // 主动续期（不对 auth 路径和重试请求执行）
+  if (!_isRetry && !path.includes("/auth/")) {
+    await ensureFreshToken();
+  }
+
   const base = getGatewayHttpUrl();
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -88,7 +109,20 @@ async function request<T>(
   return res.json();
 }
 
+let _refreshPromise: Promise<boolean> | null = null;
+
 async function tryRefreshToken(): Promise<boolean> {
+  // 复用正在进行的 refresh，防止并发竞态
+  if (_refreshPromise) return _refreshPromise;
+  _refreshPromise = doRefresh();
+  try {
+    return await _refreshPromise;
+  } finally {
+    _refreshPromise = null;
+  }
+}
+
+async function doRefresh(): Promise<boolean> {
   try {
     const auth = await getAuth();
     const rt = auth.getRefreshTokenValue();

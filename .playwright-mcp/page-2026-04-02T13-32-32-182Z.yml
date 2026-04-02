@@ -1,0 +1,146 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - banner [ref=e3]:
+      - generic [ref=e4]:
+        - button "打开侧边栏" [ref=e5] [cursor=pointer]: E
+        - generic [ref=e6]:
+          - button "日记" [ref=e7] [cursor=pointer]
+          - button "待办" [ref=e8] [cursor=pointer]
+        - generic [ref=e9]:
+          - button "AI 对话" [ref=e10] [cursor=pointer]:
+            - img "路路 Logo" [ref=e11]
+          - button "搜索" [ref=e40] [cursor=pointer]:
+            - img [ref=e41]
+          - button "通知" [ref=e44] [cursor=pointer]:
+            - img [ref=e45]
+    - main [ref=e48]:
+      - generic [ref=e50]:
+        - button "切换到项目视图" [ref=e67] [cursor=pointer]:
+          - img [ref=e68]
+        - generic [ref=e70]:
+          - generic [ref=e71]:
+            - generic [ref=e72]: 星期四
+            - generic [ref=e73]:
+              - generic [ref=e74]: 4月 2026
+              - button [ref=e75] [cursor=pointer]:
+                - img [ref=e76]
+          - generic [ref=e78]:
+            - button "一 30" [ref=e79] [cursor=pointer]:
+              - generic [ref=e80]: 一
+              - generic [ref=e82]: "30"
+            - button "二 31" [ref=e83] [cursor=pointer]:
+              - generic [ref=e84]: 二
+              - generic [ref=e86]: "31"
+            - button "三 1" [ref=e87] [cursor=pointer]:
+              - generic [ref=e88]: 三
+              - generic [ref=e90]: "1"
+            - button "四 2" [ref=e91] [cursor=pointer]:
+              - generic [ref=e92]: 四
+              - generic [ref=e94]: "2"
+            - button "五 3" [ref=e95] [cursor=pointer]:
+              - generic [ref=e96]: 五
+              - generic [ref=e98]: "3"
+            - button "六 4" [ref=e99] [cursor=pointer]:
+              - generic [ref=e100]: 六
+              - generic [ref=e102]: "4"
+            - button "日 5" [ref=e103] [cursor=pointer]:
+              - generic [ref=e104]: 日
+              - generic [ref=e106]: "5"
+          - generic [ref=e107]:
+            - button "随时 (1)" [ref=e108] [cursor=pointer]:
+              - img [ref=e109]
+              - text: 随时 (1)
+              - img [ref=e112]
+            - generic [ref=e114]:
+              - generic [ref=e115]:
+                - generic [ref=e116]:
+                  - img [ref=e117]
+                  - generic [ref=e119]: 完成
+                - generic [ref=e120]:
+                  - button "推迟" [ref=e121] [cursor=pointer]:
+                    - img [ref=e122]
+                    - text: 推迟
+                  - button "删除" [ref=e125] [cursor=pointer]:
+                    - img [ref=e126]
+                    - text: 删除
+                - generic [ref=e130]:
+                  - button [ref=e131] [cursor=pointer]
+                  - generic [ref=e133] [cursor=pointer]: v0.1 版本需明确当前能力边界：能做什么、还不能做什么
+              - button [ref=e134] [cursor=pointer]:
+                - img [ref=e135]
+          - generic [ref=e136]:
+            - button "上午 (1)" [ref=e137] [cursor=pointer]:
+              - img [ref=e138]
+              - text: 上午 (1)
+              - img [ref=e144]
+            - generic [ref=e146]:
+              - generic [ref=e147]:
+                - generic [ref=e148]:
+                  - img [ref=e149]
+                  - generic [ref=e151]: 完成
+                - generic [ref=e152]:
+                  - button "推迟" [ref=e153] [cursor=pointer]:
+                    - img [ref=e154]
+                    - text: 推迟
+                  - button "删除" [ref=e157] [cursor=pointer]:
+                    - img [ref=e158]
+                    - text: 删除
+                - generic [ref=e162]:
+                  - button [ref=e163] [cursor=pointer]
+                  - generic [ref=e164] [cursor=pointer]:
+                    - generic [ref=e165]: E2E测试上午待办
+                    - generic [ref=e166]:
+                      - generic [ref=e167]: 今天
+                      - generic [ref=e168]: 120分
+              - button [ref=e169] [cursor=pointer]:
+                - img [ref=e170]
+          - generic [ref=e171]:
+            - button "下午 (0)" [ref=e172] [cursor=pointer]:
+              - img [ref=e173]
+              - text: 下午 (0)
+              - img [ref=e179]
+            - button "下午的安排" [ref=e181] [cursor=pointer]:
+              - generic [ref=e182]: 下午的安排
+              - img [ref=e184]
+          - generic [ref=e185]:
+            - button "晚上 (0)" [ref=e186] [cursor=pointer]:
+              - img [ref=e187]
+              - text: 晚上 (0)
+              - img [ref=e189]
+            - button "晚上收尾" [ref=e191] [cursor=pointer]:
+              - generic [ref=e192]: 晚上收尾
+              - img [ref=e194]
+        - generic [ref=e197]:
+          - generic [ref=e199]:
+            - textbox [ref=e200]: E2E测试上午待办
+            - button [ref=e201] [cursor=pointer]:
+              - img [ref=e202]
+          - generic [ref=e205]:
+            - generic [ref=e206] [cursor=pointer]:
+              - img [ref=e207]
+              - generic [ref=e209]: 今天
+            - generic [ref=e210] [cursor=pointer]:
+              - img [ref=e211]
+              - generic [ref=e214]: 上午 9:00
+            - textbox [ref=e215]: 2026-04-02
+            - textbox [ref=e216]: 09:00
+          - generic [ref=e217]:
+            - generic [ref=e218]: 预估时长
+            - generic [ref=e219]:
+              - button "15分" [ref=e220] [cursor=pointer]
+              - button "30分" [ref=e221] [cursor=pointer]
+              - button "1小时" [ref=e222] [cursor=pointer]
+              - button "2小时" [ref=e223] [cursor=pointer]
+          - generic [ref=e224]:
+            - generic [ref=e225]: 优先级
+            - generic [ref=e226]:
+              - button "低" [ref=e227] [cursor=pointer]
+              - button "中" [ref=e228] [cursor=pointer]
+              - button "高" [ref=e229] [cursor=pointer]
+              - button "紧急" [ref=e230] [cursor=pointer]
+          - button "保存" [ref=e232] [cursor=pointer]
+    - button [ref=e53] [cursor=pointer]:
+      - img [ref=e54]
+  - button "Open Next.js Dev Tools" [ref=e62] [cursor=pointer]:
+    - img [ref=e63]
+  - alert [ref=e66]

@@ -1,0 +1,61 @@
+- generic [ref=e1]:
+  - button "Open Next.js Dev Tools" [ref=e12] [cursor=pointer]:
+    - img [ref=e13]
+  - alert [ref=e16]
+  - generic [ref=e95]:
+    - banner [ref=e96]:
+      - generic [ref=e97]:
+        - button "打开侧边栏" [ref=e98] [cursor=pointer]: E
+        - generic [ref=e99]:
+          - button "日记" [ref=e100] [cursor=pointer]
+          - button "待办" [ref=e101] [cursor=pointer]
+        - generic [ref=e102]:
+          - button "AI 对话" [ref=e103] [cursor=pointer]:
+            - img "路路 Logo" [ref=e104]
+          - button "搜索" [ref=e133] [cursor=pointer]:
+            - img [ref=e134]
+          - button "通知" [ref=e137] [cursor=pointer]:
+            - img [ref=e138]
+    - main [ref=e141]:
+      - generic [ref=e143]:
+        - button "切换到时间视图" [ref=e261] [cursor=pointer]:
+          - img [ref=e146]
+        - generic [ref=e267]:
+          - button "收集箱 3/11" [ref=e268] [cursor=pointer]:
+            - generic [ref=e269]: 收集箱
+            - generic [ref=e270]: 3/11
+          - generic [ref=e271]:
+            - generic [ref=e272] [cursor=pointer]:
+              - button [ref=e273]
+              - generic [ref=e274]: 3月31日下午3点去重庆
+              - img [ref=e275]
+            - generic [ref=e277] [cursor=pointer]:
+              - button [ref=e278]
+              - generic [ref=e279]: 创建3点去重庆的待办
+            - generic [ref=e280] [cursor=pointer]:
+              - button [ref=e281]
+              - generic [ref=e282]: "2342"
+            - generic [ref=e283] [cursor=pointer]:
+              - button [ref=e284]
+              - generic [ref=e285]: "453"
+            - generic [ref=e286] [cursor=pointer]:
+              - button [ref=e287]
+              - generic [ref=e288]: "123"
+            - generic [ref=e289]: 还有 3 条
+            - button "3 条已完成" [active] [ref=e290] [cursor=pointer]:
+              - img [ref=e298]
+              - text: 3 条已完成
+            - generic [ref=e300] [cursor=pointer]:
+              - button [ref=e301]
+              - generic [ref=e303]: E2E测试上午待办
+            - generic [ref=e304] [cursor=pointer]:
+              - button [ref=e305]
+              - generic [ref=e307]: ������Ŀ�ĵ�
+            - generic [ref=e308] [cursor=pointer]:
+              - button [ref=e309]
+              - generic [ref=e311]: ���翪�����۷���
+          - button "添加任务" [ref=e294] [cursor=pointer]:
+            - img [ref=e295]
+            - generic [ref=e296]: 添加任务
+    - button [ref=e257] [cursor=pointer]:
+      - img [ref=e258]

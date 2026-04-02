@@ -12,6 +12,7 @@ interface TaskItemProps {
 
 export function TaskItem({ todo, onToggle, onPress }: TaskItemProps) {
   const isDone = todo.done;
+  const priority = todo.priority ?? 3;
 
   // 格式化日期显示
   const dateLabel = todo.scheduled_start
@@ -22,10 +23,18 @@ export function TaskItem({ todo, onToggle, onPress }: TaskItemProps) {
     ? `${todo.estimated_minutes}分`
     : null;
 
+  // 优先级左边框颜色
+  const priorityBorder =
+    priority >= 5
+      ? "border-l-[3px] border-l-red-500"
+      : priority >= 4
+        ? "border-l-[3px] border-l-orange-400"
+        : "";
+
   return (
     <div
       data-testid="task-item"
-      className="flex items-start gap-3 rounded-xl border border-border bg-card p-4"
+      className={`flex items-start gap-3 rounded-xl border border-border bg-card p-4 ${priorityBorder}`}
     >
       {/* Checkbox */}
       <button
@@ -45,7 +54,7 @@ export function TaskItem({ todo, onToggle, onPress }: TaskItemProps) {
 
       {/* Content */}
       <div
-        className="min-w-0 flex-1 cursor-pointer"
+        className="min-w-0 flex-1 cursor-pointer select-none"
         onClick={() => onPress?.(todo)}
       >
         <div
@@ -59,12 +68,17 @@ export function TaskItem({ todo, onToggle, onPress }: TaskItemProps) {
         </div>
 
         {/* Meta 行 */}
-        {(dateLabel || durationLabel) && (
-          <div className="mt-1.5 flex items-center gap-3 text-xs text-muted-foreground">
+        {(dateLabel || durationLabel || todo.goal_title) && (
+          <div className="mt-1.5 flex items-center gap-2 text-xs text-muted-foreground">
             {dateLabel && (
               <span className="text-primary">{dateLabel}</span>
             )}
             {durationLabel && <span>{durationLabel}</span>}
+            {todo.goal_title && (
+              <span className="truncate max-w-[120px] rounded-full bg-muted px-1.5 py-0.5 text-[10px]">
+                {todo.goal_title}
+              </span>
+            )}
           </div>
         )}
       </div>

@@ -2,71 +2,82 @@
 
 import { useRef, useCallback, useMemo } from "react";
 import { toLocalDateStr, getLocalToday } from "../lib/date-utils";
+import type { DotColor } from "../lib/date-dots";
 
 interface CalendarStripProps {
   selectedDate: string; // YYYY-MM-DD
   onDateChange: (date: string) => void;
+  dateDots?: Map<string, DotColor>;
 }
 
 const WEEKDAY_SHORT = ["日", "一", "二", "三", "四", "五", "六"];
 
-/**
- * 获取 date 所在周的周一
- */
+const DOT_COLORS: Record<DotColor, string> = {
+  red: "bg-red-500",
+  green: "bg-emerald-500",
+  yellow: "bg-amber-400",
+};
+
+/** 获取 date 所在周的周一 */
 function getMonday(dateStr: string): Date {
   const d = new Date(dateStr + "T00:00:00");
   const day = d.getDay();
-  const diff = day === 0 ? -6 : 1 - day; // 周日 → 前推6天
+  const diff = day === 0 ? -6 : 1 - day;
   d.setDate(d.getDate() + diff);
   return d;
 }
 
-/**
- * 生成以 anchorDate 为中心的 5 周日期（35 天）
- */
-function generateWeeks(anchorDate: string): string[] {
-  const monday = getMonday(anchorDate);
-  // 前推 2 周
-  monday.setDate(monday.getDate() - 14);
+/** 生成某周一开始的 7 天 */
+function generateWeek(mondayDate: Date): string[] {
   const days: string[] = [];
-  for (let i = 0; i < 35; i++) {
-    days.push(formatDate(monday));
-    monday.setDate(monday.getDate() + 1);
+  const d = new Date(mondayDate);
+  for (let i = 0; i < 7; i++) {
+    days.push(toLocalDateStr(d));
+    d.setDate(d.getDate() + 1);
   }
   return days;
 }
 
-function formatDate(d: Date): string {
-  return toLocalDateStr(d);
-}
-
-export function CalendarStrip({ selectedDate, onDateChange }: CalendarStripProps) {
-  const scrollRef = useRef<HTMLDivElement>(null);
+export function CalendarStrip({ selectedDate, onDateChange, dateDots }: CalendarStripProps) {
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
   const today = useMemo(() => getLocalToday(), []);
 
-  const days = useMemo(() => generateWeeks(selectedDate), [selectedDate]);
+  const weekDays = useMemo(() => {
+    const monday = getMonday(selectedDate);
+    return generateWeek(monday);
+  }, [selectedDate]);
 
-  // 找到选中日所在周的起始索引（中间周 = index 14~20）
-  const selectedWeekStart = useMemo(() => {
-    const idx = days.indexOf(selectedDate);
-    return Math.floor(idx / 7) * 7;
-  }, [days, selectedDate]);
+  // 滑动切换周
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    const touch = e.touches[0];
+    touchStartRef.current = { x: touch.clientX, y: touch.clientY };
+  }, []);
 
-  // 只显示选中日所在周
-  const weekDays = days.slice(selectedWeekStart, selectedWeekStart + 7);
+  const handleTouchEnd = useCallback(
+    (e: React.TouchEvent) => {
+      if (!touchStartRef.current) return;
+      const touch = e.changedTouches[0];
+      const dx = touch.clientX - touchStartRef.current.x;
+      const dy = touch.clientY - touchStartRef.current.y;
+      touchStartRef.current = null;
 
-  const handleDateClick = useCallback(
-    (dateStr: string) => {
-      onDateChange(dateStr);
+      // 水平位移 > 垂直位移，且超过 50px
+      if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 50) {
+        const current = new Date(selectedDate + "T00:00:00");
+        const offset = dx < 0 ? 7 : -7; // 左滑 → 下一周
+        current.setDate(current.getDate() + offset);
+        onDateChange(toLocalDateStr(current));
+      }
     },
-    [onDateChange],
+    [selectedDate, onDateChange],
   );
 
   return (
     <div
-      ref={scrollRef}
       data-testid="calendar-strip"
       className="flex justify-between px-5 pb-6"
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
     >
       {weekDays.map((dateStr) => {
         const d = new Date(dateStr + "T00:00:00");
@@ -74,12 +85,13 @@ export function CalendarStrip({ selectedDate, onDateChange }: CalendarStripProps
         const weekdayIdx = d.getDay();
         const isSelected = dateStr === selectedDate;
         const isToday = dateStr === today;
+        const dotColor = dateDots?.get(dateStr);
 
         return (
           <button
             key={dateStr}
-            onClick={() => handleDateClick(dateStr)}
-            className="flex flex-col items-center gap-2"
+            onClick={() => onDateChange(dateStr)}
+            className="flex flex-col items-center gap-2 select-none active:scale-95 transition-transform"
           >
             <span
               className={`text-[13px] ${
@@ -88,19 +100,21 @@ export function CalendarStrip({ selectedDate, onDateChange }: CalendarStripProps
             >
               {WEEKDAY_SHORT[weekdayIdx]}
             </span>
-            <div className="relative">
-              <div
-                className={`flex h-9 w-9 items-center justify-center rounded-xl text-base font-semibold ${
-                  isSelected
-                    ? "border border-border bg-card text-foreground"
+            <div
+              className={`flex h-9 w-9 items-center justify-center rounded-xl text-base font-semibold ${
+                isSelected
+                  ? "border border-border bg-card text-foreground"
+                  : isToday
+                    ? "bg-primary/15 text-primary"
                     : "text-muted-foreground"
-                }`}
-              >
-                {dayNum}
-              </div>
-              {/* 今天的红点 */}
-              {isToday && !isSelected && (
-                <div className="absolute -top-0.5 right-0 h-1.5 w-1.5 rounded-full bg-destructive" />
+              }`}
+            >
+              {dayNum}
+            </div>
+            {/* 日期圆点 */}
+            <div className="h-1.5">
+              {dotColor && (
+                <div className={`h-1.5 w-1.5 rounded-full ${DOT_COLORS[dotColor]}`} />
               )}
             </div>
           </button>

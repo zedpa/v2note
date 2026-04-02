@@ -102,7 +102,7 @@ export default function TimelinePage() {
 
   return (
     <PCLayout>
-    <div className="h-screen bg-cream flex" onClick={() => setContextMenu(null)}>
+    <div className="h-dvh bg-cream flex" onClick={() => setContextMenu(null)}>
       {/* Left: Structure Navigation */}
       <aside className="w-[200px] shrink-0 border-r border-brand-border overflow-y-auto bg-sand">
         <div className="p-3">

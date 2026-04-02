@@ -1,8 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { getGatewayHttpUrl } from "@/shared/lib/gateway-url";
-import { getDeviceId } from "@/shared/lib/device";
+import { api } from "@/shared/lib/api";
 
 interface BriefingResult {
   greeting: string;
@@ -50,14 +49,8 @@ export function useDailyBriefing() {
     setLoading(true);
     setError(null);
     try {
-      const deviceId = await getDeviceId();
-      const baseUrl = getGatewayHttpUrl();
       const qs = forceRefresh ? "?refresh=true" : "";
-      const res = await fetch(`${baseUrl}/api/v1/daily/briefing${qs}`, {
-        headers: { "X-Device-Id": deviceId },
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
+      const data = await api.get<BriefingResult>(`/api/v1/daily/briefing${qs}`);
       setBriefing(data);
     } catch (err: any) {
       setError(err.message);
@@ -82,14 +75,8 @@ export function useEveningSummary() {
     setLoading(true);
     setError(null);
     try {
-      const deviceId = await getDeviceId();
-      const baseUrl = getGatewayHttpUrl();
       const qs = forceRefresh ? "?refresh=true" : "";
-      const res = await fetch(`${baseUrl}/api/v1/daily/evening-summary${qs}`, {
-        headers: { "X-Device-Id": deviceId },
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
+      const data = await api.get<SummaryResult>(`/api/v1/daily/evening-summary${qs}`);
       setSummary(data);
     } catch (err: any) {
       setError(err.message);
@@ -106,13 +93,5 @@ export function useEveningSummary() {
 }
 
 export async function markRelayDone(todoId: string): Promise<void> {
-  const deviceId = await getDeviceId();
-  const baseUrl = getGatewayHttpUrl();
-  await fetch(`${baseUrl}/api/v1/daily/relays/${todoId}`, {
-    method: "PATCH",
-    headers: {
-      "X-Device-Id": deviceId,
-      "Content-Type": "application/json",
-    },
-  });
+  await api.patch(`/api/v1/daily/relays/${todoId}`);
 }

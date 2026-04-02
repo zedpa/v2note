@@ -1,12 +1,18 @@
 "use client";
 
 import { useState } from "react";
-import { X, Clock, MapPin, Tag, CheckSquare, FileText, Pencil, Plus, Trash2 } from "lucide-react";
+import { X, Clock, MapPin, Tag, CheckSquare, FileText, Pencil, Plus, Trash2, ExternalLink, ImageIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { api } from "@/shared/lib/api";
 import { useNoteDetail } from "@/features/notes/hooks/use-note-detail";
 import { useNoteEditor } from "@/features/notes/hooks/use-note-editor";
 import { SwipeBack } from "@/shared/components/swipe-back";
+
+/** file_url 是否为图片 */
+function isImageUrl(url: string): boolean {
+  if (url.startsWith("data:image")) return true;
+  return /\.(jpe?g|png|gif|webp)(\?.*)?$/i.test(url);
+}
 
 interface NoteDetailProps {
   recordId: string;
@@ -95,6 +101,36 @@ export function NoteDetail({ recordId, onClose, onDeleted }: NoteDetailProps) {
             </span>
           )}
         </div>
+
+        {/* Attachment preview */}
+        {record.file_url && (
+          isImageUrl(record.file_url) ? (
+            <a href={record.file_url} target="_blank" rel="noopener noreferrer" className="block">
+              <img
+                src={record.file_url}
+                alt={record.file_name || "附件图片"}
+                className="w-full max-h-[300px] object-cover rounded-2xl bg-secondary"
+                onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+              />
+              {record.file_name && (
+                <p className="text-xs text-muted-foreground mt-1.5">{record.file_name}</p>
+              )}
+            </a>
+          ) : (
+            <a
+              href={record.file_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-3 p-3 rounded-2xl bg-card border border-border/60 hover:bg-secondary/60 transition-colors"
+            >
+              <FileText className="w-5 h-5 text-primary shrink-0" />
+              <span className="flex-1 min-w-0 text-sm text-foreground truncate">
+                {record.file_name || "附件"}
+              </span>
+              <ExternalLink className="w-4 h-4 text-muted-foreground shrink-0" />
+            </a>
+          )
+        )}
 
         {/* Tags — editable */}
         <div className="flex items-center gap-2 flex-wrap">

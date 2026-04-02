@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useCallback, type ReactNode } from "react";
 import { LuluLogo } from "@/components/brand/lulu-logo";
 import { api } from "@/shared/lib/api";
+import { useKeyboardOffset } from "@/shared/hooks/use-keyboard-offset";
 
 interface Message {
   role: "user" | "assistant";
@@ -75,6 +76,7 @@ export default function CounselorChat({ context, onClose }: CounselorChatProps) 
   const [loading, setLoading] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const messagesRef = useRef<Message[]>(messages);
+  const { offset: bottomOffset, viewportHeight, isKeyboardOpen } = useKeyboardOffset();
 
   // Keep ref in sync for cleanup
   useEffect(() => {
@@ -83,7 +85,7 @@ export default function CounselorChat({ context, onClose }: CounselorChatProps) 
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  }, [messages, isKeyboardOpen]);
 
   // Save conversation on unmount (close)
   useEffect(() => {
@@ -115,12 +117,9 @@ export default function CounselorChat({ context, onClose }: CounselorChatProps) 
     setLoading(true);
 
     try {
-      const res = await fetch("/api/v1/chat/decision", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question: frameworkPrefix + question }),
+      const data = await api.post<{ answer?: string; message?: string }>("/api/v1/chat/decision", {
+        question: frameworkPrefix + question,
       });
-      const data = await res.json();
       const assistantMsg: Message = {
         role: "assistant",
         content: data.answer ?? data.message ?? "抱歉，暂时无法回答。",
@@ -137,16 +136,16 @@ export default function CounselorChat({ context, onClose }: CounselorChatProps) 
   }, [input, loading]);
 
   return (
-    <div className="flex flex-col h-full bg-cream text-bark">
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-brand-border">
+    <div className="relative bg-cream text-bark" style={{ height: viewportHeight }}>
+      {/* Header — 固定顶部 */}
+      <div className="sticky top-0 z-10 flex items-center justify-between px-4 py-3 border-b border-brand-border bg-cream/80 backdrop-blur-[12px] select-none">
         <div className="flex items-center gap-2">
           <LuluLogo size={28} />
           <span className="font-serif font-semibold text-sm">路路咨询师</span>
         </div>
         <button
           onClick={onClose}
-          className="p-1 rounded-lg text-bark/50 hover:text-bark hover:bg-sand transition-colors"
+          className="p-1 rounded-lg text-bark/50 hover:text-bark active:bg-sand hover:bg-sand transition-colors"
         >
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
             <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
@@ -155,7 +154,7 @@ export default function CounselorChat({ context, onClose }: CounselorChatProps) 
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
+      <div className="overflow-y-auto px-4 py-3 space-y-3" style={{ height: "calc(100% - 48px - 64px)" }}>
         {messages.length === 0 && (
           <p className="text-bark/40 text-sm text-center mt-8">
             有什么想聊的？路路在这里陪你 ✿
@@ -191,20 +190,23 @@ export default function CounselorChat({ context, onClose }: CounselorChatProps) 
         <div ref={bottomRef} />
       </div>
 
-      {/* Input */}
-      <div className="px-4 py-3 border-t border-brand-border bg-cream/90 backdrop-blur-xl shadow-[0_-4px_20px_var(--shadow-ambient)]">
+      {/* Input — 底部固定，跟随键盘 */}
+      <div
+        className="absolute left-0 right-0 bottom-0 px-4 py-3 border-t border-brand-border bg-cream/90 backdrop-blur-xl shadow-[0_-4px_20px_var(--shadow-ambient)]"
+      >
         <div className="flex gap-2">
           <input
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && !e.nativeEvent.isComposing && handleSend()}
             placeholder="输入你的问题… (/munger 或 /mao 切换视角)"
+            enterKeyHint="send"
             className="flex-1 rounded-lg border border-brand-border bg-white px-3 py-2 text-sm text-bark placeholder:text-bark/30 focus:outline-none focus:ring-1 focus:ring-bark/20"
           />
           <button
             onClick={handleSend}
             disabled={loading || !input.trim()}
-            className="rounded-lg bg-bark text-cream px-3 py-2 text-sm font-medium hover:bg-bark/90 disabled:opacity-40 transition-colors"
+            className="rounded-lg bg-bark text-cream px-3 py-2 text-sm font-medium hover:bg-bark/90 active:bg-bark/80 disabled:opacity-40 transition-colors select-none"
           >
             发送
           </button>

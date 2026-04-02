@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useCallback, useRef, type TouchEvent } from "react";
+import { useState, useCallback, useMemo } from "react";
 import type { ProjectGroup, TodoDTO } from "../lib/todo-types";
+import { getProjectColor } from "../lib/project-colors";
 import { ProjectCard } from "./project-card";
-import { PageDots } from "./page-dots";
 import { TodoCreateSheet } from "./todo-create-sheet";
+import { ProjectDetailSheet } from "./project-detail-sheet";
 
 interface ProjectViewProps {
   projectGroups: ProjectGroup[];
@@ -14,6 +15,11 @@ interface ProjectViewProps {
     text: string;
     parent_id?: string;
   }) => Promise<any>;
+  onPostpone: (id: string) => void;
+  onRemove: (id: string) => void;
+  swipeOpenId: string | null;
+  onSwipeOpenChange: (id: string | null) => void;
+  projects?: TodoDTO[];
 }
 
 export function ProjectView({
@@ -21,42 +27,55 @@ export function ProjectView({
   onToggle,
   onPress,
   onCreate,
+  onPostpone,
+  onRemove,
+  swipeOpenId,
+  onSwipeOpenChange,
+  projects,
 }: ProjectViewProps) {
-  const [currentPage, setCurrentPage] = useState(0);
   const [createOpen, setCreateOpen] = useState(false);
   const [createParentId, setCreateParentId] = useState<string | undefined>();
-  const scrollRef = useRef<HTMLDivElement>(null);
-
-  const total = projectGroups.length;
-
-  const handleScroll = useCallback(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-    const page = Math.round(el.scrollLeft / el.clientWidth);
-    setCurrentPage(Math.min(page, total - 1));
-  }, [total]);
-
-  // 水平滑动时阻止事件冒泡，避免被外层 SwipeBack 拦截
-  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
-  const handleCarouselTouchStart = useCallback((e: TouchEvent) => {
-    touchStartRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-  }, []);
-  const handleCarouselTouchMove = useCallback((e: TouchEvent) => {
-    if (!touchStartRef.current) return;
-    const dx = Math.abs(e.touches[0].clientX - touchStartRef.current.x);
-    const dy = Math.abs(e.touches[0].clientY - touchStartRef.current.y);
-    // 水平位移大于垂直 → 用户在横滑，阻止冒泡
-    if (dx > dy && dx > 10) {
-      e.stopPropagation();
-    }
-  }, []);
+  const [detailGroup, setDetailGroup] = useState<ProjectGroup | null>(null);
+  const [detailColorIndex, setDetailColorIndex] = useState(0);
 
   const handleAdd = useCallback((parentId?: string) => {
     setCreateParentId(parentId);
     setCreateOpen(true);
   }, []);
 
-  if (total === 0) {
+  const handleHeaderPress = useCallback(
+    (group: ProjectGroup, colorIndex: number) => {
+      setDetailGroup(group);
+      setDetailColorIndex(colorIndex);
+    },
+    [],
+  );
+
+  // 瀑布流：将卡片分配到左右两列，短列优先
+  const { leftColumn, rightColumn } = useMemo(() => {
+    const left: { group: ProjectGroup; colorIndex: number }[] = [];
+    const right: { group: ProjectGroup; colorIndex: number }[] = [];
+    let leftHeight = 0;
+    let rightHeight = 0;
+
+    projectGroups.forEach((group, i) => {
+      // 估算卡片高度：头部 + 待办行数 + 底部
+      const pendingRows = Math.min(group.tasks.filter(t => !t.done).length, 5);
+      const estimatedHeight = 48 + pendingRows * 32 + 48;
+
+      if (leftHeight <= rightHeight) {
+        left.push({ group, colorIndex: i });
+        leftHeight += estimatedHeight;
+      } else {
+        right.push({ group, colorIndex: i });
+        rightHeight += estimatedHeight;
+      }
+    });
+
+    return { leftColumn: left, rightColumn: right };
+  }, [projectGroups]);
+
+  if (projectGroups.length === 0) {
     return (
       <div data-testid="project-view" className="flex flex-col items-center justify-center px-5 py-20 text-center">
         <div className="mb-2 text-lg text-foreground">还没有项目</div>
@@ -68,43 +87,65 @@ export function ProjectView({
   }
 
   return (
-    <div data-testid="project-view" className="flex flex-col">
-      {/* 水平轮播 */}
-      <div
-        ref={scrollRef}
-        onScroll={handleScroll}
-        onTouchStart={handleCarouselTouchStart}
-        onTouchMove={handleCarouselTouchMove}
-        className="flex snap-x snap-mandatory overflow-x-auto scrollbar-hide"
-        style={{ scrollSnapType: "x mandatory" }}
-      >
-        {projectGroups.map((group, i) => (
-          <div
-            key={group.project?.id ?? "inbox"}
-            className="w-full flex-shrink-0 snap-center"
-            style={{ minWidth: "100%" }}
-          >
+    <div data-testid="project-view" className="flex flex-col px-4 pb-24">
+      {/* 瀑布流双列 */}
+      <div className="flex gap-3">
+        <div className="min-w-0 flex-1 space-y-3">
+          {leftColumn.map(({ group, colorIndex }) => (
             <ProjectCard
+              key={group.project?.id ?? "inbox"}
               group={group}
+              color={getProjectColor(colorIndex)}
               onToggle={onToggle}
               onPress={onPress}
               onAdd={handleAdd}
+              onPostpone={onPostpone}
+              onRemove={onRemove}
+              swipeOpenId={swipeOpenId}
+              onSwipeOpenChange={onSwipeOpenChange}
+              onHeaderPress={() => handleHeaderPress(group, colorIndex)}
             />
-          </div>
-        ))}
+          ))}
+        </div>
+        <div className="min-w-0 flex-1 space-y-3">
+          {rightColumn.map(({ group, colorIndex }) => (
+            <ProjectCard
+              key={group.project?.id ?? "inbox"}
+              group={group}
+              color={getProjectColor(colorIndex)}
+              onToggle={onToggle}
+              onPress={onPress}
+              onAdd={handleAdd}
+              onPostpone={onPostpone}
+              onRemove={onRemove}
+              swipeOpenId={swipeOpenId}
+              onSwipeOpenChange={onSwipeOpenChange}
+              onHeaderPress={() => handleHeaderPress(group, colorIndex)}
+            />
+          ))}
+        </div>
       </div>
-
-      {/* PageDots */}
-      <PageDots total={total} current={currentPage} />
-
-      {/* 底部留白 */}
-      <div className="h-24" />
 
       <TodoCreateSheet
         open={createOpen}
         onClose={() => setCreateOpen(false)}
         onCreate={onCreate}
         defaultParentId={createParentId}
+        projects={projects}
+      />
+
+      <ProjectDetailSheet
+        group={detailGroup}
+        color={getProjectColor(detailColorIndex)}
+        open={detailGroup !== null}
+        onClose={() => setDetailGroup(null)}
+        onToggle={onToggle}
+        onPress={onPress}
+        onAdd={handleAdd}
+        onPostpone={onPostpone}
+        onRemove={onRemove}
+        swipeOpenId={swipeOpenId}
+        onSwipeOpenChange={onSwipeOpenChange}
       />
     </div>
   );

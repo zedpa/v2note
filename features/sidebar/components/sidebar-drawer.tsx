@@ -55,6 +55,25 @@ export function SidebarDrawer({
   const [nodes, setNodes] = useState<MyWorldNode[]>([]);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
 
+  // 锁定背景滚动
+  useEffect(() => {
+    if (!open) return;
+    const scrollY = window.scrollY;
+    document.body.style.overflow = "hidden";
+    document.body.style.position = "fixed";
+    document.body.style.top = `-${scrollY}px`;
+    document.body.style.left = "0";
+    document.body.style.right = "0";
+    return () => {
+      document.body.style.overflow = "";
+      document.body.style.position = "";
+      document.body.style.top = "";
+      document.body.style.left = "";
+      document.body.style.right = "";
+      window.scrollTo(0, scrollY);
+    };
+  }, [open]);
+
   // 加载 My World 数据
   useEffect(() => {
     if (!open) return;
@@ -87,7 +106,9 @@ export function SidebarDrawer({
       {/* 遮罩 */}
       <div
         className="fixed inset-0 z-50 bg-black/30"
+        style={{ touchAction: "none" }}
         onClick={onClose}
+        onTouchMove={(e) => e.preventDefault()}
       />
 
       {/* 抽屉 */}
@@ -135,10 +156,10 @@ export function SidebarDrawer({
           <nav className="space-y-0.5">
             <SidebarItem
               icon={<Zap size={18} />}
-              label="每日回顾"
+              label="日报"
               onClick={() => {
                 onClose();
-                onViewEvening?.();
+                onViewBriefing?.();
               }}
             />
           </nav>
@@ -188,23 +209,13 @@ export function SidebarDrawer({
               onClick={() => {
                 fabNotify.info("更多功能还在路上 🚀 认知地图 · 大师视角 · 行动复盘 · Skills · MCP · Tools", 3000);
               }}
-              className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-left opacity-40 cursor-pointer"
+              className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-left opacity-40 cursor-pointer select-none"
             >
               <span className="shrink-0 text-muted-foreground"><Compass size={18} /></span>
               <span className="text-sm text-muted-foreground">发现</span>
             </button>
 
-            {(onViewBriefing || onViewEvening) && (
-              <SidebarItem
-                icon={<CalendarDays size={18} />}
-                label="今日简报"
-                showDot
-                onClick={() => {
-                  onClose();
-                  onViewBriefing?.();
-                }}
-              />
-            )}
+            {/* 今日简报已合并到顶部"日报"按钮 */}
             {onViewSettings && (
               <SidebarItem
                 icon={<Settings size={18} />}
@@ -398,7 +409,7 @@ function MyWorldTreeNode({
       {/* 节点行 */}
       <div
         className={cn(
-          "flex items-center gap-2 w-full rounded-xl transition-colors cursor-pointer",
+          "flex items-center gap-2 w-full rounded-xl transition-colors cursor-pointer select-none",
           "hover:bg-surface/60 active:bg-surface/80",
           isAction && node.done && "opacity-50 line-through",
         )}
@@ -708,7 +719,7 @@ function SidebarItem({
     <button
       type="button"
       onClick={onClick}
-      className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-left hover:bg-surface/60 active:bg-surface/80 transition-colors"
+      className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-left hover:bg-surface/60 active:bg-surface/80 transition-colors select-none"
     >
       <span className="text-muted-accessible shrink-0">{icon}</span>
       <div className="flex-1 min-w-0">

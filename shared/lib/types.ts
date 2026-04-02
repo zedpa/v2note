@@ -28,6 +28,8 @@ export interface Record {
   duration_seconds: number | null
   location_text: string | null
   archived: boolean
+  file_url: string | null
+  file_name: string | null
   created_at: string
   updated_at: string
 }
@@ -169,6 +171,8 @@ export interface NoteItem {
   status: Record['status']
   duration_seconds: number | null
   audio_path: string | null
+  file_url: string | null
+  file_name: string | null
   created_at: string
   domain?: string | null
 }

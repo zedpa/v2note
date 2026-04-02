@@ -124,8 +124,18 @@ export function useChat(
         clearResponseTimeout();
         setStreaming(false);
         streamingTextRef.current = "";
-        // 移除临时的 tool-status 消息
-        setMessages((prev) => prev.filter((m) => m.role !== "tool-status"));
+        // 移除 tool-status + 空内容兜底
+        setMessages((prev) => {
+          const filtered = prev.filter((m) => m.role !== "tool-status");
+          const last = filtered[filtered.length - 1];
+          if (last?.role === "assistant" && !last.content) {
+            return [
+              ...filtered.slice(0, -1),
+              { ...last, content: msg.payload?.full_text || "抱歉，我没能回复你。请稍后再试。" },
+            ];
+          }
+          return filtered;
+        });
         break;
       }
       case "plan.proposed": {

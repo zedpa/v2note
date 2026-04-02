@@ -24,6 +24,7 @@ export async function createTodo(fields: {
   goal_id?: string;
   scheduled_start?: string;
   estimated_minutes?: number;
+  priority?: number;
   parent_id?: string;
   level?: number;
   status?: string;

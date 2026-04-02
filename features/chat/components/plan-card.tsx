@@ -154,7 +154,7 @@ export function PlanCard({ planId, intent, steps: initialSteps, onConfirm, confi
             <button
               type="button"
               onClick={handleExecuteAll}
-              className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 transition-colors"
+              className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 active:bg-primary/80 transition-colors select-none"
             >
               <Play className="w-3 h-3" />
               全部执行
@@ -165,7 +165,7 @@ export function PlanCard({ planId, intent, steps: initialSteps, onConfirm, confi
                 if (editing) handleExecuteModified();
                 else setEditing(true);
               }}
-              className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-secondary text-secondary-foreground text-xs font-medium hover:bg-secondary/80 transition-colors"
+              className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-secondary text-secondary-foreground text-xs font-medium hover:bg-secondary/80 active:bg-secondary/70 transition-colors select-none"
             >
               <Pencil className="w-3 h-3" />
               {editing ? "确认修改" : "修改后执行"}
@@ -173,7 +173,7 @@ export function PlanCard({ planId, intent, steps: initialSteps, onConfirm, confi
             <button
               type="button"
               onClick={handleAbandon}
-              className="py-2 px-3 rounded-lg text-xs text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
+              className="py-2 px-3 rounded-lg text-xs text-muted-foreground hover:bg-destructive/10 hover:text-destructive active:bg-destructive/20 transition-colors select-none"
             >
               算了
             </button>

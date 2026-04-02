@@ -5,7 +5,7 @@ import { ChevronDown, Plus } from "lucide-react";
 import type { TimeSlotConfig } from "../lib/time-slots";
 import type { TimeSlotGroup } from "../lib/todo-types";
 import type { TodoDTO } from "../lib/todo-types";
-import { TaskItem } from "./task-item";
+import { SwipeableTaskItem } from "./swipeable-task-item";
 import { TaskCardEmpty } from "./task-card-empty";
 
 interface TimeBlockProps {
@@ -14,9 +14,13 @@ interface TimeBlockProps {
   onToggle: (id: string) => void;
   onPress: (todo: TodoDTO) => void;
   onAdd: () => void;
+  onPostpone: (id: string) => void;
+  onRemove: (id: string) => void;
+  swipeOpenId: string | null;
+  onSwipeOpenChange: (id: string | null) => void;
 }
 
-export function TimeBlock({ config, group, onToggle, onPress, onAdd }: TimeBlockProps) {
+export function TimeBlock({ config, group, onToggle, onPress, onAdd, onPostpone, onRemove, swipeOpenId, onSwipeOpenChange }: TimeBlockProps) {
   const [collapsed, setCollapsed] = useState(false);
   const Icon = config.icon;
   const pendingCount = group.pending.length;
@@ -53,11 +57,15 @@ export function TimeBlock({ config, group, onToggle, onPress, onAdd }: TimeBlock
             <div className="flex flex-col gap-3">
               {/* 未完成 */}
               {group.pending.map((todo) => (
-                <TaskItem
+                <SwipeableTaskItem
                   key={todo.id}
                   todo={todo}
                   onToggle={onToggle}
                   onPress={onPress}
+                  onPostpone={onPostpone}
+                  onRemove={onRemove}
+                  openId={swipeOpenId}
+                  onOpenChange={onSwipeOpenChange}
                 />
               ))}
 
@@ -65,11 +73,15 @@ export function TimeBlock({ config, group, onToggle, onPress, onAdd }: TimeBlock
               {group.completed.length > 0 && (
                 <div className="flex flex-col gap-3">
                   {group.completed.map((todo) => (
-                    <TaskItem
+                    <SwipeableTaskItem
                       key={todo.id}
                       todo={todo}
                       onToggle={onToggle}
                       onPress={onPress}
+                      onPostpone={onPostpone}
+                      onRemove={onRemove}
+                      openId={swipeOpenId}
+                      onOpenChange={onSwipeOpenChange}
                     />
                   ))}
                 </div>

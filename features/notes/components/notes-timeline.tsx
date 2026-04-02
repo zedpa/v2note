@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useRef, useCallback, useEffect, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { MapPin, Clock, Trash2, X, CheckCircle2, Mic, Type, MoreVertical, Pencil, Copy } from "lucide-react";
+import { MapPin, Clock, Trash2, X, CheckCircle2, Mic, Paperclip, MoreVertical, Pencil, Copy } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useNotes } from "@/features/notes/hooks/use-notes";
 import { useNoteDetail } from "@/features/notes/hooks/use-note-detail";
@@ -419,7 +419,13 @@ function TimelineCard({
           {/* Meta row: time · duration/type · location · tags + menu button */}
           <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground/70 mb-2 flex-wrap">
             <span className="font-mono tabular-nums">{note.time}</span>
-            {note.duration_seconds != null && note.duration_seconds > 0 ? (
+            {note.file_url ? (
+              <>
+                <span>·</span>
+                <Paperclip className="w-3 h-3" />
+                <span className="truncate max-w-[80px]">{note.file_name || "附件"}</span>
+              </>
+            ) : note.duration_seconds != null && note.duration_seconds > 0 ? (
               <>
                 <span>·</span>
                 <Mic className="w-3 h-3" />
@@ -428,7 +434,7 @@ function TimelineCard({
             ) : (
               <>
                 <span>·</span>
-                <Type className="w-3 h-3" />
+                <Paperclip className="w-3 h-3" />
                 <span>文字</span>
               </>
             )}

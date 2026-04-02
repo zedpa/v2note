@@ -1,13 +1,14 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useState, useMemo } from "react";
 import { TIME_SLOTS, type TimeSlot } from "../lib/time-slots";
 import type { TimeSlotGroup, TodoDTO } from "../lib/todo-types";
 import { TimeViewHeader } from "./time-view-header";
-import { CalendarStrip } from "./calendar-strip";
+import { CalendarExpand } from "./calendar-expand";
 import { TimeBlock } from "./time-block";
 import { TodoCreateSheet } from "./todo-create-sheet";
 import { getLocalToday } from "../lib/date-utils";
+import { computeDateDots } from "../lib/date-dots";
 
 interface TimeViewProps {
   selectedDate: string;
@@ -19,7 +20,17 @@ interface TimeViewProps {
     text: string;
     scheduled_start?: string;
     parent_id?: string;
+    priority?: number;
+    estimated_minutes?: number;
   }) => Promise<any>;
+  onPostpone: (id: string) => void;
+  onRemove: (id: string) => void;
+  swipeOpenId: string | null;
+  onSwipeOpenChange: (id: string | null) => void;
+  projects?: TodoDTO[];
+  allTodos?: TodoDTO[];
+  viewedDates: Set<string>;
+  onMarkViewed: (date: string) => void;
 }
 
 export function TimeView({
@@ -29,13 +40,47 @@ export function TimeView({
   onToggle,
   onPress,
   onCreate,
+  onPostpone,
+  onRemove,
+  swipeOpenId,
+  onSwipeOpenChange,
+  projects,
+  allTodos,
+  viewedDates,
+  onMarkViewed,
 }: TimeViewProps) {
   const [createOpen, setCreateOpen] = useState(false);
   const [createSlot, setCreateSlot] = useState<TimeSlot>("anytime");
+  const [calendarExpanded, setCalendarExpanded] = useState(false);
+
+  const today = useMemo(() => getLocalToday(), []);
+
+  const dateDots = useMemo(
+    () => computeDateDots(allTodos ?? [], viewedDates, today),
+    [allTodos, viewedDates, today],
+  );
+
+  const handleDateChange = useCallback(
+    (date: string) => {
+      onDateChange(date);
+      onMarkViewed(date);
+    },
+    [onDateChange, onMarkViewed],
+  );
 
   const handleTodayClick = useCallback(() => {
-    onDateChange(getLocalToday());
-  }, [onDateChange]);
+    const todayStr = getLocalToday();
+    onDateChange(todayStr);
+    onMarkViewed(todayStr);
+  }, [onDateChange, onMarkViewed]);
+
+  const handleToggleCalendar = useCallback(() => {
+    setCalendarExpanded((prev) => !prev);
+  }, []);
+
+  const handleCollapseCalendar = useCallback(() => {
+    setCalendarExpanded(false);
+  }, []);
 
   const handleAdd = useCallback((slot: TimeSlot) => {
     setCreateSlot(slot);
@@ -46,12 +91,17 @@ export function TimeView({
     <div data-testid="time-view">
       <TimeViewHeader
         selectedDate={selectedDate}
+        calendarExpanded={calendarExpanded}
+        onToggleCalendar={handleToggleCalendar}
         onTodayClick={handleTodayClick}
       />
 
-      <CalendarStrip
+      <CalendarExpand
         selectedDate={selectedDate}
-        onDateChange={onDateChange}
+        onDateChange={handleDateChange}
+        expanded={calendarExpanded}
+        onCollapse={handleCollapseCalendar}
+        dateDots={dateDots}
       />
 
       {timeSlotGroups.map((group, i) => (
@@ -62,6 +112,10 @@ export function TimeView({
           onToggle={onToggle}
           onPress={onPress}
           onAdd={() => handleAdd(TIME_SLOTS[i].key)}
+          onPostpone={onPostpone}
+          onRemove={onRemove}
+          swipeOpenId={swipeOpenId}
+          onSwipeOpenChange={onSwipeOpenChange}
         />
       ))}
 
@@ -74,6 +128,7 @@ export function TimeView({
         onCreate={onCreate}
         defaultDate={selectedDate}
         defaultSlot={createSlot}
+        projects={projects}
       />
     </div>
   );

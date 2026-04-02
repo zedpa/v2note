@@ -202,6 +202,8 @@ export function GlobalSearch({ isOpen, onClose }: GlobalSearchProps) {
           onChange={(e) => handleChange(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder="搜索记录、主题、目标、命令..."
+          inputMode="search"
+          enterKeyHint="search"
           className="w-full pl-9 pr-8 py-2.5 rounded-xl bg-sand/60 dark:bg-secondary text-sm text-bark dark:text-foreground placeholder:text-bark/40 dark:placeholder:text-muted-foreground outline-none"
         />
         {query && (

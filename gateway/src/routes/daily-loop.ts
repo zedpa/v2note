@@ -1,6 +1,7 @@
 import type { Router } from "../router.js";
 import { sendJson, sendError, getDeviceId, getUserId, HttpError } from "../lib/http-helpers.js";
 import { generateMorningBriefing, generateEveningSummary } from "../handlers/daily-loop.js";
+import { generateReport } from "../handlers/report.js";
 import { todoRepo } from "../db/repositories/index.js";
 import { onTodoComplete } from "../cognitive/todo-projector.js";
 
@@ -48,6 +49,22 @@ export function registerDailyLoopRoutes(router: Router) {
       sendJson(res, relays);
     } catch (err: any) {
       const status = err instanceof HttpError ? err.status : 500;
+      sendError(res, err.message, status);
+    }
+  });
+
+  // Unified report API (new)
+  router.get("/api/v1/report", async (req, res) => {
+    try {
+      const deviceId = getDeviceId(req);
+      const userId = getUserId(req);
+      const url = new URL(req.url ?? "", `http://${req.headers.host}`);
+      const mode = url.searchParams.get("mode") ?? "auto";
+      const report = await generateReport(mode, deviceId, userId ?? undefined);
+      sendJson(res, report);
+    } catch (err: any) {
+      const status = err instanceof HttpError ? err.status : 500;
+      console.error(`[report] Error (${status}):`, err.message);
       sendError(res, err.message, status);
     }
   });

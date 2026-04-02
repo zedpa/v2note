@@ -5,8 +5,10 @@ import {
   Calendar, Clock, Trash2, Sparkles,
 } from "lucide-react";
 import { updateTodo, deleteTodo } from "@/shared/lib/api/todos";
+import { useKeyboardOffset } from "@/shared/hooks/use-keyboard-offset";
 import type { TodoDTO } from "../lib/todo-types";
 import { localTzOffset } from "../lib/time-slots";
+import { PrioritySelector } from "./priority-selector";
 
 interface TodoEditSheetProps {
   todo: TodoDTO | null;
@@ -19,8 +21,8 @@ interface TodoEditSheetProps {
 const DURATION_OPTIONS = [
   { value: 15, label: "15分" },
   { value: 30, label: "30分" },
-  { value: 60, label: "1时" },
-  { value: 120, label: "2时" },
+  { value: 60, label: "1小时" },
+  { value: 120, label: "2小时" },
 ] as const;
 
 export function TodoEditSheet({ todo, open, onClose, onUpdated, onAskAI }: TodoEditSheetProps) {
@@ -28,11 +30,12 @@ export function TodoEditSheet({ todo, open, onClose, onUpdated, onAskAI }: TodoE
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");
   const [duration, setDuration] = useState<number | null>(null);
+  const [priority, setPriority] = useState(3);
   const [saving, setSaving] = useState(false);
   const dateRef = useRef<HTMLInputElement>(null);
   const timeRef = useRef<HTMLInputElement>(null);
+  const { offset: kbOffset } = useKeyboardOffset();
 
-  // 同步数据
   const syncFromTodo = useCallback((t: TodoDTO) => {
     setText(t.text);
     if (t.scheduled_start) {
@@ -45,16 +48,8 @@ export function TodoEditSheet({ todo, open, onClose, onUpdated, onAskAI }: TodoE
       setTime("");
     }
     setDuration(t.estimated_minutes ?? null);
+    setPriority(t.priority ?? 3);
   }, []);
-
-  // 打开时同步
-  const handleOpenChange = useCallback(
-    (isOpen: boolean) => {
-      if (isOpen && todo) syncFromTodo(todo);
-      if (!isOpen) onClose();
-    },
-    [todo, syncFromTodo, onClose],
-  );
 
   // 打开时触发同步
   if (open && todo && text === "" && !saving) {
@@ -82,7 +77,10 @@ export function TodoEditSheet({ todo, open, onClose, onUpdated, onAskAI }: TodoE
         updates.scheduled_start = `${date}T09:00:00${localTzOffset()}`;
       }
 
-      if (duration) updates.estimated_minutes = duration;
+      if (duration !== (todo.estimated_minutes ?? null)) {
+        if (duration) updates.estimated_minutes = duration;
+      }
+      if (priority !== (todo.priority ?? 3)) updates.priority = priority;
 
       if (Object.keys(updates).length > 0) {
         await updateTodo(todo.id, updates);
@@ -93,7 +91,7 @@ export function TodoEditSheet({ todo, open, onClose, onUpdated, onAskAI }: TodoE
     } finally {
       setSaving(false);
     }
-  }, [todo, text, date, time, duration, saving, onUpdated, onClose]);
+  }, [todo, text, date, time, duration, priority, saving, onUpdated, onClose]);
 
   const handleDelete = useCallback(async () => {
     if (!todo) return;
@@ -106,107 +104,151 @@ export function TodoEditSheet({ todo, open, onClose, onUpdated, onAskAI }: TodoE
 
   return (
     <>
-      {/* 遮罩 */}
       <div className="fixed inset-0 z-40 bg-black/50" onClick={onClose} />
 
-      {/* Sheet */}
       <div
         data-testid="todo-edit-sheet"
-        className="fixed inset-x-0 bottom-0 z-50 max-h-[80vh] overflow-y-auto rounded-t-2xl bg-card p-5 pb-safe"
+        className="fixed inset-x-0 bottom-0 z-50 max-h-[85vh] overflow-y-auto rounded-t-[24px] bg-[hsl(var(--card))] px-5 pb-safe pt-3"
+        style={{ boxShadow: "0 -4px 24px rgba(0,0,0,0.5)", bottom: `${kbOffset}px` }}
       >
         {/* Drag handle */}
-        <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-muted-foreground/30" />
+        <div className="mx-auto mb-5 h-1 w-10 rounded-full bg-muted-foreground/20" />
 
-        {/* 标题（可编辑） */}
-        <input
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          className="mb-4 w-full bg-transparent text-base font-medium text-foreground focus:outline-none"
-        />
-
-        {/* 日期 */}
-        <div className="mb-3 flex items-center gap-3">
-          <Calendar className="h-4 w-4 text-muted-foreground" />
+        {/* 头部：标题 + 删除 */}
+        <div className="mb-6 flex items-start gap-3">
           <input
-            ref={dateRef}
-            type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-            className="bg-transparent text-sm text-foreground"
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            className="flex-1 bg-transparent text-[22px] font-semibold text-foreground placeholder:text-muted-foreground/40 focus:outline-none"
           />
+          <button
+            onClick={handleDelete}
+            className="mt-1 rounded-full p-2 text-muted-foreground/40 transition-colors hover:bg-muted/60 hover:text-red-400 active:text-red-500"
+          >
+            <Trash2 className="h-[18px] w-[18px]" />
+          </button>
         </div>
 
-        {/* 时间 */}
-        <div className="mb-3 flex items-center gap-3">
-          <Clock className="h-4 w-4 text-muted-foreground" />
-          <input
-            ref={timeRef}
-            type="time"
-            value={time}
-            onChange={(e) => setTime(e.target.value)}
-            className="bg-transparent text-sm text-foreground"
-          />
+        {/* 日程 — 日期和时间并排 */}
+        <div className="mb-6 flex gap-3">
+          <div
+            className="flex flex-1 items-center rounded-xl bg-muted/60 px-4 py-3.5 cursor-pointer"
+            onClick={() => {
+              try { dateRef.current?.showPicker(); } catch { dateRef.current?.focus(); }
+            }}
+          >
+            <Calendar className="mr-2.5 h-[18px] w-[18px] text-muted-foreground" />
+            <span className={`text-[15px] ${date ? "text-foreground" : "text-muted-foreground/50"}`}>
+              {date ? formatDateOnly(date) : "日期"}
+            </span>
+          </div>
+          <div
+            className="flex flex-1 items-center rounded-xl bg-muted/60 px-4 py-3.5 cursor-pointer"
+            onClick={() => {
+              try { timeRef.current?.showPicker(); } catch { timeRef.current?.focus(); }
+            }}
+          >
+            <Clock className="mr-2.5 h-[18px] w-[18px] text-muted-foreground" />
+            <span className={`text-[15px] ${time ? "text-foreground" : "text-muted-foreground/50"}`}>
+              {time ? formatTimeOnly(time) : "时间"}
+            </span>
+          </div>
+          <input ref={dateRef} type="date" value={date} onChange={(e) => setDate(e.target.value)} className="sr-only" tabIndex={-1} />
+          <input ref={timeRef} type="time" value={time} onChange={(e) => setTime(e.target.value)} step="1800" className="sr-only" tabIndex={-1} />
         </div>
 
-        {/* 时长 */}
-        <div className="mb-4 flex flex-wrap gap-2">
-          {DURATION_OPTIONS.map((opt) => (
-            <button
-              key={opt.value}
-              onClick={() => setDuration(duration === opt.value ? null : opt.value)}
-              className={`rounded-lg border px-3 py-1.5 text-xs transition-colors ${
-                duration === opt.value
-                  ? "border-primary bg-primary/10 text-primary"
-                  : "border-border text-muted-foreground"
-              }`}
-            >
-              {opt.label}
-            </button>
-          ))}
+        {/* 预估时长 */}
+        <div className="mb-6">
+          <div className="mb-2.5 ml-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/60">
+            预估时长
+          </div>
+          <div className="flex flex-wrap gap-2.5">
+            {DURATION_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                onClick={() => setDuration(duration === opt.value ? null : opt.value)}
+                className={`rounded-[20px] px-4 py-2 text-[13px] font-medium transition-all ${
+                  duration === opt.value
+                    ? "bg-primary/15 text-primary"
+                    : "bg-muted/60 text-muted-foreground"
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* 优先级 */}
+        <div className="mb-6">
+          <div className="mb-2.5 ml-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/60">
+            优先级
+          </div>
+          <PrioritySelector value={priority} onChange={setPriority} />
         </div>
 
         {/* AI action plan */}
         {todo.ai_action_plan && todo.ai_action_plan.length > 0 && (
-          <div className="mb-4 rounded-lg border border-border p-3">
-            <div className="mb-2 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+          <div className="mb-6 rounded-xl bg-violet-500/[0.06] p-4">
+            <div className="mb-2 flex items-center gap-1.5 text-xs font-medium text-violet-400/80">
               <Sparkles className="h-3.5 w-3.5" />
               AI 建议步骤
             </div>
             {todo.ai_action_plan.map((step, i) => (
-              <div key={i} className="py-1 text-sm text-foreground">
+              <div key={i} className="py-1 text-sm text-foreground/80">
                 {i + 1}. {step}
               </div>
             ))}
           </div>
         )}
 
-        {/* 操作按钮 */}
-        <div className="flex gap-3">
+        {/* 底部操作栏 */}
+        <div className="mt-2 flex items-center gap-3 pb-2">
+          {todo.ai_actionable && onAskAI && (
+            <button
+              onClick={() => {
+                onAskAI(`帮我分解这个任务: ${todo.text}`);
+                onClose();
+              }}
+              className="flex h-12 w-12 items-center justify-center rounded-full bg-muted/60 text-foreground transition-colors active:bg-muted"
+              style={{ boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.08)" }}
+            >
+              <Sparkles className="h-[18px] w-[18px]" />
+            </button>
+          )}
           <button
             onClick={handleSave}
             disabled={saving}
-            className="flex-1 rounded-xl bg-secondary py-3 text-sm font-medium text-foreground transition-opacity disabled:opacity-40"
+            className="flex-1 rounded-xl bg-foreground py-3.5 text-[15px] font-semibold text-background transition-opacity active:opacity-80 disabled:opacity-30"
           >
             {saving ? "保存中..." : "保存"}
           </button>
-          <button
-            onClick={handleDelete}
-            className="flex h-12 w-12 items-center justify-center rounded-xl border border-border text-muted-foreground transition-colors active:text-destructive"
-          >
-            <Trash2 className="h-4 w-4" />
-          </button>
         </div>
-
-        {/* AI 帮忙 */}
-        {todo.ai_actionable && onAskAI && (
-          <button
-            onClick={() => onAskAI(`帮我分解这个任务: ${todo.text}`)}
-            className="mt-3 w-full rounded-xl border border-border py-2.5 text-sm text-muted-foreground transition-colors active:text-primary"
-          >
-            让 AI 帮忙
-          </button>
-        )}
       </div>
     </>
   );
+}
+
+function formatDateOnly(date: string): string {
+  const d = new Date(date + "T00:00:00");
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const target = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const diff = (target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24);
+
+  if (diff === 0) return "今天";
+  if (diff === 1) return "明天";
+  if (diff === 2) return "后天";
+
+  const month = d.getMonth() + 1;
+  const day = d.getDate();
+  const weekdays = ["日", "一", "二", "三", "四", "五", "六"];
+  return `${month}月${day}日 周${weekdays[d.getDay()]}`;
+}
+
+function formatTimeOnly(time: string): string {
+  const [h, m] = time.split(":").map(Number);
+  const period = h < 12 ? "上午" : "下午";
+  const displayH = h === 0 ? 12 : h > 12 ? h - 12 : h;
+  return `${period} ${displayH}:${String(m).padStart(2, "0")}`;
 }

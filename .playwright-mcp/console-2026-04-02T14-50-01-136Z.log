@@ -1,0 +1,1288 @@
+[     991ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[    1293ms] [LOG] [HMR] connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[    1428ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:3000/favicon.ico:0
+[    1734ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[   34569ms] [LOG] [gateway-client] Auth logout detected, disconnecting @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[   61312ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3001/api/v1/auth/login:0
+[  307936ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 1002199ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 1002956ms] [LOG] [Fast Refresh] done in 861ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 1005376ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 1005394ms] [LOG] [Fast Refresh] done in 122ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 3674558ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 3674558ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 3679587ms] [ERROR] WebSocket connection to 'ws://localhost:3001/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/_next/static/chunks/features_chat_d659f97b._.js:65
+[ 3679588ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 3679588ms] [LOG] [gateway-client] Reconnect attempt 2/10 in 6000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 3687632ms] [ERROR] WebSocket connection to 'ws://localhost:3001/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/_next/static/chunks/features_chat_d659f97b._.js:65
+[ 3687632ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 3687633ms] [LOG] [gateway-client] Reconnect attempt 3/10 in 12000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 3701673ms] [ERROR] WebSocket connection to 'ws://localhost:3001/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/_next/static/chunks/features_chat_d659f97b._.js:65
+[ 3701674ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 3701674ms] [LOG] [gateway-client] Reconnect attempt 4/10 in 24000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 3727732ms] [ERROR] WebSocket connection to 'ws://localhost:3001/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/_next/static/chunks/features_chat_d659f97b._.js:65
+[ 3727732ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 3727733ms] [LOG] [gateway-client] Reconnect attempt 5/10 in 48000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 3736196ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 3736527ms] [LOG] [Fast Refresh] done in 436ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 3740878ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 3741544ms] [LOG] [Fast Refresh] done in 665ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 3766671ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 3775749ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 3776985ms] ReferenceError: Type is not defined
+    at TimelineCard (http://localhost:3000/_next/static/chunks/features_notes_47faa36f._.js?id=%255Bproject%255D%252Ffeatures%252Fnotes%252Fcomponents%252Fnotes-timeline.tsx+%255Bapp-client%255D+%2528ecmascript%2529:760:353)
+    at Object.react_stack_bottom_frame (http://localhost:3000/_next/static/chunks/dd884_next_dist_compiled_react-dom_ff212778._.js:14826:24)
+    at renderWithHooks (http://localhost:3000/_next/static/chunks/dd884_next_dist_compiled_react-dom_ff212778._.js:4651:24)
+    at updateFunctionComponent (http://localhost:3000/_next/static/chunks/dd884_next_dist_compiled_react-dom_ff212778._.js:6112:21)
+    at beginWork (http://localhost:3000/_next/static/chunks/dd884_next_dist_compiled_react-dom_ff212778._.js:6708:24)
+    at runWithFiberInDEV (http://localhost:3000/_next/static/chunks/dd884_next_dist_compiled_react-dom_ff212778._.js:965:74)
+    at performUnitOfWork (http://localhost:3000/_next/static/chunks/dd884_next_dist_compiled_react-dom_ff212778._.js:9562:97)
+    at workLoopSync (http://localhost:3000/_next/static/chunks/dd884_next_dist_compiled_react-dom_ff212778._.js:9456:40)
+    at renderRootSync (http://localhost:3000/_next/static/chunks/dd884_next_dist_compiled_react-dom_ff212778._.js:9440:13)
+    at performWorkOnRoot (http://localhost:3000/_next/static/chunks/dd884_next_dist_compiled_react-dom_ff212778._.js:9105:47)
+    at performSyncWorkOnRoot (http://localhost:3000/_next/static/chunks/dd884_next_dist_compiled_react-dom_ff212778._.js:10238:9)
+    at flushSyncWorkAcrossRoots_impl (http://localhost:3000/_next/static/chunks/dd884_next_dist_compiled_react-dom_ff212778._.js:10154:316)
+    at flushSyncWork$1 (http://localhost:3000/_next/static/chunks/dd884_next_dist_compiled_react-dom_ff212778._.js:9237:86)
+    at Object.scheduleRefresh (http://localhost:3000/_next/static/chunks/dd884_next_dist_compiled_react-dom_ff212778._.js:299:13)
+    at http://localhost:3000/_next/static/chunks/dd884_next_dist_compiled_8268c86a._.js:391:33
+    at Set.forEach (<anonymous>)
+    at Object.performReactRefresh (http://localhost:3000/_next/static/chunks/dd884_next_dist_compiled_8268c86a._.js:384:38)
+    at applyUpdate (http://localhost:3000/_next/static/chunks/dd884_next_dist_compiled_8268c86a._.js:878:31)
+    at http://localhost:3000/_next/static/chunks/dd884_next_dist_compiled_8268c86a._.js:886:13
+[ 3778551ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 3778678ms] [LOG] [HMR] connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 3780056ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 3788637ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 3788813ms] [LOG] [Fast Refresh] done in 282ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 3793200ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 3793408ms] [LOG] [Fast Refresh] done in 313ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 3799382ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 3799574ms] [LOG] [Fast Refresh] done in 298ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 3809042ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 3809300ms] [LOG] [Fast Refresh] done in 360ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 3941369ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 3941465ms] [LOG] [Fast Refresh] done in 203ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 3949415ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 3949670ms] [LOG] [Fast Refresh] done in 338ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5680350ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5680351ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5685391ms] [ERROR] WebSocket connection to 'ws://localhost:3001/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/_next/static/chunks/features_chat_d659f97b._.js:65
+[ 5685392ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5685392ms] [LOG] [gateway-client] Reconnect attempt 2/10 in 6000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5693441ms] [ERROR] WebSocket connection to 'ws://localhost:3001/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/_next/static/chunks/features_chat_d659f97b._.js:65
+[ 5693441ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5693441ms] [LOG] [gateway-client] Reconnect attempt 3/10 in 12000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5705453ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5715686ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5716030ms] [LOG] [Fast Refresh] done in 427ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5724144ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5725025ms] [LOG] [Fast Refresh] done in 965ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5742843ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5743108ms] [LOG] [Fast Refresh] done in 256ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5757966ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5758254ms] [LOG] [Fast Refresh] done in 284ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5771988ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5772250ms] [LOG] [Fast Refresh] done in 266ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5813352ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5813783ms] [LOG] [Fast Refresh] done in 509ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5826785ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5827212ms] [LOG] [Fast Refresh] done in 425ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5858581ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5859531ms] [LOG] [Fast Refresh] done in 927ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5859560ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5859560ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5859565ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5859566ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5862577ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5862577ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5862579ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5862580ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5865587ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5865588ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5865589ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5865590ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5868272ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5868635ms] [LOG] [Fast Refresh] done in 245ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5868637ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5868638ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5868641ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5868642ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5871652ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5871652ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5871655ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5871655ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5874675ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5874676ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5874677ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5874677ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5877689ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5877689ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5877691ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5877691ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5880699ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5880700ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5880702ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5880702ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5883751ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5883752ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5883754ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5883754ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5886763ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5886763ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5886765ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5886765ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5889780ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5889780ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5889782ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5889783ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5892793ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5892793ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5892796ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5892796ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5895807ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5895807ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5895809ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5895809ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5898820ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5898821ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5898822ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5898823ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5901888ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5901888ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5901890ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5901890ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5904924ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5904924ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5904926ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5904926ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5907948ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5907949ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5907951ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5907951ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5910967ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5910968ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5910970ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5910970ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5913977ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5913978ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5913980ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5913980ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5916989ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5916989ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5916991ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5916991ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5920003ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5920003ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5920005ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5920005ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5923019ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5923019ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5923021ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5923021ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5926033ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5926033ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5926035ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5926035ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5929048ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5929048ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5929050ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5929050ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5932146ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5932146ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5932148ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5932148ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5935158ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5935158ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5935160ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5935160ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5938172ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5938172ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5938175ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5938175ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5941185ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5941185ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5941187ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5941187ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5944201ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5944201ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5944203ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5944203ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5947219ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5947219ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5947221ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5947221ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5950229ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5950230ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5950231ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5950231ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5953243ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5953243ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5953244ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5953245ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5956258ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5956258ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5956259ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5956260ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5959289ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5959289ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5959291ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5959291ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5962302ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5962303ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5962304ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5962305ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5965316ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5965316ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5965318ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5965318ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5968333ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5968333ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5968335ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5968336ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5971344ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5971345ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5971346ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5971347ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5974359ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5974359ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5974361ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5974361ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5977374ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5977374ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5977376ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5977376ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5980388ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5980388ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5980390ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5980390ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5983401ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5983401ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5983402ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5983403ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5986417ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5986417ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5986419ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5986419ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5989427ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5989428ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5989429ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5989429ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5992443ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5992444ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5992445ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5992445ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5995470ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5995470ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5995472ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5995472ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5998527ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5998527ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5998529ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5998529ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6001536ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6001537ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6001538ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6001539ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6004551ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6004551ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6004552ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6004553ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6007584ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6007584ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6007586ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6007586ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6010630ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6010630ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6010632ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6010632ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6013653ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6013653ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6013655ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6013655ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6016663ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6016663ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6016665ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6016665ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6019673ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6019674ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6019675ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6019675ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6022689ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6022689ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6022691ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6022692ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6025701ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6025701ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6025702ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6025702ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6028715ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6028715ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6028717ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6028717ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6031730ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6031730ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6031732ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6031732ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6034743ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6034743ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6034745ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6034745ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6037761ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6037761ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6037763ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6037763ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6040777ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6040777ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6040778ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6040778ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6043786ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6043786ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6043788ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6043788ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6046799ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6046800ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6046801ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6046801ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6049814ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6049814ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6049816ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6049816ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6052829ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6052830ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6052831ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6052831ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6055852ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6055852ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6055857ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6055857ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6058868ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6058869ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6058870ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6058871ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6061888ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6061888ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6061889ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6061889ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6064905ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6064906ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6064908ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6064909ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6067967ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6067968ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6067970ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6067970ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6071021ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6071021ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6071024ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6071025ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6074078ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6074078ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6074080ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6074080ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6077092ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6077093ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6077095ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6077095ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6080106ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6080106ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6080108ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6080108ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6083196ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6083196ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6083198ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6083198ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6086205ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6086205ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6086206ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6086207ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6089215ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6089215ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6089216ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6089217ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6092229ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6092229ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6092231ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6092231ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6095243ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6095243ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6095244ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6095245ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6098263ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6098264ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6098265ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6098265ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6101272ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6101272ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6101274ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6101274ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6104292ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6104293ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6104294ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6104294ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6107301ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6107301ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6107303ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6107303ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6110314ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6110314ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6110316ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6110317ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6113322ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6113322ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6113324ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6113325ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6116346ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6116346ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6116349ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6116350ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6119356ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6119357ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6119358ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6119358ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6122369ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6122370ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6122371ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6122372ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6125384ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6125385ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6125386ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6125386ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6128399ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6128399ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6128401ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6128401ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6131416ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6131416ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6131420ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6131420ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6134428ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6134428ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6134429ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6134430ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6137443ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6137443ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6137445ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6137445ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6140455ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6140455ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6140457ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6140457ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6143465ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6143465ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6143467ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6143467ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6146484ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6146484ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6146487ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6146487ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6149499ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6149499ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6149500ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6149500ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6152513ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6152513ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6152514ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6152514ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6155523ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6155523ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6155525ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6155525ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6158537ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6158538ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6158540ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6158541ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6161556ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6161557ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6161558ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6161559ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6164568ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6164568ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6164570ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6164570ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6167589ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6167590ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6167591ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6167591ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6170597ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6170597ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6170599ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6170599ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6173612ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6173612ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6173614ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6173614ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6176627ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6176627ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6176629ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6176629ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6179640ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6179640ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6179642ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6179642ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6182651ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6182651ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6182653ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6182653ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6185664ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6185664ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6185666ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6185666ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6188682ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6188682ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6188684ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6188684ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6191697ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6191697ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6191699ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6191699ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6194705ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6194705ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6194707ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6194707ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6197722ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6197722ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6197724ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6197724ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6200737ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6200738ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6200739ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6200739ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6203758ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6203758ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6203760ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6203760ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6206769ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6206769ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6206771ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6206771ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6209781ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6209782ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6209783ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6209783ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6212800ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6212800ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6212802ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6212802ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6215810ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6215810ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6215811ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6215811ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6218821ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6218821ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6218824ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6218824ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6221841ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6221842ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6221845ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6221845ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6224853ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6224854ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6224855ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6224856ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6227866ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6227867ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6227868ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6227868ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6230884ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6230884ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6230886ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6230886ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6233895ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6233896ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6233897ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6233897ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6236905ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6236905ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6236907ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6236908ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6239912ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6239912ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6239914ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6239914ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6242922ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6242922ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6242923ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6242924ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6245936ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6245936ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6245937ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6245938ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6248945ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6248945ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6248947ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6248947ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6251963ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6251963ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6251965ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6251965ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6254975ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6254976ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6254977ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6254977ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6257992ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6257992ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6257994ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6257994ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6261007ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6261007ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6261009ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6261009ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6264021ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6264021ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6264022ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6264022ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6267035ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6267035ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6267037ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6267037ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6270045ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6270045ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6270047ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6270047ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6273058ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6273058ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6273060ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6273060ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6276078ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6276078ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6276080ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6276080ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6279090ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6279091ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6279092ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6279092ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6282107ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6282107ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6282108ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6282109ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6285155ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6285155ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6285156ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6285157ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6288171ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6288172ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6288173ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6288174ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6291181ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6291181ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6291182ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6291183ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6294196ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6294196ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6294198ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6294198ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6297210ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6297210ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6297211ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6297212ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6300225ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6300225ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6300226ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6300227ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6303238ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6303238ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6303240ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6303240ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6306253ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6306253ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6306254ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6306255ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6309267ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6309268ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6309269ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6309269ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6312282ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6312282ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6312284ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6312284ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6315294ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6315294ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6315296ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6315296ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6318309ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6318309ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6318310ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6318310ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6321322ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6321323ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6321324ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6321324ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6324337ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6324337ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6324338ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6324339ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6327353ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6327353ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6327354ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6327355ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6330371ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6330372ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6330374ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6330374ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6333381ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6333381ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6333383ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6333383ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6336397ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6336397ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6336399ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6336399ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6339405ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6339406ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6339407ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6339407ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6342417ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6342417ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6342419ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6342419ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6345434ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6345434ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6345437ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6345438ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6348445ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6348445ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6348447ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6348447ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6351467ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6351467ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6351468ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6351469ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6354478ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6354478ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6354480ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6354480ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6357494ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6357494ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6357496ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6357496ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6360507ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6360508ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6360509ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6360509ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6363522ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6363523ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6363524ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6363524ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6366537ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6366537ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6366538ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6366539ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6369559ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6369559ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6369560ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6369560ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6372580ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6372581ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6372582ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6372582ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6375595ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6375595ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6375597ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6375597ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6378613ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6378613ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6378615ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6378615ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6381623ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6381624ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6381625ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6381625ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6384640ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6384640ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6384642ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6384642ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6387653ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6387654ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6387655ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6387656ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6390667ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6390667ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6390668ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6390669ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6393679ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6393680ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6393681ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6393681ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6396695ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6396696ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6396697ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6396698ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6399709ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6399709ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6399710ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6399710ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6402728ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6402728ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6402731ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6402731ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6405737ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6405738ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6405739ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6405740ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6408753ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6408754ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6408755ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6408756ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6411761ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6411762ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6411763ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6411763ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6414774ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6414774ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6414776ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6414777ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6417783ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6417783ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6417784ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6417785ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6420792ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6420792ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6420794ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6420794ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6423807ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6423807ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6423808ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6423808ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6426815ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6426816ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6426817ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6426817ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6429834ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6429835ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6429836ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6429836ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6432847ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6432848ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6432849ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6432849ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6435863ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6435863ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6435865ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6435865ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6438870ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6438870ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6438872ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6438872ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6441885ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6441885ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6441887ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6441887ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6444898ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6444898ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6444900ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6444900ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6447919ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6447919ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6447921ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6447921ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6450932ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6450933ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6450934ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6450934ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6453943ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6453943ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6453945ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6453945ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6456962ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6456962ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6456963ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6456963ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6459978ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6459978ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6459980ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6459980ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6462990ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6462990ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6462992ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6462992ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6466007ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6466007ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6466009ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6466009ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6469020ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6469020ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6469022ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6469022ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6472033ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6472033ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6472035ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6472035ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6475046ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6475046ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6475048ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6475048ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6478056ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6478057ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6478058ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6478059ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6481069ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6481069ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6481070ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6481071ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6484086ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6484086ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6484088ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6484089ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6487099ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6487099ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6487101ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6487101ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6490118ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6490118ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6490120ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6490120ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6493133ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6493134ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6493135ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6493135ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6496146ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6496147ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6496148ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6496148ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6499161ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6499161ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6499163ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6499163ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6502171ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6502171ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6502172ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6502172ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6505184ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6505185ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6505186ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6505186ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6508204ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6508204ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6508206ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6508206ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6511217ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6511217ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6511219ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6511219ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6514232ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6514232ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6514233ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6514233ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6517239ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6517239ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6517241ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6517241ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6520246ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6520246ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6520247ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6520248ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6523258ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6523258ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6523259ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6523260ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6526275ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6526276ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6526278ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6526278ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6529288ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6529288ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6529290ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6529290ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6532299ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6532299ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6532301ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6532301ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6535314ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6535314ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6535316ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6535316ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6538326ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6538326ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6538327ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6538328ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6541466ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6541466ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6541469ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6541470ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6544478ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6544479ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6544480ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6544480ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6547488ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6547488ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6547489ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6547489ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6550501ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6550501ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6550503ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6550503ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6553516ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6553516ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6553517ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6553518ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6556530ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6556531ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6556533ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6556533ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6559544ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6559544ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6559546ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6559546ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6562560ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6562560ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6562561ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6562562ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6565578ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6565578ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6565579ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6565580ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6568588ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6568588ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6568590ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6568590ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6571601ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6571601ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6571602ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6571603ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6574610ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6574610ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6574612ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6574612ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6577623ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6577623ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6577625ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6577625ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6580647ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6580647ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6580649ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6580649ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6583655ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6583655ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6583656ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6583657ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6586672ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6586673ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6586674ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6586674ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6589688ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6589688ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6589689ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6589690ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6592700ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6592700ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6592701ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6592702ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6595715ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6595715ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6595716ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6595717ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6598730ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6598731ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6598733ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6598733ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6601744ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6601744ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6601745ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6601746ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6604036ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6604758ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6604758ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6604760ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6604760ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6607773ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6607773ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6607775ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6607775ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6609110ms] [LOG] [Fast Refresh] done in 5047ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6610785ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6610785ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6610786ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6610786ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6613803ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6613803ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6613806ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6613806ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6616813ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6616814ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6616815ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6616815ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6619828ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6619828ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6619830ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6619830ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6622845ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6622846ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6622847ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6622847ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6625857ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6625857ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6625859ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6625859ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6628873ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6628873ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6628875ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6628875ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6631883ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6631883ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6631884ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6631885ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6634891ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6634891ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6634893ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6634893ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6637904ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6637904ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6637905ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6637906ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6640923ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6640924ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6640925ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6640926ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6643945ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6643945ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6643947ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6643947ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6646955ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6646956ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6646957ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6646957ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6649970ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6649970ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6649971ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6649971ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6652985ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6652986ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6652987ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6652987ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6655998ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6655998ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6655999ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6655999ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6659011ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6659012ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6659013ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6659013ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6662028ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6662028ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6662031ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6662031ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6665041ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6665041ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6665043ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6665043ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6668054ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6668054ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6668056ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6668056ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6671069ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6671069ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6671070ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6671071ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6674083ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6674083ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6674085ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6674085ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6677097ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6677097ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6677098ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6677098ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6680111ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6680111ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6680113ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6680113ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6683130ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6683130ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6683133ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6683133ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6686141ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6686141ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6686143ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6686143ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6689154ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6689154ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6689155ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6689155ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6692166ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6692167ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6692168ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6692168ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6695176ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6695176ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6695178ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6695178ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6698191ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6698191ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6698193ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6698193ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6701207ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6701208ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6701209ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6701209ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6704220ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6704220ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6704222ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6704222ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6707239ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6707240ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6707241ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6707241ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6710247ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6710247ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6710249ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6710249ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6713256ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6713256ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6713257ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6713257ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6716265ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6716266ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6716267ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6716268ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6719284ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6719284ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6719286ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6719286ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6719641ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6720747ms] [LOG] [Fast Refresh] done in 1217ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6722298ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6722298ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6722299ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6722300ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6725308ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6725308ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6725310ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6725310ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6728315ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6728315ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6728316ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6728317ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6731334ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6731335ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6731336ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6731337ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6734349ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6734350ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6734351ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6734351ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6737364ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6737364ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6737367ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6737367ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6740374ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6740375ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6740376ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6740377ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6741396ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6741396ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6744427ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6744427ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6744433ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6744433ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6744444ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6747444ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6747444ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6747447ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6747447ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6750455ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6750455ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6750458ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6750458ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6753468ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6753468ms] [WARNING] [gateway-client] No access token, closing unauthenticated connection @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6753470ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 6753470ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297

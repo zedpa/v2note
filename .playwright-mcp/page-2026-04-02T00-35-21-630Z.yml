@@ -1,0 +1,91 @@
+- generic [ref=e1]:
+  - button "Open Next.js Dev Tools" [ref=e76] [cursor=pointer]:
+    - img [ref=e77]
+  - alert [ref=e80]
+  - generic [ref=e294]:
+    - banner [ref=e295]:
+      - generic [ref=e296]:
+        - button "打开侧边栏" [ref=e297] [cursor=pointer]: 测
+        - generic [ref=e298]:
+          - button "日记" [ref=e299] [cursor=pointer]
+          - button "待办" [active] [ref=e300] [cursor=pointer]
+        - generic [ref=e301]:
+          - button "AI 对话" [ref=e302] [cursor=pointer]:
+            - img "路路 Logo" [ref=e303]
+          - button "搜索" [ref=e332] [cursor=pointer]:
+            - img [ref=e333]
+          - button "通知" [ref=e336] [cursor=pointer]:
+            - img [ref=e337]
+    - main [ref=e340]:
+      - generic [ref=e422]:
+        - button "切换到项目视图" [ref=e527] [cursor=pointer]:
+          - img [ref=e528]
+        - generic [ref=e530]:
+          - generic [ref=e531]:
+            - generic [ref=e532]: 星期四
+            - generic [ref=e533]:
+              - generic [ref=e534]: 4月 2026
+              - button [ref=e535] [cursor=pointer]:
+                - img [ref=e536]
+          - generic [ref=e538]:
+            - button "一 30" [ref=e539] [cursor=pointer]:
+              - generic [ref=e540]: 一
+              - generic [ref=e542]: "30"
+            - button "二 31" [ref=e543] [cursor=pointer]:
+              - generic [ref=e544]: 二
+              - generic [ref=e546]: "31"
+            - button "三 1" [ref=e547] [cursor=pointer]:
+              - generic [ref=e548]: 三
+              - generic [ref=e550]: "1"
+            - button "四 2" [ref=e551] [cursor=pointer]:
+              - generic [ref=e552]: 四
+              - generic [ref=e554]: "2"
+            - button "五 3" [ref=e555] [cursor=pointer]:
+              - generic [ref=e556]: 五
+              - generic [ref=e558]: "3"
+            - button "六 4" [ref=e559] [cursor=pointer]:
+              - generic [ref=e560]: 六
+              - generic [ref=e562]: "4"
+            - button "日 5" [ref=e563] [cursor=pointer]:
+              - generic [ref=e564]: 日
+              - generic [ref=e566]: "5"
+          - generic [ref=e567]:
+            - button "随时 (0)" [ref=e568] [cursor=pointer]:
+              - img [ref=e569]
+              - text: 随时 (0)
+              - img [ref=e572]
+            - button "今天随时可做的事" [ref=e574] [cursor=pointer]:
+              - generic [ref=e575]: 今天随时可做的事
+              - img [ref=e577]
+          - generic [ref=e578]:
+            - button "上午 (0)" [ref=e622] [cursor=pointer]:
+              - img [ref=e580]
+              - text: 上午 (0)
+              - img [ref=e586]
+            - generic [ref=e588]:
+              - generic [ref=e624]:
+                - button [ref=e625] [cursor=pointer]:
+                  - img [ref=e626]
+                - generic [ref=e628] [cursor=pointer]:
+                  - generic [ref=e629]: 准备融资PPT初稿
+                  - generic [ref=e631]: 今天
+              - button [ref=e595] [cursor=pointer]:
+                - img [ref=e596]
+          - generic [ref=e597]:
+            - button "下午 (0)" [ref=e598] [cursor=pointer]:
+              - img [ref=e599]
+              - text: 下午 (0)
+              - img [ref=e605]
+            - button "下午的安排" [ref=e607] [cursor=pointer]:
+              - generic [ref=e608]: 下午的安排
+              - img [ref=e610]
+          - generic [ref=e611]:
+            - button "晚上 (0)" [ref=e612] [cursor=pointer]:
+              - img [ref=e613]
+              - text: 晚上 (0)
+              - img [ref=e615]
+            - button "晚上收尾" [ref=e617] [cursor=pointer]:
+              - generic [ref=e618]: 晚上收尾
+              - img [ref=e620]
+    - button [ref=e391] [cursor=pointer]:
+      - img [ref=e392]

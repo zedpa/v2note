@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { ArrowLeft, Send, Mic, MicOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useChat } from "@/features/chat/hooks/use-chat";
+import { useKeyboardOffset } from "@/shared/hooks/use-keyboard-offset";
 import { ChatBubble } from "./chat-bubble";
 import { PlanCard } from "./plan-card";
 import { SwipeBack } from "@/shared/components/swipe-back";
@@ -41,29 +42,14 @@ export function ChatView({ dateRange, onClose, initialMessage, title, mode: mode
       skill,
     });
   const [input, setInput] = useState("");
-  const [bottomOffset, setBottomOffset] = useState(0);
   const [skillSuggestions, setSkillSuggestions] = useState<typeof CHAT_SKILLS>([]);
   const [listening, setListening] = useState(false);
   const recognitionRef = useRef<any>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
-  // visualViewport: keep input bar above keyboard on mobile
-  useEffect(() => {
-    const vv = window.visualViewport;
-    if (!vv) return;
-    const update = () => {
-      const offset = window.innerHeight - vv.offsetTop - vv.height;
-      setBottomOffset(Math.max(0, offset));
-    };
-    vv.addEventListener("resize", update);
-    vv.addEventListener("scroll", update);
-    update();
-    return () => {
-      vv.removeEventListener("resize", update);
-      vv.removeEventListener("scroll", update);
-    };
-  }, []);
+  // 键盘偏移 + 可视区域高度（驱动整体布局）
+  const { offset: bottomOffset, viewportHeight, isKeyboardOpen } = useKeyboardOffset();
 
   // Detect if the command list is showing (last assistant message contains command list)
   const commandDefs = useMemo(() => getCommandDefs(), []);
@@ -117,12 +103,12 @@ export function ChatView({ dateRange, onClose, initialMessage, title, mode: mode
     };
   }, [connect, disconnect]);
 
-  // Auto-scroll to bottom on new messages
+  // Auto-scroll to bottom on new messages or keyboard open
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [messages]);
+  }, [messages, isKeyboardOpen]);
 
   // Detect slash commands in AI responses and execute them
   const prevStreamingRef = useRef(streaming);
@@ -196,52 +182,59 @@ export function ChatView({ dateRange, onClose, initialMessage, title, mode: mode
 
   return (
     <SwipeBack onClose={onClose}>
-      <div className="fixed inset-0 flex flex-col bg-surface pt-safe">
-        {/* Header — Glass & Soul */}
-        <header
-          className="flex items-center gap-3 px-4 h-[44px] bg-surface/80 backdrop-blur-[12px] shrink-0 border-b border-brand-border/40"
-          style={{ paddingTop: "env(safe-area-inset-top)" }}
+      {/* Header — 独立 fixed 层，不受键盘影响 */}
+      <header
+        className="fixed top-0 left-0 right-0 z-40 flex items-center gap-3 px-4 h-[44px] bg-surface/80 backdrop-blur-[12px] border-b border-brand-border/40 pt-safe"
+      >
+        <button
+          type="button"
+          onClick={onClose}
+          className="w-9 h-9 flex items-center justify-center rounded-full text-muted-accessible hover:text-on-surface active:bg-surface/60 transition-colors select-none"
+          aria-label="返回"
         >
-          <button
-            type="button"
-            onClick={onClose}
-            className="w-9 h-9 flex items-center justify-center rounded-full text-muted-accessible hover:text-on-surface transition-colors"
-            aria-label="返回"
-          >
-            <ArrowLeft size={20} />
-          </button>
-          <div className="flex-1">
-            <p className="text-sm font-medium text-on-surface">
-              {title ?? (resolvedMode === "insight" ? "洞察分析" : (resolvedMode === "command" || initialMessage) ? "和路路聊聊" : "复盘")}
-            </p>
-            <div className="flex items-center gap-1">
-              {resolvedMode === "insight" ? (
-                <p className="text-[10px] text-muted-accessible">
-                  {dateRange.start} — {dateRange.end}
-                </p>
-              ) : (resolvedMode !== "command" && !initialMessage) ? (
-                <p className="text-[10px] text-muted-accessible">
-                  {dateRange.start} - {dateRange.end}
-                </p>
-              ) : (
-                <p className="text-[10px] text-muted-accessible">
-                  和路路对话
-                </p>
-              )}
-              {moodText && (
-                <p className="text-[10px] text-muted-accessible">
-                  · 心情: {moodText}{deerState ? ` · ${deerState}` : ""}
-                </p>
-              )}
-            </div>
+          <ArrowLeft size={20} />
+        </button>
+        <div className="flex-1 select-none">
+          <p className="text-sm font-medium text-on-surface">
+            {title ?? (resolvedMode === "insight" ? "洞察分析" : (resolvedMode === "command" || initialMessage) ? "和路路聊聊" : "复盘")}
+          </p>
+          <div className="flex items-center gap-1">
+            {resolvedMode === "insight" ? (
+              <p className="text-[10px] text-muted-accessible">
+                {dateRange.start} — {dateRange.end}
+              </p>
+            ) : (resolvedMode !== "command" && !initialMessage) ? (
+              <p className="text-[10px] text-muted-accessible">
+                {dateRange.start} - {dateRange.end}
+              </p>
+            ) : (
+              <p className="text-[10px] text-muted-accessible">
+                和路路对话
+              </p>
+            )}
+            {moodText && (
+              <p className="text-[10px] text-muted-accessible">
+                · 心情: {moodText}{deerState ? ` · ${deerState}` : ""}
+              </p>
+            )}
           </div>
-          {!connected && (
-            <span className="text-[10px] text-dawn">连接中...</span>
-          )}
-        </header>
+        </div>
+        {!connected && (
+          <span className="text-[10px] text-dawn">连接中...</span>
+        )}
+      </header>
 
-        {/* Messages */}
-        <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4">
+      {/* 主容器 — 高度跟随 visualViewport，键盘弹出时自动缩小 */}
+      <div
+        className="fixed inset-x-0 top-0 flex flex-col bg-surface"
+        style={{ height: viewportHeight }}
+      >
+        {/* Messages — pt 避让 header + safe-area */}
+        <div
+          ref={scrollRef}
+          className="flex-1 overflow-y-auto px-4 py-4"
+          style={{ paddingTop: "calc(44px + env(safe-area-inset-top, 24px))" }}
+        >
           {messages.map((msg, i) =>
             msg.role === "plan" && msg.plan ? (
               <PlanCard
@@ -268,20 +261,20 @@ export function ChatView({ dateRange, onClose, initialMessage, title, mode: mode
                   key={cmd.name}
                   type="button"
                   onClick={() => handleCommandChip(cmd.name)}
-                  className="px-3 py-1.5 rounded-full bg-deer/10 text-deer text-xs font-medium hover:bg-deer/20 transition-colors"
+                  className="px-3 py-1.5 rounded-full bg-deer/10 text-deer text-xs font-medium hover:bg-deer/20 active:bg-deer/30 transition-colors select-none"
                 >
                   /{cmd.name}
                 </button>
               ))}
             </div>
           )}
-        </div>
 
-        {/* Spacer so messages don't hide behind fixed input bar */}
-        <div className="shrink-0 h-[72px]" />
+          {/* Spacer so messages don't hide behind input bar */}
+          <div className="shrink-0 h-[72px]" />
+        </div>
       </div>
 
-      {/* Input bar — truly fixed at bottom, follows keyboard */}
+      {/* Input bar — fixed 在底部，跟随键盘 */}
       <div
         className="fixed left-0 right-0 z-50 px-4 py-3 pb-safe bg-surface/90 backdrop-blur-xl border-t border-brand-border/40 shadow-[0_-4px_20px_var(--shadow-ambient)]"
         style={{ bottom: `${bottomOffset}px` }}
@@ -294,7 +287,7 @@ export function ChatView({ dateRange, onClose, initialMessage, title, mode: mode
                 key={s.name}
                 type="button"
                 onClick={() => handleSkillChip(s.name, s.label)}
-                className="px-3 py-1.5 rounded-full bg-deer/10 text-deer text-xs font-medium hover:bg-deer/20 transition-colors"
+                className="px-3 py-1.5 rounded-full bg-deer/10 text-deer text-xs font-medium hover:bg-deer/20 active:bg-deer/30 transition-colors select-none"
               >
                 {s.label}
               </button>
@@ -314,6 +307,7 @@ export function ChatView({ dateRange, onClose, initialMessage, title, mode: mode
             }}
             placeholder="输入你的想法..."
             rows={1}
+            enterKeyHint="send"
             className="flex-1 bg-surface-lowest rounded-xl px-4 py-2.5 text-sm text-on-surface outline-none resize-none placeholder:text-muted-accessible/50 max-h-24"
             style={{ minHeight: "40px" }}
             disabled={streaming}

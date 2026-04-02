@@ -1,0 +1,22 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - banner [ref=e3]:
+      - generic [ref=e4]:
+        - button "打开侧边栏" [ref=e5] [cursor=pointer]: E
+        - generic [ref=e6]:
+          - button "日记" [ref=e7] [cursor=pointer]
+          - button "待办" [ref=e8] [cursor=pointer]
+        - generic [ref=e9]:
+          - button "AI 对话" [ref=e10] [cursor=pointer]:
+            - img "路路 Logo" [ref=e11]
+          - button "搜索" [ref=e40] [cursor=pointer]:
+            - img [ref=e41]
+          - button "通知" [ref=e44] [cursor=pointer]:
+            - img [ref=e45]
+    - main [ref=e48]
+    - button [ref=e53] [cursor=pointer]:
+      - img [ref=e54]
+    - button "Choose File" [ref=e57]
+  - button "Open Next.js Dev Tools" [ref=e63] [cursor=pointer]:
+    - img [ref=e64]
+  - alert [ref=e67]

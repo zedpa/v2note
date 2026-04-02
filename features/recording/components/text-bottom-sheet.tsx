@@ -261,11 +261,11 @@ export function TextBottomSheet({
         />
       )}
 
-      {/* Hidden file input */}
+      {/* Hidden file input — 不能用 display:none，iOS WebView 会拦截 .click() */}
       <input
         ref={fileInputRef}
         type="file"
-        className="hidden"
+        className="sr-only"
         accept="image/*,.pdf,.docx,.xlsx,.txt,.md,.csv"
         onChange={handleFileSelect}
       />
@@ -287,27 +287,49 @@ export function TextBottomSheet({
             <div className="px-4 pt-1 pb-4 pb-safe space-y-1">
               <button
                 type="button"
-                disabled
-                className="flex items-center gap-3 w-full px-3 py-3 rounded-xl opacity-40 cursor-not-allowed"
+                onClick={() => {
+                  // 先触发 file input（必须在用户手势同步调用栈内），再关闭 sheet
+                  if (fileInputRef.current) {
+                    fileInputRef.current.accept = "image/*";
+                    fileInputRef.current.capture = "environment";
+                    fileInputRef.current.click();
+                  }
+                  setShowActions(false);
+                }}
+                className="flex items-center gap-3 w-full px-3 py-3 rounded-xl hover:bg-muted/60 active:bg-muted/80 transition-colors select-none"
               >
-                <Camera className="w-5 h-5 text-muted-foreground" />
-                <span className="text-sm text-muted-foreground">拍照</span>
+                <Camera className="w-5 h-5 text-primary" />
+                <span className="text-sm">拍照</span>
               </button>
               <button
                 type="button"
-                disabled
-                className="flex items-center gap-3 w-full px-3 py-3 rounded-xl opacity-40 cursor-not-allowed"
+                onClick={() => {
+                  if (fileInputRef.current) {
+                    fileInputRef.current.accept = "image/*";
+                    fileInputRef.current.removeAttribute("capture");
+                    fileInputRef.current.click();
+                  }
+                  setShowActions(false);
+                }}
+                className="flex items-center gap-3 w-full px-3 py-3 rounded-xl hover:bg-muted/60 active:bg-muted/80 transition-colors select-none"
               >
-                <Image className="w-5 h-5 text-muted-foreground" />
-                <span className="text-sm text-muted-foreground">从相册选择</span>
+                <Image className="w-5 h-5 text-primary" />
+                <span className="text-sm">从相册选择</span>
               </button>
               <button
                 type="button"
-                disabled
-                className="flex items-center gap-3 w-full px-3 py-3 rounded-xl opacity-40 cursor-not-allowed"
+                onClick={() => {
+                  if (fileInputRef.current) {
+                    fileInputRef.current.accept = "image/*,.pdf,.docx,.xlsx,.txt,.md,.csv";
+                    fileInputRef.current.removeAttribute("capture");
+                    fileInputRef.current.click();
+                  }
+                  setShowActions(false);
+                }}
+                className="flex items-center gap-3 w-full px-3 py-3 rounded-xl hover:bg-muted/60 active:bg-muted/80 transition-colors select-none"
               >
-                <FileText className="w-5 h-5 text-muted-foreground" />
-                <span className="text-sm text-muted-foreground">选择文件</span>
+                <FileText className="w-5 h-5 text-primary" />
+                <span className="text-sm">选择文件</span>
               </button>
             </div>
           </div>

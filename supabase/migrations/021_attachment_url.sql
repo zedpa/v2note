@@ -1,0 +1,3 @@
+-- 附件持久化：存储 OSS URL 和原始文件名
+ALTER TABLE record ADD COLUMN IF NOT EXISTS file_url TEXT;
+ALTER TABLE record ADD COLUMN IF NOT EXISTS file_name TEXT;

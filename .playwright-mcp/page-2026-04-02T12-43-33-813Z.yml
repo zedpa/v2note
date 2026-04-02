@@ -1,0 +1,103 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - banner [ref=e3]:
+      - generic [ref=e4]:
+        - button "打开侧边栏" [ref=e5] [cursor=pointer]: E
+        - generic [ref=e6]:
+          - button "日记" [ref=e7] [cursor=pointer]
+          - button "待办" [ref=e8] [cursor=pointer]
+        - generic [ref=e9]:
+          - button "AI 对话" [ref=e10] [cursor=pointer]:
+            - img "路路 Logo" [ref=e11]
+          - button "搜索" [ref=e40] [cursor=pointer]:
+            - img [ref=e41]
+          - button "通知" [ref=e44] [cursor=pointer]:
+            - img [ref=e45]
+    - main [ref=e48]:
+      - generic [ref=e50]:
+        - button "切换到项目视图" [ref=e208] [cursor=pointer]:
+          - img [ref=e209]
+        - generic [ref=e211]:
+          - generic [ref=e212]:
+            - generic [ref=e213]: 星期四
+            - generic [ref=e214]:
+              - generic [ref=e215]: 4月 2026
+              - button [ref=e216] [cursor=pointer]:
+                - img [ref=e217]
+          - generic [ref=e219]:
+            - button "一 30" [ref=e220] [cursor=pointer]:
+              - generic [ref=e221]: 一
+              - generic [ref=e223]: "30"
+            - button "二 31" [ref=e224] [cursor=pointer]:
+              - generic [ref=e225]: 二
+              - generic [ref=e227]: "31"
+            - button "三 1" [ref=e228] [cursor=pointer]:
+              - generic [ref=e229]: 三
+              - generic [ref=e231]: "1"
+            - button "四 2" [ref=e232] [cursor=pointer]:
+              - generic [ref=e233]: 四
+              - generic [ref=e235]: "2"
+            - button "五 3" [ref=e236] [cursor=pointer]:
+              - generic [ref=e237]: 五
+              - generic [ref=e239]: "3"
+            - button "六 4" [ref=e240] [cursor=pointer]:
+              - generic [ref=e241]: 六
+              - generic [ref=e243]: "4"
+            - button "日 5" [ref=e244] [cursor=pointer]:
+              - generic [ref=e245]: 日
+              - generic [ref=e247]: "5"
+          - generic [ref=e248]:
+            - button "随时 (0)" [ref=e249] [cursor=pointer]:
+              - img [ref=e250]
+              - text: 随时 (0)
+              - img [ref=e253]
+            - button "今天随时可做的事" [ref=e255] [cursor=pointer]:
+              - generic [ref=e256]: 今天随时可做的事
+              - img [ref=e258]
+          - generic [ref=e259]:
+            - button "上午 (1)" [ref=e260] [cursor=pointer]:
+              - img [ref=e261]
+              - text: 上午 (1)
+              - img [ref=e267]
+            - generic [ref=e269]:
+              - generic [ref=e270]:
+                - generic [ref=e271]:
+                  - img [ref=e272]
+                  - generic [ref=e274]: 完成
+                - generic [ref=e275]:
+                  - button "推迟" [ref=e276] [cursor=pointer]:
+                    - img [ref=e277]
+                    - text: 推迟
+                  - button "删除" [ref=e280] [cursor=pointer]:
+                    - img [ref=e281]
+                    - text: 删除
+                - generic [ref=e285]:
+                  - button [ref=e286] [cursor=pointer]
+                  - generic [ref=e287] [cursor=pointer]:
+                    - generic [ref=e288]: E2E测试上午待办
+                    - generic [ref=e289]:
+                      - generic [ref=e290]: 今天
+                      - generic [ref=e291]: 120分
+              - button [ref=e292] [cursor=pointer]:
+                - img [ref=e293]
+          - generic [ref=e294]:
+            - button "下午 (0)" [ref=e295] [cursor=pointer]:
+              - img [ref=e296]
+              - text: 下午 (0)
+              - img [ref=e302]
+            - button "下午的安排" [ref=e304] [cursor=pointer]:
+              - generic [ref=e305]: 下午的安排
+              - img [ref=e307]
+          - generic [ref=e308]:
+            - button "晚上 (0)" [ref=e309] [cursor=pointer]:
+              - img [ref=e310]
+              - text: 晚上 (0)
+              - img [ref=e312]
+            - button "晚上收尾" [ref=e314] [cursor=pointer]:
+              - generic [ref=e315]: 晚上收尾
+              - img [ref=e317]
+    - button [ref=e53] [cursor=pointer]:
+      - img [ref=e54]
+  - button "Open Next.js Dev Tools" [ref=e62] [cursor=pointer]:
+    - img [ref=e63]
+  - alert [ref=e66]

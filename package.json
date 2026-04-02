@@ -18,6 +18,7 @@
     "build:android": "bash scripts/build-android.sh debug",
     "build:android:release": "bash scripts/build-android.sh release",
     "build:android:install": "bash scripts/build-android.sh debug --install",
+    "release:apk": "node scripts/release-apk.mjs",
     "gateway": "cd gateway && pnpm dev",
     "electron:dev": "next build && electron electron/main.js",
     "electron:build": "next build && electron-builder --win --publish never",

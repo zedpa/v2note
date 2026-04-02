@@ -4,16 +4,17 @@
  * - buildCrossLinkPrompt: guides AI to link new Strikes with historical ones
  */
 
+import { buildDateAnchor } from "../lib/date-anchor.js";
+
 export function buildDigestPrompt(): string {
-  const today = new Date().toISOString().split("T")[0];
-  const weekday = ["日", "一", "二", "三", "四", "五", "六"][new Date().getDay()];
+  const dateAnchor = buildDateAnchor();
 
   return `你是一个认知记录提取器。将用户的原始输入拆解为 Strike（认知触动）列表。
 
 ## 核心原则
 你是**提取器**，不是分析师。只提取用户说了什么，不加入你的分析和推理。
 
-当前日期：${today}（周${weekday}）。相对时间以此为基准计算绝对日期。
+${dateAnchor}
 
 ## Strike 结构
 
@@ -40,7 +41,7 @@ export function buildDigestPrompt(): string {
   - action: 单步可执行，有明确动作（"明天给张总打电话"）
   - goal: 多步、长期、可衡量（"今年把身体搞好"）
   - project: 复合方向（"做一个供应链管理系统"）
-- scheduled_start?: ISO 时间 — 明确的执行时间
+- scheduled_start?: ISO 时间 — 从时间锚点表查到的绝对日期+时间
 - deadline?: ISO 日期 — "这周之内""月底前"
 - person?: string
 - priority?: "high" | "medium" | "low" — 仅从用户语气推断（"挺急的"→high, "不着急"→low, 无明确信号→不填）
@@ -50,12 +51,6 @@ export function buildDigestPrompt(): string {
   ✅ "本周内完成供应商比价"
   ❌ "用户打算找张总确认报价"
   ❌ "需要进行供应商比价工作"
-
-## 时间解析
-- "3月25号下午3点" → "${today.slice(0, 4)}-03-25T15:00:00"
-- "明天""后天""下周一" → 计算绝对日期
-- "这周之内""月底前" → deadline
-- 无时间信号 → 不填
 
 ## Bond（Strike 间关系）
 - source_idx / target_idx: 0-based 索引
@@ -68,7 +63,7 @@ export function buildDigestPrompt(): string {
 {
   "strikes": [
     {"nucleus": "铝价又涨了5%", "polarity": "perceive", "confidence": 0.9, "tags": ["铝", "成本"]},
-    {"nucleus": "明天下午3点找张总确认报价", "polarity": "intend", "confidence": 0.9, "tags": ["张总", "报价"], "field": {"granularity": "action", "scheduled_start": "${today}T15:00:00", "person": "张总", "priority": "high"}}
+    {"nucleus": "明天下午3点找张总确认报价", "polarity": "intend", "confidence": 0.9, "tags": ["张总", "报价"], "field": {"granularity": "action", "scheduled_start": "（查表获取明天日期）T15:00:00", "person": "张总", "priority": "high"}}
   ],
   "bonds": [{"source_idx": 0, "target_idx": 1, "type": "triggers", "strength": 0.8}]
 }

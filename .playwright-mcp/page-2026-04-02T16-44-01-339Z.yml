@@ -1,0 +1,135 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - banner [ref=e3]:
+      - generic [ref=e4]:
+        - button "打开侧边栏" [ref=e5] [cursor=pointer]: E
+        - generic [ref=e6]:
+          - button "日记" [ref=e7] [cursor=pointer]
+          - button "待办" [ref=e8] [cursor=pointer]
+        - generic [ref=e9]:
+          - button "AI 对话" [ref=e10] [cursor=pointer]:
+            - img "路路 Logo" [ref=e11]
+          - button "搜索" [ref=e40] [cursor=pointer]:
+            - img [ref=e41]
+          - button "通知" [ref=e44] [cursor=pointer]:
+            - img [ref=e45]
+    - main [ref=e48]:
+      - generic [ref=e50]:
+        - button "切换到项目视图" [ref=e68] [cursor=pointer]:
+          - img [ref=e69]
+        - generic [ref=e71]:
+          - generic [ref=e72]:
+            - generic [ref=e73]: 星期五
+            - generic [ref=e74]:
+              - generic [ref=e75]: 4月 2026
+              - button [ref=e76] [cursor=pointer]:
+                - img [ref=e77]
+          - generic [ref=e79]:
+            - button "一 30" [ref=e80] [cursor=pointer]:
+              - generic [ref=e81]: 一
+              - generic [ref=e82]: "30"
+            - button "二 31" [ref=e83] [cursor=pointer]:
+              - generic [ref=e84]: 二
+              - generic [ref=e85]: "31"
+            - button "三 1" [ref=e88] [cursor=pointer]:
+              - generic [ref=e89]: 三
+              - generic [ref=e90]: "1"
+            - button "四 2" [ref=e91] [cursor=pointer]:
+              - generic [ref=e92]: 四
+              - generic [ref=e93]: "2"
+            - button "五 3" [ref=e96] [cursor=pointer]:
+              - generic [ref=e97]: 五
+              - generic [ref=e98]: "3"
+            - button "六 4" [ref=e99] [cursor=pointer]:
+              - generic [ref=e100]: 六
+              - generic [ref=e101]: "4"
+            - button "日 5" [ref=e102] [cursor=pointer]:
+              - generic [ref=e103]: 日
+              - generic [ref=e104]: "5"
+          - generic [ref=e105]:
+            - button "随时 (0)" [ref=e106] [cursor=pointer]:
+              - img [ref=e107]
+              - text: 随时 (0)
+              - img [ref=e110]
+            - button "今天随时可做的事" [ref=e112] [cursor=pointer]:
+              - generic [ref=e113]: 今天随时可做的事
+              - img [ref=e115]
+          - generic [ref=e116]:
+            - button "上午 (0)" [ref=e117] [cursor=pointer]:
+              - img [ref=e118]
+              - text: 上午 (0)
+              - img [ref=e124]
+            - button "上午要做什么？" [ref=e126] [cursor=pointer]:
+              - generic [ref=e127]: 上午要做什么？
+              - img [ref=e129]
+          - generic [ref=e130]:
+            - button "下午 (0)" [ref=e131] [cursor=pointer]:
+              - img [ref=e132]
+              - text: 下午 (0)
+              - img [ref=e138]
+            - button "下午的安排" [ref=e140] [cursor=pointer]:
+              - generic [ref=e141]: 下午的安排
+              - img [ref=e143]
+          - generic [ref=e144]:
+            - button "晚上 (0)" [ref=e145] [cursor=pointer]:
+              - img [ref=e146]
+              - text: 晚上 (0)
+              - img [ref=e148]
+            - button "晚上收尾" [ref=e150] [cursor=pointer]:
+              - generic [ref=e151]: 晚上收尾
+              - img [ref=e153]
+    - button [ref=e53] [cursor=pointer]:
+      - img [ref=e54]
+    - button "Choose File" [ref=e57]
+    - generic [ref=e235]:
+      - generic [ref=e236]:
+        - heading "每日回顾" [level=1] [ref=e251]
+        - generic [ref=e238]:
+          - generic [ref=e239]: 4月3日 周五
+          - button [ref=e240] [cursor=pointer]:
+            - img [ref=e241]
+          - button "×" [ref=e246] [cursor=pointer]
+      - generic [ref=e252]:
+        - paragraph [ref=e253]: 今天做了几件小事，也算没白过
+        - generic [ref=e254]:
+          - generic [ref=e255]:
+            - img [ref=e258]
+            - heading "完成" [level=2] [ref=e261]
+          - generic [ref=e262]:
+            - generic [ref=e263]:
+              - img [ref=e264]
+              - generic [ref=e267]: 创建3点去重庆的待办
+            - generic [ref=e268]:
+              - img [ref=e269]
+              - generic [ref=e272]: 记下“明天上山打老虎”
+        - generic [ref=e273]:
+          - generic [ref=e274]:
+            - img [ref=e277]
+            - heading "目标进展" [level=2] [ref=e281]
+          - generic [ref=e283]:
+            - generic [ref=e284]:
+              - generic [ref=e285]: 产品设计目标是让录入、管理、对话所有操作‘一看就会’
+              - generic [ref=e286]: +0 / 余1
+            - paragraph [ref=e287]: 还没动这块
+        - generic [ref=e288]:
+          - generic [ref=e289]:
+            - img [ref=e292]
+            - heading "需要关注" [level=2] [ref=e294]
+          - paragraph [ref=e296]: v0.1的能力边界还没明确
+        - generic [ref=e297]:
+          - generic [ref=e298]:
+            - img [ref=e301]
+            - heading "明天" [level=2] [ref=e303]
+          - paragraph [ref=e305]: 明确v0.1能力边界
+        - generic [ref=e307]:
+          - generic [ref=e308]: 2 件完成
+          - generic [ref=e309]: ·
+          - generic [ref=e310]: 0 条记录
+          - generic [ref=e311]: ·
+          - generic [ref=e312]: 连续 0 天
+        - button "和路路聊聊" [ref=e314] [cursor=pointer]:
+          - img [ref=e315]
+          - text: 和路路聊聊
+  - button "Open Next.js Dev Tools" [ref=e63] [cursor=pointer]:
+    - img [ref=e64]
+  - alert [ref=e67]

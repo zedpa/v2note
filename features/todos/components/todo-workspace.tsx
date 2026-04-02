@@ -2,10 +2,12 @@
 
 import { useState, useCallback } from "react";
 import { useTodoStore } from "../hooks/use-todo-store";
+import { useViewedDates } from "../hooks/use-viewed-dates";
 import type { TodoDTO } from "../lib/todo-types";
 import { TimeView } from "./time-view";
 import { ProjectView } from "./project-view";
 import { TodoEditSheet } from "./todo-edit-sheet";
+import { showUndoToast } from "../hooks/use-undo-toast";
 
 type ViewMode = "time" | "project";
 
@@ -15,9 +17,51 @@ interface TodoWorkspaceProps {
 
 export function TodoWorkspace({ onOpenChat }: TodoWorkspaceProps) {
   const store = useTodoStore();
+  const { viewedDates, markViewed } = useViewedDates();
   const [viewMode, setViewMode] = useState<ViewMode>("time");
   const [editTodo, setEditTodo] = useState<TodoDTO | null>(null);
   const [editOpen, setEditOpen] = useState(false);
+
+  const [swipeOpenId, setSwipeOpenId] = useState<string | null>(null);
+
+  /** 右滑完成 + 撤销 Toast */
+  const handleSwipeToggle = useCallback(
+    (id: string) => {
+      store.toggle(id);
+      const todo = store.allTodos.find((t) => t.id === id);
+      showUndoToast({
+        message: `已完成「${todo?.text?.slice(0, 15) ?? "待办"}」`,
+        onUndo: () => store.undoToggle(id),
+      });
+    },
+    [store],
+  );
+
+  /** 左滑推迟 */
+  const handlePostpone = useCallback(
+    (id: string) => {
+      store.postpone(id);
+      const todo = store.allTodos.find((t) => t.id === id);
+      showUndoToast({
+        message: `已推迟「${todo?.text?.slice(0, 15) ?? "待办"}」到明天`,
+        onUndo: () => store.refresh(),
+      });
+    },
+    [store],
+  );
+
+  /** 左滑删除 + 撤销 Toast */
+  const handleRemove = useCallback(
+    (id: string) => {
+      const todo = store.allTodos.find((t) => t.id === id);
+      store.remove(id);
+      showUndoToast({
+        message: `已删除「${todo?.text?.slice(0, 15) ?? "待办"}」`,
+        onUndo: () => store.undoRemove(),
+      });
+    },
+    [store],
+  );
 
   const handlePress = useCallback((todo: TodoDTO) => {
     setEditTodo(todo);
@@ -89,16 +133,29 @@ export function TodoWorkspace({ onOpenChat }: TodoWorkspaceProps) {
           selectedDate={store.selectedDate}
           onDateChange={store.setSelectedDate}
           timeSlotGroups={store.timeSlotGroups}
-          onToggle={store.toggle}
+          onToggle={handleSwipeToggle}
           onPress={handlePress}
           onCreate={store.create}
+          onPostpone={handlePostpone}
+          onRemove={handleRemove}
+          swipeOpenId={swipeOpenId}
+          onSwipeOpenChange={setSwipeOpenId}
+          projects={store.projects}
+          allTodos={store.allTodos}
+          viewedDates={viewedDates}
+          onMarkViewed={markViewed}
         />
       ) : (
         <ProjectView
           projectGroups={store.projectGroups}
-          onToggle={store.toggle}
+          onToggle={handleSwipeToggle}
           onPress={handlePress}
           onCreate={store.create}
+          onPostpone={handlePostpone}
+          onRemove={handleRemove}
+          swipeOpenId={swipeOpenId}
+          onSwipeOpenChange={setSwipeOpenId}
+          projects={store.projects}
         />
       )}
 

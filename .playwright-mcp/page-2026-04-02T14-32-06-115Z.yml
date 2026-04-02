@@ -1,0 +1,153 @@
+- generic [ref=e1]:
+  - generic [ref=e2]:
+    - banner [ref=e16]:
+      - generic [ref=e17]:
+        - button "打开侧边栏" [ref=e18] [cursor=pointer]: E
+        - generic [ref=e19]:
+          - button "日记" [ref=e20] [cursor=pointer]
+          - button "待办" [ref=e21] [cursor=pointer]
+        - generic [ref=e22]:
+          - button "AI 对话" [ref=e23] [cursor=pointer]:
+            - img "路路 Logo" [ref=e24]
+          - button "搜索" [ref=e53] [cursor=pointer]:
+            - img [ref=e54]
+          - button "通知" [ref=e57] [cursor=pointer]:
+            - img [ref=e58]
+    - main [ref=e61]:
+      - generic [ref=e63]:
+        - button "切换到项目视图" [ref=e65] [cursor=pointer]:
+          - img [ref=e66]
+        - generic [ref=e68]:
+          - generic [ref=e69]:
+            - generic [ref=e70]: 4月 2026
+            - button [active] [ref=e73] [cursor=pointer]:
+              - img [ref=e207]
+          - generic [ref=e213]:
+            - generic [ref=e214]:
+              - generic [ref=e215]: April 2026
+              - generic:
+                - button "Go to previous month" [ref=e216] [cursor=pointer]:
+                  - img
+                - button "Go to next month" [ref=e217] [cursor=pointer]:
+                  - img
+            - grid "April 2026" [ref=e218]:
+              - rowgroup [ref=e219]:
+                - row "Monday Tuesday Wednesday Thursday Friday Saturday Sunday" [ref=e220]:
+                  - columnheader "Monday" [ref=e221]: Mo
+                  - columnheader "Tuesday" [ref=e222]: Tu
+                  - columnheader "Wednesday" [ref=e223]: We
+                  - columnheader "Thursday" [ref=e224]: Th
+                  - columnheader "Friday" [ref=e225]: Fr
+                  - columnheader "Saturday" [ref=e226]: Sa
+                  - columnheader "Sunday" [ref=e227]: Su
+              - rowgroup [ref=e228]:
+                - row "30 31 1 2 3 4 5" [ref=e229]:
+                  - gridcell "30" [ref=e230] [cursor=pointer]
+                  - gridcell "31" [ref=e231] [cursor=pointer]
+                  - gridcell "1" [ref=e232] [cursor=pointer]
+                  - gridcell "2" [selected] [ref=e233] [cursor=pointer]
+                  - gridcell "3" [ref=e234] [cursor=pointer]
+                  - gridcell "4" [ref=e235] [cursor=pointer]
+                  - gridcell "5" [ref=e236] [cursor=pointer]
+                - row "6 7 8 9 10 11 12" [ref=e237]:
+                  - gridcell "6" [ref=e238] [cursor=pointer]
+                  - gridcell "7" [ref=e239] [cursor=pointer]
+                  - gridcell "8" [ref=e240] [cursor=pointer]
+                  - gridcell "9" [ref=e241] [cursor=pointer]
+                  - gridcell "10" [ref=e242] [cursor=pointer]
+                  - gridcell "11" [ref=e243] [cursor=pointer]
+                  - gridcell "12" [ref=e244] [cursor=pointer]
+                - row "13 14 15 16 17 18 19" [ref=e245]:
+                  - gridcell "13" [ref=e246] [cursor=pointer]
+                  - gridcell "14" [ref=e247] [cursor=pointer]
+                  - gridcell "15" [ref=e248] [cursor=pointer]
+                  - gridcell "16" [ref=e249] [cursor=pointer]
+                  - gridcell "17" [ref=e250] [cursor=pointer]
+                  - gridcell "18" [ref=e251] [cursor=pointer]
+                  - gridcell "19" [ref=e252] [cursor=pointer]
+                - row "20 21 22 23 24 25 26" [ref=e253]:
+                  - gridcell "20" [ref=e254] [cursor=pointer]
+                  - gridcell "21" [ref=e255] [cursor=pointer]
+                  - gridcell "22" [ref=e256] [cursor=pointer]
+                  - gridcell "23" [ref=e257] [cursor=pointer]
+                  - gridcell "24" [ref=e258] [cursor=pointer]
+                  - gridcell "25" [ref=e259] [cursor=pointer]
+                  - gridcell "26" [ref=e260] [cursor=pointer]
+                - row "27 28 29 30 1 2 3" [ref=e261]:
+                  - gridcell "27" [ref=e262] [cursor=pointer]
+                  - gridcell "28" [ref=e263] [cursor=pointer]
+                  - gridcell "29" [ref=e264] [cursor=pointer]
+                  - gridcell "30" [ref=e265] [cursor=pointer]
+                  - gridcell "1" [ref=e266] [cursor=pointer]
+                  - gridcell "2" [ref=e267] [cursor=pointer]
+                  - gridcell "3" [ref=e268] [cursor=pointer]
+          - generic [ref=e111]:
+            - button "随时 (1)" [ref=e112] [cursor=pointer]:
+              - img [ref=e113]
+              - text: 随时 (1)
+              - img [ref=e116]
+            - generic [ref=e118]:
+              - generic [ref=e119]:
+                - generic [ref=e120]:
+                  - img [ref=e121]
+                  - generic [ref=e123]: 完成
+                - generic [ref=e124]:
+                  - button "推迟" [ref=e125] [cursor=pointer]:
+                    - img [ref=e126]
+                    - text: 推迟
+                  - button "删除" [ref=e129] [cursor=pointer]:
+                    - img [ref=e130]
+                    - text: 删除
+                - generic [ref=e134]:
+                  - button [ref=e135] [cursor=pointer]
+                  - generic [ref=e137] [cursor=pointer]: v0.1 版本需明确当前能力边界：能做什么、还不能做什么
+              - button [ref=e138] [cursor=pointer]:
+                - img [ref=e139]
+          - generic [ref=e140]:
+            - button "上午 (1)" [ref=e141] [cursor=pointer]:
+              - img [ref=e142]
+              - text: 上午 (1)
+              - img [ref=e148]
+            - generic [ref=e150]:
+              - generic [ref=e151]:
+                - generic [ref=e152]:
+                  - img [ref=e153]
+                  - generic [ref=e155]: 完成
+                - generic [ref=e156]:
+                  - button "推迟" [ref=e157] [cursor=pointer]:
+                    - img [ref=e158]
+                    - text: 推迟
+                  - button "删除" [ref=e161] [cursor=pointer]:
+                    - img [ref=e162]
+                    - text: 删除
+                - generic [ref=e166]:
+                  - button [ref=e167] [cursor=pointer]
+                  - generic [ref=e168] [cursor=pointer]:
+                    - generic [ref=e169]: E2E测试上午待办
+                    - generic [ref=e170]:
+                      - generic [ref=e171]: 今天
+                      - generic [ref=e172]: 120分
+              - button [ref=e173] [cursor=pointer]:
+                - img [ref=e174]
+          - generic [ref=e175]:
+            - button "下午 (0)" [ref=e176] [cursor=pointer]:
+              - img [ref=e177]
+              - text: 下午 (0)
+              - img [ref=e183]
+            - button "下午的安排" [ref=e185] [cursor=pointer]:
+              - generic [ref=e186]: 下午的安排
+              - img [ref=e188]
+          - generic [ref=e189]:
+            - button "晚上 (0)" [ref=e190] [cursor=pointer]:
+              - img [ref=e191]
+              - text: 晚上 (0)
+              - img [ref=e193]
+            - button "晚上收尾" [ref=e195] [cursor=pointer]:
+              - generic [ref=e196]: 晚上收尾
+              - img [ref=e198]
+    - button [ref=e201] [cursor=pointer]:
+      - img [ref=e202]
+    - button "Choose File" [ref=e205]
+  - button "Open Next.js Dev Tools" [ref=e12] [cursor=pointer]:
+    - img [ref=e13]
+  - alert [ref=e206]

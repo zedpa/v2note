@@ -3,6 +3,7 @@ import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Skill } from "./types.js";
 import type { ContextTier, ContextBuildOptions, AgentRole } from "../context/tiers.js";
+import { buildDateAnchor } from "../lib/date-anchor.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const AGENTS_DIR = join(__dirname, "../../agents");
@@ -53,6 +54,9 @@ export function buildTieredContext(opts: ContextBuildOptions): ContextTier {
   if (opts.agent && agentPrompts[opts.agent]) {
     hot.push(agentPrompts[opts.agent]!);
   }
+
+  // ── HOT TIER: 时间锚点（让 AI 调用 create_todo 时知道今天日期）──
+  hot.push(buildDateAnchor());
 
   // ── WARM TIER: task-specific ──
 

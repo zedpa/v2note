@@ -216,7 +216,7 @@ function MindMapView({
       ref={containerRef}
       className="relative overflow-auto"
       style={{
-        minHeight: "calc(100vh - 2.5rem)",
+        minHeight: "calc(100dvh - 2.5rem)",
         backgroundImage: "radial-gradient(#E0D5C8 1px, transparent 1px)",
         backgroundSize: "32px 32px",
         backgroundColor: "white",
@@ -446,7 +446,7 @@ export default function MapPage() {
 
   return (
     <PCLayout>
-      <div className="relative min-h-screen bg-cream">
+      <div className="relative min-h-dvh bg-cream">
         {/* ── Top toolbar ── */}
         <div className="sticky top-0 z-20 flex h-10 items-center gap-2 border-b border-brand-border bg-sand px-4">
           {/* View switch */}
@@ -503,7 +503,7 @@ export default function MapPage() {
             ref={canvasRef}
             className="relative overflow-auto"
             style={{
-              minHeight: "calc(100vh - 2.5rem)",
+              minHeight: "calc(100dvh - 2.5rem)",
               backgroundImage:
                 "radial-gradient(#E0D5C8 1px, transparent 1px)",
               backgroundSize: "32px 32px",
