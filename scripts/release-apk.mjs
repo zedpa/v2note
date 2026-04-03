@@ -20,12 +20,13 @@
  */
 
 import { readFileSync, writeFileSync, existsSync, statSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { join, resolve, dirname } from "node:path";
 import { createHash } from "node:crypto";
 import { execSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
 const require = createRequire(join(fileURLToPath(new URL(".", import.meta.url)), "..", "gateway", "node_modules", "x"));
+const QRCode = require("qrcode");
 const pg = require("pg");
 const OSS = require("ali-oss");
 const { config } = require("dotenv");
@@ -106,6 +107,21 @@ const ossResult = await ossClient.put(ossKey, apkBuf, {
 const downloadUrl = `https://oss.v2note.online/${ossKey}`;
 
 console.log(`  ✓ 上传成功: ${downloadUrl}`);
+
+// ── 生成二维码 + 下载链接文件 ──
+const apkDir = dirname(fullApkPath);
+const qrPath = join(apkDir, `v2note-${version}-${versionCode}-qr.png`);
+const linkPath = join(apkDir, `v2note-${version}-${versionCode}-download.txt`);
+
+await QRCode.toFile(qrPath, downloadUrl, {
+  width: 512,
+  margin: 2,
+  color: { dark: "#000000", light: "#ffffff" },
+});
+writeFileSync(linkPath, `念念有路 v${version} (build ${versionCode})\n下载链接: ${downloadUrl}\n`, "utf-8");
+
+console.log(`  ✓ 二维码: ${qrPath}`);
+console.log(`  ✓ 链接文件: ${linkPath}`);
 console.log();
 
 // ── Step 2: 写入数据库 ──
