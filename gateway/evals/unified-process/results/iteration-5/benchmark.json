@@ -1,0 +1,990 @@
+{
+  "iteration": "5",
+  "timestamp": "2026-04-04T03:07:09.980Z",
+  "totalCases": 25,
+  "totalPassed": 23,
+  "overallPassRate": 92,
+  "avgDurationMs": 9695.32,
+  "categoryStats": {
+    "time_precision": {
+      "total": 5,
+      "passed": 5
+    },
+    "polarity_correct": {
+      "total": 5,
+      "passed": 5
+    },
+    "decomposition": {
+      "total": 4,
+      "passed": 4
+    },
+    "negative_intend": {
+      "total": 4,
+      "passed": 4
+    },
+    "goal_match": {
+      "total": 3,
+      "passed": 2
+    },
+    "bond_quality": {
+      "total": 4,
+      "passed": 3
+    }
+  },
+  "results": [
+    {
+      "id": "time-exact-830pm",
+      "prompt": "今天晚上八点半提醒我吃药",
+      "category": "time_precision",
+      "run": 1,
+      "durationMs": 12495,
+      "strikes": [
+        {
+          "polarity": "intend",
+          "nucleus": "今天晚上八点半吃药",
+          "field": {
+            "priority": "high",
+            "granularity": "action",
+            "scheduled_start": "2026-04-04T20:30:00"
+          }
+        }
+      ],
+      "todosCreated": 2,
+      "bondsCreated": 0,
+      "assertions": [
+        {
+          "field": "strikes[0].polarity",
+          "op": "eq",
+          "expected": "intend",
+          "actual": "intend",
+          "passed": true
+        },
+        {
+          "field": "todo.scheduled_start",
+          "op": "time_contains",
+          "expected": "T20:30",
+          "actual": "2026-04-04T20:30:00.000Z",
+          "passed": true
+        },
+        {
+          "field": "todo.text",
+          "op": "contains",
+          "expected": "吃药",
+          "actual": "今天晚上八点半吃药",
+          "passed": true
+        }
+      ],
+      "allPassed": true
+    },
+    {
+      "id": "time-exact-315pm",
+      "prompt": "明天下午三点一刻和李总开会",
+      "category": "time_precision",
+      "run": 1,
+      "durationMs": 11968,
+      "strikes": [
+        {
+          "polarity": "intend",
+          "nucleus": "明天下午三点一刻和李总开会",
+          "field": {
+            "person": "李总",
+            "granularity": "action",
+            "scheduled_start": "2026-04-05T15:15:00"
+          }
+        }
+      ],
+      "todosCreated": 1,
+      "bondsCreated": 0,
+      "assertions": [
+        {
+          "field": "strikes[0].polarity",
+          "op": "eq",
+          "expected": "intend",
+          "actual": "intend",
+          "passed": true
+        },
+        {
+          "field": "todo.scheduled_start",
+          "op": "time_contains",
+          "expected": "T15:15",
+          "actual": "2026-04-05T15:15:00.000Z",
+          "passed": true
+        },
+        {
+          "field": "todo.text",
+          "op": "contains",
+          "expected": "李总",
+          "actual": "和李总开会",
+          "passed": true
+        }
+      ],
+      "allPassed": true
+    },
+    {
+      "id": "time-exact-245pm",
+      "prompt": "后天下午两点四十五去机场接人",
+      "category": "time_precision",
+      "run": 1,
+      "durationMs": 11658,
+      "strikes": [
+        {
+          "polarity": "intend",
+          "nucleus": "后天下午两点四十五去机场接人",
+          "field": {
+            "person": null,
+            "priority": "medium",
+            "granularity": "action",
+            "scheduled_start": "2026-04-06T14:45:00"
+          }
+        }
+      ],
+      "todosCreated": 1,
+      "bondsCreated": 0,
+      "assertions": [
+        {
+          "field": "strikes[0].polarity",
+          "op": "eq",
+          "expected": "intend",
+          "actual": "intend",
+          "passed": true
+        },
+        {
+          "field": "todo.scheduled_start",
+          "op": "time_contains",
+          "expected": "T14:45",
+          "actual": "2026-04-06T14:45:00.000Z",
+          "passed": true
+        },
+        {
+          "field": "todo.text",
+          "op": "contains",
+          "expected": "机场",
+          "actual": "去机场接人",
+          "passed": true
+        }
+      ],
+      "allPassed": true
+    },
+    {
+      "id": "time-morning-only",
+      "prompt": "明天上午去银行办卡",
+      "category": "time_precision",
+      "run": 1,
+      "durationMs": 11689,
+      "strikes": [
+        {
+          "polarity": "intend",
+          "nucleus": "明天上午去银行办卡",
+          "field": {
+            "person": null,
+            "priority": null,
+            "granularity": "action",
+            "scheduled_start": "2026-04-05T09:00:00"
+          }
+        }
+      ],
+      "todosCreated": 1,
+      "bondsCreated": 0,
+      "assertions": [
+        {
+          "field": "strikes[0].polarity",
+          "op": "eq",
+          "expected": "intend",
+          "actual": "intend",
+          "passed": true
+        },
+        {
+          "field": "todo.scheduled_start",
+          "op": "time_contains",
+          "expected": "T09:00",
+          "actual": "2026-04-05T09:00:00.000Z",
+          "passed": true
+        },
+        {
+          "field": "todo.text",
+          "op": "contains",
+          "expected": "银行",
+          "actual": "去银行办卡",
+          "passed": true
+        }
+      ],
+      "allPassed": true
+    },
+    {
+      "id": "time-exact-910am",
+      "prompt": "明天早上九点十分去面试",
+      "category": "time_precision",
+      "run": 1,
+      "durationMs": 11650,
+      "strikes": [
+        {
+          "polarity": "intend",
+          "nucleus": "明天早上九点十分去面试",
+          "field": {
+            "person": null,
+            "priority": "high",
+            "granularity": "action",
+            "scheduled_start": "2026-04-05T09:10:00"
+          }
+        }
+      ],
+      "todosCreated": 2,
+      "bondsCreated": 0,
+      "assertions": [
+        {
+          "field": "strikes[0].polarity",
+          "op": "eq",
+          "expected": "intend",
+          "actual": "intend",
+          "passed": true
+        },
+        {
+          "field": "todo.scheduled_start",
+          "op": "time_contains",
+          "expected": "T09:10",
+          "actual": "2026-04-05T09:10:00.000Z",
+          "passed": true
+        },
+        {
+          "field": "todo.text",
+          "op": "contains",
+          "expected": "面试",
+          "actual": "明天早上九点十分去面试",
+          "passed": true
+        }
+      ],
+      "allPassed": true
+    },
+    {
+      "id": "polarity-perceive",
+      "prompt": "铝价又涨了百分之五",
+      "category": "polarity_correct",
+      "run": 1,
+      "durationMs": 7367,
+      "strikes": [
+        {
+          "polarity": "perceive",
+          "nucleus": "铝价又涨了百分之五",
+          "field": {}
+        }
+      ],
+      "todosCreated": 0,
+      "bondsCreated": 0,
+      "assertions": [
+        {
+          "field": "strikes",
+          "op": "length",
+          "expected": 1,
+          "actual": "[1 items]",
+          "passed": true
+        },
+        {
+          "field": "strikes[0].polarity",
+          "op": "eq",
+          "expected": "perceive",
+          "actual": "perceive",
+          "passed": true
+        },
+        {
+          "field": "todos_created",
+          "op": "eq",
+          "expected": 0,
+          "actual": 0,
+          "passed": true
+        }
+      ],
+      "allPassed": true
+    },
+    {
+      "id": "polarity-judge",
+      "prompt": "我觉得这个方案不太靠谱，风险太大了",
+      "category": "polarity_correct",
+      "run": 1,
+      "durationMs": 7408,
+      "strikes": [
+        {
+          "polarity": "judge",
+          "nucleus": "我觉得这个方案不太靠谱，风险太大了",
+          "field": {}
+        }
+      ],
+      "todosCreated": 0,
+      "bondsCreated": 0,
+      "assertions": [
+        {
+          "field": "strikes[0].polarity",
+          "op": "eq",
+          "expected": "judge",
+          "actual": "judge",
+          "passed": true
+        },
+        {
+          "field": "todos_created",
+          "op": "eq",
+          "expected": 0,
+          "actual": 0,
+          "passed": true
+        }
+      ],
+      "allPassed": true
+    },
+    {
+      "id": "polarity-realize",
+      "prompt": "突然想明白了，原来客户要的不是降价而是增值服务",
+      "category": "polarity_correct",
+      "run": 1,
+      "durationMs": 7679,
+      "strikes": [
+        {
+          "polarity": "realize",
+          "nucleus": "突然想明白了，原来客户要的不是降价而是增值服务",
+          "field": {}
+        }
+      ],
+      "todosCreated": 0,
+      "bondsCreated": 0,
+      "assertions": [
+        {
+          "field": "strikes[0].polarity",
+          "op": "eq",
+          "expected": "realize",
+          "actual": "realize",
+          "passed": true
+        },
+        {
+          "field": "todos_created",
+          "op": "eq",
+          "expected": 0,
+          "actual": 0,
+          "passed": true
+        }
+      ],
+      "allPassed": true
+    },
+    {
+      "id": "polarity-feel",
+      "prompt": "好累啊今天加班到十点",
+      "category": "polarity_correct",
+      "run": 1,
+      "durationMs": 7395,
+      "strikes": [
+        {
+          "polarity": "feel",
+          "nucleus": "今天加班到十点，感觉好累",
+          "field": {}
+        }
+      ],
+      "todosCreated": 0,
+      "bondsCreated": 0,
+      "assertions": [
+        {
+          "field": "strikes[0].polarity",
+          "op": "eq",
+          "expected": "feel",
+          "actual": "feel",
+          "passed": true
+        },
+        {
+          "field": "todos_created",
+          "op": "eq",
+          "expected": 0,
+          "actual": 0,
+          "passed": true
+        }
+      ],
+      "allPassed": true
+    },
+    {
+      "id": "polarity-intend-natural",
+      "prompt": "明天得把那个报告写完",
+      "category": "polarity_correct",
+      "run": 1,
+      "durationMs": 12585,
+      "strikes": [
+        {
+          "polarity": "intend",
+          "nucleus": "明天把报告写完",
+          "field": {
+            "deadline": "2026-04-05",
+            "priority": "medium",
+            "granularity": "action",
+            "scheduled_start": "2026-04-05T09:00:00"
+          }
+        }
+      ],
+      "todosCreated": 1,
+      "bondsCreated": 0,
+      "assertions": [
+        {
+          "field": "strikes[0].polarity",
+          "op": "eq",
+          "expected": "intend",
+          "actual": "intend",
+          "passed": true
+        },
+        {
+          "field": "todos_created",
+          "op": "gte",
+          "expected": 1,
+          "actual": 1,
+          "passed": true
+        }
+      ],
+      "allPassed": true
+    },
+    {
+      "id": "decomp-single-short",
+      "prompt": "今天心情不错",
+      "category": "decomposition",
+      "run": 1,
+      "durationMs": 5287,
+      "strikes": [
+        {
+          "polarity": "feel",
+          "nucleus": "今天心情不错",
+          "field": {}
+        }
+      ],
+      "todosCreated": 0,
+      "bondsCreated": 0,
+      "assertions": [
+        {
+          "field": "strikes",
+          "op": "length",
+          "expected": 1,
+          "actual": "[1 items]",
+          "passed": true
+        }
+      ],
+      "allPassed": true
+    },
+    {
+      "id": "decomp-single-topic",
+      "prompt": "今天在公司和小王讨论了新版设计稿的配色问题",
+      "category": "decomposition",
+      "run": 1,
+      "durationMs": 7429,
+      "strikes": [
+        {
+          "polarity": "perceive",
+          "nucleus": "今天在公司和小王讨论了新版设计稿的配色问题",
+          "field": {}
+        }
+      ],
+      "todosCreated": 0,
+      "bondsCreated": 0,
+      "assertions": [
+        {
+          "field": "strikes",
+          "op": "length",
+          "expected": 1,
+          "actual": "[1 items]",
+          "passed": true
+        }
+      ],
+      "allPassed": true
+    },
+    {
+      "id": "decomp-multi-list",
+      "prompt": "今天要做三件事：给妈妈打电话，把快递取了，还有把报告写完",
+      "category": "decomposition",
+      "run": 1,
+      "durationMs": 16562,
+      "strikes": [
+        {
+          "polarity": "intend",
+          "nucleus": "今天给妈妈打电话",
+          "field": {
+            "granularity": "action",
+            "scheduled_start": "2026-04-04T09:00:00"
+          }
+        },
+        {
+          "polarity": "intend",
+          "nucleus": "今天把快递取了",
+          "field": {
+            "granularity": "action",
+            "scheduled_start": "2026-04-04T09:00:00"
+          }
+        },
+        {
+          "polarity": "intend",
+          "nucleus": "今天把报告写完",
+          "field": {
+            "granularity": "action",
+            "scheduled_start": "2026-04-04T09:00:00"
+          }
+        }
+      ],
+      "todosCreated": 2,
+      "bondsCreated": 0,
+      "assertions": [
+        {
+          "field": "strikes",
+          "op": "length_gte",
+          "expected": 3,
+          "actual": "[3 items]",
+          "passed": true
+        },
+        {
+          "field": "strikes_all_intend",
+          "op": "eq",
+          "expected": true,
+          "actual": true,
+          "passed": true
+        }
+      ],
+      "allPassed": true
+    },
+    {
+      "id": "decomp-mixed",
+      "prompt": "开会讨论了项目延期的问题老板不太高兴，提醒我明天上午给客户发邮件解释一下",
+      "category": "decomposition",
+      "run": 1,
+      "durationMs": 16809,
+      "strikes": [
+        {
+          "polarity": "perceive",
+          "nucleus": "开会讨论了项目延期的问题，老板不太高兴",
+          "field": {}
+        },
+        {
+          "polarity": "intend",
+          "nucleus": "明天上午给客户发邮件解释项目延期",
+          "field": {
+            "person": "客户",
+            "granularity": "action",
+            "scheduled_start": "2026-04-05T09:00:00"
+          }
+        }
+      ],
+      "todosCreated": 1,
+      "bondsCreated": 2,
+      "assertions": [
+        {
+          "field": "strikes",
+          "op": "length_gte",
+          "expected": 2,
+          "actual": "[2 items]",
+          "passed": true
+        },
+        {
+          "field": "has_intend",
+          "op": "eq",
+          "expected": true,
+          "actual": true,
+          "passed": true
+        },
+        {
+          "field": "has_non_intend",
+          "op": "eq",
+          "expected": true,
+          "actual": true,
+          "passed": true
+        }
+      ],
+      "allPassed": true
+    },
+    {
+      "id": "neg-past-event",
+      "prompt": "昨天和老王吃了顿火锅聊了很久",
+      "category": "negative_intend",
+      "run": 1,
+      "durationMs": 6248,
+      "strikes": [
+        {
+          "polarity": "perceive",
+          "nucleus": "昨天和老王吃了顿火锅聊了很久",
+          "field": {}
+        }
+      ],
+      "todosCreated": 0,
+      "bondsCreated": 0,
+      "assertions": [
+        {
+          "field": "strikes[?].polarity",
+          "op": "not_contains",
+          "expected": "intend",
+          "actual": "[1 items]",
+          "passed": true
+        },
+        {
+          "field": "todos_created",
+          "op": "eq",
+          "expected": 0,
+          "actual": 0,
+          "passed": true
+        }
+      ],
+      "allPassed": true
+    },
+    {
+      "id": "neg-opinion",
+      "prompt": "我觉得北京的冬天越来越冷了",
+      "category": "negative_intend",
+      "run": 1,
+      "durationMs": 6190,
+      "strikes": [
+        {
+          "polarity": "judge",
+          "nucleus": "我觉得北京的冬天越来越冷了",
+          "field": {}
+        }
+      ],
+      "todosCreated": 0,
+      "bondsCreated": 0,
+      "assertions": [
+        {
+          "field": "strikes[?].polarity",
+          "op": "not_contains",
+          "expected": "intend",
+          "actual": "[1 items]",
+          "passed": true
+        },
+        {
+          "field": "todos_created",
+          "op": "eq",
+          "expected": 0,
+          "actual": 0,
+          "passed": true
+        }
+      ],
+      "allPassed": true
+    },
+    {
+      "id": "neg-emotion-only",
+      "prompt": "特别开心，升职了",
+      "category": "negative_intend",
+      "run": 1,
+      "durationMs": 6282,
+      "strikes": [
+        {
+          "polarity": "feel",
+          "nucleus": "特别开心，升职了",
+          "field": {}
+        }
+      ],
+      "todosCreated": 0,
+      "bondsCreated": 0,
+      "assertions": [
+        {
+          "field": "strikes[0].polarity",
+          "op": "eq",
+          "expected": "feel",
+          "actual": "feel",
+          "passed": true
+        },
+        {
+          "field": "todos_created",
+          "op": "eq",
+          "expected": 0,
+          "actual": 0,
+          "passed": true
+        }
+      ],
+      "allPassed": true
+    },
+    {
+      "id": "neg-past-completion",
+      "prompt": "刚把那个方案写完了，终于搞定",
+      "category": "negative_intend",
+      "run": 1,
+      "durationMs": 7324,
+      "strikes": [
+        {
+          "polarity": "feel",
+          "nucleus": "刚把那个方案写完了，终于搞定",
+          "field": {}
+        }
+      ],
+      "todosCreated": 0,
+      "bondsCreated": 0,
+      "assertions": [
+        {
+          "field": "todos_created",
+          "op": "eq",
+          "expected": 0,
+          "actual": 0,
+          "passed": true
+        }
+      ],
+      "allPassed": true
+    },
+    {
+      "id": "goal-match-hit",
+      "prompt": "融资的BP需要改一下财务预测部分",
+      "category": "goal_match",
+      "run": 1,
+      "durationMs": 9584,
+      "strikes": [
+        {
+          "polarity": "intend",
+          "nucleus": "修改融资BP的财务预测部分",
+          "field": {
+            "person": null,
+            "priority": "medium",
+            "granularity": "action",
+            "scheduled_start": "2026-04-04T09:00:00"
+          }
+        }
+      ],
+      "todosCreated": 1,
+      "bondsCreated": 0,
+      "assertions": [
+        {
+          "field": "strikes[0].polarity",
+          "op": "eq",
+          "expected": "intend",
+          "actual": "intend",
+          "passed": true
+        },
+        {
+          "field": "strike_has_goal_id",
+          "op": "eq",
+          "expected": true,
+          "actual": false,
+          "passed": false,
+          "note": "应匹配到'完成融资'目标"
+        }
+      ],
+      "allPassed": false
+    },
+    {
+      "id": "goal-match-miss",
+      "prompt": "今天路上看到一只很可爱的猫",
+      "category": "goal_match",
+      "run": 1,
+      "durationMs": 7442,
+      "strikes": [
+        {
+          "polarity": "perceive",
+          "nucleus": "今天路上看到一只很可爱的猫",
+          "field": {}
+        }
+      ],
+      "todosCreated": 0,
+      "bondsCreated": 0,
+      "assertions": [
+        {
+          "field": "strike_has_goal_id",
+          "op": "eq",
+          "expected": false,
+          "actual": false,
+          "passed": true,
+          "note": "无匹配目标，进收集箱"
+        }
+      ],
+      "allPassed": true
+    },
+    {
+      "id": "goal-match-ambiguous",
+      "prompt": "下周要去看牙医",
+      "category": "goal_match",
+      "run": 1,
+      "durationMs": 9661,
+      "strikes": [
+        {
+          "polarity": "intend",
+          "nucleus": "下周要去看牙医",
+          "field": {
+            "person": null,
+            "deadline": null,
+            "priority": null,
+            "granularity": "action",
+            "scheduled_start": "2026-04-06T09:00:00"
+          }
+        }
+      ],
+      "todosCreated": 1,
+      "bondsCreated": 0,
+      "assertions": [
+        {
+          "field": "strikes[0].polarity",
+          "op": "eq",
+          "expected": "intend",
+          "actual": "intend",
+          "passed": true
+        },
+        {
+          "field": "todos_created",
+          "op": "gte",
+          "expected": 1,
+          "actual": 1,
+          "passed": true
+        },
+        {
+          "field": "strike_has_goal_id",
+          "op": "eq",
+          "expected": false,
+          "actual": false,
+          "passed": true,
+          "note": "与现有目标无关"
+        }
+      ],
+      "allPassed": true
+    },
+    {
+      "id": "bond-causal",
+      "prompt": "原料涨价了百分之二十，得赶紧找供应商重新谈价格",
+      "category": "bond_quality",
+      "run": 1,
+      "durationMs": 14396,
+      "strikes": [
+        {
+          "polarity": "perceive",
+          "nucleus": "原料涨价了百分之二十",
+          "field": {}
+        },
+        {
+          "polarity": "intend",
+          "nucleus": "得赶紧找供应商重新谈价格",
+          "field": {
+            "priority": "high",
+            "granularity": "action",
+            "scheduled_start": "2026-04-04T09:00:00"
+          }
+        }
+      ],
+      "todosCreated": 1,
+      "bondsCreated": 2,
+      "assertions": [
+        {
+          "field": "strikes",
+          "op": "length_gte",
+          "expected": 2,
+          "actual": "[2 items]",
+          "passed": true
+        },
+        {
+          "field": "bonds",
+          "op": "length_gte",
+          "expected": 1,
+          "actual": "[2 items]",
+          "passed": true
+        },
+        {
+          "field": "bonds[0].type",
+          "op": "in",
+          "expected": [
+            "triggers",
+            "causal"
+          ],
+          "actual": "triggers",
+          "passed": true
+        }
+      ],
+      "allPassed": true
+    },
+    {
+      "id": "bond-no-bond-independent",
+      "prompt": "今天天气不错。晚上想吃火锅",
+      "category": "bond_quality",
+      "run": 1,
+      "durationMs": 9860,
+      "strikes": [
+        {
+          "polarity": "perceive",
+          "nucleus": "今天天气不错",
+          "field": {}
+        },
+        {
+          "polarity": "intend",
+          "nucleus": "晚上想吃火锅",
+          "field": {
+            "granularity": "action",
+            "scheduled_start": "2026-04-04T20:00:00"
+          }
+        }
+      ],
+      "todosCreated": 1,
+      "bondsCreated": 0,
+      "assertions": [
+        {
+          "field": "strikes",
+          "op": "length_gte",
+          "expected": 2,
+          "actual": "[2 items]",
+          "passed": true
+        },
+        {
+          "field": "bonds",
+          "op": "length",
+          "expected": 0,
+          "actual": "[0 items]",
+          "passed": true,
+          "note": "天气和吃火锅无逻辑关系"
+        }
+      ],
+      "allPassed": true
+    },
+    {
+      "id": "bond-elaborates",
+      "prompt": "供应链要优化，先从物流环节入手降低成本",
+      "category": "bond_quality",
+      "run": 1,
+      "durationMs": 9903,
+      "strikes": [
+        {
+          "polarity": "intend",
+          "nucleus": "供应链要优化，先从物流环节入手降低成本",
+          "field": {
+            "granularity": "project",
+            "scheduled_start": "2026-04-04T09:00:00"
+          }
+        }
+      ],
+      "todosCreated": 1,
+      "bondsCreated": 0,
+      "assertions": [
+        {
+          "field": "strikes",
+          "op": "length_gte",
+          "expected": 2,
+          "actual": "[1 items]",
+          "passed": false
+        },
+        {
+          "field": "bonds",
+          "op": "length_gte",
+          "expected": 1,
+          "actual": "[0 items]",
+          "passed": false
+        },
+        {
+          "field": "bonds[0].type",
+          "op": "eq",
+          "expected": "elaborates",
+          "passed": false
+        }
+      ],
+      "allPassed": false
+    },
+    {
+      "id": "bond-no-bond-feel",
+      "prompt": "好烦啊，项目又延期了",
+      "category": "bond_quality",
+      "run": 1,
+      "durationMs": 7512,
+      "strikes": [
+        {
+          "polarity": "feel",
+          "nucleus": "好烦啊，项目又延期了",
+          "field": {}
+        }
+      ],
+      "todosCreated": 0,
+      "bondsCreated": 0,
+      "assertions": [
+        {
+          "field": "feel_not_in_bond",
+          "op": "eq",
+          "expected": true,
+          "actual": true,
+          "passed": true,
+          "note": "feel strike 不参与 bond"
+        }
+      ],
+      "allPassed": true
+    }
+  ]
+}

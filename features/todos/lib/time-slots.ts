@@ -1,6 +1,7 @@
 "use client";
 
 import { Clock, Sun, Moon, type LucideIcon } from "lucide-react";
+import { parseScheduledTime } from "./date-utils";
 
 // ===== 时段类型 =====
 
@@ -69,7 +70,7 @@ export const TIME_SLOTS: TimeSlotConfig[] = [
 export function assignTimeSlot(scheduledStart: string | null | undefined): TimeSlot {
   if (!scheduledStart) return "anytime";
 
-  const hour = new Date(scheduledStart).getHours();
+  const hour = parseScheduledTime(scheduledStart).getHours();
 
   for (const slot of TIME_SLOTS) {
     if (slot.key === "anytime") continue;

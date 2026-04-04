@@ -1,3 +1,13 @@
+---
+id: "091"
+title: "系统提示词重构：多 Agent + Skill 架构"
+status: completed
+domain: agent
+dependencies: []
+superseded_by: null
+created: 2026-03-23
+updated: 2026-03-31
+---
 # 系统提示词重构：多 Agent + Skill 架构
 
 > 状态：✅ 已完成

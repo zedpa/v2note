@@ -1,4 +1,6 @@
 import { query, queryOne, execute } from "../pool.js";
+// v2: 过滤待办页/指令模式创建的隐藏 record（仅用于溯源，不在日记列表展示）
+const HIDDEN_SOURCES_CLAUSE = `AND source NOT IN ('todo_voice', 'command_voice')`;
 export async function findByDevice(deviceId, opts) {
     const conditions = [`device_id = $1`];
     const params = [deviceId];
@@ -19,6 +21,7 @@ export async function findByDevice(deviceId, opts) {
     const limit = opts?.limit ?? 100;
     const offset = opts?.offset ?? 0;
     return query(`SELECT * FROM record WHERE ${conditions.join(" AND ")}
+     ${HIDDEN_SOURCES_CLAUSE}
      ORDER BY created_at DESC LIMIT $${i++} OFFSET $${i}`, [...params, limit, offset]);
 }
 export async function findByUser(userId, opts) {
@@ -41,11 +44,13 @@ export async function findByUser(userId, opts) {
     const limit = opts?.limit ?? 100;
     const offset = opts?.offset ?? 0;
     return query(`SELECT * FROM record WHERE ${conditions.join(" AND ")}
+     ${HIDDEN_SOURCES_CLAUSE}
      ORDER BY created_at DESC LIMIT $${i++} OFFSET $${i}`, [...params, limit, offset]);
 }
 export async function findByUserAndDateRange(userId, start, end) {
     return query(`SELECT * FROM record WHERE user_id = $1
      AND created_at >= $2 AND created_at <= $3
+     ${HIDDEN_SOURCES_CLAUSE}
      ORDER BY created_at ASC`, [userId, start, end]);
 }
 export async function findById(id) {
@@ -121,6 +126,7 @@ export async function search(deviceId, q) {
      LEFT JOIN summary s ON s.record_id = r.id
      WHERE r.device_id = $1
        AND (t.text ILIKE $2 OR s.title ILIKE $2 OR s.short_summary ILIKE $2)
+       AND r.source NOT IN ('todo_voice', 'command_voice')
      ORDER BY r.created_at DESC
      LIMIT 50`, [deviceId, `%${q}%`]);
 }
@@ -130,6 +136,7 @@ export async function searchByUser(userId, q) {
      LEFT JOIN summary s ON s.record_id = r.id
      WHERE r.user_id = $1
        AND (t.text ILIKE $2 OR s.title ILIKE $2 OR s.short_summary ILIKE $2)
+       AND r.source NOT IN ('todo_voice', 'command_voice')
      ORDER BY r.created_at DESC
      LIMIT 50`, [userId, `%${q}%`]);
 }
@@ -189,6 +196,7 @@ export async function updateHierarchyTags(id, tags) {
 export async function findByDeviceAndDateRange(deviceId, start, end) {
     return query(`SELECT * FROM record WHERE device_id = $1
      AND created_at >= $2 AND created_at <= $3
+     ${HIDDEN_SOURCES_CLAUSE}
      ORDER BY created_at ASC`, [deviceId, start, end]);
 }
 //# sourceMappingURL=record.js.map

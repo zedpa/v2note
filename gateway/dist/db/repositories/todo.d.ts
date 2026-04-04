@@ -9,7 +9,10 @@ export interface Todo {
     priority: number;
     completed_at: string | null;
     created_at: string;
+    updated_at?: string;
     category?: string;
+    user_id?: string | null;
+    device_id?: string | null;
     relay_meta?: {
         source_person?: string;
         target_person?: string;
@@ -32,6 +35,15 @@ export interface Todo {
     status?: string;
     /** 父目标名称（JOIN 得到，非 DB 列） */
     goal_title?: string | null;
+    reminder_at?: string | null;
+    reminder_before?: number | null;
+    reminder_types?: string[] | null;
+    reminder_sent?: boolean;
+    recurrence_rule?: string | null;
+    recurrence_end?: string | null;
+    recurrence_parent_id?: string | null;
+    calendar_event_id?: string | null;
+    calendar_synced_at?: string | null;
 }
 export declare function findByDevice(deviceId: string): Promise<Todo[]>;
 export declare function findByUser(userId: string): Promise<Todo[]>;
@@ -47,12 +59,20 @@ export declare function create(fields: {
     impact?: number;
     goal_id?: string;
     scheduled_start?: string;
+    scheduled_end?: string;
     estimated_minutes?: number;
     user_id?: string;
     device_id?: string;
     parent_id?: string;
     level?: number;
     status?: string;
+    priority?: number;
+    reminder_at?: string;
+    reminder_before?: number;
+    reminder_types?: string[];
+    recurrence_rule?: string;
+    recurrence_end?: string;
+    recurrence_parent_id?: string;
 }): Promise<Todo>;
 export declare function createMany(items: Array<{
     record_id: string;
@@ -74,6 +94,13 @@ export declare function update(id: string, fields: {
     strike_id?: string | null;
     level?: number;
     status?: string;
+    reminder_at?: string | null;
+    reminder_before?: number | null;
+    reminder_types?: string[] | null;
+    reminder_sent?: boolean;
+    recurrence_rule?: string | null;
+    recurrence_end?: string | null;
+    recurrence_parent_id?: string | null;
 }): Promise<void>;
 export declare function del(id: string): Promise<void>;
 export declare function toggle(id: string): Promise<Todo | null>;
@@ -145,6 +172,12 @@ export declare function dedupCreate(fields: {
     parent_id?: string;
     level?: number;
     status?: string;
+    priority?: number;
+    reminder_at?: string;
+    reminder_before?: number;
+    reminder_types?: string[];
+    recurrence_rule?: string;
+    recurrence_end?: string;
 }): Promise<{
     todo: Todo;
     action: "created" | "matched";
@@ -194,3 +227,18 @@ export interface MyWorldNode {
 }
 /** 侧边栏"我的世界"：组装三级树结构 */
 export declare function getMyWorldData(userId: string): Promise<MyWorldNode[]>;
+/** 查询所有活跃的周期模板（非实例、有 recurrence_rule） */
+export declare function findRecurrenceTemplates(opts: {
+    userId?: string;
+    deviceId?: string;
+}): Promise<Todo[]>;
+/** 检查某日某模板是否已有实例 */
+export declare function hasInstanceForDate(templateId: string, date: string): Promise<boolean>;
+/** 从模板创建周期实例 */
+export declare function createRecurrenceInstance(template: Todo, date: string): Promise<Todo>;
+/** 查询即将到来的提醒（窗口内、未完成、未发送） */
+export declare function findPendingReminders(windowStart: string, windowEnd: string): Promise<Todo[]>;
+/** 标记提醒已发送 */
+export declare function markReminderSent(todoId: string): Promise<void>;
+/** 根据 scheduled_start 和 reminder_before 重算 reminder_at */
+export declare function recalcReminderAt(todoId: string): Promise<void>;

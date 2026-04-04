@@ -81,4 +81,53 @@ describe("todos API", () => {
       expect(api.delete).toHaveBeenCalledWith("/api/v1/todos/todo-1");
     });
   });
+
+  // fix-voice-todo-pipeline Phase 2: 前端 API 类型补齐
+  describe("createTodo with reminder/recurrence fields", () => {
+    it("sends POST with reminder and recurrence fields", async () => {
+      vi.mocked(api.post).mockResolvedValue({ id: "t1" });
+
+      await createTodo({
+        text: "开会",
+        scheduled_start: "2026-04-05T15:00:00",
+        priority: 3,
+        reminder_before: 30,
+        reminder_types: ["notification"],
+        recurrence_rule: "daily",
+        recurrence_end: "2026-05-01",
+        goal_id: "g1",
+      });
+
+      expect(api.post).toHaveBeenCalledWith("/api/v1/todos", {
+        text: "开会",
+        scheduled_start: "2026-04-05T15:00:00",
+        priority: 3,
+        reminder_before: 30,
+        reminder_types: ["notification"],
+        recurrence_rule: "daily",
+        recurrence_end: "2026-05-01",
+        goal_id: "g1",
+      });
+    });
+  });
+
+  describe("updateTodo with reminder/recurrence fields", () => {
+    it("sends PATCH with reminder and recurrence fields", async () => {
+      vi.mocked(api.patch).mockResolvedValue(undefined);
+
+      await updateTodo("t1", {
+        reminder_before: 15,
+        reminder_types: ["notification"],
+        recurrence_rule: "weekly:1",
+        recurrence_end: "2026-06-01",
+      });
+
+      expect(api.patch).toHaveBeenCalledWith("/api/v1/todos/t1", {
+        reminder_before: 15,
+        reminder_types: ["notification"],
+        recurrence_rule: "weekly:1",
+        recurrence_end: "2026-06-01",
+      });
+    });
+  });
 });

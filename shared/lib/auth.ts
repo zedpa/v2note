@@ -69,14 +69,16 @@ export function getRefreshTokenValue(): string | null {
 export async function saveAuthTokens(tokens: {
   accessToken: string;
   refreshToken: string;
-  user: { id: string; phone: string; displayName: string | null; createdAt?: string };
+  user: { id: string; phone: string | null; email?: string | null; displayName: string | null; createdAt?: string };
 }): Promise<void> {
   _accessToken = tokens.accessToken;
   _refreshToken = tokens.refreshToken;
   _user = {
     id: tokens.user.id,
     phone: tokens.user.phone,
+    email: tokens.user.email ?? null,
     displayName: tokens.user.displayName,
+    avatarUrl: null,
     createdAt: tokens.user.createdAt ?? new Date().toISOString(),
   };
   await setItem(KEY_ACCESS_TOKEN, _accessToken);

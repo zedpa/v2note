@@ -1,3 +1,13 @@
+---
+id: "056"
+title: "行动事件追踪 + 反馈回流"
+status: completed
+domain: cognitive
+dependencies: []
+superseded_by: null
+created: 2026-03-23
+updated: 2026-03-30
+---
 # 行动事件追踪 + 反馈回流
 
 > 状态：✅ completed | 优先级：Phase 4 | 预计：3-4 天

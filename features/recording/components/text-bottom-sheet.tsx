@@ -30,6 +30,8 @@ interface TextBottomSheetProps {
   activeNotebook?: string | null;
   /** Called when mic button is tapped — closes sheet and starts recording */
   onRecordPress?: () => void;
+  /** 当前页面上下文，待办页时文字输入走 gateway process pipeline */
+  sourceContext?: "todo" | "timeline" | "chat" | "review";
 }
 
 function fileToBase64(file: File): Promise<string> {
@@ -53,6 +55,7 @@ export function TextBottomSheet({
   commandContext,
   activeNotebook,
   onRecordPress,
+  sourceContext = "timeline",
 }: TextBottomSheetProps) {
   const [text, setText] = useState("");
   const [suggestions, setSuggestions] = useState<string[]>([]);
@@ -203,6 +206,25 @@ export function TextBottomSheet({
       if (cmdResult.message) fabNotify.info(cmdResult.message);
       setText("");
       onClose();
+      return;
+    }
+
+    // 待办页：文字走 gateway process pipeline（和录音同路径）
+    if (sourceContext === "todo") {
+      setText("");
+      onClose();
+      try {
+        const { getGatewayClient } = await import("@/features/chat/lib/gateway-client");
+        const { getDeviceId } = await import("@/shared/lib/device");
+        const client = getGatewayClient();
+        const deviceId = await getDeviceId();
+        client.send({
+          type: "process",
+          payload: { text: trimmed, deviceId, sourceContext: "todo" },
+        });
+      } catch (err: any) {
+        fabNotify.error(`发送失败: ${err.message}`);
+      }
       return;
     }
 

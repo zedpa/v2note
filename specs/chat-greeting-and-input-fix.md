@@ -1,3 +1,8 @@
+---
+status: superseded
+superseded_by: "chat-system.md"
+---
+
 # 聊天模式优化：AI 问候 + 输入框浮动
 
 > 状态：✅ 已完成

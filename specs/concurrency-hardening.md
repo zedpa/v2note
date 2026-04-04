@@ -1,3 +1,13 @@
+---
+id: "070"
+title: "并发加固 — Semaphore 超时 + AI 调用优先级 + Retry-After"
+status: completed
+domain: infra
+dependencies: []
+superseded_by: null
+created: 2026-03-23
+updated: 2026-04-02
+---
 # 并发加固 — Semaphore 超时 + AI 调用优先级 + Retry-After
 
 > 状态：✅ 已完成

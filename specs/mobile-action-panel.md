@@ -1,3 +1,13 @@
+---
+id: "089"
+title: "移动端行动面板完善"
+status: active
+domain: ui
+dependencies: []
+superseded_by: null
+created: 2026-03-23
+updated: 2026-03-30
+---
 # 移动端行动面板完善
 
 > 状态：✅ completed | 优先级：Phase 7 | 预计：3-4 天

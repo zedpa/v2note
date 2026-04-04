@@ -134,12 +134,15 @@ export async function projectIntendStrike(strike, userId) {
         return goal;
     }
     // action（默认）→ 创建 todo
+    // 如果统一 prompt 已匹配到目标（field.matched_goal_id），用作 parent_id 关联
+    const matchedGoalId = strike.field?.matched_goal_id ?? undefined;
     const createFields = {
         record_id: strike.source_id,
         text: strike.nucleus,
         strike_id: strike.id,
         user_id: uid,
         device_id: deviceId,
+        parent_id: matchedGoalId,
     };
     const { todo, action: dedupAction } = await todoRepo.dedupCreate(createFields);
     if (dedupAction === "matched") {

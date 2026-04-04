@@ -1,3 +1,13 @@
+---
+id: "074"
+title: "设计语言对齐 — Editorial Serenity 落地"
+status: completed
+domain: design
+dependencies: []
+superseded_by: null
+created: 2026-03-23
+updated: 2026-03-30
+---
 # 设计语言对齐 — Editorial Serenity 落地
 
 > 状态：✅ completed | 优先级：Phase 7.4

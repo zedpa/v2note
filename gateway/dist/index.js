@@ -308,10 +308,10 @@ function startWorker() {
                         break;
                     }
                     case "asr.start": {
-                        console.log(`[asr.start] notebook=${msg.payload.notebook}, mode=${msg.payload.mode}`);
+                        console.log(`[asr.start] notebook=${msg.payload.notebook}, mode=${msg.payload.mode}, sourceContext=${msg.payload.sourceContext}`);
                         connectionDeviceMap.set(ws, msg.payload.deviceId);
                         proactiveEngine.registerDevice(msg.payload.deviceId, ws, authedUserId);
-                        await startASR(ws, msg.payload.deviceId, msg.payload.locationText, msg.payload.mode, msg.payload.notebook, authedUserId);
+                        await startASR(ws, msg.payload.deviceId, msg.payload.locationText, msg.payload.mode, msg.payload.notebook, authedUserId, msg.payload.sourceContext);
                         break;
                     }
                     case "asr.stop": {

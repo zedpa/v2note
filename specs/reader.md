@@ -1,3 +1,13 @@
+---
+id: "094"
+title: "阅读器"
+status: draft
+domain: ui
+dependencies: []
+superseded_by: null
+created: 2026-03-23
+updated: 2026-03-30
+---
 # 阅读器
 
 > 状态：🔴 未实现（仅reader-utils.ts工具函数，UI组件未创建）| 优先级：Phase 5

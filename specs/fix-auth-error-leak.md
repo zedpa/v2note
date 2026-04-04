@@ -1,3 +1,8 @@
+---
+status: superseded
+superseded_by: "auth.md"
+---
+
 # 修复：登录/注册错误状态泄漏
 
 > 状态：✅ 已完成（合入 auth-hardening Phase 1）

@@ -1,0 +1,26 @@
+- generic [ref=e1]:
+  - generic [ref=e69]:
+    - generic [ref=e70]:
+      - img "路路 Logo" [ref=e72]
+      - heading "念念有路" [level=1] [ref=e101]
+      - paragraph [ref=e102]: 你的每一个想法，我都帮你记住
+    - generic [ref=e103]:
+      - button "手机号" [ref=e104] [cursor=pointer]
+      - button "邮箱" [active] [ref=e105] [cursor=pointer]
+    - generic [ref=e106]:
+      - textbox "邮箱地址" [ref=e122]
+      - generic [ref=e108]:
+        - textbox "密码" [ref=e109]
+        - button [ref=e110] [cursor=pointer]:
+          - img [ref=e111]
+      - generic [ref=e114]:
+        - generic [ref=e115] [cursor=pointer]:
+          - checkbox "自动登录" [checked] [ref=e116]
+          - generic [ref=e117]: 自动登录
+        - button "忘记密码？" [ref=e118] [cursor=pointer]
+      - button "登录" [disabled] [ref=e119]
+    - button "没有账号？立即注册" [ref=e121] [cursor=pointer]
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=e63] [cursor=pointer]:
+    - img [ref=e64]
+  - alert [ref=e67]

@@ -1,3 +1,13 @@
+---
+id: "062"
+title: "AI 伴侣窗口 — 像素小鹿 + 心情系统 + 工具可视化"
+status: active
+domain: ui
+dependencies: []
+superseded_by: null
+created: 2026-03-23
+updated: 2026-03-30
+---
 # AI 伴侣窗口 — 像素小鹿 + 心情系统 + 工具可视化
 
 > 状态：⏸ 暂缓（2026-03-29 代码已全部删除）| 优先级：Phase 7.2

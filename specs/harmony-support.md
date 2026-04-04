@@ -1,3 +1,13 @@
+---
+id: "087"
+title: "鸿蒙 HarmonyOS NEXT 适配"
+status: draft
+domain: infra
+dependencies: []
+superseded_by: null
+created: 2026-03-23
+updated: 2026-03-30
+---
 # 鸿蒙 HarmonyOS NEXT 适配
 
 > 状态：🟡 待开发 | 优先级：Phase 6+（平台扩展）| 预计：3-4 周

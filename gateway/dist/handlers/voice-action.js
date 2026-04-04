@@ -9,24 +9,6 @@ import { todoRepo, goalRepo } from "../db/repositories/index.js";
 import { safeParseJson } from "../lib/text-utils.js";
 import { buildDateAnchor } from "../lib/date-anchor.js";
 import { createTodoTool } from "../tools/definitions/create-todo.js";
-// ── 规则预筛 ──────────────────────────────────────────────────────────
-/** 指令型关键词/模式 — 命中时才走 AI 分类，否则直接视为 record */
-const ACTION_PATTERNS = [
-    // 创建待办
-    /(?:提醒我|帮我记|别忘了|记得要|待办|备忘)/,
-    // 完成/取消
-    /(?:做完了|搞定了|完成了|打了卡|不用做了|取消)/,
-    // 修改
-    /(?:改[到为成]|推迟|提前|延[后期]|调整)/,
-    // 查询
-    /(?:有什么安排|还有什么没做|什么待办|进展怎么样|查一下)/,
-    // 祈使句前缀
-    /^(?:把|帮|给我|替我)/,
-];
-/** 快速判断是否可能是指令型，不消耗 AI 调用 */
-function mayBeAction(text) {
-    return ACTION_PATTERNS.some((re) => re.test(text));
-}
 // ── 意图分类 ───────────────────────────────────────────────────────────
 function buildClassifyPrompt() {
     const dateAnchor = buildDateAnchor();
@@ -63,7 +45,7 @@ ${dateAnchor}
       "target_hint": "匹配关键词（人名/事项关键词）",
       "changes": {
         "text": "【create_todo 必填】纯净的待办内容，动词开头，去掉指令前缀",
-        "scheduled_start": "ISO 时间（从时间锚点表查到的绝对日期+时间）",
+        "scheduled_start": "ISO 时间（优先用户原话精确到分钟，参照锚点表解析优先级）",
         "priority": 1-5
       },
       "query_params": {},
@@ -78,15 +60,15 @@ ${dateAnchor}
   ✅ 用户说"帮我记一下明天去开会" → changes.text = "明天去开会"
   ✅ 用户说"提醒我下周找张总" → changes.text = "下周找张总"
   ❌ changes.text = "帮我记一下明天去开会"（不要保留指令前缀）
-- scheduled_start 必须从时间锚点表查找，禁止自行计算日期
+- scheduled_start：日期从锚点表查找，时刻以用户原话为准精确到分钟
 - delete_todo 和批量修改的 risk_level 为 "high"，其余为 "low"
 - record 类型时 actions 为空数组
 - confidence 反映你对判断的确信度`;
 }
 export async function classifyVoiceIntent(text, forceAction) {
-    // 规则预筛：没有指令特征 → 直接返回 record，跳过 AI 调用
-    // forceAction=true 时（上滑手势）跳过预筛，强制走 AI 分类
-    if (!forceAction && !mayBeAction(text)) {
+    // v2 方案B：去掉正则预筛，全部走 AI 分类
+    // 仅对极短文本（≤2字）跳过分类（无实质内容）
+    if (text.length <= 2) {
         return { type: "record", actions: [] };
     }
     const messages = [

@@ -595,6 +595,36 @@ export class ProactiveEngine {
       }
     }
 
+    // ── 提醒检查：reminder_at 在 30 分钟窗口内 ──
+    try {
+      const windowStart = new Date().toISOString();
+      const windowEnd = new Date(Date.now() + 30 * 60000).toISOString();
+      const reminders = await todoRepo.findPendingReminders(windowStart, windowEnd);
+      for (const todo of reminders) {
+        // 只推送给相关设备
+        const isOwner = (todo.user_id && todo.user_id === device.userId)
+          || (todo.device_id && todo.device_id === device.deviceId);
+        if (!isOwner) continue;
+
+        this.sendMessage(device, {
+          type: "proactive.todo_reminder",
+          payload: {
+            todo_id: todo.id,
+            text: todo.text,
+            scheduled_start: todo.scheduled_start,
+            reminder_types: todo.reminder_types ?? ["notification"],
+          },
+        });
+        this.persistNotification(device, "proactive.todo_reminder", "待办提醒", todo.text);
+        await todoRepo.markReminderSent(todo.id);
+      }
+    } catch (err: any) {
+      // reminder 列可能还不存在（migration 未执行）
+      if (!err.message?.includes("column") && !err.message?.includes("does not exist")) {
+        console.warn(`[proactive] Reminder check failed: ${err.message}`);
+      }
+    }
+
     // Standard todo checks
     const pending = device.userId
       ? await todoRepo.findPendingByUser(device.userId)

@@ -68,12 +68,17 @@ export function TaskItem({ todo, onToggle, onPress }: TaskItemProps) {
         </div>
 
         {/* Meta 行 */}
-        {(dateLabel || durationLabel || todo.goal_title) && (
+        {(dateLabel || durationLabel || todo.goal_title || todo.subtask_count > 0) && (
           <div className="mt-1.5 flex items-center gap-2 text-xs text-muted-foreground">
             {dateLabel && (
               <span className="text-primary">{dateLabel}</span>
             )}
             {durationLabel && <span>{durationLabel}</span>}
+            {todo.subtask_count > 0 && (
+              <span className="text-muted-foreground">
+                {todo.subtask_done_count}/{todo.subtask_count} 子任务
+              </span>
+            )}
             {todo.goal_title && (
               <span className="truncate max-w-[120px] rounded-full bg-muted px-1.5 py-0.5 text-[10px]">
                 {todo.goal_title}

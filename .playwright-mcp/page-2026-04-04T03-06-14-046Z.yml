@@ -1,0 +1,125 @@
+- generic [active] [ref=e1]:
+  - button "Open Next.js Dev Tools" [ref=e77] [cursor=pointer]:
+    - img [ref=e78]
+  - alert [ref=e81]
+  - generic [ref=e131]:
+    - banner [ref=e132]:
+      - generic [ref=e133]:
+        - button "打开侧边栏" [ref=e134] [cursor=pointer]: E
+        - generic [ref=e135]:
+          - button "日记" [ref=e136] [cursor=pointer]
+          - button "待办" [ref=e137] [cursor=pointer]
+        - generic [ref=e138]:
+          - button "AI 对话" [ref=e139] [cursor=pointer]:
+            - img "路路 Logo" [ref=e140]
+          - button "搜索" [ref=e169] [cursor=pointer]:
+            - img [ref=e170]
+          - button "通知" [ref=e173] [cursor=pointer]:
+            - img [ref=e174]
+    - main [ref=e177]:
+      - generic [ref=e179]:
+        - generic [ref=e751]:
+          - generic [ref=e752]:
+            - generic [ref=e753]: "4"
+            - generic [ref=e754]: 4月 周六
+          - button "11:05 · 文字 铝价又涨了百分之五" [ref=e756] [cursor=pointer]:
+            - generic [ref=e758]:
+              - generic [ref=e759]:
+                - generic [ref=e760]: 11:05
+                - generic [ref=e761]: ·
+                - img [ref=e762]
+                - generic [ref=e764]: 文字
+              - paragraph [ref=e767]: 铝价又涨了百分之五
+        - generic [ref=e180]:
+          - generic [ref=e181]:
+            - generic [ref=e182]: "2"
+            - generic [ref=e183]: 4月 周四
+          - generic [ref=e184]:
+            - button "20:13 · 文字 · 版本说明 v0.1 能做什么、还不能做什么" [ref=e185] [cursor=pointer]:
+              - generic [ref=e187]:
+                - generic [ref=e188]:
+                  - generic [ref=e189]: 20:13
+                  - generic [ref=e190]: ·
+                  - img [ref=e191]
+                  - generic [ref=e193]: 文字
+                  - generic [ref=e194]: ·
+                  - generic [ref=e195]: 版本说明
+                - paragraph [ref=e198]: v0.1 能做什么、还不能做什么
+            - button "20:12 · 文字 · 功能介绍 录入、管理、对话——所有操作一看就会" [ref=e199] [cursor=pointer]:
+              - generic [ref=e201]:
+                - generic [ref=e202]:
+                  - generic [ref=e203]: 20:12
+                  - generic [ref=e204]: ·
+                  - img [ref=e205]
+                  - generic [ref=e207]: 文字
+                  - generic [ref=e208]: ·
+                  - generic [ref=e209]: 功能介绍
+                - paragraph [ref=e212]: 录入、管理、对话——所有操作一看就会
+            - button "20:11 · 文字 · 写给你的信 产品 动机 UI 用户体验 版本规划 v0.1 功能范围 为什么要做这个产品" [ref=e213] [cursor=pointer]:
+              - generic [ref=e215]:
+                - generic [ref=e216]:
+                  - generic [ref=e217]: 20:11
+                  - generic [ref=e218]: ·
+                  - img [ref=e219]
+                  - generic [ref=e221]: 文字
+                  - generic [ref=e222]: ·
+                  - generic [ref=e223]: 写给你的信
+                  - generic [ref=e224]: 产品
+                  - generic [ref=e225]: 动机
+                  - generic [ref=e226]: UI
+                  - generic [ref=e227]: 用户体验
+                  - generic [ref=e228]: 版本规划
+                  - generic [ref=e229]: v0.1
+                  - generic [ref=e230]: 功能范围
+                - paragraph [ref=e233]: 为什么要做这个产品
+        - generic [ref=e337]:
+          - generic [ref=e338]:
+            - generic [ref=e339]: "31"
+            - generic [ref=e340]: 3月 周二
+          - generic [ref=e341]:
+            - button "12:44 · 文字 · 重庆 出行 创建3点去重庆的待办" [ref=e666] [cursor=pointer]:
+              - generic [ref=e668]:
+                - generic [ref=e669]:
+                  - generic [ref=e670]: 12:44
+                  - generic [ref=e671]: ·
+                  - img [ref=e672]
+                  - generic [ref=e674]: 文字
+                  - generic [ref=e675]: ·
+                  - generic [ref=e676]: 重庆
+                  - generic [ref=e677]: 出行
+                - paragraph [ref=e680]: 创建3点去重庆的待办
+            - button "09:36 · 文字 测试" [ref=e681] [cursor=pointer]:
+              - generic [ref=e683]:
+                - generic [ref=e684]:
+                  - generic [ref=e685]: 09:36
+                  - generic [ref=e686]: ·
+                  - img [ref=e687]
+                  - generic [ref=e689]: 文字
+                - paragraph [ref=e692]: 测试
+            - button "09:32 · 0:13 输了让他了，直接了，把个了，1 2 3 4 5 6 7 8 9 10，明天上山打老虎。" [ref=e693] [cursor=pointer]:
+              - generic [ref=e695]:
+                - generic [ref=e696]:
+                  - generic [ref=e697]: 09:32
+                  - generic [ref=e698]: ·
+                  - img [ref=e699]
+                  - generic [ref=e702]: 0:13
+                - paragraph [ref=e705]: 输了让他了，直接了，把个了，1 2 3 4 5 6 7 8 9 10，明天上山打老虎。
+            - button "09:24 · 文字 测试创建日记" [ref=e706] [cursor=pointer]:
+              - generic [ref=e708]:
+                - generic [ref=e709]:
+                  - generic [ref=e710]: 09:24
+                  - generic [ref=e711]: ·
+                  - img [ref=e712]
+                  - generic [ref=e714]: 文字
+                - paragraph [ref=e717]: 测试创建日记
+            - button "08:53 · 文字 你好" [ref=e718] [cursor=pointer]:
+              - generic [ref=e720]:
+                - generic [ref=e721]:
+                  - generic [ref=e722]: 08:53
+                  - generic [ref=e723]: ·
+                  - img [ref=e724]
+                  - generic [ref=e726]: 文字
+                - paragraph [ref=e729]: 你好
+    - button [ref=e772] [cursor=pointer]:
+      - img [ref=e773]
+    - button "Choose File" [ref=e735]

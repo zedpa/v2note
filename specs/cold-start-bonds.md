@@ -1,3 +1,8 @@
+---
+status: superseded
+superseded_by: "cold-start.md"
+---
+
 # 冷启动浅层关联
 
 > 状态：✅ 已完成 | 优先级：Phase 1 | 完成日期：2026-03-24

@@ -59,6 +59,7 @@ interface ASRSession {
   saveAudio: boolean;
   startTime: number;
   forceCommand?: boolean;
+  sourceContext?: "todo" | "timeline" | "chat" | "review";
 }
 
 const sessions = new Map<string, ASRSession>();
@@ -75,6 +76,7 @@ export async function startASR(
   mode: ASRMode = "realtime",
   notebook?: string,
   userId?: string,
+  sourceContext?: "todo" | "timeline" | "chat" | "review",
 ): Promise<void> {
   const asrT0 = Date.now();
   const apiKey = process.env.DASHSCOPE_API_KEY;
@@ -113,6 +115,7 @@ export async function startASR(
     preFlushBuffer: [],
     saveAudio: false,
     startTime: Date.now(),
+    sourceContext,
   };
   sessions.set(deviceId, session);
   console.log(`[asr][⏱ session-create] ${Date.now() - asrT0}ms`);
@@ -508,11 +511,19 @@ async function createRecordAndProcess(
   transcript: string,
   durationSeconds: number,
 ): Promise<void> {
+  // 根据 sourceContext 决定 record source 类型
+  // Layer 1 (todo 页面) 和 Layer 2 (上滑指令) 创建隐藏 record
+  const recordSource = session.sourceContext === "todo"
+    ? "todo_voice"
+    : session.forceCommand
+      ? "command_voice"
+      : "voice";
+
   const record = await recordRepo.create({
     device_id: session.deviceId,
     user_id: session.userId,
     status: "processing",
-    source: "voice",
+    source: recordSource,
     duration_seconds: durationSeconds,
     location_text: session.locationText,
     notebook: session.notebook,
@@ -558,6 +569,7 @@ async function createRecordAndProcess(
     recordId: record.id,
     notebook: session.notebook,
     forceCommand: session.forceCommand,
+    sourceContext: session.sourceContext,
   })
     .then(async (result) => {
       console.log(`[asr] Process result for ${record.id}: ${JSON.stringify(result)}`);

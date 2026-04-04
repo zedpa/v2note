@@ -1,3 +1,13 @@
+---
+id: "088"
+title: "知识生命周期管理"
+status: active
+domain: cognitive
+dependencies: []
+superseded_by: null
+created: 2026-03-23
+updated: 2026-03-30
+---
 # 知识生命周期管理
 
 > 状态：✅ completed | 优先级：Phase 6 | 预计：3 天

@@ -1,3 +1,8 @@
+---
+status: superseded
+superseded_by: "chat-system.md"
+---
+
 # Header 路路 AI 入口 + 全局后台处理状态
 
 > 状态：🟡 待开发

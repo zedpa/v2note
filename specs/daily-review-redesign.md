@@ -1,3 +1,13 @@
+---
+id: "072"
+title: "每日回顾重构"
+status: superseded
+domain: report
+dependencies: []
+superseded_by: daily-report.md
+created: 2026-03-23
+updated: 2026-03-30
+---
 # 每日回顾重构
 
 > 状态：✅ 已完成

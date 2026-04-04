@@ -1,3 +1,8 @@
+---
+status: superseded
+superseded_by: "chat-system.md"
+---
+
 # Chat UI 大师级重构
 
 > 状态: ✅ completed

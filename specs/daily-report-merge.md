@@ -1,3 +1,8 @@
+---
+status: superseded
+superseded_by: "daily-report.md"
+---
+
 # 每日报告合并：智能日报
 
 > 状态：🟡 待开发

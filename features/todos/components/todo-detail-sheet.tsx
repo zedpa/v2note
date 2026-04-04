@@ -70,7 +70,7 @@ export function TodoDetailSheet({ todo, open, onClose, onUpdated, onAskAI }: Tod
   const syncFromTodo = useCallback((t: TodoItem | null) => {
     if (!t) return;
     if (t.scheduled_start) {
-      const d = new Date(t.scheduled_start);
+      const d = new Date(t.scheduled_start.replace(/Z$/i, ""));
       const pad = (n: number) => String(n).padStart(2, "0");
       setDate(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`);
       setTime(`${pad(d.getHours())}:${pad(d.getMinutes())}`);

@@ -5,7 +5,7 @@ export type ASRMode = "realtime" | "upload";
  * - realtime: spawn Python realtime ASR subprocess for streaming recognition.
  * - upload: just accumulate PCM chunks; transcribe when recording stops.
  */
-export declare function startASR(clientWs: WsWebSocket, deviceId: string, locationText?: string, mode?: ASRMode, notebook?: string, userId?: string): Promise<void>;
+export declare function startASR(clientWs: WsWebSocket, deviceId: string, locationText?: string, mode?: ASRMode, notebook?: string, userId?: string, sourceContext?: "todo" | "timeline" | "chat" | "review"): Promise<void>;
 /**
  * Forward binary PCM audio chunk.
  * - realtime: writes to Python subprocess stdin

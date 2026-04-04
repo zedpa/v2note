@@ -1,3 +1,8 @@
+---
+status: superseded
+superseded_by: "todo-system.md"
+---
+
 # Todo UI 全面重构
 
 > Status: ✅ 实现完成 — 数据层+UI组件+集成+E2E 全部就位

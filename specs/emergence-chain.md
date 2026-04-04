@@ -1,3 +1,13 @@
+---
+id: "077"
+title: "完整涌现链 L1→L2→L3"
+status: deprecated
+domain: cognitive
+dependencies: []
+superseded_by: null
+created: 2026-03-23
+updated: 2026-03-30
+---
 # 完整涌现链 L1→L2→L3
 
 > 状态：✅ L1+L2完成，L3通过todo.domain实现 | 优先级：Phase 3

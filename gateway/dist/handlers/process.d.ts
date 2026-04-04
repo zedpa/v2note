@@ -16,6 +16,7 @@ export interface LocalConfigPayload {
     settings?: Record<string, unknown>;
     existingTags?: string[];
 }
+export type SourceContext = "todo" | "timeline" | "chat" | "review";
 export interface ProcessPayload {
     text: string;
     audioUrl?: string;
@@ -25,6 +26,7 @@ export interface ProcessPayload {
     notebook?: string;
     localConfig?: LocalConfigPayload;
     forceCommand?: boolean;
+    sourceContext?: SourceContext;
 }
 export interface RelayExtract {
     text: string;
@@ -55,8 +57,55 @@ export interface ProcessResult {
         confirm_id: string;
         summary: string;
     };
+    /** Layer 1: 待办全能模式 — AI 提取的待办指令（前端 CommandSheet 用） */
+    todo_commands?: TodoCommand[];
+}
+/** Layer 1 待办指令 */
+export interface TodoCommand {
+    action_type: "create" | "complete" | "modify" | "query";
+    confidence: number;
+    todo?: ExtractedTodo;
+    target_hint?: string;
+    target_id?: string;
+    changes?: Partial<ExtractedTodo>;
+    query_params?: {
+        date?: string;
+        goal_id?: string;
+        status?: string;
+    };
+    /** query 结果：后端查询后填充 */
+    query_result?: Array<{
+        id: string;
+        text: string;
+        scheduled_start?: string;
+        done: boolean;
+        priority?: number;
+    }>;
+}
+export interface ExtractedTodo {
+    text: string;
+    scheduled_start?: string;
+    scheduled_end?: string;
+    estimated_minutes?: number;
+    priority?: number;
+    person?: string;
+    goal_hint?: string | null;
+    reminder?: {
+        enabled: boolean;
+        before_minutes: number;
+        types: ("notification" | "alarm" | "calendar")[];
+    };
+    recurrence?: {
+        rule: string;
+        end_date?: string | null;
+    };
 }
 /**
  * Process a single diary entry: clean transcript text, save summary, trigger digest.
+ *
+ * 三层路由（v2）：
+ * Layer 1: sourceContext="todo" → 待办全能模式（不存日记、不 Digest）
+ * Layer 2: forceCommand=true → 全量 Agent 模式（不存日记、不 Digest）
+ * Layer 3: 其余 → AI 分类 + 存日记 + 条件 Digest
  */
 export declare function processEntry(payload: ProcessPayload): Promise<ProcessResult>;

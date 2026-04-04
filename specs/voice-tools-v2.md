@@ -1,3 +1,13 @@
+---
+id: "103"
+title: "语音控制完整化 v2"
+status: completed
+domain: voice
+dependencies: []
+superseded_by: null
+created: 2026-03-23
+updated: 2026-03-30
+---
 # 语音控制完整化 v2
 
 > 状态：✅ 核心+确认流完成 | 优先级：P0（4/1公测前）| Phase 8.5

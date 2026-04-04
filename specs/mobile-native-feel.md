@@ -1,3 +1,13 @@
+---
+id: "090"
+title: "移动端原生体感优化"
+status: completed
+domain: ui
+dependencies: []
+superseded_by: null
+created: 2026-03-23
+updated: 2026-04-02
+---
 # 移动端原生体感优化
 
 > 状态：🟡 待开发

@@ -39,6 +39,7 @@ interface FABProps {
   onOpenSkillChat?: (skillName: string) => void;
   commandContext?: Partial<CommandContext>;
   activeNotebook?: string | null;
+  sourceContext?: "todo" | "timeline" | "chat" | "review";
 }
 
 export function FAB({
@@ -48,6 +49,7 @@ export function FAB({
   onOpenSkillChat,
   commandContext,
   activeNotebook,
+  sourceContext = "timeline",
 }: FABProps) {
   const [showTextSheet, setShowTextSheet] = useState(false);
   const [displayDuration, setDisplayDuration] = useState(0);
@@ -74,6 +76,8 @@ export function FAB({
   const preCaptureAbortRef = useRef(false);
   const activeNotebookRef = useRef(activeNotebook);
   activeNotebookRef.current = activeNotebook;
+  const sourceContextRef = useRef(sourceContext);
+  sourceContextRef.current = sourceContext;
   const gwClientRef = useRef<ReturnType<typeof getGatewayClient> | null>(null);
 
   const startTimers = useCallback(() => {
@@ -135,12 +139,14 @@ export function FAB({
         case "asr.done": {
           if (commandReleaseRef.current) {
             commandReleaseRef.current = false;
-            const transcript = (msg.payload.transcript || "").trim();
             setDisplayDuration(0);
             setConfirmedText("");
             setPartialText("");
             resetRef.current();
-            onOpenCommandChat?.(transcript || "/");
+            // 统一走 CommandSheet 弹窗：通过自定义事件通知 page.tsx
+            window.dispatchEvent(new CustomEvent("v2note:forceCommand", {
+              detail: { transcript: (msg.payload.transcript || "").trim() },
+            }));
             return;
           }
 
@@ -286,7 +292,7 @@ export function FAB({
       }
       gwClientRef.current = client;
 
-      client.send({ type: "asr.start", payload: { deviceId, mode: asrMode, notebook: activeNotebookRef.current ?? undefined } });
+      client.send({ type: "asr.start", payload: { deviceId, mode: asrMode, notebook: activeNotebookRef.current ?? undefined, sourceContext: sourceContextRef.current } });
 
       for (const chunk of preBufferRef.current) {
         client.sendBinary(chunk);
@@ -347,7 +353,7 @@ export function FAB({
 
         if (asCommand) {
           commandReleaseRef.current = true;
-          client.send({ type: "asr.stop", payload: { deviceId, saveAudio: false } });
+          client.send({ type: "asr.stop", payload: { deviceId, saveAudio: false, forceCommand: true } });
         } else {
           commandReleaseRef.current = false;
           client.send({ type: "asr.stop", payload: { deviceId } });
@@ -406,7 +412,7 @@ export function FAB({
     onSwipeRight: () => {
       // phase transitions to "locked" by gesture hook
     },
-    onSwipeUp: () => finishRecording(false), // 上滑不再区分指令模式，统一发送
+    onSwipeUp: () => finishRecording(true), // v2: 上滑 = 指令模式，发送 forceCommand=true
     onRelease: () => finishRecording(false),
   });
 
@@ -772,6 +778,7 @@ export function FAB({
         }}
         commandContext={commandContext}
         activeNotebook={activeNotebook}
+        sourceContext={sourceContext}
         onRecordPress={() => {
           longPressTriggeredRef.current = true;
           gestures.forcePhase("locked");

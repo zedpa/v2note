@@ -1,3 +1,13 @@
+---
+id: "076"
+title: "领域词库 — DashScope 热词 + 自动收录"
+status: completed
+domain: cognitive
+dependencies: []
+superseded_by: null
+created: 2026-03-23
+updated: 2026-03-30
+---
 ﻿# 领域词库 — DashScope 热词 + 自动收录
 
 > 状态：✅ 完成 | 优先级：Phase 7.3

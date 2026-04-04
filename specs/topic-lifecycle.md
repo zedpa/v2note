@@ -1,3 +1,13 @@
+---
+id: "099"
+title: "主题生命周期 — 统一视图 + 认知-实践飞轮"
+status: active
+domain: cognitive
+dependencies: []
+superseded_by: null
+created: 2026-03-23
+updated: 2026-03-30
+---
 # 主题生命周期 — 统一视图 + 认知-实践飞轮
 
 > 状态：🔄 实现中 | 优先级：Phase 7.2 | 预计：6-7 天

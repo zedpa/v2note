@@ -1,3 +1,13 @@
+---
+id: "069"
+title: "认知结构修复 v2 — 统一数据模型 + L3 侧边栏"
+status: completed
+domain: cognitive
+dependencies: []
+superseded_by: null
+created: 2026-03-23
+updated: 2026-03-30
+---
 # 认知结构修复 v2 — 统一数据模型 + L3 侧边栏
 
 > 状态：✅ 已完成（后端模型+前端导航+domain回填）

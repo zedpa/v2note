@@ -1,0 +1,41 @@
+- generic [active] [ref=e1]:
+  - button "Open Next.js Dev Tools" [ref=e7] [cursor=pointer]:
+    - img [ref=e8]
+  - alert [ref=e11]
+  - generic:
+    - generic:
+      - img "路路 Logo"
+      - generic: 念念有路
+      - generic:
+        - button "写作"
+        - button "时间线"
+        - button "地图"
+        - button "目标"
+    - generic:
+      - button "🔍"
+      - button "🎙"
+      - button "⚡️行动"
+      - button "📋回顾"
+      - button "⚙️"
+  - generic [ref=e12]:
+    - complementary [ref=e13]:
+      - generic [ref=e14]:
+        - heading "主题" [level=2] [ref=e15]
+        - button "全部" [ref=e16] [cursor=pointer]
+        - paragraph [ref=e17]: 加载中…
+        - button "+ 新主题" [ref=e18] [cursor=pointer]
+    - main [ref=e19]:
+      - generic [ref=e20]:
+        - generic [ref=e21]:
+          - button "全部" [ref=e22] [cursor=pointer]
+          - button "语音" [ref=e23] [cursor=pointer]
+          - button "文字" [ref=e24] [cursor=pointer]
+          - button "图片" [ref=e25] [cursor=pointer]
+          - button "带文件" [ref=e26] [cursor=pointer]
+          - generic [ref=e27]: "|"
+          - textbox [ref=e28]:
+            - /placeholder: 开始日期
+          - generic [ref=e29]: —
+          - textbox [ref=e30]:
+            - /placeholder: 结束日期
+        - paragraph [ref=e31]: 加载中…

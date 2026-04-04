@@ -22,6 +22,7 @@ export function registerStrikeRoutes(router: Router) {
           nucleus: s.nucleus,
           polarity: s.polarity,
           confidence: s.confidence,
+          field: s.field,
           tags: tags.map((t) => t.label),
           created_at: s.created_at,
         };
@@ -92,6 +93,7 @@ export function registerStrikeRoutes(router: Router) {
         nucleus: strike.nucleus,
         polarity: strike.polarity,
         confidence: strike.confidence,
+        field: strike.field,
         created_at: strike.created_at,
       },
       source,

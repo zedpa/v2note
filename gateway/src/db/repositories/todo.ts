@@ -12,7 +12,10 @@ export interface Todo {
   priority: number;
   completed_at: string | null;
   created_at: string;
+  updated_at?: string;
   category?: string;
+  user_id?: string | null;
+  device_id?: string | null;
   relay_meta?: {
     source_person?: string;
     target_person?: string;
@@ -35,6 +38,21 @@ export interface Todo {
   status?: string;
   /** 父目标名称（JOIN 得到，非 DB 列） */
   goal_title?: string | null;
+
+  // ── 提醒字段（048 migration）──
+  reminder_at?: string | null;
+  reminder_before?: number | null;
+  reminder_types?: string[] | null;
+  reminder_sent?: boolean;
+
+  // ── 周期字段（048 migration）──
+  recurrence_rule?: string | null;
+  recurrence_end?: string | null;
+  recurrence_parent_id?: string | null;
+
+  // ── 日历同步（048 migration，v2 实现）──
+  calendar_event_id?: string | null;
+  calendar_synced_at?: string | null;
 }
 
 export async function findByDevice(deviceId: string): Promise<Todo[]> {
@@ -108,12 +126,22 @@ export async function create(fields: {
   impact?: number;
   goal_id?: string;
   scheduled_start?: string;
+  scheduled_end?: string;
   estimated_minutes?: number;
   user_id?: string;
   device_id?: string;
   parent_id?: string;
   level?: number;
   status?: string;
+  priority?: number;
+  // 提醒
+  reminder_at?: string;
+  reminder_before?: number;
+  reminder_types?: string[];
+  // 周期
+  recurrence_rule?: string;
+  recurrence_end?: string;
+  recurrence_parent_id?: string;
 }): Promise<Todo> {
   const cols = ["text", "done"];
   const vals: any[] = [fields.text, fields.done ?? false];
@@ -125,12 +153,20 @@ export async function create(fields: {
     ["impact", fields.impact],
     ["goal_id", fields.goal_id],
     ["scheduled_start", fields.scheduled_start],
+    ["scheduled_end", fields.scheduled_end],
     ["estimated_minutes", fields.estimated_minutes],
     ["user_id", fields.user_id],
     ["device_id", fields.device_id],
     ["parent_id", fields.parent_id],
     ["level", fields.level],
     ["status", fields.status],
+    ["priority", fields.priority],
+    ["reminder_at", fields.reminder_at],
+    ["reminder_before", fields.reminder_before],
+    ["reminder_types", fields.reminder_types],
+    ["recurrence_rule", fields.recurrence_rule],
+    ["recurrence_end", fields.recurrence_end],
+    ["recurrence_parent_id", fields.recurrence_parent_id],
   ];
   for (const [col, val] of optionals) {
     if (val !== undefined && val !== null) {
@@ -181,68 +217,55 @@ export async function update(
     strike_id?: string | null;
     level?: number;
     status?: string;
+    // 提醒
+    reminder_at?: string | null;
+    reminder_before?: number | null;
+    reminder_types?: string[] | null;
+    reminder_sent?: boolean;
+    // 周期
+    recurrence_rule?: string | null;
+    recurrence_end?: string | null;
+    recurrence_parent_id?: string | null;
   },
 ): Promise<void> {
   const sets: string[] = [];
   const params: any[] = [];
   let i = 1;
-  if (fields.text !== undefined) {
-    sets.push(`text = $${i++}`);
-    params.push(fields.text);
+
+  // 通用字段遍历，减少重复代码
+  const entries: Array<[string, any, ((v: any) => any)?]> = [
+    ["text", fields.text],
+    ["done", fields.done],
+    ["estimated_minutes", fields.estimated_minutes],
+    ["scheduled_start", fields.scheduled_start],
+    ["scheduled_end", fields.scheduled_end],
+    ["priority", fields.priority],
+    ["domain", fields.domain],
+    ["impact", fields.impact],
+    ["ai_actionable", fields.ai_actionable],
+    ["ai_action_plan", fields.ai_action_plan, (v: any) => JSON.stringify(v)],
+    ["goal_id", fields.goal_id],
+    ["strike_id", fields.strike_id],
+    ["level", fields.level],
+    ["status", fields.status],
+    ["reminder_at", fields.reminder_at],
+    ["reminder_before", fields.reminder_before],
+    ["reminder_types", fields.reminder_types],
+    ["reminder_sent", fields.reminder_sent],
+    ["recurrence_rule", fields.recurrence_rule],
+    ["recurrence_end", fields.recurrence_end],
+    ["recurrence_parent_id", fields.recurrence_parent_id],
+  ];
+
+  for (const [col, val, transform] of entries) {
+    if (val !== undefined) {
+      sets.push(`${col} = $${i++}`);
+      params.push(transform ? transform(val) : val);
+    }
   }
-  if (fields.done !== undefined) {
-    sets.push(`done = $${i++}`);
-    params.push(fields.done);
-  }
-  if (fields.estimated_minutes !== undefined) {
-    sets.push(`estimated_minutes = $${i++}`);
-    params.push(fields.estimated_minutes);
-  }
-  if (fields.scheduled_start !== undefined) {
-    sets.push(`scheduled_start = $${i++}`);
-    params.push(fields.scheduled_start);
-  }
-  if (fields.scheduled_end !== undefined) {
-    sets.push(`scheduled_end = $${i++}`);
-    params.push(fields.scheduled_end);
-  }
-  if (fields.priority !== undefined) {
-    sets.push(`priority = $${i++}`);
-    params.push(fields.priority);
-  }
-  if (fields.domain !== undefined) {
-    sets.push(`domain = $${i++}`);
-    params.push(fields.domain);
-  }
-  if (fields.impact !== undefined) {
-    sets.push(`impact = $${i++}`);
-    params.push(fields.impact);
-  }
-  if (fields.ai_actionable !== undefined) {
-    sets.push(`ai_actionable = $${i++}`);
-    params.push(fields.ai_actionable);
-  }
-  if (fields.ai_action_plan !== undefined) {
-    sets.push(`ai_action_plan = $${i++}`);
-    params.push(JSON.stringify(fields.ai_action_plan));
-  }
-  if (fields.goal_id !== undefined) {
-    sets.push(`goal_id = $${i++}`);
-    params.push(fields.goal_id);
-  }
-  if (fields.strike_id !== undefined) {
-    sets.push(`strike_id = $${i++}`);
-    params.push(fields.strike_id);
-  }
-  if (fields.level !== undefined) {
-    sets.push(`level = $${i++}`);
-    params.push(fields.level);
-  }
-  if (fields.status !== undefined) {
-    sets.push(`status = $${i++}`);
-    params.push(fields.status);
-  }
+
   if (sets.length === 0) return;
+  sets.push(`updated_at = now()`);
   params.push(id);
   await execute(`UPDATE todo SET ${sets.join(", ")} WHERE id = $${i}`, params);
 }
@@ -454,7 +477,7 @@ export async function createWithDedup(params: {
   return { todo, action: "created" };
 }
 
-const TODO_DEDUP_THRESHOLD = 0.65;
+const TODO_DEDUP_THRESHOLD = 0.85;
 
 /**
  * 普通待办（level=0）去重创建。
@@ -477,6 +500,12 @@ export async function dedupCreate(fields: {
   parent_id?: string;
   level?: number;
   status?: string;
+  priority?: number;
+  reminder_at?: string;
+  reminder_before?: number;
+  reminder_types?: string[];
+  recurrence_rule?: string;
+  recurrence_end?: string;
 }): Promise<{ todo: Todo; action: "created" | "matched" }> {
   const userId = fields.user_id;
   if (!userId) {
@@ -820,4 +849,117 @@ export async function getMyWorldData(userId: string): Promise<MyWorldNode[]> {
   }
 
   return nodes;
+}
+
+// ── 周期任务方法 ──────────────────────────────────────────────────
+
+/** 查询所有活跃的周期模板（非实例、有 recurrence_rule） */
+export async function findRecurrenceTemplates(opts: {
+  userId?: string;
+  deviceId?: string;
+}): Promise<Todo[]> {
+  const { userId, deviceId } = opts;
+  const [where, params] = userId
+    ? ["user_id = $1", [userId]]
+    : ["device_id = $1", [deviceId]];
+
+  return query<Todo>(
+    `SELECT * FROM todo
+     WHERE ${where}
+       AND recurrence_rule IS NOT NULL
+       AND recurrence_parent_id IS NULL
+       AND (recurrence_end IS NULL OR recurrence_end >= CURRENT_DATE)
+     ORDER BY created_at`,
+    params,
+  );
+}
+
+/** 检查某日某模板是否已有实例 */
+export async function hasInstanceForDate(
+  templateId: string,
+  date: string,
+): Promise<boolean> {
+  const row = await queryOne<{ exists: boolean }>(
+    `SELECT EXISTS(
+       SELECT 1 FROM todo
+       WHERE recurrence_parent_id = $1
+         AND scheduled_start::date = $2::date
+     ) AS exists`,
+    [templateId, date],
+  );
+  return row?.exists ?? false;
+}
+
+/** 从模板创建周期实例 */
+export async function createRecurrenceInstance(
+  template: Todo,
+  date: string,
+): Promise<Todo> {
+  // 拼接日期 + 模板的时间部分
+  const timePart = template.scheduled_start
+    ? template.scheduled_start.split("T")[1] ?? "09:00:00"
+    : "09:00:00";
+  const scheduledStart = `${date}T${timePart}`;
+
+  // 计算 reminder_at
+  let reminderAt: string | undefined;
+  if (template.reminder_before && template.reminder_before > 0) {
+    const ms = new Date(scheduledStart).getTime() - template.reminder_before * 60000;
+    reminderAt = new Date(ms).toISOString();
+  }
+
+  return create({
+    text: template.text,
+    user_id: template.user_id ?? undefined,
+    device_id: template.device_id ?? undefined,
+    record_id: template.record_id,
+    scheduled_start: scheduledStart,
+    priority: template.priority,
+    estimated_minutes: template.estimated_minutes ?? undefined,
+    reminder_at: reminderAt,
+    reminder_before: template.reminder_before ?? undefined,
+    reminder_types: template.reminder_types ?? undefined,
+    recurrence_parent_id: template.id,
+    parent_id: template.parent_id ?? undefined,
+  });
+}
+
+// ── 提醒方法 ──────────────────────────────────────────────────────
+
+/** 查询即将到来的提醒（窗口内、未完成、未发送） */
+export async function findPendingReminders(
+  windowStart: string,
+  windowEnd: string,
+): Promise<Todo[]> {
+  return query<Todo>(
+    `SELECT * FROM todo
+     WHERE reminder_at >= $1 AND reminder_at < $2
+       AND done = false
+       AND reminder_sent = false
+     ORDER BY reminder_at`,
+    [windowStart, windowEnd],
+  );
+}
+
+/** 标记提醒已发送 */
+export async function markReminderSent(todoId: string): Promise<void> {
+  await execute(
+    `UPDATE todo SET reminder_sent = true WHERE id = $1`,
+    [todoId],
+  );
+}
+
+/** 根据 scheduled_start 和 reminder_before 重算 reminder_at */
+export async function recalcReminderAt(todoId: string): Promise<void> {
+  await execute(
+    `UPDATE todo SET
+       reminder_at = CASE
+         WHEN scheduled_start IS NOT NULL AND reminder_before IS NOT NULL AND reminder_before > 0
+         THEN scheduled_start - (reminder_before || ' minutes')::interval
+         ELSE NULL
+       END,
+       reminder_sent = false
+     WHERE id = $1`,
+    [todoId],
+  );
 }

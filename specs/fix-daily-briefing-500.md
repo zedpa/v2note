@@ -1,3 +1,13 @@
+---
+id: "082"
+title: "修复：今日简报 HTTP 500 崩溃"
+status: completed
+domain: report
+dependencies: []
+superseded_by: null
+created: 2026-03-23
+updated: 2026-04-02
+---
 # 修复：今日简报 HTTP 500 崩溃
 
 > 状态：✅ 已完成

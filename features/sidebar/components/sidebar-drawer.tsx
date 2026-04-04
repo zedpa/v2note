@@ -123,7 +123,11 @@ export function SidebarDrawer({
       >
         {/* 头部: 头像 + 用户名 */}
         <div className="flex items-center justify-between px-5 pt-5 pb-4">
-          <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => { onClose(); onViewProfile?.(); }}
+            className="flex items-center gap-3 text-left"
+          >
             <div
               className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-medium text-white shrink-0"
               style={{ background: "linear-gradient(135deg, #89502C, #C8845C)" }}
@@ -138,7 +142,7 @@ export function SidebarDrawer({
                 {userPhone || "AI 个人助手"}
               </p>
             </div>
-          </div>
+          </button>
           <button
             type="button"
             onClick={onClose}

@@ -1,0 +1,151 @@
+- generic [active] [ref=e1]:
+  - button "Open Next.js Dev Tools" [ref=e77] [cursor=pointer]:
+    - img [ref=e78]
+  - alert [ref=e81]
+  - generic [ref=e131]:
+    - banner [ref=e132]:
+      - generic [ref=e133]:
+        - button "打开侧边栏" [ref=e134] [cursor=pointer]: E
+        - generic [ref=e135]:
+          - button "日记" [ref=e136] [cursor=pointer]
+          - button "待办" [ref=e137] [cursor=pointer]
+        - generic [ref=e138]:
+          - button "AI 对话" [ref=e139] [cursor=pointer]:
+            - img "路路 Logo" [ref=e140]
+          - button "搜索" [ref=e169] [cursor=pointer]:
+            - img [ref=e170]
+          - button "通知" [ref=e173] [cursor=pointer]:
+            - img [ref=e174]
+    - main [ref=e177]:
+      - generic [ref=e942]:
+        - button "切换到项目视图" [ref=e1141] [cursor=pointer]:
+          - img [ref=e1142]
+        - generic [ref=e1144]:
+          - generic [ref=e1145]:
+            - generic [ref=e1146]: 星期日
+            - generic [ref=e1147]:
+              - generic [ref=e1148]: 4月 2026
+              - button [ref=e1149] [cursor=pointer]:
+                - img [ref=e1150]
+          - generic [ref=e1152]:
+            - button "一 30" [ref=e1153] [cursor=pointer]:
+              - generic [ref=e1154]: 一
+              - generic [ref=e1155]: "30"
+            - button "二 31" [ref=e1156] [cursor=pointer]:
+              - generic [ref=e1157]: 二
+              - generic [ref=e1158]: "31"
+            - button "三 1" [ref=e1161] [cursor=pointer]:
+              - generic [ref=e1162]: 三
+              - generic [ref=e1163]: "1"
+            - button "四 2" [ref=e1164] [cursor=pointer]:
+              - generic [ref=e1165]: 四
+              - generic [ref=e1166]: "2"
+            - button "五 3" [ref=e1169] [cursor=pointer]:
+              - generic [ref=e1170]: 五
+              - generic [ref=e1171]: "3"
+            - button "六 4" [ref=e1172] [cursor=pointer]:
+              - generic [ref=e1173]: 六
+              - generic [ref=e1174]: "4"
+            - button "日 5" [ref=e1175] [cursor=pointer]:
+              - generic [ref=e1176]: 日
+              - generic [ref=e1177]: "5"
+          - generic [ref=e1180]:
+            - button "随时 (0)" [ref=e1181] [cursor=pointer]:
+              - img [ref=e1182]
+              - text: 随时 (0)
+              - img [ref=e1185]
+            - button "今天随时可做的事" [ref=e1187] [cursor=pointer]:
+              - generic [ref=e1188]: 今天随时可做的事
+              - img [ref=e1190]
+          - generic [ref=e1191]:
+            - button "上午 (0)" [ref=e1192] [cursor=pointer]:
+              - img [ref=e1193]
+              - text: 上午 (0)
+              - img [ref=e1199]
+            - button "上午要做什么？" [ref=e1201] [cursor=pointer]:
+              - generic [ref=e1202]: 上午要做什么？
+              - img [ref=e1204]
+          - generic [ref=e1205]:
+            - button "下午 (0)" [ref=e1326] [cursor=pointer]:
+              - img [ref=e1207]
+              - text: 下午 (0)
+              - img [ref=e1213]
+            - generic [ref=e1235]:
+              - generic [ref=e1328]:
+                - generic [ref=e1329]:
+                  - img [ref=e1330]
+                  - generic [ref=e1332]: 完成
+                - generic [ref=e1333]:
+                  - button "推迟" [ref=e1334] [cursor=pointer]:
+                    - img [ref=e1335]
+                    - text: 推迟
+                  - button "删除" [ref=e1338] [cursor=pointer]:
+                    - img [ref=e1339]
+                    - text: 删除
+                - generic [ref=e1343]:
+                  - button [ref=e1344] [cursor=pointer]:
+                    - img [ref=e1345]
+                  - generic [ref=e1347] [cursor=pointer]:
+                    - generic [ref=e1348]: 给客户发邮件解释项目延期
+                    - generic [ref=e1350]: 明天
+              - button [ref=e1257] [cursor=pointer]:
+                - img [ref=e1258]
+          - generic [ref=e1219]:
+            - button "晚上 (3)" [ref=e1259] [cursor=pointer]:
+              - img [ref=e1221]
+              - text: 晚上 (3)
+              - img [ref=e1223]
+            - generic [ref=e1260]:
+              - generic [ref=e1261]:
+                - generic [ref=e1262]:
+                  - img [ref=e1263]
+                  - generic [ref=e1265]: 完成
+                - generic [ref=e1266]:
+                  - button "推迟" [ref=e1267] [cursor=pointer]:
+                    - img [ref=e1268]
+                    - text: 推迟
+                  - button "删除" [ref=e1271] [cursor=pointer]:
+                    - img [ref=e1272]
+                    - text: 删除
+                - generic [ref=e1276]:
+                  - button [ref=e1277] [cursor=pointer]
+                  - generic [ref=e1278] [cursor=pointer]:
+                    - generic [ref=e1279]: 和李总开会
+                    - generic [ref=e1281]: 明天
+              - generic [ref=e1282]:
+                - generic [ref=e1283]:
+                  - img [ref=e1284]
+                  - generic [ref=e1286]: 完成
+                - generic [ref=e1287]:
+                  - button "推迟" [ref=e1288] [cursor=pointer]:
+                    - img [ref=e1289]
+                    - text: 推迟
+                  - button "删除" [ref=e1292] [cursor=pointer]:
+                    - img [ref=e1293]
+                    - text: 删除
+                - generic [ref=e1297]:
+                  - button [ref=e1298] [cursor=pointer]
+                  - generic [ref=e1299] [cursor=pointer]:
+                    - generic [ref=e1300]: 今天晚上八点半吃药
+                    - generic [ref=e1302]: 明天
+              - generic [ref=e1303]:
+                - generic [ref=e1304]:
+                  - img [ref=e1305]
+                  - generic [ref=e1307]: 完成
+                - generic [ref=e1308]:
+                  - button "推迟" [ref=e1309] [cursor=pointer]:
+                    - img [ref=e1310]
+                    - text: 推迟
+                  - button "删除" [ref=e1313] [cursor=pointer]:
+                    - img [ref=e1314]
+                    - text: 删除
+                - generic [ref=e1318]:
+                  - button [ref=e1319] [cursor=pointer]
+                  - generic [ref=e1320] [cursor=pointer]:
+                    - generic [ref=e1321]: 吃药
+                    - generic [ref=e1323]: 明天
+              - button [ref=e1324] [cursor=pointer]:
+                - img [ref=e1325]
+    - button [ref=e1230] [cursor=pointer]:
+      - img [ref=e1231]
+    - button "Choose File" [ref=e735]

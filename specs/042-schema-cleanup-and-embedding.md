@@ -1,3 +1,13 @@
+---
+id: "055"
+title: "数据库 Schema 清理 + Embedding 持久化"
+status: completed
+domain: infra
+dependencies: []
+superseded_by: null
+created: 2026-03-23
+updated: 2026-03-30
+---
 # 042: 数据库 Schema 清理 + Embedding 持久化
 
 > 状态：✅ 已完成

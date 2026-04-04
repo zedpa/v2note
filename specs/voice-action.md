@@ -1,3 +1,13 @@
+---
+id: "101"
+title: "语音指令自动识别与执行"
+status: completed
+domain: voice
+dependencies: []
+superseded_by: null
+created: 2026-03-23
+updated: 2026-03-30
+---
 # 语音指令自动识别与执行
 
 > 状态：✅ 已完成 | 优先级：Phase 4.5（语音行动闭环）| 完成日期：2026-03-26

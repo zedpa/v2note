@@ -1,3 +1,13 @@
+---
+id: "084"
+title: "目标粒度处理——快路径 + 慢路径"
+status: active
+domain: goal
+dependencies: []
+superseded_by: null
+created: 2026-03-23
+updated: 2026-03-30
+---
 # 目标粒度处理——快路径 + 慢路径
 
 > 状态：✅ completed | 优先级：Phase 4 | 预计：4-5 天

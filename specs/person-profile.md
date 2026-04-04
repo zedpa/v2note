@@ -1,3 +1,13 @@
+---
+id: "093"
+title: "人物画像系统"
+status: active
+domain: cognitive
+dependencies: []
+superseded_by: null
+created: 2026-03-23
+updated: 2026-03-30
+---
 # 人物画像系统
 
 > 状态：✅ completed | 优先级：Phase 6 | 预计：4 天

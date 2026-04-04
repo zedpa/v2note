@@ -34,9 +34,20 @@ v2note/
 **所有新功能和 bug 修复，必须遵循以下 5 阶段流程：**
 
 ### Phase 1: 读取 Spec
-1. 查看 `specs/` 目录下是否存在对应的需求文件
-2. 如果没有 spec，先询问用户需求，然后基于 `specs/_template.md` 生成 spec
-3. Spec 使用 Given/When/Then 场景格式 + 接口约定 + 边界条件
+1. **必须**先用工具读取 `specs/INDEX.md`，按 domain 查找是否已有 active/draft 状态的 spec
+2. 如果已有同 domain 的 spec → 在已有文件中追加功能模块或场景，**禁止新建文件**
+3. 如果没有匹配的 spec → 先询问用户需求，然后基于 `specs/_template.md` 生成新 spec，并同步更新 INDEX.md
+4. Spec 使用 Given/When/Then 场景格式 + 接口约定 + 边界条件
+5. ⚠️ **强制约束**：在回答任何涉及功能逻辑、修改现有行为的请求前，必须使用工具读取 `specs/INDEX.md`。禁止凭空猜测现有的领域划分。
+6. **Spec 拆分规则**：当一个 spec 文件超过约 500 行时，应主动拆分为子域文件（如 `todo-core.md` + `todo-ui.md`）。这不是死规则，按需判断——如果内容紧密耦合不宜拆分可保持原样，但超长文件会削弱大模型的注意力，拆分后需在 INDEX.md 中标注子域关系，并将原文件标记为 `superseded`。
+
+### Bug 修复快捷流程
+对于 bug 修复任务，不要污染功能 spec，采用**临时 spec → 修复 → 回写**的流程：
+1. 在 `specs/` 下创建临时 spec 文件，命名 `fix-<简述>.md`，status 设为 `active`，记录 bug 现象、复现条件、修复方案
+2. 按正常 Phase 2-4 流程修复（写测试 → 实现 → 验证）
+3. 修复完成后，将修复结果（场景 + 边界条件）**回写到对应的模块 spec** 中（如 `todo-core.md`、`chat-system.md`）
+4. 临时 fix spec 标记为 `status: completed`，不再维护
+5. 同步更新 `INDEX.md`（添加时放 Active，完成后移到 Completed）
 
 ### Phase 2: 生成测试（先于实现代码）
 1. 根据 spec 中的每个场景，生成对应的测试用例

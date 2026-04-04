@@ -16,3 +16,13 @@ export function getLocalToday(): string {
 export function toLocalDate(ts: string): string {
   return toLocalDateStr(new Date(ts));
 }
+
+/**
+ * 将 scheduled_start 解析为本地 Date。
+ * AI 输出的时间是用户本地时间（如 "2026-04-04T20:30:00"），
+ * 但经过 PostgreSQL timestamptz 存储后变成 "2026-04-04T20:30:00.000Z"。
+ * 去掉 Z 后缀避免被浏览器当作 UTC 解析。
+ */
+export function parseScheduledTime(ts: string): Date {
+  return new Date(ts.replace(/Z$/i, ""));
+}

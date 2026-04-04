@@ -1,3 +1,8 @@
+---
+status: superseded
+superseded_by: "todo-system.md"
+---
+
 # 待办交互重构
 
 > 状态：🟡 待开发

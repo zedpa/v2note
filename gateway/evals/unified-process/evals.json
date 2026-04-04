@@ -1,0 +1,236 @@
+{
+  "skill_name": "unified-process",
+  "description": "Layer 3 统一处理链路的端到端评测",
+  "evals": [
+    {
+      "id": "time-exact-830pm",
+      "prompt": "今天晚上八点半提醒我吃药",
+      "category": "time_precision",
+      "assertions": [
+        { "field": "strikes[0].polarity", "op": "eq", "value": "intend" },
+        { "field": "todo.scheduled_start", "op": "time_contains", "value": "T20:30" },
+        { "field": "todo.text", "op": "contains", "value": "吃药" }
+      ]
+    },
+    {
+      "id": "time-exact-315pm",
+      "prompt": "明天下午三点一刻和李总开会",
+      "category": "time_precision",
+      "assertions": [
+        { "field": "strikes[0].polarity", "op": "eq", "value": "intend" },
+        { "field": "todo.scheduled_start", "op": "time_contains", "value": "T15:15" },
+        { "field": "todo.text", "op": "contains", "value": "李总" }
+      ]
+    },
+    {
+      "id": "time-exact-245pm",
+      "prompt": "后天下午两点四十五去机场接人",
+      "category": "time_precision",
+      "assertions": [
+        { "field": "strikes[0].polarity", "op": "eq", "value": "intend" },
+        { "field": "todo.scheduled_start", "op": "time_contains", "value": "T14:45" },
+        { "field": "todo.text", "op": "contains", "value": "机场" }
+      ]
+    },
+    {
+      "id": "time-morning-only",
+      "prompt": "明天上午去银行办卡",
+      "category": "time_precision",
+      "assertions": [
+        { "field": "strikes[0].polarity", "op": "eq", "value": "intend" },
+        { "field": "todo.scheduled_start", "op": "time_contains", "value": "T09:00" },
+        { "field": "todo.text", "op": "contains", "value": "银行" }
+      ]
+    },
+    {
+      "id": "time-exact-910am",
+      "prompt": "明天早上九点十分去面试",
+      "category": "time_precision",
+      "assertions": [
+        { "field": "strikes[0].polarity", "op": "eq", "value": "intend" },
+        { "field": "todo.scheduled_start", "op": "time_contains", "value": "T09:10" },
+        { "field": "todo.text", "op": "contains", "value": "面试" }
+      ]
+    },
+    {
+      "id": "polarity-perceive",
+      "prompt": "铝价又涨了百分之五",
+      "category": "polarity_correct",
+      "assertions": [
+        { "field": "strikes", "op": "length", "value": 1 },
+        { "field": "strikes[0].polarity", "op": "eq", "value": "perceive" },
+        { "field": "todos_created", "op": "eq", "value": 0 }
+      ]
+    },
+    {
+      "id": "polarity-judge",
+      "prompt": "我觉得这个方案不太靠谱，风险太大了",
+      "category": "polarity_correct",
+      "assertions": [
+        { "field": "strikes[0].polarity", "op": "eq", "value": "judge" },
+        { "field": "todos_created", "op": "eq", "value": 0 }
+      ]
+    },
+    {
+      "id": "polarity-realize",
+      "prompt": "突然想明白了，原来客户要的不是降价而是增值服务",
+      "category": "polarity_correct",
+      "assertions": [
+        { "field": "strikes[0].polarity", "op": "eq", "value": "realize" },
+        { "field": "todos_created", "op": "eq", "value": 0 }
+      ]
+    },
+    {
+      "id": "polarity-feel",
+      "prompt": "好累啊今天加班到十点",
+      "category": "polarity_correct",
+      "assertions": [
+        { "field": "strikes[0].polarity", "op": "eq", "value": "feel" },
+        { "field": "todos_created", "op": "eq", "value": 0 }
+      ]
+    },
+    {
+      "id": "polarity-intend-natural",
+      "prompt": "明天得把那个报告写完",
+      "category": "polarity_correct",
+      "assertions": [
+        { "field": "strikes[0].polarity", "op": "eq", "value": "intend" },
+        { "field": "todos_created", "op": "gte", "value": 1 }
+      ]
+    },
+    {
+      "id": "decomp-single-short",
+      "prompt": "今天心情不错",
+      "category": "decomposition",
+      "assertions": [
+        { "field": "strikes", "op": "length", "value": 1 }
+      ]
+    },
+    {
+      "id": "decomp-single-topic",
+      "prompt": "今天在公司和小王讨论了新版设计稿的配色问题",
+      "category": "decomposition",
+      "assertions": [
+        { "field": "strikes", "op": "length", "value": 1 }
+      ]
+    },
+    {
+      "id": "decomp-multi-list",
+      "prompt": "今天要做三件事：给妈妈打电话，把快递取了，还有把报告写完",
+      "category": "decomposition",
+      "assertions": [
+        { "field": "strikes", "op": "length_gte", "value": 3 },
+        { "field": "strikes_all_intend", "op": "eq", "value": true }
+      ]
+    },
+    {
+      "id": "decomp-mixed",
+      "prompt": "开会讨论了项目延期的问题老板不太高兴，提醒我明天上午给客户发邮件解释一下",
+      "category": "decomposition",
+      "assertions": [
+        { "field": "strikes", "op": "length_gte", "value": 2 },
+        { "field": "has_intend", "op": "eq", "value": true },
+        { "field": "has_non_intend", "op": "eq", "value": true }
+      ]
+    },
+    {
+      "id": "neg-past-event",
+      "prompt": "昨天和老王吃了顿火锅聊了很久",
+      "category": "negative_intend",
+      "assertions": [
+        { "field": "strikes[?].polarity", "op": "not_contains", "value": "intend" },
+        { "field": "todos_created", "op": "eq", "value": 0 }
+      ]
+    },
+    {
+      "id": "neg-opinion",
+      "prompt": "我觉得北京的冬天越来越冷了",
+      "category": "negative_intend",
+      "assertions": [
+        { "field": "strikes[?].polarity", "op": "not_contains", "value": "intend" },
+        { "field": "todos_created", "op": "eq", "value": 0 }
+      ]
+    },
+    {
+      "id": "neg-emotion-only",
+      "prompt": "特别开心，升职了",
+      "category": "negative_intend",
+      "assertions": [
+        { "field": "strikes[0].polarity", "op": "eq", "value": "feel" },
+        { "field": "todos_created", "op": "eq", "value": 0 }
+      ]
+    },
+    {
+      "id": "neg-past-completion",
+      "prompt": "刚把那个方案写完了，终于搞定",
+      "category": "negative_intend",
+      "assertions": [
+        { "field": "todos_created", "op": "eq", "value": 0 }
+      ]
+    },
+    {
+      "id": "goal-match-hit",
+      "prompt": "融资的BP需要改一下财务预测部分",
+      "category": "goal_match",
+      "assertions": [
+        { "field": "strikes[0].polarity", "op": "eq", "value": "intend" },
+        { "field": "strike_has_goal_id", "op": "eq", "value": true, "note": "应匹配到'完成融资'目标" }
+      ]
+    },
+    {
+      "id": "goal-match-miss",
+      "prompt": "今天路上看到一只很可爱的猫",
+      "category": "goal_match",
+      "assertions": [
+        { "field": "strike_has_goal_id", "op": "eq", "value": false, "note": "无匹配目标，进收集箱" }
+      ]
+    },
+    {
+      "id": "goal-match-ambiguous",
+      "prompt": "下周要去看牙医",
+      "category": "goal_match",
+      "assertions": [
+        { "field": "strikes[0].polarity", "op": "eq", "value": "intend" },
+        { "field": "todos_created", "op": "gte", "value": 1 },
+        { "field": "strike_has_goal_id", "op": "eq", "value": false, "note": "与现有目标无关" }
+      ]
+    },
+    {
+      "id": "bond-causal",
+      "prompt": "原料涨价了百分之二十，得赶紧找供应商重新谈价格",
+      "category": "bond_quality",
+      "assertions": [
+        { "field": "strikes", "op": "length_gte", "value": 2 },
+        { "field": "bonds", "op": "length_gte", "value": 1 },
+        { "field": "bonds[0].type", "op": "in", "value": ["triggers", "causal"] }
+      ]
+    },
+    {
+      "id": "bond-no-bond-independent",
+      "prompt": "今天天气不错。晚上想吃火锅",
+      "category": "bond_quality",
+      "assertions": [
+        { "field": "strikes", "op": "length_gte", "value": 2 },
+        { "field": "bonds", "op": "length", "value": 0, "note": "天气和吃火锅无逻辑关系" }
+      ]
+    },
+    {
+      "id": "bond-elaborates",
+      "prompt": "供应链要优化，先从物流环节入手降低成本",
+      "category": "bond_quality",
+      "assertions": [
+        { "field": "strikes", "op": "length_gte", "value": 2 },
+        { "field": "bonds", "op": "length_gte", "value": 1 },
+        { "field": "bonds[0].type", "op": "eq", "value": "elaborates" }
+      ]
+    },
+    {
+      "id": "bond-no-bond-feel",
+      "prompt": "好烦啊，项目又延期了",
+      "category": "bond_quality",
+      "assertions": [
+        { "field": "feel_not_in_bond", "op": "eq", "value": true, "note": "feel strike 不参与 bond" }
+      ]
+    }
+  ]
+}

@@ -1,3 +1,8 @@
+---
+status: superseded
+superseded_by: "auth.md"
+---
+
 # Auth 加固：登录保持 + 竞态修复 + 体验优化
 
 > 状态：🔵 Phase 1-2 已完成，Phase 3-4 待开发

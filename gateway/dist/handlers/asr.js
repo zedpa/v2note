@@ -41,7 +41,7 @@ const sessions = new Map();
  * - realtime: spawn Python realtime ASR subprocess for streaming recognition.
  * - upload: just accumulate PCM chunks; transcribe when recording stops.
  */
-export async function startASR(clientWs, deviceId, locationText, mode = "realtime", notebook, userId) {
+export async function startASR(clientWs, deviceId, locationText, mode = "realtime", notebook, userId, sourceContext) {
     const asrT0 = Date.now();
     const apiKey = process.env.DASHSCOPE_API_KEY;
     if (!apiKey)
@@ -77,6 +77,7 @@ export async function startASR(clientWs, deviceId, locationText, mode = "realtim
         preFlushBuffer: [],
         saveAudio: false,
         startTime: Date.now(),
+        sourceContext,
     };
     sessions.set(deviceId, session);
     console.log(`[asr][⏱ session-create] ${Date.now() - asrT0}ms`);
@@ -415,11 +416,18 @@ async function finishUploadASR(clientWs, deviceId, expectedTaskId) {
  * Shared logic: create record + transcript, trigger AI processing.
  */
 async function createRecordAndProcess(clientWs, session, transcript, durationSeconds) {
+    // 根据 sourceContext 决定 record source 类型
+    // Layer 1 (todo 页面) 和 Layer 2 (上滑指令) 创建隐藏 record
+    const recordSource = session.sourceContext === "todo"
+        ? "todo_voice"
+        : session.forceCommand
+            ? "command_voice"
+            : "voice";
     const record = await recordRepo.create({
         device_id: session.deviceId,
         user_id: session.userId,
         status: "processing",
-        source: "voice",
+        source: recordSource,
         duration_seconds: durationSeconds,
         location_text: session.locationText,
         notebook: session.notebook,
@@ -462,6 +470,7 @@ async function createRecordAndProcess(clientWs, session, transcript, durationSec
         recordId: record.id,
         notebook: session.notebook,
         forceCommand: session.forceCommand,
+        sourceContext: session.sourceContext,
     })
         .then(async (result) => {
         console.log(`[asr] Process result for ${record.id}: ${JSON.stringify(result)}`);

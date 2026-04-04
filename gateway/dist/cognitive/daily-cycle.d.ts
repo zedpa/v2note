@@ -14,6 +14,7 @@ export interface CognitiveCycleResult {
         salience: number;
     } | null;
     report: CognitiveReport | null;
+    recurringInstances: number;
 }
 export declare function runDailyCognitiveCycle(userId: string, opts?: {
     deviceId?: string;

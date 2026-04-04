@@ -1,106 +1,131 @@
 # V2Note Roadmap
 
-> 最后更新：2026-04-03
+> 最后更新：2026-04-04
+> 数据来源：`specs/INDEX.md` + 代码实际状态核验
 
-## Auth Hardening
+## ✅ 已完成 — 代码已落地
 
-Spec: `specs/auth-hardening.md`
+### 认知引擎（全部完成）
+- [x] **涌现全生命周期** — 5阶段完整：吸收/释放/清理/创建/合并 (`emergence-lifecycle.md`)
+- [x] **知识生命周期** — 新旧覆盖检测+撤销+告警 (`knowledge-lifecycle.md`)
+- [x] **Strike 提取** — 5极性分类+复杂文本拆分+素材降权 (`strike-extraction.md`)
+- [x] **人物画像** — 高频检测+行为模式+参谋注入 (`person-profile.md`)
+- [x] **Record 层级标签** — JSONB存储+batch刷新+L2>L1>L3优先级 (`record-hierarchy-tags.md`)
 
-- [x] Phase 1: Refresh Token 竞态锁 + Token 过期延长 (access 2h / refresh 30d)
-- [x] Phase 2: 登录/注册 UX 强化（记住账号、自动登录、密码强度、错误提示优化）
-- [ ] Phase 3: 注册事务保护 — createUser + linkDevice + issueTokens 原子化，失败回滚
-- [ ] Phase 4: 短信验证码、忘记密码/重置密码、多设备管理
+### 目标体系（全部完成）
+- [x] **目标全生命周期** — 列表/详情/创建/归档/健康4D (`goal-lifecycle.md`)
+- [x] **目标自动关联** — 全量扫描+增量+健康计算+项目汇总 (`goal-auto-link.md`)
+- [x] **目标粒度** — 快路径(action/goal/project)+慢路径(intend密度涌现) (`goal-granularity.md`)
+- [x] **顶层维度** — 种子维度+关键词匹配+统一模型 (`top-level-dimensions.md`)
 
-## Unified Daily Report (统一日报系统)
+### Auth（全部完成）
+- [x] **Token & Session** — 2h access/30d refresh/并发锁/主动续期 (`auth-core.md`)
+- [x] **UX & Registration** — 记住手机号/自动登录/密码可见/失败计数 (`auth-ux.md`)
 
-Spec: `specs/unified-daily-report.md`
+### 其他已完成
+- [x] **Cold Start & Onboarding** — AI五问+欢迎种子+早期Bond检测 (`cold-start.md`)
+- [x] **Daily Report Core** — 晨报/晚报/视角轮换/认知注入 (`daily-report-core.md`)
 
-- [x] Phase 1: 合并早晚报 + Prompt 外置 + 统一 API (`/api/v1/report?mode=auto`)
-  - 前端 SmartDailyReport 组件、侧边栏合并为单一"日报"入口
-  - Soul 自适应语气、视角轮换（晚间）、prompt 模板 (.md)
-- [ ] Phase 2: 周报 + 月报 + 历史存档
-  - weekly/monthly handler 实现
-  - daily_briefing 表加 user_id 列 + 新 type 支持
-  - 历史报告查询 API + 前端页面
-  - 周报定时触发（每周日 20:00）、月报定时触发（每月1日 09:00）
-- [ ] Phase 3: 增强
-  - 晚间注入用户今日原始记录 (record.transcript) 供 AI 引用
-  - 周报引用晚间 cognitive_highlights
-  - 月报引用周报 top_moments
-  - 报告质量校验（headline 长度、引用检查）
+---
 
-## Todo UI Redesign (待办重构)
+## 🟡 Active — 已部分实现，仍需推进
 
-- [ ] 双视图：今日卡片 + 项目卡片
-- [ ] 新设计稿驱动（详见 memory: project_todo_redesign.md）
+### Todo System (~85%)
+- [x] 核心数据流：TodoDTO完整字段、goal_title JOIN、subtask计数
+- [x] AI提取：粒度判断、时间/人物/优先级提取、voice-action分类
+- [x] 去重：dedupCreate() embedding匹配 (阈值0.65)
+- [x] 时间解析：buildDateAnchor()、时间槽分配、时区修复(Z后缀)
+- [x] Strike关联：intend投射、strike_id回填
+- [x] UI双视图：TimeView+ProjectView、日历条、滑动手势、优先级选择器
+- [ ] **子任务前端展示** — 后端就绪(parent_id/counts)，前端折叠/展开UI待做
+- [ ] **项目视图瀑布流** — ProjectView待重写
+- [ ] **voice-action统一tool路径** — 未完全复用Chat tool handler
 
-## Chat UI Redesign (聊天界面重构)
+### Chat System (~70%)
+- [x] UI重构：消息气泡、毛玻璃输入栏、AI状态呼吸点
+- [x] 问候个性化：加载最近记录+待办生成上下文问候
+- [x] AI处理状态：引用计数+衰减定时器+绝对超时
+- [ ] **WebSocket事件流验证** — todo.created → endAiPipeline 集成待验证
 
-Spec: `specs/chat-ui-redesign.md`
+### Daily Report Extended (~40%)
+- [x] 认知洞察注入（Phase 1）
+- [ ] **周报/月报** — 未开始
+- [ ] **历史报告页** — 未开始
+- [ ] **通知Hook** — 未开始
 
-- [ ] Phase 1: 顶部极简 — "路路" + AI 呼吸状态灯，去掉副标题
-- [ ] Phase 2: 对话区质感 — 头像品牌色底板、非对称圆角气泡、1.6 行高
-- [ ] Phase 3: 底部控制中心 — 去 N 按钮、胶囊输入框、麦克风突出、毛玻璃
-- [ ] Phase 4: 滚动锁定 — 进入即锁 body，键盘不推页面
+### Voice Routing (~60%)
+- [x] 三层路由骨架：sourceContext/forceCommand/AI分类
+- [x] Layer 1(todo模式)+Layer 2(命令模式) 已实现
+- [ ] **Layer 3 regex预过滤移除** — ACTION_PATTERNS仍在使用，应改为全部AI分类
+- [ ] **用户设置联动** — confirm_before_execute 定义了但UI集成待完善
 
-## Android 状态栏适配 (全机型兼容)
+### Voice Todo Extension (~50%)
+- [x] TodoCommand接口定义(create/complete/modify/query)
+- [x] AI提取prompt(todo-extract-prompt.ts)
+- [ ] **确认弹窗UI** — command-sheet.tsx 不存在
+- [ ] **提醒系统** — DB schema(reminder_*)未迁移，调度未实现
+- [ ] **周期任务** — DB schema(recurrence_*)未迁移
 
-已知问题: 荣耀 Magic 7 全面屏模式下 App 内容侵入系统状态栏
+### 主题生命周期 (~85%)
+- [x] 侧边栏列表、全局过滤、生命周期视图(4阶段)
+- [x] 脉络Tab、种子晋升、沉默区唤醒、Tier2孵化
+- [ ] **Harvest AI摘要生成** — 结构就绪，生成逻辑待完成
 
-根因分析:
-- Android 15 (targetSdk 35) 强制启用 Edge-to-Edge，`overlaysWebView: false` 无效
-- `env(safe-area-inset-top)` 在 Android WebView (Chromium <140) 中返回 0
-- `.pt-safe` fallback 24px 可能不足以覆盖所有机型状态栏高度
+### Mobile App (~65%)
+- [x] 整体结构、日记/待办视图、FAB录音、侧边栏基本结构
+- [x] Chat页面完整实现、Onboarding AI对话、登录/登出
+- [ ] **设计语言落地** — 触控44px规则未执行、无press反馈、emoji未替换SVG
+- [ ] **Discovery页** — 空白（缺/topics API）
+- [ ] **/timeline Runtime Error** — "Objects are not valid as React child"
+- [ ] **通知持久化** — 仅内存，无持久层
+- [ ] **AI伴侣窗口** — 仅占位符，状态机未实现
+- [ ] **PC端导航** — 页面间零导航
 
-### 方案 A: 短期修复 — opt-out Edge-to-Edge（已执行）
+### UI/UX 审查 (审查100%, 修复0%)
+- [x] 审查已完成并文档化(7类问题)
+- [ ] **触控目标** — 7个元素<44px (🔴 CRITICAL)
+- [ ] **无障碍** — ARIA/对比度/reduced-motion 全缺
+- [ ] **按压反馈** — 所有按钮/卡片无active状态
+- [ ] **PC端导航** — 侧边栏缺失 (🔴 CRITICAL)
+- [ ] **空状态** — 5个页面无引导
+- [ ] **字体加载** — @import阻塞渲染
 
-在 `android/app/src/main/res/values/styles.xml` 的 AppTheme.NoActionBar 中添加:
-```xml
-<item name="android:windowOptOutEdgeToEdgeEnforcement">true</item>
-```
-优点: 改动最小，一行 XML，下次打包即生效
-缺点: Android 未来版本可能移除此 opt-out 开关
+---
 
-- [x] styles.xml 添加 windowOptOutEdgeToEdgeEnforcement
-- [ ] 荣耀 Magic 7 用户验证
+## 🔵 Active — 尚未开始实施
 
-### 方案 B: 长期方案 — @capacitor-community/safe-area 插件
+### 基础设施
+- [ ] **附件持久化 + RAG** — Phase 2-3 (`attachment-persistence.md`)
+- [ ] **并发扩容** — 阿里云方案 (`concurrency-scaling.md`)
 
-安装 `@capacitor-community/safe-area`，由原生层注入真实 `--safe-area-inset-*` CSS 变量，
-全项目 CSS 从 `env(safe-area-inset-top)` 迁移到 `var(--safe-area-inset-top, 24px)`。
+### UI
+- [ ] **移动端行动面板** (`mobile-action-panel.md`)
+- [ ] **留存分析** (`onboarding-retention-analytics.md`)
 
-- [ ] 安装插件: `pnpm add @capacitor-community/safe-area && npx cap sync`
-- [ ] globals.css: `.pt-safe` / `.pb-safe` 改用 `var(--safe-area-inset-top)` + fallback
-- [ ] 全项目 inline `env(safe-area-inset-top)` 替换为 CSS 变量
-- [ ] 移除 styles.xml 中的 opt-out（不再需要）
-- [ ] 全机型测试（荣耀/OPPO/vivo/小米/三星）
+---
 
-## 录音功能 (暂不修复)
+## 🟡 Draft — 规划中
 
-已知问题: 聊天界面麦克风按钮点击无反应
+- [ ] 发现页 (`discovery-page.md`)
+- [ ] 外部数据源集成 (`external-integration.md`)
+- [ ] 鸿蒙适配 (`harmony-support.md`)
+- [ ] 阅读器 (`reader.md`)
 
-现状:
-- `ChatView` 中的 `toggleVoice()` 使用浏览器 Web Speech API (`SpeechRecognition`)
-- Android WebView 中 `SpeechRecognition` API 不可用，`hasSpeechAPI` 为 false 时按钮隐藏
-- 当 `hasSpeechAPI` 意外为 true 但实际不工作时，点击无反应
-- 与主录音功能（FAB → capacitor-voice-recorder）是不同的实现路径
+---
 
-后续方向:
-- [ ] 聊天内语音输入改用 capacitor-voice-recorder + ASR（与主录音一致）
-- [ ] 或集成 DashScope 实时语音识别（已有 ASR handler）
+## 📋 已知问题（非 spec，跟踪用）
 
-## Attachment Persistence (附件持久化)
+- Android 状态栏侵入（Magic 7）— 短期 XML opt-out 已执行，长期需 safe-area 插件
+- Chat 语音录入 Android WebView 不可用 — 需迁移到 capacitor-voice-recorder
+- /goals 标题显示 AI reasoning 文本（数据泄漏）
+- 13个overlay组件在页面加载时全量导入（应改为dynamic import）
 
-Spec: `specs/attachment-persistence.md`
+---
 
-- [x] Phase 1: OSS URL + 文件名存储、timeline 图标、detail 预览
-- [ ] Phase 2: 文档分块 + RAG 检索（document_chunk 表、hybridRetrieve 扩展）
-- [ ] Phase 3: 检索增强（query rewriting、cross-encoder、多粒度索引）
+## 🎯 建议优先级（下一步）
 
-## Fixes Completed (本轮已修复)
-
-- [x] Daily Briefing HTTP 500: pg Date 对象 `.startsWith()` 崩溃
-- [x] Chat AI 响应挂起: stream 超时保护 + chat.done 兜底
-- [x] Auth 错误状态泄漏: 切换登录/注册时 clearError
-- [x] 项目详情双关闭按钮: 移除重复 × 按钮
-- [x] Refresh Token 竞态: 并发刷新锁
+1. **UI/UX 修复** — 触控44px + press反馈（用户体感直接提升，工作量小）
+2. **子任务前端** — 后端已完备，前端折叠展开即可落地
+3. **/timeline 崩溃修复** — 阻断功能
+4. **Voice 确认弹窗** — 打通语音→待办最后一公里
+5. **周报/月报** — Daily Report 自然延伸

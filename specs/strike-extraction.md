@@ -1,3 +1,13 @@
+---
+id: "098"
+title: "Strike 提取（Strike Extraction）"
+status: active
+domain: cognitive
+dependencies: []
+superseded_by: null
+created: 2026-03-23
+updated: 2026-03-23
+---
 # Strike 提取（Strike Extraction）
 
 > 状态：✅ 已完成（Phase 1 规则引擎）

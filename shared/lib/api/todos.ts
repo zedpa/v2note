@@ -28,6 +28,10 @@ export async function createTodo(fields: {
   parent_id?: string;
   level?: number;
   status?: string;
+  reminder_before?: number | null;
+  reminder_types?: string[] | null;
+  recurrence_rule?: string | null;
+  recurrence_end?: string | null;
 }): Promise<{ id: string }> {
   return api.post("/api/v1/todos", fields);
 }
@@ -49,6 +53,10 @@ export async function updateTodo(
     ai_actionable?: boolean;
     ai_action_plan?: string[];
     parent_id?: string | null;
+    reminder_before?: number | null;
+    reminder_types?: string[] | null;
+    recurrence_rule?: string | null;
+    recurrence_end?: string | null;
   },
 ): Promise<void> {
   await api.patch(`/api/v1/todos/${id}`, fields);

@@ -1,3 +1,13 @@
+---
+id: "095"
+title: "Record 层级标签 — 从涌现结构反向标注"
+status: active
+domain: cognitive
+dependencies: []
+superseded_by: null
+created: 2026-03-23
+updated: 2026-04-01
+---
 # Record 层级标签 — 从涌现结构反向标注
 
 > Status: ✅ completed

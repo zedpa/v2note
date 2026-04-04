@@ -1,3 +1,13 @@
+---
+id: "057"
+title: "参谋上下文合并"
+status: completed
+domain: chat
+dependencies: []
+superseded_by: null
+created: 2026-03-23
+updated: 2026-03-30
+---
 # 参谋上下文合并
 
 > 状态：✅ completed | 优先级：Phase 5 | 预计：3-4 天

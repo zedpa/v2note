@@ -49,7 +49,7 @@ export function registerCognitiveClusterRoutes(router) {
             return;
         }
         // Members with tags
-        const members = await query(`SELECT s.id, s.nucleus, s.polarity, s.confidence, s.created_at
+        const members = await query(`SELECT s.id, s.nucleus, s.polarity, s.confidence, s.field, s.created_at
        FROM strike s
        JOIN bond cm ON cm.target_strike_id = s.id AND cm.type = 'cluster_member'
        WHERE cm.source_strike_id = $1 AND s.status = 'active'

@@ -1,3 +1,8 @@
+---
+status: superseded
+superseded_by: "daily-report.md"
+---
+
 # 统一日报系统：早晚合并 + 周/月报 + 历史存档
 
 > 状态：🔵 Phase 1 已完成，Phase 2-3 待开发

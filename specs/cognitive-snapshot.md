@@ -1,3 +1,13 @@
+---
+id: "068"
+title: "认知快照 — 增量分析基础设施"
+status: completed
+domain: cognitive
+dependencies: []
+superseded_by: null
+created: 2026-03-23
+updated: 2026-03-30
+---
 # 认知快照 — 增量分析基础设施
 
 > 状态：✅ completed | 优先级：Phase 0（最高优先，cognitive-engine-v2 前置）

@@ -1,3 +1,13 @@
+---
+id: "065"
+title: "附件系统：持久化 → UI → 文档 RAG"
+status: active
+domain: infra
+dependencies: []
+superseded_by: null
+created: 2026-03-23
+updated: 2026-04-02
+---
 # 附件系统：持久化 → UI → 文档 RAG
 
 > 状态：🟡 Phase 1 待开发

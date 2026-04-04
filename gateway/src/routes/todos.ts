@@ -27,42 +27,51 @@ export function registerTodoRoutes(router: Router) {
       parent_id?: string;
       level?: number;
       status?: string;
+      priority?: number;
+      reminder_before?: number | null;
+      reminder_types?: string[] | null;
+      recurrence_rule?: string | null;
+      recurrence_end?: string | null;
     }>(_req);
     const userId = getUserId(_req) ?? undefined;
     const deviceId = getDeviceId(_req);
-    // level=0 走去重，level>=1 走 createWithDedup
+
+    // 计算 reminder_at：reminder_before（分钟）+ scheduled_start → 自动推算
+    let reminder_at: string | undefined;
+    if (body.reminder_before && body.reminder_before > 0 && body.scheduled_start) {
+      reminder_at = new Date(
+        new Date(body.scheduled_start).getTime() - body.reminder_before * 60000,
+      ).toISOString();
+    }
+
+    const shared = {
+      record_id: body.record_id || null,
+      text: body.text,
+      domain: body.domain,
+      impact: body.impact,
+      goal_id: body.goal_id,
+      scheduled_start: body.scheduled_start,
+      estimated_minutes: body.estimated_minutes,
+      parent_id: body.parent_id,
+      level: body.level,
+      status: body.status,
+      priority: body.priority,
+      reminder_at,
+      reminder_before: body.reminder_before ?? undefined,
+      reminder_types: body.reminder_types ?? undefined,
+      recurrence_rule: body.recurrence_rule ?? undefined,
+      recurrence_end: body.recurrence_end ?? undefined,
+      user_id: userId,
+      device_id: deviceId,
+    };
+
+    // level=0 走去重，level>=1 走 create
     const isGoal = (body.level ?? 0) >= 1;
     if (isGoal) {
-      const todo = await todoRepo.create({
-        record_id: body.record_id || null,
-        text: body.text,
-        domain: body.domain,
-        impact: body.impact,
-        goal_id: body.goal_id,
-        scheduled_start: body.scheduled_start,
-        estimated_minutes: body.estimated_minutes,
-        parent_id: body.parent_id,
-        level: body.level,
-        status: body.status,
-        user_id: userId,
-        device_id: deviceId,
-      });
+      const todo = await todoRepo.create(shared);
       sendJson(res, { id: todo.id }, 201);
     } else {
-      const { todo, action } = await todoRepo.dedupCreate({
-        record_id: body.record_id || null,
-        text: body.text,
-        domain: body.domain,
-        impact: body.impact,
-        goal_id: body.goal_id,
-        scheduled_start: body.scheduled_start,
-        estimated_minutes: body.estimated_minutes,
-        parent_id: body.parent_id,
-        level: body.level,
-        status: body.status,
-        user_id: userId,
-        device_id: deviceId,
-      });
+      const { todo, action } = await todoRepo.dedupCreate(shared);
       sendJson(res, { id: todo.id, deduplicated: action === "matched" }, action === "matched" ? 200 : 201);
     }
   });
@@ -85,8 +94,30 @@ export function registerTodoRoutes(router: Router) {
       level?: number;
       status?: string;
       domain?: string;
+      reminder_before?: number | null;
+      reminder_types?: string[] | null;
+      recurrence_rule?: string | null;
+      recurrence_end?: string | null;
     }>(req);
-    await todoRepo.update(params.id, body);
+
+    // 计算 reminder_at
+    const updateFields: Record<string, any> = { ...body };
+    if (body.reminder_before === null) {
+      // 清除提醒
+      updateFields.reminder_at = null;
+      updateFields.reminder_types = null;
+    } else if (body.reminder_before && body.reminder_before > 0 && body.scheduled_start) {
+      // 同时传 reminder_before + scheduled_start → 重算
+      updateFields.reminder_at = new Date(
+        new Date(body.scheduled_start).getTime() - body.reminder_before * 60000,
+      ).toISOString();
+    }
+
+    await todoRepo.update(params.id, updateFields);
+    // scheduled_start 变更时重算 reminder_at（处理只改时间未传 reminder_before 的场景）
+    if (body.scheduled_start !== undefined && body.reminder_before === undefined) {
+      await todoRepo.recalcReminderAt(params.id);
+    }
     // todo 完成时触发双向一致性：降低 Strike salience
     if (body.done === true) {
       onTodoComplete(params.id).catch((e) =>

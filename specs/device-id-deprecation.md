@@ -1,3 +1,8 @@
+---
+status: superseded
+superseded_by: "auth.md"
+---
+
 # device_id 身份职责下线
 
 > 状态：✅ 已完成 | 优先级：P1（数据隔离安全）

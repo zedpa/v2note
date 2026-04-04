@@ -1,12 +1,13 @@
 import type { TodoDTO, ProjectGroup, TimeSlotGroup } from "./todo-types";
 import { assignTimeSlot, TIME_SLOTS, type TimeSlot } from "./time-slots";
-import { toLocalDate } from "./date-utils";
+import { toLocalDate, toLocalDateStr, parseScheduledTime } from "./date-utils";
 
 export function filterByDate(todos: TodoDTO[], dateStr: string): TodoDTO[] {
   return todos.filter((t) => {
     if (t.level > 0) return false; // 项目/目标不在时间视图
 
-    if (t.scheduled_start) return toLocalDate(t.scheduled_start) === dateStr;
+    // scheduled_start 是用户本地时间（去 Z 解析），created_at 是真实 UTC
+    if (t.scheduled_start) return toLocalDateStr(parseScheduledTime(t.scheduled_start)) === dateStr;
     if (t.created_at) return toLocalDate(t.created_at) === dateStr;
     return false;
   });

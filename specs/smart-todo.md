@@ -1,3 +1,8 @@
+---
+status: superseded
+superseded_by: "todo-system.md"
+---
+
 # 智能待办 — 从认知到行动的核心桥梁
 
 > 状态：✅ 已完成 | 优先级：Phase 4（核心体验）

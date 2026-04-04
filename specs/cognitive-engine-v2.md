@@ -1,3 +1,13 @@
+---
+id: "067"
+title: "认知引擎 v2 — 单次批量分析"
+status: completed
+domain: cognitive
+dependencies: []
+superseded_by: null
+created: 2026-03-23
+updated: 2026-03-30
+---
 # 认知引擎 v2 — 单次批量分析
 
 > 状态：✅ completed | 优先级：Phase 0（最高优先）

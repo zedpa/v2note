@@ -1,3 +1,8 @@
+---
+status: superseded
+superseded_by: "todo-system.md"
+---
+
 # 待办提取质量修复
 
 > 状态：✅ 已完成

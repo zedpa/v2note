@@ -3,12 +3,19 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "overrides": {
+    "mem0ai": {
+      "@types/pg": "$@types/pg",
+      "pg": "$pg"
+    }
+  },
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "eval:unified": "tsx evals/unified-process/run-eval.ts"
   },
   "dependencies": {
     "@ai-sdk/openai": "^3.0.41",
@@ -27,6 +34,7 @@
     "mem0ai": "^2.2.4",
     "pdf-parse": "^2.4.5",
     "pg": "^8.18.0",
+    "resend": "^6.10.0",
     "ws": "^8.18.0",
     "xlsx": "^0.18.5"
   },

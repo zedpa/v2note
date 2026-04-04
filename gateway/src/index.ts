@@ -3,7 +3,7 @@ import { availableParallelism } from "node:os";
 import { createServer } from "node:http";
 import { WebSocketServer, WebSocket } from "ws";
 import { config } from "dotenv";
-import { processEntry, type ProcessPayload, type ProcessResult } from "./handlers/process.js";
+import { processEntry, refineTodoCommands, type ProcessPayload, type ProcessResult } from "./handlers/process.js";
 import { todoRepo } from "./db/repositories/index.js";
 import { startChat, sendChatMessage, endChat, type ChatStartPayload } from "./handlers/chat.js";
 import { aggregateTodos } from "./handlers/todo.js";
@@ -86,10 +86,11 @@ type GatewayMessage =
   | { type: "chat.message"; payload: { text: string; deviceId: string } }
   | { type: "chat.end"; payload: { deviceId: string } }
   | { type: "todo.aggregate"; payload: { deviceId: string } }
-  | { type: "asr.start"; payload: { deviceId: string; locationText?: string; mode?: ASRMode; notebook?: string } }
+  | { type: "asr.start"; payload: { deviceId: string; locationText?: string; mode?: ASRMode; notebook?: string; sourceContext?: "todo" | "timeline" | "chat" | "review" } }
   | { type: "asr.stop"; payload: { deviceId: string; saveAudio?: boolean; forceCommand?: boolean } }
   | { type: "asr.cancel"; payload: { deviceId: string } }
-  | { type: "action.confirm_reply"; payload: { deviceId: string; confirm_id: string; confirmed: boolean } };
+  | { type: "action.confirm_reply"; payload: { deviceId: string; confirm_id: string; confirmed: boolean } }
+  | { type: "todo.refine"; payload: { deviceId: string; commands: any[]; modificationText: string } };
 
 type GatewayResponse =
   | { type: "process.result"; payload: ProcessResult }
@@ -375,10 +376,10 @@ wss.on("connection", (ws) => {
         }
 
         case "asr.start": {
-          console.log(`[asr.start] notebook=${msg.payload.notebook}, mode=${msg.payload.mode}`);
+          console.log(`[asr.start] notebook=${msg.payload.notebook}, mode=${msg.payload.mode}, sourceContext=${msg.payload.sourceContext}`);
           connectionDeviceMap.set(ws, msg.payload.deviceId);
           proactiveEngine.registerDevice(msg.payload.deviceId, ws, authedUserId);
-          await startASR(ws, msg.payload.deviceId, msg.payload.locationText, msg.payload.mode, msg.payload.notebook, authedUserId);
+          await startASR(ws, msg.payload.deviceId, msg.payload.locationText, msg.payload.mode, msg.payload.notebook, authedUserId, msg.payload.sourceContext);
           break;
         }
 
@@ -396,6 +397,17 @@ wss.on("connection", (ws) => {
           if (deviceId) {
             cancelASR(deviceId, ws);
             connectionDeviceMap.delete(ws);
+          }
+          break;
+        }
+
+        case "todo.refine": {
+          try {
+            const refined = await refineTodoCommands(msg.payload.commands, msg.payload.modificationText);
+            send(ws, { type: "process.result", payload: { todo_commands: refined, voice_intent_type: "action" } });
+          } catch (err: any) {
+            console.error(`[gateway] todo.refine error:`, err.message);
+            send(ws, { type: "error", payload: { message: `修改失败: ${err.message}` } });
           }
           break;
         }

@@ -21,6 +21,9 @@ export interface Record {
   updated_at: string;
 }
 
+// v2: 过滤待办页/指令模式创建的隐藏 record（仅用于溯源，不在日记列表展示）
+const HIDDEN_SOURCES_CLAUSE = `AND source NOT IN ('todo_voice', 'command_voice')`;
+
 export async function findByDevice(
   deviceId: string,
   opts?: { archived?: boolean; limit?: number; offset?: number; notebook?: string | null },
@@ -44,6 +47,7 @@ export async function findByDevice(
   const offset = opts?.offset ?? 0;
   return query<Record>(
     `SELECT * FROM record WHERE ${conditions.join(" AND ")}
+     ${HIDDEN_SOURCES_CLAUSE}
      ORDER BY created_at DESC LIMIT $${i++} OFFSET $${i}`,
     [...params, limit, offset],
   );
@@ -72,6 +76,7 @@ export async function findByUser(
   const offset = opts?.offset ?? 0;
   return query<Record>(
     `SELECT * FROM record WHERE ${conditions.join(" AND ")}
+     ${HIDDEN_SOURCES_CLAUSE}
      ORDER BY created_at DESC LIMIT $${i++} OFFSET $${i}`,
     [...params, limit, offset],
   );
@@ -85,6 +90,7 @@ export async function findByUserAndDateRange(
   return query<Record>(
     `SELECT * FROM record WHERE user_id = $1
      AND created_at >= $2 AND created_at <= $3
+     ${HIDDEN_SOURCES_CLAUSE}
      ORDER BY created_at ASC`,
     [userId, start, end],
   );
@@ -196,6 +202,7 @@ export async function search(
      LEFT JOIN summary s ON s.record_id = r.id
      WHERE r.device_id = $1
        AND (t.text ILIKE $2 OR s.title ILIKE $2 OR s.short_summary ILIKE $2)
+       AND r.source NOT IN ('todo_voice', 'command_voice')
      ORDER BY r.created_at DESC
      LIMIT 50`,
     [deviceId, `%${q}%`],
@@ -212,6 +219,7 @@ export async function searchByUser(
      LEFT JOIN summary s ON s.record_id = r.id
      WHERE r.user_id = $1
        AND (t.text ILIKE $2 OR s.title ILIKE $2 OR s.short_summary ILIKE $2)
+       AND r.source NOT IN ('todo_voice', 'command_voice')
      ORDER BY r.created_at DESC
      LIMIT 50`,
     [userId, `%${q}%`],
@@ -333,6 +341,7 @@ export async function findByDeviceAndDateRange(
   return query<Record>(
     `SELECT * FROM record WHERE device_id = $1
      AND created_at >= $2 AND created_at <= $3
+     ${HIDDEN_SOURCES_CLAUSE}
      ORDER BY created_at ASC`,
     [deviceId, start, end],
   );

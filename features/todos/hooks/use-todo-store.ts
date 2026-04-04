@@ -138,7 +138,7 @@ export function useTodoStore() {
       let newStart: string;
       if (todo.scheduled_start) {
         // 保留原时间，日期推到明天
-        const orig = new Date(todo.scheduled_start);
+        const orig = new Date(todo.scheduled_start.replace(/Z$/i, ""));
         tomorrow.setHours(orig.getHours(), orig.getMinutes(), 0, 0);
         newStart = tomorrow.toISOString();
       } else {

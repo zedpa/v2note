@@ -1,3 +1,13 @@
+---
+id: "080"
+title: "外部数据源集成"
+status: draft
+domain: infra
+dependencies: []
+superseded_by: null
+created: 2026-03-23
+updated: 2026-03-30
+---
 # 外部数据源集成
 
 > 状态：🟡 设计阶段 | 优先级：Phase 6+ | 预计：待评估

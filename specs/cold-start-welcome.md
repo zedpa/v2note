@@ -1,3 +1,8 @@
+---
+status: superseded
+superseded_by: "cold-start.md"
+---
+
 # 冷启动欢迎体验
 
 > 状态：✅ 已完成 | 优先级：P0 | 依赖：cold-start-onboarding✅ | 完成日期：2026-03-31

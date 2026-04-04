@@ -1,3 +1,13 @@
+---
+id: "071"
+title: "并发扩容方案（阿里云版）"
+status: active
+domain: infra
+dependencies: []
+superseded_by: null
+created: 2026-03-23
+updated: 2026-04-01
+---
 # 并发扩容方案（阿里云版）
 
 > 状态：🔵 Phase 1 已实现

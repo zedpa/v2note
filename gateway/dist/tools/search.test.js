@@ -35,6 +35,8 @@ function mockRecord(id, overrides) {
         created_at: "2026-03-20T10:00:00Z",
         updated_at: "2026-03-20T10:00:00Z",
         user_id: null,
+        file_url: null,
+        file_name: null,
         ...overrides,
     };
 }

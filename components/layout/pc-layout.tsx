@@ -47,7 +47,7 @@ export function PCLayout({ children }: { children: React.ReactNode }) {
   }
 
   if (!loggedIn) {
-    return <LoginPage onLogin={login} onSwitchToRegister={() => {}} error={authError} />;
+    return <LoginPage onLogin={login} onLoginWithEmail={() => Promise.resolve()} onSwitchToRegister={() => {}} onForgotPassword={() => {}} error={authError} />;
   }
 
   return (

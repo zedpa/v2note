@@ -1,3 +1,8 @@
+---
+status: superseded
+superseded_by: "todo-system.md"
+---
+
 # 待办数据通路修复 — 前端字段映射 + API 类型 + goal_title
 
 > 状态：✅ 已完成 | 优先级：P0（其他待办面板修复的前提）

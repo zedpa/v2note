@@ -1,3 +1,13 @@
+---
+id: "073"
+title: "设计对齐 — Phase 8 P1 Spec"
+status: completed
+domain: design
+dependencies: []
+superseded_by: null
+created: 2026-03-23
+updated: 2026-03-30
+---
 # 设计对齐 — Phase 8 P1 Spec
 
 > 状态：🟡 待开发

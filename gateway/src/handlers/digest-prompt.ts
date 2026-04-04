@@ -41,7 +41,7 @@ ${dateAnchor}
   - action: 单步可执行，有明确动作（"明天给张总打电话"）
   - goal: 多步、长期、可衡量（"今年把身体搞好"）
   - project: 复合方向（"做一个供应链管理系统"）
-- scheduled_start?: ISO 时间 — 从时间锚点表查到的绝对日期+时间
+- scheduled_start?: ISO 时间 — 优先用户原话精确到分钟，参照锚点表解析优先级
 - deadline?: ISO 日期 — "这周之内""月底前"
 - person?: string
 - priority?: "high" | "medium" | "low" — 仅从用户语气推断（"挺急的"→high, "不着急"→low, 无明确信号→不填）

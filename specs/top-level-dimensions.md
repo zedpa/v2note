@@ -1,3 +1,13 @@
+---
+id: "100"
+title: "顶层维度——统一模型实现"
+status: active
+domain: goal
+dependencies: []
+superseded_by: null
+created: 2026-03-23
+updated: 2026-03-30
+---
 # 顶层维度——统一模型实现
 
 > 状态：✅ 已完成 | 优先级：Phase 3

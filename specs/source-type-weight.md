@@ -1,3 +1,13 @@
+---
+id: "097"
+title: "source_type 权重全链路落地"
+status: completed
+domain: cognitive
+dependencies: []
+superseded_by: null
+created: 2026-03-23
+updated: 2026-03-30
+---
 # source_type 权重全链路落地
 
 > 状态：⚠️ 部分完成（retrieval降权✅，clustering未过滤material）| 优先级：Phase 1

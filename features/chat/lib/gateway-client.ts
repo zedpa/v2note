@@ -22,7 +22,7 @@ export interface LocalConfigPayload {
 
 export type GatewayMessage =
   | { type: "auth"; payload: { token: string; deviceId: string } }
-  | { type: "process"; payload: { text: string; deviceId: string; recordId: string; localConfig?: LocalConfigPayload } }
+  | { type: "process"; payload: { text: string; deviceId: string; recordId?: string; sourceContext?: string; localConfig?: LocalConfigPayload } }
   | {
       type: "chat.start";
       payload: {
@@ -38,10 +38,11 @@ export type GatewayMessage =
   | { type: "chat.message"; payload: { text: string; deviceId: string } }
   | { type: "chat.end"; payload: { deviceId: string } }
   | { type: "todo.aggregate"; payload: { deviceId: string } }
-  | { type: "asr.start"; payload: { deviceId: string; locationText?: string; mode?: "realtime" | "upload"; notebook?: string } }
+  | { type: "asr.start"; payload: { deviceId: string; locationText?: string; mode?: "realtime" | "upload"; notebook?: string; sourceContext?: "todo" | "timeline" | "chat" | "review" } }
   | { type: "asr.stop"; payload: { deviceId: string; saveAudio?: boolean; forceCommand?: boolean } }
   | { type: "asr.cancel"; payload: { deviceId: string } }
-  | { type: "plan.confirm"; payload: { deviceId: string; planId: string; action: "execute_all" | "execute_modified" | "abandon"; modifications?: Array<{ stepIndex: number; description?: string; deleted?: boolean }> } };
+  | { type: "plan.confirm"; payload: { deviceId: string; planId: string; action: "execute_all" | "execute_modified" | "abandon"; modifications?: Array<{ stepIndex: number; description?: string; deleted?: boolean }> } }
+  | { type: "todo.refine"; payload: { deviceId: string; commands: any[]; modificationText: string } };
 
 export type GatewayResponse =
   | { type: "process.result"; payload: Record<string, unknown> }
@@ -263,6 +264,13 @@ export class GatewayClient {
     };
   }
 
+  /** 注入模拟消息（e2e 测试用） */
+  injectMessage(msg: GatewayResponse): void {
+    for (const handler of this.handlers) {
+      handler(msg);
+    }
+  }
+
   disconnect(): void {
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
@@ -325,6 +333,10 @@ let instance: GatewayClient | null = null;
 export function getGatewayClient(): GatewayClient {
   if (!instance) {
     instance = new GatewayClient();
+    // 暴露到 window 以便 e2e 测试注入消息
+    if (typeof window !== "undefined") {
+      (window as any).__gatewayClient = instance;
+    }
   }
   return instance;
 }

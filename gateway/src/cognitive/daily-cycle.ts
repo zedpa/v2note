@@ -9,11 +9,13 @@ import { runBatchAnalyze, type BatchAnalyzeResult } from "./batch-analyze.js";
 import { normalizeBondTypes, decayBondStrength, decaySalience } from "./maintenance.js";
 import { generateCognitiveReport, type CognitiveReport } from "./report.js";
 import { appendToDiary } from "../diary/manager.js";
+import * as todoRepo from "../db/repositories/todo.js";
 
 export interface CognitiveCycleResult {
   batchAnalyze: BatchAnalyzeResult | null;
   maintenance: { normalized: number; decayed: number; salience: number } | null;
   report: CognitiveReport | null;
+  recurringInstances: number;
 }
 
 export async function runDailyCognitiveCycle(
@@ -25,6 +27,17 @@ export async function runDailyCognitiveCycle(
   let batchResult: BatchAnalyzeResult | null = null;
   let maintenance: CognitiveCycleResult["maintenance"] = null;
   let report: CognitiveReport | null = null;
+
+  // Step 0: 生成今日的周期任务实例
+  let recurringInstances = 0;
+  try {
+    recurringInstances = await generateRecurringInstances(userId, opts?.deviceId);
+    if (recurringInstances > 0) {
+      console.log(`[cognitive] Generated ${recurringInstances} recurring task instances`);
+    }
+  } catch (err) {
+    console.error("[cognitive] Recurring instance generation failed:", err);
+  }
 
   // Step 1: 批量分析（替代 clustering + emergence + contradiction + promote + tag-sync）
   try {
@@ -91,5 +104,62 @@ export async function runDailyCognitiveCycle(
     console.error("[cognitive] Failed to save cognitive digest:", err);
   }
 
-  return { batchAnalyze: batchResult, maintenance, report };
+  return { batchAnalyze: batchResult, maintenance, report, recurringInstances };
+}
+
+// ── 周期任务实例生成 ──────────────────────────────────────────────
+
+/** 解析 recurrence_rule，判断指定日期是否命中 */
+function matchesRecurrenceRule(rule: string, date: Date): boolean {
+  const dayOfWeek = date.getDay(); // 0=Sun, 1=Mon...6=Sat
+  const dayOfMonth = date.getDate();
+
+  if (rule === "daily") return true;
+  if (rule === "weekdays") return dayOfWeek >= 1 && dayOfWeek <= 5;
+
+  if (rule.startsWith("weekly:")) {
+    const days = rule.slice(7).split(",").map(Number);
+    return days.includes(dayOfWeek);
+  }
+
+  if (rule.startsWith("monthly:")) {
+    const targetDay = parseInt(rule.slice(8), 10);
+    return dayOfMonth === targetDay;
+  }
+
+  return false;
+}
+
+/** 为指定用户生成今日的周期任务实例 */
+async function generateRecurringInstances(
+  userId: string,
+  deviceId?: string,
+): Promise<number> {
+  const templates = await todoRepo.findRecurrenceTemplates({
+    userId,
+    deviceId,
+  });
+
+  if (templates.length === 0) return 0;
+
+  const today = new Date();
+  const todayStr = today.toISOString().split("T")[0];
+  let created = 0;
+
+  for (const template of templates) {
+    if (!template.recurrence_rule) continue;
+
+    // 检查是否命中今天
+    if (!matchesRecurrenceRule(template.recurrence_rule, today)) continue;
+
+    // 检查今天是否已有实例
+    const exists = await todoRepo.hasInstanceForDate(template.id, todayStr);
+    if (exists) continue;
+
+    // 创建实例
+    await todoRepo.createRecurrenceInstance(template, todayStr);
+    created++;
+  }
+
+  return created;
 }

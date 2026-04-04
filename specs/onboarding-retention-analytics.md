@@ -1,3 +1,13 @@
+---
+id: "092"
+title: "冷启动五问与留存分析"
+status: active
+domain: onboarding
+dependencies: []
+superseded_by: null
+created: 2026-03-23
+updated: 2026-04-01
+---
 # 冷启动五问与留存分析
 
 > 状态：🟡 待开发

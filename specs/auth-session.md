@@ -1,3 +1,8 @@
+---
+status: superseded
+superseded_by: "auth.md"
+---
+
 # 登出与会话管理
 
 > 状态：✅ 已完成

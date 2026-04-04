@@ -1,3 +1,13 @@
+---
+id: "058"
+title: "Agent Plan 机制"
+status: completed
+domain: agent
+dependencies: []
+superseded_by: null
+created: 2026-03-23
+updated: 2026-03-30
+---
 # Agent Plan 机制
 
 > 状态：✅ 后端+前端基础完成 | 优先级：Phase 2.5（Agent 基础能力）

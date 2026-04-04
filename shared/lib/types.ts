@@ -5,8 +5,10 @@ export interface AuthIdentity {
 
 export interface AppUser {
   id: string
-  phone: string
+  phone: string | null
+  email: string | null
   displayName: string | null
+  avatarUrl: string | null
   createdAt: string
 }
 

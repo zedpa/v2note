@@ -1,3 +1,13 @@
+---
+id: "063"
+title: "批注系统"
+status: deprecated
+domain: ui
+dependencies: []
+superseded_by: null
+created: 2026-03-23
+updated: 2026-03-30
+---
 # 批注系统
 
 > 状态：🔴 未实现（后端工具函数在，前端UI组件从未创建）| 优先级：Phase 5

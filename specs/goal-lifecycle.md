@@ -1,3 +1,13 @@
+---
+id: "085"
+title: "目标全生命周期"
+status: active
+domain: goal
+dependencies: []
+superseded_by: null
+created: 2026-03-23
+updated: 2026-03-30
+---
 # 目标全生命周期
 
 > 状态：⚠️ 部分完成（核心CRUD✅，Skip→alert和7天result追踪不完整）| 优先级：Phase 4（目标闭环）

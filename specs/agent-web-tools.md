@@ -1,3 +1,13 @@
+---
+id: "061"
+title: "Agent 联网工具"
+status: completed
+domain: agent
+dependencies: []
+superseded_by: null
+created: 2026-03-23
+updated: 2026-03-30
+---
 # Agent 联网工具
 
 > 状态：✅ 已完成 | 优先级：Phase 2.5（Agent 基础能力）| 完成日期：2026-03-24

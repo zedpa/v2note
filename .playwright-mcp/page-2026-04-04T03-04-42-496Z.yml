@@ -1,0 +1,436 @@
+- generic [active] [ref=e1]:
+  - button "Open Next.js Dev Tools" [ref=e77] [cursor=pointer]:
+    - img [ref=e78]
+  - alert [ref=e81]
+  - generic [ref=e131]:
+    - banner [ref=e132]:
+      - generic [ref=e133]:
+        - button "打开侧边栏" [ref=e134] [cursor=pointer]: E
+        - generic [ref=e135]:
+          - button "日记" [ref=e136] [cursor=pointer]
+          - button "待办" [ref=e137] [cursor=pointer]
+        - generic [ref=e138]:
+          - button "AI 对话" [ref=e139] [cursor=pointer]:
+            - img "路路 Logo" [ref=e140]
+          - button "搜索" [ref=e169] [cursor=pointer]:
+            - img [ref=e170]
+          - button "通知" [ref=e173] [cursor=pointer]:
+            - img [ref=e174]
+    - main [ref=e177]:
+      - generic [ref=e179]:
+        - generic [ref=e180]:
+          - generic [ref=e181]:
+            - generic [ref=e182]: "2"
+            - generic [ref=e183]: 4月 周四
+          - generic [ref=e184]:
+            - button "20:13 · 文字 · 版本说明 v0.1 能做什么、还不能做什么" [ref=e185] [cursor=pointer]:
+              - generic [ref=e187]:
+                - generic [ref=e188]:
+                  - generic [ref=e189]: 20:13
+                  - generic [ref=e190]: ·
+                  - img [ref=e191]
+                  - generic [ref=e193]: 文字
+                  - generic [ref=e194]: ·
+                  - generic [ref=e195]: 版本说明
+                - paragraph [ref=e198]: v0.1 能做什么、还不能做什么
+            - button "20:12 · 文字 · 功能介绍 录入、管理、对话——所有操作一看就会" [ref=e199] [cursor=pointer]:
+              - generic [ref=e201]:
+                - generic [ref=e202]:
+                  - generic [ref=e203]: 20:12
+                  - generic [ref=e204]: ·
+                  - img [ref=e205]
+                  - generic [ref=e207]: 文字
+                  - generic [ref=e208]: ·
+                  - generic [ref=e209]: 功能介绍
+                - paragraph [ref=e212]: 录入、管理、对话——所有操作一看就会
+            - button "20:11 · 文字 · 写给你的信 产品 动机 UI 用户体验 版本规划 v0.1 功能范围 为什么要做这个产品" [ref=e213] [cursor=pointer]:
+              - generic [ref=e215]:
+                - generic [ref=e216]:
+                  - generic [ref=e217]: 20:11
+                  - generic [ref=e218]: ·
+                  - img [ref=e219]
+                  - generic [ref=e221]: 文字
+                  - generic [ref=e222]: ·
+                  - generic [ref=e223]: 写给你的信
+                  - generic [ref=e224]: 产品
+                  - generic [ref=e225]: 动机
+                  - generic [ref=e226]: UI
+                  - generic [ref=e227]: 用户体验
+                  - generic [ref=e228]: 版本规划
+                  - generic [ref=e229]: v0.1
+                  - generic [ref=e230]: 功能范围
+                - paragraph [ref=e233]: 为什么要做这个产品
+            - button "08:30 · 文字 · 版本说明 v0.1 能做什么、还不能做什么" [ref=e234] [cursor=pointer]:
+              - generic [ref=e236]:
+                - generic [ref=e237]:
+                  - generic [ref=e238]: 08:30
+                  - generic [ref=e239]: ·
+                  - img [ref=e240]
+                  - generic [ref=e242]: 文字
+                  - generic [ref=e243]: ·
+                  - generic [ref=e244]: 版本说明
+                - paragraph [ref=e247]: v0.1 能做什么、还不能做什么
+            - button "08:29 · 文字 · 功能介绍 录入、管理、对话——所有操作一看就会" [ref=e248] [cursor=pointer]:
+              - generic [ref=e250]:
+                - generic [ref=e251]:
+                  - generic [ref=e252]: 08:29
+                  - generic [ref=e253]: ·
+                  - img [ref=e254]
+                  - generic [ref=e256]: 文字
+                  - generic [ref=e257]: ·
+                  - generic [ref=e258]: 功能介绍
+                - paragraph [ref=e261]: 录入、管理、对话——所有操作一看就会
+            - button "08:28 · 文字 · 写给你的信 产品 动机 UX 功能 v0.1 MVP 功能范围 为什么要做这个产品" [ref=e262] [cursor=pointer]:
+              - generic [ref=e264]:
+                - generic [ref=e265]:
+                  - generic [ref=e266]: 08:28
+                  - generic [ref=e267]: ·
+                  - img [ref=e268]
+                  - generic [ref=e270]: 文字
+                  - generic [ref=e271]: ·
+                  - generic [ref=e272]: 写给你的信
+                  - generic [ref=e273]: 产品
+                  - generic [ref=e274]: 动机
+                  - generic [ref=e275]: UX
+                  - generic [ref=e276]: 功能
+                  - generic [ref=e277]: v0.1
+                  - generic [ref=e278]: MVP
+                  - generic [ref=e279]: 功能范围
+                - paragraph [ref=e282]: 为什么要做这个产品
+        - generic [ref=e283]:
+          - generic [ref=e284]:
+            - generic [ref=e285]: "1"
+            - generic [ref=e286]: 4月 周三
+          - generic [ref=e287]:
+            - button "12:00 · 文字 · 版本说明 v0.1 能做什么、还不能做什么" [ref=e288] [cursor=pointer]:
+              - generic [ref=e290]:
+                - generic [ref=e291]:
+                  - generic [ref=e292]: 12:00
+                  - generic [ref=e293]: ·
+                  - img [ref=e294]
+                  - generic [ref=e296]: 文字
+                  - generic [ref=e297]: ·
+                  - generic [ref=e298]: 版本说明
+                - paragraph [ref=e301]: v0.1 能做什么、还不能做什么
+            - button "11:59 · 文字 · 功能介绍 说出来的每一句话，都会变为行动" [ref=e302] [cursor=pointer]:
+              - generic [ref=e304]:
+                - generic [ref=e305]:
+                  - generic [ref=e306]: 11:59
+                  - generic [ref=e307]: ·
+                  - img [ref=e308]
+                  - generic [ref=e310]: 文字
+                  - generic [ref=e311]: ·
+                  - generic [ref=e312]: 功能介绍
+                - paragraph [ref=e315]: 说出来的每一句话，都会变为行动
+            - button "11:58 · 文字 · 写给你的信 产品 上班族 编程 语言 行动 v0.1 功能边界 一个不会编程的上班族，为什么下班后要做这个产品" [ref=e316] [cursor=pointer]:
+              - generic [ref=e318]:
+                - generic [ref=e319]:
+                  - generic [ref=e320]: 11:58
+                  - generic [ref=e321]: ·
+                  - img [ref=e322]
+                  - generic [ref=e324]: 文字
+                  - generic [ref=e325]: ·
+                  - generic [ref=e326]: 写给你的信
+                  - generic [ref=e327]: 产品
+                  - generic [ref=e328]: 上班族
+                  - generic [ref=e329]: 编程
+                  - generic [ref=e330]: 语言
+                  - generic [ref=e331]: 行动
+                  - generic [ref=e332]: v0.1
+                  - generic [ref=e333]: 功能边界
+                - paragraph [ref=e336]: 一个不会编程的上班族，为什么下班后要做这个产品
+        - generic [ref=e337]:
+          - generic [ref=e338]:
+            - generic [ref=e339]: "31"
+            - generic [ref=e340]: 3月 周二
+          - generic [ref=e341]:
+            - button "00:30 · 文字 我：[系统指令] 用户刚进入对话界面，请生成一段个性化问候。 当前时间：4/1星期三 00:20（深夜） 问候策略：语气关怀，不强行引导规划或复盘，可以关心用户为什么还没休息 以下是用户最近的记录，用于生成贴切的问候： 最近日记摘要： [2026/3/31] 念念有路是你的个人认知操作系统。 你可以把任何想法丢进来——散乱的感想、工作计划、读书笔记、生活碎片，甚至一段语音。" [ref=e342] [cursor=pointer]:
+              - generic [ref=e344]:
+                - generic [ref=e345]:
+                  - generic [ref=e346]: 00:30
+                  - generic [ref=e347]: ·
+                  - img [ref=e348]
+                  - generic [ref=e350]: 文字
+                - generic [ref=e352]:
+                  - paragraph [ref=e353]: 我：[系统指令] 用户刚进入对话界面，请生成一段个性化问候。
+                  - paragraph [ref=e354]: 当前时间：4/1星期三 00:20（深夜） 问候策略：语气关怀，不强行引导规划或复盘，可以关心用户为什么还没休息
+                  - paragraph [ref=e355]:
+                    - text: 以下是用户最近的记录，用于生成贴切的问候： 最近日记摘要： [2026/3/31]
+                    - strong [ref=e356]: 念念有路
+                    - text: 是你的个人认知操作系统。
+                  - paragraph [ref=e357]:
+                    - text: 你可以把
+                    - strong [ref=e358]: 任何想法
+                    - text: 丢进来——散乱的感想、工作计划、读书笔记、生活碎片，甚至一段语音。
+            - button "23:55 · 0:04 · 打老虎 行动 我要上山打老虎，记住了吗？ 0:00" [ref=e359] [cursor=pointer]:
+              - generic [ref=e361]:
+                - generic [ref=e362]:
+                  - generic [ref=e363]: 23:55
+                  - generic [ref=e364]: ·
+                  - img [ref=e365]
+                  - generic [ref=e368]: 0:04
+                  - generic [ref=e369]: ·
+                  - generic [ref=e370]: 打老虎
+                  - generic [ref=e371]: 行动
+                - paragraph [ref=e374]: 我要上山打老虎，记住了吗？
+                - generic [ref=e376]:
+                  - button [ref=e377]:
+                    - img [ref=e378]
+                  - generic [ref=e401]: 0:00
+            - button "23:34 · 文字 我：[系统指令] 用户刚进入对话界面，请生成一段个性化问候。 当前时间：3/31星期二 23:32（晚上） 问候策略：推测用户可能想复盘或总结今天，引用具体的日记或待办事项 以下是用户最近的记录，用于生成贴切的问候： 最近日记摘要： [2026/3/31] 念念有路是你的个人认知操作系统。 你可以把任何想法丢进来——散乱的感想、工作计划、读书笔记、生活碎片，甚至一段语音。不" [ref=e402] [cursor=pointer]:
+              - generic [ref=e404]:
+                - generic [ref=e405]:
+                  - generic [ref=e406]: 23:34
+                  - generic [ref=e407]: ·
+                  - img [ref=e408]
+                  - generic [ref=e410]: 文字
+                - generic [ref=e412]:
+                  - paragraph [ref=e413]: 我：[系统指令] 用户刚进入对话界面，请生成一段个性化问候。
+                  - paragraph [ref=e414]: 当前时间：3/31星期二 23:32（晚上） 问候策略：推测用户可能想复盘或总结今天，引用具体的日记或待办事项
+                  - paragraph [ref=e415]:
+                    - text: 以下是用户最近的记录，用于生成贴切的问候： 最近日记摘要： [2026/3/31]
+                    - strong [ref=e416]: 念念有路
+                    - text: 是你的个人认知操作系统。
+                  - paragraph [ref=e417]:
+                    - text: 你可以把
+                    - strong [ref=e418]: 任何想法
+                    - text: 丢进来——散乱的感想、工作计划、读书笔记、生活碎片，甚至一段语音。不
+            - button "23:14 · 文字 我：[系统指令] 用户刚进入对话界面，请生成一段个性化问候。 当前时间：3/31星期二 23:09（晚上） 问候策略：推测用户可能想复盘或总结今天，引用具体的日记或待办事项 以下是用户最近的记录，用于生成贴切的问候： 最近日记摘要： [2026/3/31] 念念有路是你的个人认知操作系统。 你可以把任何想法丢进来——散乱的感想、工作计划、读书笔记、生活碎片，甚至一段语音。不" [ref=e419] [cursor=pointer]:
+              - generic [ref=e421]:
+                - generic [ref=e422]:
+                  - generic [ref=e423]: 23:14
+                  - generic [ref=e424]: ·
+                  - img [ref=e425]
+                  - generic [ref=e427]: 文字
+                - generic [ref=e429]:
+                  - paragraph [ref=e430]: 我：[系统指令] 用户刚进入对话界面，请生成一段个性化问候。
+                  - paragraph [ref=e431]: 当前时间：3/31星期二 23:09（晚上） 问候策略：推测用户可能想复盘或总结今天，引用具体的日记或待办事项
+                  - paragraph [ref=e432]:
+                    - text: 以下是用户最近的记录，用于生成贴切的问候： 最近日记摘要： [2026/3/31]
+                    - strong [ref=e433]: 念念有路
+                    - text: 是你的个人认知操作系统。
+                  - paragraph [ref=e434]:
+                    - text: 你可以把
+                    - strong [ref=e435]: 任何想法
+                    - text: 丢进来——散乱的感想、工作计划、读书笔记、生活碎片，甚至一段语音。不
+            - button "23:08 · 文字 · 创始人 写给你的信 写给每一位用户的信——关于念念有路的初心" [ref=e436] [cursor=pointer]:
+              - generic [ref=e438]:
+                - generic [ref=e439]:
+                  - generic [ref=e440]: 23:08
+                  - generic [ref=e441]: ·
+                  - img [ref=e442]
+                  - generic [ref=e444]: 文字
+                  - generic [ref=e445]: ·
+                  - generic [ref=e446]: 创始人
+                  - generic [ref=e447]: 写给你的信
+                - paragraph [ref=e450]: 写给每一位用户的信——关于念念有路的初心
+            - button "23:07 · 文字 · 路路的故事 产品理念 为什么我们要做一个「认知操作系统」" [ref=e451] [cursor=pointer]:
+              - generic [ref=e453]:
+                - generic [ref=e454]:
+                  - generic [ref=e455]: 23:07
+                  - generic [ref=e456]: ·
+                  - img [ref=e457]
+                  - generic [ref=e459]: 文字
+                  - generic [ref=e460]: ·
+                  - generic [ref=e461]: 路路的故事
+                  - generic [ref=e462]: 产品理念
+                - paragraph [ref=e465]: 为什么我们要做一个「认知操作系统」
+            - button "23:06 · 文字 · 功能介绍 产品指南 念念有路 核心功能 认知操作系统 初心 用户沟通 念念有路的核心功能——混沌输入、结构涌现、AI 陪伴" [ref=e466] [cursor=pointer]:
+              - generic [ref=e468]:
+                - generic [ref=e469]:
+                  - generic [ref=e470]: 23:06
+                  - generic [ref=e471]: ·
+                  - img [ref=e472]
+                  - generic [ref=e474]: 文字
+                  - generic [ref=e475]: ·
+                  - generic [ref=e476]: 功能介绍
+                  - generic [ref=e477]: 产品指南
+                  - generic [ref=e478]: 念念有路
+                  - generic [ref=e479]: 核心功能
+                  - generic [ref=e480]: 认知操作系统
+                  - generic [ref=e481]: 初心
+                  - generic [ref=e482]: 用户沟通
+                - paragraph [ref=e485]: 念念有路的核心功能——混沌输入、结构涌现、AI 陪伴
+            - button "22:54 · 文字 · 创始人 写给你的信 写给每一位用户的信——关于念念有路的初心" [ref=e486] [cursor=pointer]:
+              - generic [ref=e488]:
+                - generic [ref=e489]:
+                  - generic [ref=e490]: 22:54
+                  - generic [ref=e491]: ·
+                  - img [ref=e492]
+                  - generic [ref=e494]: 文字
+                  - generic [ref=e495]: ·
+                  - generic [ref=e496]: 创始人
+                  - generic [ref=e497]: 写给你的信
+                - paragraph [ref=e500]: 写给每一位用户的信——关于念念有路的初心
+            - button "22:53 · 文字 · 路路的故事 产品理念 为什么我们要做一个「认知操作系统」" [ref=e501] [cursor=pointer]:
+              - generic [ref=e503]:
+                - generic [ref=e504]:
+                  - generic [ref=e505]: 22:53
+                  - generic [ref=e506]: ·
+                  - img [ref=e507]
+                  - generic [ref=e509]: 文字
+                  - generic [ref=e510]: ·
+                  - generic [ref=e511]: 路路的故事
+                  - generic [ref=e512]: 产品理念
+                - paragraph [ref=e515]: 为什么我们要做一个「认知操作系统」
+            - button "22:52 · 文字 · 功能介绍 产品指南 念念有路 功能 认知操作系统 初心 用户沟通 念念有路的核心功能——混沌输入、结构涌现、AI 陪伴" [ref=e516] [cursor=pointer]:
+              - generic [ref=e518]:
+                - generic [ref=e519]:
+                  - generic [ref=e520]: 22:52
+                  - generic [ref=e521]: ·
+                  - img [ref=e522]
+                  - generic [ref=e524]: 文字
+                  - generic [ref=e525]: ·
+                  - generic [ref=e526]: 功能介绍
+                  - generic [ref=e527]: 产品指南
+                  - generic [ref=e528]: 念念有路
+                  - generic [ref=e529]: 功能
+                  - generic [ref=e530]: 认知操作系统
+                  - generic [ref=e531]: 初心
+                  - generic [ref=e532]: 用户沟通
+                - paragraph [ref=e535]: 念念有路的核心功能——混沌输入、结构涌现、AI 陪伴
+            - button "22:22 · 文字 · 创始人 写给你的信 写给每一位用户的信——关于念念有路的初心" [ref=e536] [cursor=pointer]:
+              - generic [ref=e538]:
+                - generic [ref=e539]:
+                  - generic [ref=e540]: 22:22
+                  - generic [ref=e541]: ·
+                  - img [ref=e542]
+                  - generic [ref=e544]: 文字
+                  - generic [ref=e545]: ·
+                  - generic [ref=e546]: 创始人
+                  - generic [ref=e547]: 写给你的信
+                - paragraph [ref=e550]: 写给每一位用户的信——关于念念有路的初心
+            - button "22:21 · 文字 · 路路的故事 产品理念 为什么我们要做一个「认知操作系统」" [ref=e551] [cursor=pointer]:
+              - generic [ref=e553]:
+                - generic [ref=e554]:
+                  - generic [ref=e555]: 22:21
+                  - generic [ref=e556]: ·
+                  - img [ref=e557]
+                  - generic [ref=e559]: 文字
+                  - generic [ref=e560]: ·
+                  - generic [ref=e561]: 路路的故事
+                  - generic [ref=e562]: 产品理念
+                - paragraph [ref=e565]: 为什么我们要做一个「认知操作系统」
+            - button "22:20 · 文字 · 功能介绍 产品指南 念念有路 核心功能 认知操作系统 初心 用户信 念念有路的核心功能——混沌输入、结构涌现、AI 陪伴" [ref=e566] [cursor=pointer]:
+              - generic [ref=e568]:
+                - generic [ref=e569]:
+                  - generic [ref=e570]: 22:20
+                  - generic [ref=e571]: ·
+                  - img [ref=e572]
+                  - generic [ref=e574]: 文字
+                  - generic [ref=e575]: ·
+                  - generic [ref=e576]: 功能介绍
+                  - generic [ref=e577]: 产品指南
+                  - generic [ref=e578]: 念念有路
+                  - generic [ref=e579]: 核心功能
+                  - generic [ref=e580]: 认知操作系统
+                  - generic [ref=e581]: 初心
+                  - generic [ref=e582]: 用户信
+                - paragraph [ref=e585]: 念念有路的核心功能——混沌输入、结构涌现、AI 陪伴
+            - button "20:30 · 文字 我：[系统指令] 用户刚进入对话界面，请生成一段个性化问候。 当前时间：3/31星期二 20:26（晚上） 问候策略：推测用户可能想复盘或总结今天，引用具体的日记或待办事项 （用户暂无最近的日记和待办记录） 要求： 简短（2-4句话），自然口语化，像朋友打招呼 如果有具体日记或待办内容，引用其中1-2个具体事项（不要泛泛而谈） 如果没有数据，就简单问候 + 引导用户聊聊或记录点" [ref=e586] [cursor=pointer]:
+              - generic [ref=e588]:
+                - generic [ref=e589]:
+                  - generic [ref=e590]: 20:30
+                  - generic [ref=e591]: ·
+                  - img [ref=e592]
+                  - generic [ref=e594]: 文字
+                - generic [ref=e596]:
+                  - paragraph [ref=e597]: 我：[系统指令] 用户刚进入对话界面，请生成一段个性化问候。
+                  - paragraph [ref=e598]: 当前时间：3/31星期二 20:26（晚上） 问候策略：推测用户可能想复盘或总结今天，引用具体的日记或待办事项
+                  - paragraph [ref=e599]: （用户暂无最近的日记和待办记录）
+                  - paragraph [ref=e600]: 要求：
+                  - list [ref=e601]:
+                    - listitem [ref=e602]: 简短（2-4句话），自然口语化，像朋友打招呼
+                    - listitem [ref=e603]: 如果有具体日记或待办内容，引用其中1-2个具体事项（不要泛泛而谈）
+                    - listitem [ref=e604]: 如果没有数据，就简单问候 + 引导用户聊聊或记录点
+            - button "16:24 · 文字 · 整理想法 时间偏好 早上 睡前 晚上 你一般什么时候有空整理想法？早上？睡前？ 晚上" [ref=e605] [cursor=pointer]:
+              - generic [ref=e607]:
+                - generic [ref=e608]:
+                  - generic [ref=e609]: 16:24
+                  - generic [ref=e610]: ·
+                  - img [ref=e611]
+                  - generic [ref=e613]: 文字
+                  - generic [ref=e614]: ·
+                  - generic [ref=e615]: 整理想法
+                  - generic [ref=e616]: 时间偏好
+                  - generic [ref=e617]: 早上
+                  - generic [ref=e618]: 睡前
+                  - generic [ref=e619]: 晚上
+                - paragraph [ref=e622]: 你一般什么时候有空整理想法？早上？睡前？ 晚上
+            - button "16:23 · 文字 · MVP 产品测试 工作重点 最近最让你花心思的一件事是什么？ MVP产品测试" [ref=e623] [cursor=pointer]:
+              - generic [ref=e625]:
+                - generic [ref=e626]:
+                  - generic [ref=e627]: 16:23
+                  - generic [ref=e628]: ·
+                  - img [ref=e629]
+                  - generic [ref=e631]: 文字
+                  - generic [ref=e632]: ·
+                  - generic [ref=e633]: MVP
+                  - generic [ref=e634]: 产品测试
+                  - generic [ref=e635]: 工作重点
+                - paragraph [ref=e638]: 最近最让你花心思的一件事是什么？ MVP产品测试
+            - button "16:23 · 文字 · 创业 状态 你现在主要在做什么？上学、工作、创业、带娃…随便说说。 创业" [ref=e639] [cursor=pointer]:
+              - generic [ref=e641]:
+                - generic [ref=e642]:
+                  - generic [ref=e643]: 16:23
+                  - generic [ref=e644]: ·
+                  - img [ref=e645]
+                  - generic [ref=e647]: 文字
+                  - generic [ref=e648]: ·
+                  - generic [ref=e649]: 创业
+                  - generic [ref=e650]: 状态
+                - paragraph [ref=e653]: 你现在主要在做什么？上学、工作、创业、带娃…随便说说。 创业
+            - button "16:23 · 文字 finance" [ref=e654] [cursor=pointer]:
+              - generic [ref=e656]:
+                - generic [ref=e657]:
+                  - generic [ref=e658]: 16:23
+                  - generic [ref=e659]: ·
+                  - img [ref=e660]
+                  - generic [ref=e662]: 文字
+                - paragraph [ref=e665]: finance
+            - button "12:44 · 文字 · 重庆 出行 创建3点去重庆的待办" [ref=e666] [cursor=pointer]:
+              - generic [ref=e668]:
+                - generic [ref=e669]:
+                  - generic [ref=e670]: 12:44
+                  - generic [ref=e671]: ·
+                  - img [ref=e672]
+                  - generic [ref=e674]: 文字
+                  - generic [ref=e675]: ·
+                  - generic [ref=e676]: 重庆
+                  - generic [ref=e677]: 出行
+                - paragraph [ref=e680]: 创建3点去重庆的待办
+            - button "09:36 · 文字 测试" [ref=e681] [cursor=pointer]:
+              - generic [ref=e683]:
+                - generic [ref=e684]:
+                  - generic [ref=e685]: 09:36
+                  - generic [ref=e686]: ·
+                  - img [ref=e687]
+                  - generic [ref=e689]: 文字
+                - paragraph [ref=e692]: 测试
+            - button "09:32 · 0:13 输了让他了，直接了，把个了，1 2 3 4 5 6 7 8 9 10，明天上山打老虎。" [ref=e693] [cursor=pointer]:
+              - generic [ref=e695]:
+                - generic [ref=e696]:
+                  - generic [ref=e697]: 09:32
+                  - generic [ref=e698]: ·
+                  - img [ref=e699]
+                  - generic [ref=e702]: 0:13
+                - paragraph [ref=e705]: 输了让他了，直接了，把个了，1 2 3 4 5 6 7 8 9 10，明天上山打老虎。
+            - button "09:24 · 文字 测试创建日记" [ref=e706] [cursor=pointer]:
+              - generic [ref=e708]:
+                - generic [ref=e709]:
+                  - generic [ref=e710]: 09:24
+                  - generic [ref=e711]: ·
+                  - img [ref=e712]
+                  - generic [ref=e714]: 文字
+                - paragraph [ref=e717]: 测试创建日记
+            - button "08:53 · 文字 你好" [ref=e718] [cursor=pointer]:
+              - generic [ref=e720]:
+                - generic [ref=e721]:
+                  - generic [ref=e722]: 08:53
+                  - generic [ref=e723]: ·
+                  - img [ref=e724]
+                  - generic [ref=e726]: 文字
+                - paragraph [ref=e729]: 你好
+    - button [ref=e731] [cursor=pointer]:
+      - img [ref=e732]
+    - button "Choose File" [ref=e735]

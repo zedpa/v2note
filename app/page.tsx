@@ -9,6 +9,7 @@ import { NotesTimeline } from "@/features/notes/components/notes-timeline";
 import { TodoWorkspace } from "@/features/todos/components/todo-workspace";
 import { TopicLifecycleView } from "@/features/workspace/components/topic-lifecycle-view";
 import { FAB } from "@/features/recording/components/fab";
+import { CommandSheet, type TodoCommand } from "@/features/todos/components/command-sheet";
 import { emit } from "@/features/recording/lib/events";
 import { api } from "@/shared/lib/api";
 import { SidebarDrawer } from "@/features/sidebar/components/sidebar-drawer";
@@ -27,12 +28,18 @@ import { GoalDetailOverlay } from "@/features/goals/components/goal-detail-overl
 import { ProjectDetailOverlay } from "@/features/goals/components/project-detail-overlay";
 import { GoalList } from "@/features/goals/components/goal-list";
 import { fabNotify } from "@/shared/lib/fab-notify";
+import { getGatewayClient, type GatewayResponse } from "@/features/chat/lib/gateway-client";
+import { createTodo, updateTodo, deleteTodo } from "@/shared/lib/api/todos";
+import { getSettings } from "@/shared/lib/local-config";
+import { showUndoToast } from "@/features/todos/hooks/use-undo-toast";
 import { getCommandDefs } from "@/features/commands/lib/registry";
 import { on } from "@/features/recording/lib/events";
 import { useBackHandler } from "@/shared/hooks/use-back-handler";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { LoginPage } from "@/features/auth/components/login-page";
 import { RegisterPage } from "@/features/auth/components/register-page";
+import { ForgotPassword } from "@/features/auth/components/forgot-password";
+import { UserSettings } from "@/features/auth/components/user-settings";
 import { useUpdateCheck } from "@/shared/hooks/use-update-check";
 import { UpdateDialog } from "@/shared/components/update-dialog";
 import { NotificationCenter } from "@/features/notifications/components/notification-center";
@@ -45,6 +52,7 @@ type OverlayName =
   | "review"
   | "profile"
   | "settings"
+  | "user-settings"
   | "notebooks"
   | "morning-briefing"
   | "evening-summary"
@@ -58,9 +66,9 @@ type OverlayName =
 export default function Page() {
   const router = useRouter();
   const { setTheme } = useTheme();
-  const { loggedIn, user, loading: authLoading, error: authError, login, register, logout, clearError } = useAuth();
+  const { loggedIn, user, loading: authLoading, error: authError, login, loginEmail, register, registerEmail, logout, clearError } = useAuth();
   const { update, dismiss, applying } = useUpdateCheck();
-  const [authMode, setAuthMode] = useState<"login" | "register">("login");
+  const [authMode, setAuthMode] = useState<"login" | "register" | "forgot-password">("login");
   const [showSidebar, setShowSidebar] = useState(false);
   const [activeOverlay, setActiveOverlay] = useState<OverlayName>(null);
   const [chatDateRange, setChatDateRange] = useState<{
@@ -71,6 +79,13 @@ export default function Page() {
   const [chatMode, setChatMode] = useState<"review" | "command" | "insight">("review");
   const [chatSkill, setChatSkill] = useState<string | undefined>();
   const [selectedGoalId, setSelectedGoalId] = useState<string | null>(null);
+  // CommandSheet 状态（语音指令确认弹窗）
+  const [commandSheetOpen, setCommandSheetOpen] = useState(false);
+  const [commandSheetTranscript, setCommandSheetTranscript] = useState<string>("");
+  const [commandSheetCommands, setCommandSheetCommands] = useState<TodoCommand[]>([]);
+  const [commandSheetMode, setCommandSheetMode] = useState<"todo" | "agent" | "action">("todo");
+  const [commandToolStatuses, setCommandToolStatuses] = useState<string[]>([]);
+
   // 主题筛选（场景 10: localStorage 持久化）
   const [topicFilter, setTopicFilter] = useState<TopicFilter | null>(() => {
     if (typeof window === "undefined") return null;
@@ -129,6 +144,253 @@ export default function Page() {
       }
     }
   }, [loggedIn]);
+
+  // ── CommandSheet: 用 ref 避免闭包捕获过期值 ──
+  const activeTabRef = useRef(activeTab);
+  activeTabRef.current = activeTab;
+  const activeOverlayRef = useRef(activeOverlay);
+  activeOverlayRef.current = activeOverlay;
+  const commandSheetOpenRef = useRef(commandSheetOpen);
+  commandSheetOpenRef.current = commandSheetOpen;
+
+  // ── 上滑 forceCommand：统一走 CommandSheet 弹窗 ──
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const transcript = (e as CustomEvent).detail?.transcript || "";
+      setCommandSheetTranscript(transcript);
+      setCommandSheetCommands([]);
+      setCommandToolStatuses([]);
+      setCommandSheetMode("todo");
+      setCommandSheetOpen(true);
+    };
+    window.addEventListener("v2note:forceCommand", handler);
+    return () => window.removeEventListener("v2note:forceCommand", handler);
+  }, []);
+
+  // ── CommandSheet: 监听 gateway 消息，驱动语音指令弹窗 ──
+  useEffect(() => {
+    if (!loggedIn) return;
+    const client = getGatewayClient();
+
+    const unsub = client.onMessage((msg: GatewayResponse) => {
+      switch (msg.type) {
+        // 1) ASR 转写完成 → 仅待办页零等待弹出 CommandSheet
+        case "asr.done": {
+          const transcript = (msg.payload.transcript || "").trim();
+          if (!transcript) break;
+          console.log("[CommandSheet] asr.done received, activeTab:", activeTabRef.current, "overlay:", activeOverlayRef.current, "transcript:", transcript.slice(0, 30));
+          // 只在待办页 (sourceContext="todo") 时立即弹出，日记页由 process.result 决定
+          if (activeTabRef.current === "todo" && !activeOverlayRef.current) {
+            setCommandSheetTranscript(transcript);
+            setCommandSheetCommands([]);
+            setCommandToolStatuses([]);
+            setCommandSheetMode("todo");
+            setCommandSheetOpen(true);
+          }
+          break;
+        }
+
+        // 2) process.result — AI 识别结果回填
+        case "process.result": {
+          const payload = msg.payload as Record<string, unknown>;
+          console.log("[CommandSheet] process.result received, todo_commands:", !!(payload.todo_commands), "action_results:", !!(payload.action_results), "sheetOpen:", commandSheetOpenRef.current);
+
+          // Layer 1: todo_commands
+          if (payload.todo_commands && Array.isArray(payload.todo_commands)) {
+            const cmds = payload.todo_commands as TodoCommand[];
+
+            // 静默执行模式：confirm_before_execute=false 时跳过弹窗
+            getSettings().then((settings) => {
+              if (!settings.confirm_before_execute) {
+                silentExecuteCommands(cmds);
+              } else {
+                setCommandSheetCommands(cmds);
+                setCommandSheetMode("todo");
+                if (!commandSheetOpenRef.current) {
+                  setCommandSheetTranscript((payload as any).original_text || "");
+                  setCommandSheetOpen(true);
+                }
+              }
+            });
+            break;
+          }
+
+          // Layer 3: action_results（voice_intent_type === "action"）
+          if (payload.action_results && Array.isArray(payload.action_results)) {
+            const cmds = payload.action_results as TodoCommand[];
+
+            getSettings().then((settings) => {
+              if (!settings.confirm_before_execute) {
+                silentExecuteCommands(cmds);
+              } else {
+                setCommandSheetCommands(cmds);
+                setCommandSheetMode("action");
+                if (!commandSheetOpenRef.current) {
+                  setCommandSheetTranscript((payload as any).original_text || "");
+                  setCommandSheetOpen(true);
+                }
+              }
+            });
+            break;
+          }
+          break;
+        }
+
+        // 3) tool.step — Agent 模式下的工具执行状态流
+        case "tool.step": {
+          const { toolName, status } = msg.payload;
+          setCommandToolStatuses((prev) => [...prev, `${toolName}: ${status}`]);
+          setCommandSheetMode("agent");
+          break;
+        }
+      }
+    });
+
+    return () => unsub();
+  }, [loggedIn]);
+
+  // CommandSheet 确认执行：根据指令类型调用 REST API
+  const handleCommandConfirm = useCallback(async (commands: TodoCommand[]) => {
+    setCommandSheetOpen(false);
+    try {
+      for (const cmd of commands) {
+        switch (cmd.action_type) {
+          case "create": {
+            if (!cmd.todo?.text) break;
+            await createTodo({
+              text: cmd.todo.text,
+              scheduled_start: cmd.todo.scheduled_start,
+              estimated_minutes: cmd.todo.estimated_minutes,
+              priority: cmd.todo.priority,
+              goal_id: (cmd.todo as any)._matched_goal_id,
+              reminder_before: cmd.todo.reminder?.before_minutes,
+              reminder_types: cmd.todo.reminder?.types,
+              recurrence_rule: cmd.todo.recurrence?.rule,
+              recurrence_end: cmd.todo.recurrence?.end_date,
+            });
+            break;
+          }
+          case "complete": {
+            if (!cmd.target_id) break;
+            await updateTodo(cmd.target_id, { done: true });
+            break;
+          }
+          case "modify": {
+            if (!cmd.target_id || !cmd.changes) break;
+            await updateTodo(cmd.target_id, {
+              text: cmd.changes.text,
+              scheduled_start: cmd.changes.scheduled_start,
+              estimated_minutes: cmd.changes.estimated_minutes,
+              priority: cmd.changes.priority,
+              reminder_before: cmd.changes.reminder?.before_minutes,
+              reminder_types: cmd.changes.reminder?.types,
+              recurrence_rule: cmd.changes.recurrence?.rule,
+              recurrence_end: cmd.changes.recurrence?.end_date,
+            });
+            break;
+          }
+          case "query":
+            // 查询结果已展示在 CommandSheet 中，无需额外操作
+            break;
+        }
+      }
+      emit("recording:processed");
+      fabNotify.success("指令已执行");
+    } catch (err: any) {
+      console.error("[CommandSheet] confirm error:", err);
+      fabNotify.error("执行失败: " + (err.message || "未知错误"));
+    }
+  }, []);
+
+  // 静默执行：跳过 CommandSheet 直接执行 + 撤销 toast
+  const silentExecuteCommands = useCallback(async (commands: TodoCommand[]) => {
+    const createdIds: string[] = [];
+    const completedIds: string[] = [];
+    const modifiedEntries: Array<{ id: string; original: Record<string, unknown> }> = [];
+
+    try {
+      for (const cmd of commands) {
+        switch (cmd.action_type) {
+          case "create": {
+            if (!cmd.todo?.text) break;
+            const result = await createTodo({
+              text: cmd.todo.text,
+              scheduled_start: cmd.todo.scheduled_start,
+              estimated_minutes: cmd.todo.estimated_minutes,
+              priority: cmd.todo.priority,
+              goal_id: (cmd.todo as any)._matched_goal_id,
+              reminder_before: cmd.todo.reminder?.before_minutes,
+              reminder_types: cmd.todo.reminder?.types,
+              recurrence_rule: cmd.todo.recurrence?.rule,
+              recurrence_end: cmd.todo.recurrence?.end_date,
+            });
+            if (result?.id) createdIds.push(result.id);
+            break;
+          }
+          case "complete": {
+            if (!cmd.target_id) break;
+            await updateTodo(cmd.target_id, { done: true });
+            completedIds.push(cmd.target_id);
+            break;
+          }
+          case "modify": {
+            if (!cmd.target_id || !cmd.changes) break;
+            // 保存原值用于撤销（从 changes 的反向推导）
+            modifiedEntries.push({ id: cmd.target_id, original: {} });
+            await updateTodo(cmd.target_id, {
+              text: cmd.changes.text,
+              scheduled_start: cmd.changes.scheduled_start,
+              estimated_minutes: cmd.changes.estimated_minutes,
+              priority: cmd.changes.priority,
+              reminder_before: cmd.changes.reminder?.before_minutes,
+              reminder_types: cmd.changes.reminder?.types,
+              recurrence_rule: cmd.changes.recurrence?.rule,
+              recurrence_end: cmd.changes.recurrence?.end_date,
+            });
+            break;
+          }
+        }
+      }
+
+      emit("recording:processed");
+
+      // 构建 toast 消息
+      const summaries: string[] = [];
+      for (const cmd of commands) {
+        if (cmd.action_type === "create" && cmd.todo?.text) {
+          summaries.push(`创建「${cmd.todo.text}」`);
+        } else if (cmd.action_type === "complete") {
+          summaries.push("完成待办");
+        } else if (cmd.action_type === "modify") {
+          summaries.push("修改待办");
+        }
+      }
+      const message = summaries.length > 0 ? `已${summaries.join("、")}` : "指令已执行";
+
+      showUndoToast({
+        message,
+        duration: 5000,
+        onUndo: async () => {
+          try {
+            // 撤销创建：删除
+            for (const id of createdIds) {
+              await deleteTodo(id);
+            }
+            // 撤销完成：重新打开
+            for (const id of completedIds) {
+              await updateTodo(id, { done: false });
+            }
+            emit("recording:processed");
+            fabNotify.info("已撤销");
+          } catch (err: any) {
+            fabNotify.error("撤销失败");
+          }
+        },
+      });
+    } catch (err: any) {
+      fabNotify.error("执行失败: " + (err.message || "未知错误"));
+    }
+  }, []);
 
   const backHandler = useMemo(() => {
     if (activeOverlay) return () => setActiveOverlay(null);
@@ -272,10 +534,18 @@ export default function Page() {
   }
 
   if (!loggedIn) {
+    if (authMode === "forgot-password") {
+      return (
+        <ForgotPassword
+          onBack={() => { clearError(); setAuthMode("login"); }}
+        />
+      );
+    }
     if (authMode === "register") {
       return (
         <RegisterPage
           onRegister={register}
+          onRegisterWithEmail={registerEmail}
           onSwitchToLogin={() => { clearError(); setAuthMode("login"); }}
           error={authError}
         />
@@ -284,7 +554,9 @@ export default function Page() {
     return (
       <LoginPage
         onLogin={login}
+        onLoginWithEmail={loginEmail}
         onSwitchToRegister={() => { clearError(); setAuthMode("register"); }}
+        onForgotPassword={() => { clearError(); setAuthMode("forgot-password"); }}
         error={authError}
       />
     );
@@ -320,7 +592,7 @@ export default function Page() {
       <SidebarDrawer
         open={showSidebar}
         onClose={() => setShowSidebar(false)}
-        onViewProfile={() => setActiveOverlay("profile")}
+        onViewProfile={() => setActiveOverlay("user-settings")}
         onViewBriefing={() => setActiveOverlay("daily-report")}
         onViewSettings={() => setActiveOverlay("settings")}
         onViewEvening={() => setActiveOverlay("evening-summary")}
@@ -391,6 +663,7 @@ export default function Page() {
       {/* FAB 录音按钮 — 常驻底部 */}
       <FAB
         activeNotebook={activeNotebook}
+        sourceContext={activeOverlay === "chat" ? "chat" : activeOverlay === "review" ? "review" : activeTab === "todo" ? "todo" : "timeline"}
         onStartReview={(range) => {
           setChatDateRange(range);
           setChatInitialMessage(undefined);
@@ -405,6 +678,42 @@ export default function Page() {
           startReview: handleStartReview,
           showHelp,
           openOverlay,
+        }}
+      />
+
+      {/* CommandSheet — 语音指令确认弹窗 */}
+      <CommandSheet
+        open={commandSheetOpen}
+        onClose={() => setCommandSheetOpen(false)}
+        transcript={commandSheetTranscript}
+        commands={commandSheetCommands}
+        mode={commandSheetMode}
+        toolStatuses={commandToolStatuses}
+        onConfirm={handleCommandConfirm}
+        onCancel={() => setCommandSheetOpen(false)}
+        onContinueSpeak={() => { /* v2: trigger recording again */ }}
+        onTextSubmit={async (text) => {
+          try {
+            const { getGatewayClient } = await import("@/features/chat/lib/gateway-client");
+            const { getDeviceId } = await import("@/shared/lib/device");
+            const client = getGatewayClient();
+            const deviceId = await getDeviceId();
+            // 发送修改指令，gateway 返回 process.result 会自动更新 commands
+            client.send({
+              type: "todo.refine",
+              payload: { deviceId, commands: commandSheetCommands, modificationText: text },
+            });
+          } catch (err: any) {
+            console.error("[CommandSheet] text submit error:", err);
+          }
+        }}
+        onViewMore={(params) => {
+          setCommandSheetOpen(false);
+          if (params.goal_id) {
+            setSelectedGoalId(params.goal_id);
+            setActiveOverlay("goal-detail");
+          }
+          setActiveTab("todo");
         }}
       />
 
@@ -437,6 +746,8 @@ export default function Page() {
         <ReviewOverlay key="review" onClose={closeOverlay} onStartInsight={handleStartInsight} />
       ) : activeOverlay === "profile" ? (
         <ProfileEditor key="profile" onClose={closeOverlay} />
+      ) : activeOverlay === "user-settings" ? (
+        <UserSettings key="user-settings" onClose={closeOverlay} onLogout={logout} />
       ) : activeOverlay === "settings" ? (
         <SettingsEditor
           key="settings"

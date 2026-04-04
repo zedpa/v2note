@@ -1,3 +1,13 @@
+---
+id: "096"
+title: "侧边栏「我的世界」重构"
+status: completed
+domain: ui
+dependencies: []
+superseded_by: null
+created: 2026-03-23
+updated: 2026-03-31
+---
 # 侧边栏「我的世界」重构
 
 > 状态：🟡 待开发 | 优先级：Phase 2

@@ -510,7 +510,7 @@ function TodoRow({
 }) {
   const isDone = done || todo.done;
   const timeStr = todo.scheduled_start
-    ? new Date(todo.scheduled_start).toLocaleTimeString("zh-CN", {
+    ? new Date(todo.scheduled_start.replace(/Z$/i, "")).toLocaleTimeString("zh-CN", {
         hour: "2-digit",
         minute: "2-digit",
       })

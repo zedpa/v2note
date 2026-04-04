@@ -1,3 +1,13 @@
+---
+id: "059"
+title: "Agent 自适应——交互偏好学习 + Soul 守护"
+status: completed
+domain: agent
+dependencies: []
+superseded_by: null
+created: 2026-03-23
+updated: 2026-03-30
+---
 # Agent 自适应——交互偏好学习 + Soul 守护
 
 > 状态：✅ completed | 优先级：Phase 5+（需要足够交互数据）| 预计：4-5 天

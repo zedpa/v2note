@@ -1,3 +1,13 @@
+---
+id: "079"
+title: "空状态引导"
+status: completed
+domain: design
+dependencies: []
+superseded_by: null
+created: 2026-03-23
+updated: 2026-03-30
+---
 # 空状态引导
 
 > 状态：✅ 已完成

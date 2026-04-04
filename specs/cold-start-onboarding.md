@@ -1,3 +1,8 @@
+---
+status: superseded
+superseded_by: "cold-start.md"
+---
+
 # 冷启动 5 问（v2：AI 驱动对话）
 
 > 状态：🔵 开发中 | 优先级：Phase 2

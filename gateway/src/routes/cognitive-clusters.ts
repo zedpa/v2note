@@ -80,9 +80,10 @@ export function registerCognitiveClusterRoutes(router: Router) {
       nucleus: string;
       polarity: string;
       confidence: number;
+      field: Record<string, any>;
       created_at: string;
     }>(
-      `SELECT s.id, s.nucleus, s.polarity, s.confidence, s.created_at
+      `SELECT s.id, s.nucleus, s.polarity, s.confidence, s.field, s.created_at
        FROM strike s
        JOIN bond cm ON cm.target_strike_id = s.id AND cm.type = 'cluster_member'
        WHERE cm.source_strike_id = $1 AND s.status = 'active'

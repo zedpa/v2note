@@ -1,3 +1,8 @@
+---
+status: superseded
+superseded_by: "todo-system.md"
+---
+
 # 子任务树
 
 > 状态：✅ 已完成（后端+数据库，前端展示待设计稿对齐后补充）

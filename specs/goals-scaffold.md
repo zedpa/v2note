@@ -1,3 +1,13 @@
+---
+id: "086"
+title: "目标场景前端骨架"
+status: completed
+domain: goal
+dependencies: []
+superseded_by: null
+created: 2026-03-23
+updated: 2026-03-30
+---
 # 目标场景前端骨架
 
 > 状态：✅ 列表+详情+子任务计数完成 | 优先级：Phase 4

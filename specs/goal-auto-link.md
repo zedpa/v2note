@@ -1,3 +1,13 @@
+---
+id: "083"
+title: "目标自动拆解与关联"
+status: active
+domain: goal
+dependencies: []
+superseded_by: null
+created: 2026-03-23
+updated: 2026-03-30
+---
 # 目标自动拆解与关联
 
 > 状态：✅ completed | 优先级：Phase 4 | 预计：3-4 天

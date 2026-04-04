@@ -1,3 +1,8 @@
+---
+status: superseded
+superseded_by: "todo-system.md"
+---
+
 # Todo-Strike 数据桥梁
 
 > 状态：✅ completed | 优先级：Phase 4（地基）| 预计：2-3 天

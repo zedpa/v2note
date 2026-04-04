@@ -1,3 +1,13 @@
+---
+id: "081"
+title: "修复：Chat AI 回复无限加载"
+status: completed
+domain: chat
+dependencies: []
+superseded_by: null
+created: 2026-03-23
+updated: 2026-04-02
+---
 # 修复：Chat AI 回复无限加载
 
 > 状态：✅ 已完成

@@ -1,3 +1,13 @@
+---
+id: "075"
+title: "发现页"
+status: draft
+domain: ui
+dependencies: []
+superseded_by: null
+created: 2026-03-23
+updated: 2026-03-30
+---
 # 发现页
 
 > 状态：✅ 已完成

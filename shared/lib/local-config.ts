@@ -74,6 +74,8 @@ export interface LocalSettings {
   proactiveInterval: number; // minutes
   theme: "light" | "dark" | "system";
   language: string;
+  /** 执行动作前弹窗确认（默认 true）。关闭后静默执行 + toast 通知 */
+  confirm_before_execute: boolean;
   [key: string]: unknown;
 }
 
@@ -100,6 +102,7 @@ const DEFAULT_SETTINGS: LocalSettings = {
   proactiveInterval: 30,
   theme: "system",
   language: "zh-CN",
+  confirm_before_execute: true,
 };
 
 // ── Generic typed get/set ──

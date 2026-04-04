@@ -1,3 +1,13 @@
+---
+id: "066"
+title: "Cluster 标签反写日记"
+status: completed
+domain: cognitive
+dependencies: []
+superseded_by: null
+created: 2026-03-23
+updated: 2026-03-30
+---
 # Cluster 标签反写日记
 
 > 状态：✅ 已完成（集成到batch-analyze）| 优先级：Phase 1

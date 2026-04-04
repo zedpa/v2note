@@ -1,3 +1,8 @@
+---
+status: superseded
+superseded_by: "daily-report.md"
+---
+
 # 认知报告 + 每日回顾数据源
 
 > 状态：✅ 已完成 | 优先级：Phase 2 | 完成日期：2026-03-24

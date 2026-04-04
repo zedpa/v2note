@@ -1,3 +1,8 @@
+---
+status: superseded
+superseded_by: "todo-system.md"
+---
+
 # 待办时间解析准确性修复
 
 > 状态：🟡 待开发
