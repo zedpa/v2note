@@ -86,7 +86,7 @@ type GatewayMessage =
   | { type: "chat.message"; payload: { text: string; deviceId: string } }
   | { type: "chat.end"; payload: { deviceId: string } }
   | { type: "todo.aggregate"; payload: { deviceId: string } }
-  | { type: "asr.start"; payload: { deviceId: string; locationText?: string; mode?: ASRMode; notebook?: string; sourceContext?: "todo" | "timeline" | "chat" | "review" } }
+  | { type: "asr.start"; payload: { deviceId: string; locationText?: string; mode?: ASRMode; notebook?: string; sourceContext?: "todo" | "timeline" | "chat" | "review"; saveAudio?: boolean } }
   | { type: "asr.stop"; payload: { deviceId: string; saveAudio?: boolean; forceCommand?: boolean } }
   | { type: "asr.cancel"; payload: { deviceId: string } }
   | { type: "action.confirm_reply"; payload: { deviceId: string; confirm_id: string; confirmed: boolean } }
@@ -379,7 +379,7 @@ wss.on("connection", (ws) => {
           console.log(`[asr.start] notebook=${msg.payload.notebook}, mode=${msg.payload.mode}, sourceContext=${msg.payload.sourceContext}`);
           connectionDeviceMap.set(ws, msg.payload.deviceId);
           proactiveEngine.registerDevice(msg.payload.deviceId, ws, authedUserId);
-          await startASR(ws, msg.payload.deviceId, msg.payload.locationText, msg.payload.mode, msg.payload.notebook, authedUserId, msg.payload.sourceContext);
+          await startASR(ws, msg.payload.deviceId, msg.payload.locationText, msg.payload.mode, msg.payload.notebook, authedUserId, msg.payload.sourceContext, msg.payload.saveAudio);
           break;
         }
 

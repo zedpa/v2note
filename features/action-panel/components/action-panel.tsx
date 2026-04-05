@@ -57,12 +57,13 @@ export function ActionPanel({ isOpen, onClose, onTraverse, onReflect }: ActionPa
       {/* Panel — Glass & Soul */}
       <div
         className={cn(
-          "fixed inset-x-0 bottom-0 z-50 max-h-[60vh]",
+          "fixed inset-x-0 z-50 max-h-[60vh]",
           "rounded-t-3xl bg-surface/80 backdrop-blur-[12px]",
           "transition-transform duration-300 ease-out",
           isOpen ? "translate-y-0" : "translate-y-full",
         )}
         style={{
+          bottom: "var(--kb-offset, 0px)",
           transform: isOpen
             ? `translateY(${dragY}px)`
             : "translateY(100%)",

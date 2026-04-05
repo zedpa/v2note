@@ -10,7 +10,7 @@
 6. superseded 状态的 spec 已被合并，永远不要引用它们，使用 superseded_by 指向的文件
 -->
 
-> 最后更新：2026-04-04 | 共 86 个 spec（18 active / 4 draft / 33 completed / 29 superseded / 2 deprecated）
+> 最后更新：2026-04-04 | 共 88 个 spec（19 active / 4 draft / 34 completed / 29 superseded / 2 deprecated）
 
 ## 🔵 Active（当前有效，可直接引用和修改）
 
@@ -31,6 +31,8 @@
 | 102a | Voice Routing — Core | voice | voice-routing.md | Layer 3 regex预过滤待移除 |
 | 102b | Voice — Todo Extension | voice | voice-todo-ext.md | 确认弹窗UI/提醒/周期未做 |
 | 110 | UI/UX 全局审查与改进 | design | ui-ux-audit.md | 审查完毕,修复0% |
+| 112 | Recording Resilience — 录音防丢 | voice | recording-resilience.md | 本地缓存+断线重试+连接保护 |
+| 114 | 录音入口统一 | voice | voice-input-unify.md | 删InputBar死代码 + ChatView接gateway ASR + useVoiceToText hook |
 
 ## 🟡 Draft（规划中，尚未开始实施）
 
@@ -84,6 +86,7 @@
 | 101 | 语音指令识别 | voice | voice-action.md |
 | 103 | 语音控制 v2 | voice | voice-tools-v2.md |
 | 111 | Fix: Voice→Todo 管线接通 | voice | fix-voice-todo-pipeline.md |
+| 113 | 键盘弹出 & Viewport 适配 | ui | keyboard-viewport-adapt.md |
 
 ## ⛔ Superseded（已被合并，不要引用）
 

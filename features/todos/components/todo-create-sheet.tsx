@@ -2,7 +2,6 @@
 
 import { useState, useCallback, useRef, useEffect } from "react";
 import { Calendar, Clock, FolderOpen } from "lucide-react";
-import { useKeyboardOffset } from "@/shared/hooks/use-keyboard-offset";
 import { getDefaultHourForSlot, localTzOffset, type TimeSlot } from "../lib/time-slots";
 import { PrioritySelector } from "./priority-selector";
 import type { TodoDTO } from "../lib/todo-types";
@@ -51,7 +50,6 @@ export function TodoCreateSheet({
   const inputRef = useRef<HTMLInputElement>(null);
   const dateRef = useRef<HTMLInputElement>(null);
   const timeRef = useRef<HTMLInputElement>(null);
-  const { offset: kbOffset } = useKeyboardOffset();
 
   useEffect(() => {
     if (open) {
@@ -115,7 +113,7 @@ export function TodoCreateSheet({
       <div
         data-testid="todo-create-sheet"
         className="fixed inset-x-0 bottom-0 z-50 max-h-[85vh] overflow-y-auto rounded-t-[24px] bg-[hsl(var(--card))] px-5 pb-safe pt-3"
-        style={{ boxShadow: "0 -4px 24px rgba(0,0,0,0.5)", bottom: `${kbOffset}px` }}
+        style={{ boxShadow: "0 -4px 24px rgba(0,0,0,0.5)", bottom: "var(--kb-offset, 0px)", transition: "bottom 150ms ease-out" }}
       >
         {/* Drag handle */}
         <div className="mx-auto mb-5 h-1 w-10 rounded-full bg-muted-foreground/20" />

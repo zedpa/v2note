@@ -1,10 +1,10 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
-import { ArrowLeft, Send, Mic, MicOff } from "lucide-react";
+import { ArrowLeft, Send, Mic, Square } from "lucide-react";
+import { useVoiceToText } from "@/features/recording/hooks/use-voice-to-text";
 import { cn } from "@/lib/utils";
 import { useChat } from "@/features/chat/hooks/use-chat";
-import { useKeyboardOffset } from "@/shared/hooks/use-keyboard-offset";
 import { ChatBubble } from "./chat-bubble";
 import { PlanCard } from "./plan-card";
 import { SwipeBack } from "@/shared/components/swipe-back";
@@ -43,13 +43,27 @@ export function ChatView({ dateRange, onClose, initialMessage, title, mode: mode
     });
   const [input, setInput] = useState("");
   const [skillSuggestions, setSkillSuggestions] = useState<typeof CHAT_SKILLS>([]);
-  const [listening, setListening] = useState(false);
-  const recognitionRef = useRef<any>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
-  // 键盘偏移 + 可视区域高度（驱动整体布局）
-  const { offset: bottomOffset, viewportHeight, isKeyboardOpen } = useKeyboardOffset();
+  // 语音转文字（gateway ASR）
+  const voice = useVoiceToText({
+    onTranscript: (text) => setInput((prev) => prev ? prev + text : text),
+    sourceContext: "chat",
+  });
+
+  // 键盘状态（用于自动滚动触发）
+  const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const check = () => {
+      const offset = Math.max(0, window.innerHeight - vv.offsetTop - vv.height);
+      setIsKeyboardOpen(offset > 50);
+    };
+    vv.addEventListener("resize", check);
+    return () => vv.removeEventListener("resize", check);
+  }, []);
 
   // Detect if the command list is showing (last assistant message contains command list)
   const commandDefs = useMemo(() => getCommandDefs(), []);
@@ -100,24 +114,6 @@ export function ChatView({ dateRange, onClose, initialMessage, title, mode: mode
     };
   }, [connect, disconnect]);
 
-  // 锁定背景滚动，防止键盘弹出时推动整个页面
-  useEffect(() => {
-    const scrollY = window.scrollY;
-    document.body.style.overflow = "hidden";
-    document.body.style.position = "fixed";
-    document.body.style.top = `-${scrollY}px`;
-    document.body.style.left = "0";
-    document.body.style.right = "0";
-    return () => {
-      document.body.style.overflow = "";
-      document.body.style.position = "";
-      document.body.style.top = "";
-      document.body.style.left = "";
-      document.body.style.right = "";
-      window.scrollTo(0, scrollY);
-    };
-  }, []);
-
   // Auto-scroll to bottom on new messages or keyboard open
   useEffect(() => {
     if (scrollRef.current) {
@@ -160,42 +156,27 @@ export function ChatView({ dateRange, onClose, initialMessage, title, mode: mode
     inputRef.current?.focus();
   }, [input, streaming, initialMessage, commandContext, send]);
 
-  const hasSpeechAPI =
-    typeof window !== "undefined" &&
-    !!((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition);
-
   const toggleVoice = useCallback(() => {
-    if (listening) {
-      recognitionRef.current?.stop();
-      setListening(false);
-      return;
+    if (voice.recording) {
+      voice.stop();
+    } else {
+      voice.start();
     }
-    const SR =
-      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SR) return;
-    const recognition = new SR();
-    recognition.lang = "zh-CN";
-    recognition.interimResults = true;
-    recognition.continuous = false;
-    recognition.onresult = (e: any) => {
-      const transcript = Array.from(e.results as SpeechRecognitionResultList)
-        .map((r: any) => r[0].transcript)
-        .join("");
-      setInput(transcript);
+  }, [voice]);
+
+  // 组件卸载时自动取消录音
+  useEffect(() => {
+    return () => {
+      voice.cancel();
     };
-    recognition.onend = () => setListening(false);
-    recognition.onerror = () => setListening(false);
-    recognitionRef.current = recognition;
-    recognition.start();
-    setListening(true);
-  }, [listening]);
+  }, []);
 
   return (
     <SwipeBack onClose={onClose}>
       {/* 主容器 — 高度跟随 visualViewport，键盘弹出时自动缩小 */}
       <div
         className="fixed inset-x-0 top-0 flex flex-col bg-surface"
-        style={{ height: viewportHeight }}
+        style={{ height: "var(--app-height, 100dvh)" }}
       >
         {/* ── Header: 极简 — "路路" + 呼吸状态灯 ── */}
         <header
@@ -279,7 +260,8 @@ export function ChatView({ dateRange, onClose, initialMessage, title, mode: mode
       <div
         className="fixed left-0 right-0 z-50 px-5 py-3 pb-safe bg-surface/85 backdrop-blur-[20px]"
         style={{
-          bottom: `${bottomOffset}px`,
+          bottom: "var(--kb-offset, 0px)",
+          transition: "bottom 150ms ease-out",
           WebkitBackdropFilter: "blur(20px)",
           borderTop: "1px solid rgba(255,255,255,0.05)",
         }}
@@ -297,6 +279,13 @@ export function ChatView({ dateRange, onClose, initialMessage, title, mode: mode
                 {s.label}
               </button>
             ))}
+          </div>
+        )}
+        {/* 录音实时转写预览 */}
+        {voice.recording && (voice.confirmedText || voice.partialText) && (
+          <div className="px-2 pb-2 text-center">
+            <span className="text-sm text-on-surface/70">{voice.confirmedText}</span>
+            <span className="text-sm text-on-surface/35">{voice.partialText}</span>
           </div>
         )}
         <div className="flex items-end gap-3">
@@ -321,31 +310,37 @@ export function ChatView({ dateRange, onClose, initialMessage, title, mode: mode
             }}
             disabled={streaming}
           />
-          {/* 语音按钮 — 品牌色底板突出 */}
-          {hasSpeechAPI && !input.trim() && (
+          {/* 语音按钮 — gateway ASR，44×44px 触控区 */}
+          {!input.trim() && !voice.recording && (
             <button
               type="button"
               onClick={toggleVoice}
               disabled={streaming}
-              className={cn(
-                "flex items-center justify-center w-10 h-10 rounded-full transition-colors shrink-0",
-                listening
-                  ? "bg-maple/20 text-maple"
-                  : "bg-deer/15 text-deer hover:bg-deer/30",
-              )}
-              aria-label={listening ? "停止语音" : "语音输入"}
+              className="flex items-center justify-center w-11 h-11 rounded-full bg-deer/15 text-deer hover:bg-deer/30 transition-colors shrink-0"
+              aria-label="语音输入"
             >
-              {listening ? <MicOff size={18} /> : <Mic size={18} />}
+              <Mic size={20} />
             </button>
           )}
-          {/* 发送按钮 — 品牌渐变 */}
-          {(input.trim() || !hasSpeechAPI) && (
+          {/* 录音中 — 停止按钮 */}
+          {voice.recording && (
+            <button
+              type="button"
+              onClick={toggleVoice}
+              className="flex items-center justify-center w-11 h-11 rounded-full bg-maple/20 text-maple animate-pulse shrink-0"
+              aria-label="停止录音"
+            >
+              <Square size={18} className="fill-current" />
+            </button>
+          )}
+          {/* 发送按钮 — 品牌渐变，44×44px */}
+          {input.trim() && !voice.recording && (
             <button
               type="button"
               onClick={handleSend}
               disabled={!input.trim() || streaming}
               className={cn(
-                "flex items-center justify-center w-10 h-10 rounded-full transition-colors shrink-0",
+                "flex items-center justify-center w-11 h-11 rounded-full transition-colors shrink-0",
                 input.trim() && !streaming
                   ? "text-white"
                   : "bg-surface-high text-muted-accessible",
@@ -357,7 +352,7 @@ export function ChatView({ dateRange, onClose, initialMessage, title, mode: mode
               }
               aria-label="发送"
             >
-              <Send size={16} />
+              <Send size={18} />
             </button>
           )}
         </div>

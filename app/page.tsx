@@ -588,7 +588,7 @@ export default function Page() {
   }
 
   return (
-    <div className="min-h-dvh bg-surface max-w-lg mx-auto relative">
+    <div className="bg-surface max-w-lg mx-auto relative flex flex-col overflow-hidden" style={{ height: "var(--app-height, 100dvh)" }}>
       <SidebarDrawer
         open={showSidebar}
         onClose={() => setShowSidebar(false)}
@@ -633,7 +633,7 @@ export default function Page() {
 
       {/* 工作区内容: 日记 or 待办 (swipeable) — 保持双 tab 挂载避免切换重载 */}
       <main
-        className="overflow-x-hidden"
+        className="flex-1 overflow-x-hidden overflow-y-auto"
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
       >

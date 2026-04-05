@@ -57,6 +57,7 @@ interface ASRSession {
   // 仅 realtime 模式：Python 未就绪时的临时缓冲（就绪后清空）
   preFlushBuffer: Buffer[];
   saveAudio: boolean;
+  transcriptOnly: boolean;
   startTime: number;
   forceCommand?: boolean;
   sourceContext?: "todo" | "timeline" | "chat" | "review";
@@ -77,6 +78,7 @@ export async function startASR(
   notebook?: string,
   userId?: string,
   sourceContext?: "todo" | "timeline" | "chat" | "review",
+  saveAudio?: boolean,
 ): Promise<void> {
   const asrT0 = Date.now();
   const apiKey = process.env.DASHSCOPE_API_KEY;
@@ -114,6 +116,7 @@ export async function startASR(
     audioChunkCount: 0,
     preFlushBuffer: [],
     saveAudio: false,
+    transcriptOnly: saveAudio === false,
     startTime: Date.now(),
     sourceContext,
   };
@@ -425,6 +428,44 @@ async function finishRealtimeASR(
     return;
   }
 
+  // transcript-only 模式：只返回文本，不创建 record / 不触发 AI 处理
+  if (session.transcriptOnly) {
+    const lastSentence = session.sentences[session.sentences.length - 1];
+    const durationMs = lastSentence?.end_time ?? 0;
+    sendToClient(clientWs, {
+      type: "asr.done",
+      payload: { transcript, recordId: "", duration: Math.round(durationMs / 1000) },
+    });
+    cleanupSessionFiles(session);
+    return;
+  }
+
+  // 指令模式：不创建 record，不存音频，只执行 processEntry Layer 2
+  if (session.forceCommand) {
+    sendToClient(clientWs, {
+      type: "asr.done",
+      payload: { transcript, recordId: "", duration: 0 },
+    });
+    cleanupSessionFiles(session);
+
+    processEntry({
+      text: transcript,
+      deviceId: session.deviceId,
+      userId: session.userId,
+      notebook: session.notebook,
+      forceCommand: true,
+      sourceContext: session.sourceContext,
+    })
+      .then((result) => {
+        sendToClient(clientWs, { type: "process.result", payload: result });
+      })
+      .catch((err) => {
+        console.error("[asr] forceCommand process error:", err);
+        sendToClient(clientWs, { type: "error", payload: { message: err.message } });
+      });
+    return;
+  }
+
   // Calculate duration from last sentence end_time
   const lastSentence = session.sentences[session.sentences.length - 1];
   const durationMs = lastSentence?.end_time ?? 0;
@@ -481,6 +522,44 @@ async function finishUploadASR(
       payload: { transcript: "", recordId: "", duration: 0 },
     });
     sessions.delete(deviceId);
+    return;
+  }
+
+  // transcript-only 模式
+  if (session.transcriptOnly) {
+    sendToClient(clientWs, {
+      type: "asr.done",
+      payload: { transcript, recordId: "", duration: durationSeconds },
+    });
+    cleanupSessionFiles(session);
+    sessions.delete(deviceId);
+    return;
+  }
+
+  // 指令模式：不创建 record，只执行 processEntry Layer 2
+  if (session.forceCommand) {
+    sendToClient(clientWs, {
+      type: "asr.done",
+      payload: { transcript, recordId: "", duration: durationSeconds },
+    });
+    cleanupSessionFiles(session);
+    sessions.delete(deviceId);
+
+    processEntry({
+      text: transcript,
+      deviceId: session.deviceId,
+      userId: session.userId,
+      notebook: session.notebook,
+      forceCommand: true,
+      sourceContext: session.sourceContext,
+    })
+      .then((result) => {
+        sendToClient(clientWs, { type: "process.result", payload: result });
+      })
+      .catch((err) => {
+        console.error("[asr] forceCommand process error:", err);
+        sendToClient(clientWs, { type: "error", payload: { message: err.message } });
+      });
     return;
   }
 
@@ -652,7 +731,7 @@ function pcmToWavFromBuffer(pcmData: Buffer): Buffer {
  * Transcribe a WAV audio buffer via Python DashScope SDK subprocess.
  * Pipes WAV data to stdin, reads JSON result from stdout.
  */
-async function transcribeAudioFile(wavBuffer: Buffer, vocabularyId?: string): Promise<string> {
+export async function transcribeAudioFile(wavBuffer: Buffer, vocabularyId?: string): Promise<string> {
   const apiKey = process.env.DASHSCOPE_API_KEY;
   if (!apiKey) throw new Error("Missing DASHSCOPE_API_KEY");
 

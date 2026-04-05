@@ -321,7 +321,8 @@ export function NowCard({ card, onComplete, onSkip, onTraverse, onReflect }: Now
             />
             {/* Sheet */}
             <motion.div
-              className="fixed inset-x-0 bottom-0 z-50 bg-surface-lowest rounded-t-2xl shadow-ambient px-5 pt-5 pb-8"
+              className="fixed inset-x-0 z-50 bg-surface-lowest rounded-t-2xl shadow-ambient px-5 pt-5 pb-8"
+              style={{ bottom: "var(--kb-offset, 0px)" }}
               initial={{ y: "100%" }}
               animate={{ y: 0 }}
               exit={{ y: "100%" }}

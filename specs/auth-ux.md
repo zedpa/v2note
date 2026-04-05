@@ -50,24 +50,29 @@ app/page.tsx
 
 ### 修复方案
 
-#### Fix 5：记住账号 + 自动登录 <!-- ✅ completed -->
+#### Fix 5：记住账号 + 记住密码 + 自动登录 <!-- ✅ completed -->
 
 **记住账号（默认开启）：**
-- 登录/注册成功后将手机号存入 `localStorage("voicenote:lastPhone")`
+- 登录/注册成功后将手机号/邮箱存入 `localStorage("voicenote:lastPhone"` / `"voicenote:lastEmail")`
 - 登录页初始化时读取并填入输入框
-- 不存密码（安全原则）
+- 同时记住上次登录方式 `localStorage("voicenote:lastLoginMethod")` = "phone" | "email"
+
+**记住密码（用户可选，默认关闭）：**
+- 登录页增加"记住密码"勾选框
+- 勾选时：登录成功后将密码存入 `localStorage("voicenote:savedPassword")`，下次打开自动填充
+- 取消勾选时：清除已保存的密码
+- 偏好存 `localStorage("voicenote:rememberPassword")` = "1" | "0"
 
 **自动登录（用户可选，默认开启）：**
 - 登录页增加"自动登录"勾选框
-- 勾选时：token 存 `localStorage`（持久，当前行为）
-- 不勾选时：token 存 `sessionStorage`（关闭浏览器即清除）
-- 自动登录状态存 `localStorage("voicenote:autoLogin")` = "1"
+- 勾选时：重新打开浏览器后仍保持登录态
+- 不勾选时：重新打开浏览器后需重新登录（token 被清除）
+- 实现机制：`sessionStorage("voicenote:sessionAlive")` 标记当前浏览器会话，`useAuth` initAuth 时检查该标记 + autoLogin 偏好决定是否清除 token
+- 自动登录状态存 `localStorage("voicenote:autoLogin")` = "1" | "0"
 
-**密码记忆（浏览器原生）：**
-- 确保表单结构符合浏览器密码管理器识别标准
-- `input[type=tel][autoComplete=tel]` for phone
-- `input[type=password][autoComplete=current-password]` for login
-- 当前已基本符合
+**表单 autoComplete 属性：**
+- 账号输入框加 `name="phone"` / `name="email"` 属性帮助浏览器正确区分
+- 注册页昵称输入框 `autoComplete="off"` 防止浏览器将昵称误填入登录页账号栏
 
 #### Fix 6：密码显示/隐藏切换 <!-- ✅ completed -->
 

@@ -2,12 +2,14 @@
 
 import { useMemo, useState, useRef, useCallback, useEffect, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { MapPin, Clock, Trash2, X, CheckCircle2, Mic, Paperclip, MoreVertical, Pencil, Copy } from "lucide-react";
+import { MapPin, Clock, Trash2, X, CheckCircle2, Mic, Paperclip, MoreVertical, Pencil, Copy, RotateCcw, AlertTriangle, HardDrive } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useNotes } from "@/features/notes/hooks/use-notes";
 import { useNoteDetail } from "@/features/notes/hooks/use-note-detail";
 import { MiniAudioPlayer } from "./mini-audio-player";
 import { fabNotify } from "@/shared/lib/fab-notify";
+import { getAudioByRecordId, deleteAudio, addWavHeader, type PendingAudio } from "@/features/recording/lib/audio-cache";
+import { retryRecordAudio, deleteRecords } from "@/shared/lib/api/records";
 import type { NoteItem } from "@/shared/lib/types";
 import { InsightCard } from "./insight-card";
 import { MarkdownContent } from "@/shared/components/markdown-content";
@@ -222,7 +224,7 @@ export function NotesTimeline({ filter, notebook, clusterId, domainFilter, onOpe
 
       {/* Selection toolbar */}
       {selectionMode && (
-        <div className="fixed bottom-0 left-0 right-0 z-40 bg-background/95 backdrop-blur-xl border-t border-border pb-safe">
+        <div className="fixed left-0 right-0 z-40 bg-background/95 backdrop-blur-xl border-t border-border pb-safe" style={{ bottom: "var(--kb-offset, 0px)", transition: "bottom 150ms ease-out" }}>
           <div className="max-w-lg mx-auto flex items-center justify-between px-4 py-3">
             <button
               type="button"
@@ -359,9 +361,116 @@ function TimelineCard({
     }
   }, [onDelete]);
 
+  // pending_retry: 录音未处理，显示播放条+重试按钮
+  const [retrying, setRetrying] = useState(false);
+  const [localCache, setLocalCache] = useState<PendingAudio | null>(null);
+  const localCacheFetched = useRef(false);
+
+  // 检查是否有本地缓存（pending_retry 时立即查，展开时也查）
+  useEffect(() => {
+    if (localCacheFetched.current) return;
+    if (note.status === "pending_retry" || expanded) {
+      localCacheFetched.current = true;
+      getAudioByRecordId(note.id).then((cache) => {
+        if (cache) setLocalCache(cache);
+      }).catch(() => {});
+    }
+  }, [note.id, note.status, expanded]);
+
+  const handleRetry = useCallback(async () => {
+    if (!localCache || retrying) return;
+    setRetrying(true);
+    try {
+      const wavData = addWavHeader(localCache.pcmData);
+      await retryRecordAudio(note.id, wavData);
+      fabNotify.success("重试成功，正在处理");
+      // 会通过 process.result WS 消息刷新
+    } catch (err: any) {
+      fabNotify.error("重试失败: " + (err.message || "请检查网络"));
+    } finally {
+      setRetrying(false);
+    }
+  }, [localCache, retrying, note.id]);
+
+  const handleDeleteLocalAudio = useCallback(async () => {
+    if (!localCache) return;
+    if (note.status === "pending_retry") {
+      // 未处理的录音：确认后删除缓存+record
+      if (!confirm("该录音尚未处理，删除后无法恢复，确定？")) return;
+      try {
+        await deleteAudio(localCache.id);
+        await deleteRecords([note.id]);
+        onDelete();
+        fabNotify.info("已删除");
+      } catch {
+        fabNotify.error("删除失败");
+      }
+    } else {
+      // 已处理的录音：仅删缓存
+      try {
+        await deleteAudio(localCache.id);
+        setLocalCache(null);
+        fabNotify.info("本地录音已清除");
+      } catch {
+        fabNotify.error("清除失败");
+      }
+    }
+    setMenuPos(null);
+  }, [localCache, note.id, note.status, onDelete]);
+
+  if (note.status === "pending_retry") {
+    return (
+      <div
+        className="rounded-2xl p-5 bg-card shadow-sm border border-orange-200/50 animate-card-enter"
+        style={{ animationDelay: `${index * 60}ms` }}
+      >
+        <div className="flex items-center gap-2 mb-3">
+          <AlertTriangle className="w-4 h-4 text-orange-500" />
+          <span className="text-sm text-orange-600 font-medium">录音未处理</span>
+          <span className="flex-1" />
+          <button
+            type="button"
+            onClick={handleRetry}
+            disabled={retrying || !localCache}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-medium disabled:opacity-50 transition-opacity"
+          >
+            {retrying ? (
+              <div className="w-3.5 h-3.5 rounded-full border-2 border-primary-foreground/30 border-t-primary-foreground animate-spin" />
+            ) : (
+              <RotateCcw className="w-3.5 h-3.5" />
+            )}
+            {retrying ? "重试中..." : "重试"}
+          </button>
+        </div>
+        {localCache && (
+          <MiniAudioPlayer recordId={note.id} localPcmData={localCache.pcmData} />
+        )}
+        <div className="flex items-center gap-1.5 mt-3 text-muted-foreground/60">
+          <Clock className="w-3 h-3" />
+          <span className="text-[11px] font-mono tabular-nums">{note.time}</span>
+          {note.duration_seconds != null && note.duration_seconds > 0 && (
+            <>
+              <span>·</span>
+              <Mic className="w-3 h-3" />
+              <span className="text-[11px]">{formatDuration(note.duration_seconds)}</span>
+            </>
+          )}
+          <span className="flex-1" />
+          <button
+            type="button"
+            onClick={handleDeleteLocalAudio}
+            className="text-[11px] text-destructive/60 hover:text-destructive transition-colors"
+          >
+            删除
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   // Only show skeleton if still processing AND no content available yet
   const hasContent = !!(note.short_summary || note.title !== "处理中...");
-  const isProcessing = note.status !== "completed" && note.status !== "error" && note.status !== "failed" && !hasContent;
+  const isProcessing = note.status !== "completed" && note.status !== "error" && note.status !== "failed" && note.status !== "pending_retry" && !hasContent;
 
   if (isProcessing) {
     return (
@@ -626,6 +735,16 @@ function TimelineCard({
               <Copy className="w-4 h-4" />
               复制
             </button>
+            {localCache && (
+              <button
+                type="button"
+                onClick={handleDeleteLocalAudio}
+                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground hover:bg-secondary/60 transition-colors"
+              >
+                <HardDrive className="w-4 h-4" />
+                删除本地录音
+              </button>
+            )}
             <button
               type="button"
               onClick={handleDeleteSingle}

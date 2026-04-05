@@ -8,6 +8,8 @@ import { api } from "@/shared/lib/api";
 interface MiniAudioPlayerProps {
   recordId: string;
   className?: string;
+  /** 本地 PCM 数据（用于 pending_retry 条目播放，无需从 OSS 获取） */
+  localPcmData?: ArrayBuffer;
 }
 
 function seededBars(seed: string, count: number): number[] {
@@ -23,7 +25,7 @@ function seededBars(seed: string, count: number): number[] {
   return bars;
 }
 
-export function MiniAudioPlayer({ recordId, className }: MiniAudioPlayerProps) {
+export function MiniAudioPlayer({ recordId, className, localPcmData }: MiniAudioPlayerProps) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [playing, setPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -69,8 +71,23 @@ export function MiniAudioPlayer({ recordId, className }: MiniAudioPlayerProps) {
       return;
     }
 
-    // Fetch signed URL from gateway
     setLoading(true);
+
+    // 本地 PCM 数据：添加 WAV header 后生成 blob URL
+    if (localPcmData) {
+      try {
+        const { addWavHeader } = await import("@/features/recording/lib/audio-cache");
+        const wavData = addWavHeader(localPcmData);
+        const blob = new Blob([wavData], { type: "audio/wav" });
+        setAudioSrc(URL.createObjectURL(blob));
+      } catch {
+        setError(true);
+        setLoading(false);
+      }
+      return;
+    }
+
+    // Fetch signed URL from gateway
     try {
       const data = await api.get(`/api/v1/records/${recordId}/audio`) as { url: string };
       setAudioSrc(data.url);
@@ -78,7 +95,7 @@ export function MiniAudioPlayer({ recordId, className }: MiniAudioPlayerProps) {
       setError(true);
       setLoading(false);
     }
-  }, [recordId, audioSrc, playing, error, updateProgress]);
+  }, [recordId, audioSrc, playing, error, updateProgress, localPcmData]);
 
   // Auto-play when audioSrc is set
   useEffect(() => {

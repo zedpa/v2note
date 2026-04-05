@@ -8,6 +8,10 @@ const config: CapacitorConfig = {
     androidScheme: 'https',
   },
   plugins: {
+    Keyboard: {
+      resize: "none",    // 关闭原生 resize，由 ViewportHeightManager 统一管理
+      scroll: false,     // 禁止 WebView 自动滚动到 input
+    },
     SplashScreen: {
       launchShowDuration: 2000,
       launchAutoHide: true,
