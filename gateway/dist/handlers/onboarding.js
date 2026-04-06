@@ -1,286 +1,68 @@
 /**
- * Onboarding handler v2 — AI 驱动的冷启动对话。
+ * Onboarding handler v3 — 极简两步引导。
  *
- * 核心变化（v1 → v2）：
- * - 不再创建日记 / transcript / digest
- * - 每步调 AI（fast tier）生成回应 + 下一问
- * - 只写 UserProfile 字段
- * - Q5 完成后触发 seedWelcomeDiaries + seedGoals + Profile/Soul 初始化
+ * Step 1: 输入名字 → 存 UserProfile.name
+ * Step 2: 输入一句话 → 调用 process pipeline → 返回 AI 拆解结果
+ *
+ * 不再创建欢迎日记 / seed goals / seed strikes。
+ * 不再收集 occupation / current_focus / pain_points / review_time。
  */
-import { userProfileRepo, todoRepo, strikeRepo } from "../db/repositories/index.js";
-import { chatCompletion } from "../ai/provider.js";
-import { seedWelcomeDiaries } from "./welcome-seed.js";
-import { updateProfile } from "../profile/manager.js";
-import { buildOnboardingSystemPrompt, buildOnboardingMessages, FALLBACK_QUESTIONS, } from "./onboarding-prompt.js";
-/** @deprecated 使用 handleOnboardingChat 替代 */
-export async function handleOnboardingAnswer(input) {
+import { userProfileRepo, recordRepo, transcriptRepo } from "../db/repositories/index.js";
+import { processEntry } from "./process.js";
+// ── 主接口 ──────────────────────────────────────────────────
+export async function handleOnboardingChat(input) {
     const { userId, deviceId, step, answer } = input;
     const trimmed = answer.trim();
-    if (!trimmed) {
-        return { ok: true, recordCreated: false, skipped: true };
-    }
-    // 只存 profile，不创建日记
+    // ── Step 1: 存名字 ──
     if (step === 1) {
-        await userProfileRepo.upsertOnboardingField(userId, "name", trimmed, deviceId);
+        const name = trimmed || "用户";
+        await userProfileRepo.upsertOnboardingField(userId, "name", name, deviceId);
+        console.log(`[onboarding] Step 1: saved name="${name}" for user ${userId}`);
+        return { step: 1, done: false, name };
     }
-    if (step === 5) {
+    // ── Step 2: 调用 process pipeline，返回 AI 拆解结果 ──
+    if (step === 2) {
+        // 标记 onboarding 完成
         await userProfileRepo.upsertOnboardingField(userId, "onboarding_done", "true", deviceId);
+        if (!trimmed) {
+            console.log("[onboarding] Step 2: empty input, skipping process");
+            return { step: 2, done: true };
+        }
         try {
-            await seedWelcomeDiaries(userId, deviceId);
-        }
-        catch (e) {
-            console.error("[onboarding] Welcome seed failed:", e);
-        }
-    }
-    return { ok: true, recordCreated: false, skipped: false };
-}
-// ── 新接口：AI 驱动对话 ─────────────────────────────────────
-export async function handleOnboardingChat(input) {
-    const { userId, deviceId, step, answer, history } = input;
-    const trimmed = answer.trim();
-    // 收集所有提取到的字段
-    const extracted = {};
-    // Q1: 存名字
-    if (step === 1 && trimmed) {
-        extracted.name = trimmed;
-        await userProfileRepo.upsertOnboardingField(userId, "name", trimmed, deviceId);
-    }
-    // 空回答 = 跳过（AI 生成不含回应的下一问）
-    if (!trimmed) {
-        const nextStep = Math.min(step + 1, 6);
-        const done = nextStep > 5;
-        if (done) {
-            await finishOnboarding(userId, deviceId, extracted, history);
-        }
-        const fallback = FALLBACK_QUESTIONS[step] ?? "我们开始吧 ✨";
-        return { reply: fallback, nextStep, done, extracted };
-    }
-    // 调 AI 生成回应
-    let reply;
-    let aiExtracted = {};
-    let skipTo = null;
-    try {
-        const userName = extracted.name ?? getUserNameFromHistory(history) ?? null;
-        const systemPrompt = buildOnboardingSystemPrompt(step, userName);
-        const messages = buildOnboardingMessages(systemPrompt, history, trimmed);
-        const aiResult = await chatCompletion(messages, {
-            tier: "fast",
-            json: true,
-            temperature: 0.7,
-            timeout: 8000,
-        });
-        const parsed = parseAIResponse(aiResult.content);
-        reply = parsed.reply;
-        aiExtracted = parsed.extracted_fields;
-        skipTo = parsed.skip_to;
-        console.log(`[onboarding] Q${step} AI reply: ${reply}`);
-    }
-    catch (e) {
-        console.warn(`[onboarding] AI call failed for Q${step}:`, e.message);
-        // Fallback 到硬编码
-        reply = FALLBACK_QUESTIONS[step] ?? "我们继续吧";
-    }
-    // 合并 AI 提取的字段
-    if (aiExtracted.occupation)
-        extracted.occupation = aiExtracted.occupation;
-    if (aiExtracted.current_focus)
-        extracted.current_focus = aiExtracted.current_focus;
-    if (aiExtracted.pain_points)
-        extracted.pain_points = aiExtracted.pain_points;
-    if (aiExtracted.review_time)
-        extracted.review_time = aiExtracted.review_time;
-    if (aiExtracted.dimensions?.length)
-        extracted.dimensions = aiExtracted.dimensions;
-    if (aiExtracted.seed_goals?.length) {
-        extracted.seed_goals = [
-            ...(extracted.seed_goals ?? []),
-            ...aiExtracted.seed_goals,
-        ];
-    }
-    // 按 step 存储字段
-    await saveExtractedFields(userId, deviceId, step, trimmed, extracted);
-    // 计算下一步
-    const nextStep = skipTo ?? Math.min(step + 1, 6);
-    const done = nextStep > 5 || step >= 5;
-    // 完成 onboarding
-    if (done) {
-        await finishOnboarding(userId, deviceId, extracted, history, trimmed);
-    }
-    return { reply, nextStep: Math.min(nextStep, 6), done, extracted };
-}
-// ── 内部函数 ─────────────────────────────────────────────────
-/** 从历史对话中提取用户名字（Q1 回答） */
-function getUserNameFromHistory(history) {
-    // 第一条 user 消息通常是名字
-    const firstUserMsg = history.find((m) => m.role === "user");
-    return firstUserMsg?.text?.trim() || null;
-}
-/** 解析 AI JSON 回应 */
-function parseAIResponse(content) {
-    // 清理可能的 markdown code block
-    const cleaned = content.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
-    const defaults = { extracted_fields: {}, skip_to: null };
-    // 1. 尝试直接解析完整 JSON
-    try {
-        const parsed = JSON.parse(cleaned);
-        return {
-            reply: parsed.reply ?? "",
-            extracted_fields: parsed.extracted_fields ?? {},
-            skip_to: parsed.skip_to ?? null,
-        };
-    }
-    catch {
-        // not valid JSON — continue
-    }
-    // 2. AI 可能输出 "文本 + JSON" 混合格式，用 regex 找 JSON 块（兼容 `{ "reply"` 有空格）
-    const jsonMatch = cleaned.match(/\{\s*"reply"\s*:/);
-    if (jsonMatch?.index !== undefined) {
-        const jsonStr = cleaned.slice(jsonMatch.index);
-        // 2a. 尝试完整解析 JSON 块
-        try {
-            const parsed = JSON.parse(jsonStr);
+            // 创建 record + transcript
+            const record = await recordRepo.create({
+                device_id: deviceId,
+                user_id: userId,
+                status: "processing",
+                source: "manual",
+            });
+            await transcriptRepo.create({ record_id: record.id, text: trimmed, language: "zh" });
+            // 同步调用 process pipeline
+            const processResult = await processEntry({
+                text: trimmed,
+                deviceId,
+                userId,
+                recordId: record.id,
+                sourceContext: "timeline",
+            });
+            console.log(`[onboarding] Step 2: processed record ${record.id}`);
             return {
-                reply: parsed.reply ?? "",
-                extracted_fields: parsed.extracted_fields ?? {},
-                skip_to: parsed.skip_to ?? null,
+                step: 2,
+                done: true,
+                summary: processResult.summary ?? trimmed,
+                todos: processResult.todos ?? [],
+                tags: processResult.tags ?? [],
+                recordId: record.id,
             };
         }
-        catch {
-            // 2b. JSON 可能被截断，用 regex 提取 reply 字段值
-            const replyMatch = jsonStr.match(/"reply"\s*:\s*"((?:[^"\\]|\\.)*)"/);
-            if (replyMatch) {
-                const reply = replyMatch[1].replace(/\\"/g, '"').replace(/\\n/g, "\n");
-                return { reply, ...defaults };
-            }
+        catch (e) {
+            console.error("[onboarding] Step 2 process failed:", e.message);
+            // 即使处理失败也标记完成
+            return { step: 2, done: true };
         }
     }
-    // 3. 最终 fallback：去掉可能混入的 JSON 碎片，只保留纯文本
-    const textOnly = cleaned.replace(/\{[\s\S]*$/, "").trim();
-    if (textOnly) {
-        return { reply: textOnly, ...defaults };
-    }
-    // 4. 全部失败：返回原始内容前 100 字（去掉 JSON 碎片）
-    return { reply: cleaned.replace(/[{}"\[\]]/g, "").slice(0, 100).trim(), ...defaults };
-}
-/** 按 step 存储提取的字段到 UserProfile */
-async function saveExtractedFields(userId, deviceId, step, answer, extracted) {
-    // ── 1. 存储 profile 字段（失败不阻塞种子创建）──
-    try {
-        if (step === 2) {
-            const occupation = extracted.occupation ?? answer;
-            await userProfileRepo.upsertOnboardingField(userId, "occupation", occupation, deviceId);
-        }
-        if (step === 3) {
-            const focus = extracted.current_focus ?? answer;
-            await userProfileRepo.upsertOnboardingField(userId, "current_focus", focus, deviceId);
-        }
-        if (step === 4) {
-            const pain = extracted.pain_points ?? answer;
-            await userProfileRepo.upsertOnboardingField(userId, "pain_points", pain, deviceId);
-        }
-        if (step === 5) {
-            const time = extracted.review_time ?? answer;
-            await userProfileRepo.upsertOnboardingField(userId, "review_time", time, deviceId);
-        }
-    }
-    catch (e) {
-        console.warn(`[onboarding] saveExtractedFields Q${step} profile failed:`, e.message);
-    }
-    // ── 2. 种子目标创建（独立于 profile 存储）──
-    if ((step === 2 || step === 3) && extracted.seed_goals?.length) {
-        seedGoals(userId, deviceId, extracted.seed_goals, extracted).catch((e) => console.warn(`[onboarding] Goal seeding Q${step} failed:`, e.message));
-    }
-}
-/** 创建种子目标 + 种子 Strike（供后续聚类使用） */
-async function seedGoals(userId, deviceId, seedGoalTitles, extracted) {
-    // 收集所有种子目标标题（去重）
-    const titles = [...new Set(seedGoalTitles)];
-    // 如果 AI 没提取到任何 seed_goals，从 occupation / current_focus 生成 fallback
-    if (titles.length === 0) {
-        if (extracted.current_focus)
-            titles.push(extracted.current_focus);
-        if (extracted.occupation && titles.length === 0)
-            titles.push(extracted.occupation);
-    }
-    if (titles.length === 0) {
-        console.log("[onboarding] No seed goals to create");
-        return;
-    }
-    // 查已有目标，避免跨步骤重复创建
-    const existing = userId
-        ? await todoRepo.findByUser(userId)
-        : await todoRepo.findByDevice(deviceId);
-    const existingTexts = new Set(existing.filter((t) => (t.level ?? 0) >= 1).map((t) => t.text));
-    const newTitles = titles.slice(0, 6).filter((t) => !existingTexts.has(t));
-    if (newTitles.length === 0) {
-        console.log("[onboarding] All seed goals already exist, skipping");
-        return;
-    }
-    for (const title of newTitles) {
-        // 创建 level=1 目标
-        await todoRepo.createGoalAsTodo({
-            user_id: userId,
-            device_id: deviceId,
-            text: title,
-            level: 1,
-            status: "active",
-        });
-        // 创建对应的种子 Strike（为 batch-analyze 提供锚点）
-        await strikeRepo.create({
-            user_id: userId,
-            nucleus: title,
-            polarity: "intend",
-            is_cluster: false,
-            confidence: 0.8,
-            salience: 1.0,
-            source_type: "onboarding",
-        });
-    }
-    console.log(`[onboarding] Seeded ${newTitles.length} goals + strikes: ${newTitles.join(", ")}`);
-}
-/** Onboarding 完成：标记 done + 欢迎日记 + Profile/Soul 初始化 */
-async function finishOnboarding(userId, deviceId, extracted, history, lastAnswer) {
-    // 标记完成
-    try {
-        await userProfileRepo.upsertOnboardingField(userId, "onboarding_done", "true", deviceId);
-    }
-    catch (e) {
-        console.warn("[onboarding] Mark done failed:", e.message);
-    }
-    // 插入欢迎日记
-    try {
-        const seedResult = await seedWelcomeDiaries(userId, deviceId);
-        console.log(`[onboarding] Welcome seed: created=${seedResult.created}`);
-    }
-    catch (e) {
-        console.error("[onboarding] Welcome seed failed:", e);
-    }
-    // 拼接完整对话（含 AI 问题），让 Profile 更新能正确理解上下文
-    const conversationParts = [];
-    for (const m of history) {
-        const prefix = m.role === "ai" ? "AI" : "用户";
-        conversationParts.push(`${prefix}：${m.text}`);
-    }
-    if (lastAnswer)
-        conversationParts.push(`用户：${lastAnswer}`);
-    const fullConversation = conversationParts.join("\n");
-    if (fullConversation.trim()) {
-        // 写入 UserProfile.content（只存用户回答的摘要）
-        const userAnswers = history
-            .filter((m) => m.role === "user")
-            .map((m) => m.text);
-        if (lastAnswer)
-            userAnswers.push(lastAnswer);
-        try {
-            await userProfileRepo.upsertByUser(userId, userAnswers.join("\n"));
-        }
-        catch {
-            // 可能 user 还没有 profile 行（由前面的 upsertOnboardingField 创建）
-        }
-        // Fire-and-forget: 仅 Profile 初始化
-        // 冷启动五问全是用户信息（名字、职业、焦点），不涉及 AI 身份，不触发 Soul 更新
-        updateProfile(deviceId, fullConversation, userId).catch((e) => console.warn("[onboarding] Profile init failed:", e.message));
-    }
-    console.log("[onboarding] ✅ Onboarding completed for user", userId);
+    // 非法 step
+    await userProfileRepo.upsertOnboardingField(userId, "onboarding_done", "true", deviceId);
+    return { step: 2, done: true };
 }
 //# sourceMappingURL=onboarding.js.map

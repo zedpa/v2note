@@ -11,7 +11,7 @@ describe("ai-diary repository", () => {
         vi.clearAllMocks();
     });
     describe("upsertEntry", () => {
-        it("inserts new diary entry", async () => {
+        it("inserts new diary entry when none exists", async () => {
             const mockEntry = {
                 id: "d-1",
                 device_id: "dev-1",
@@ -22,17 +22,30 @@ describe("ai-diary repository", () => {
                 created_at: "2026-03-12T00:00:00Z",
                 updated_at: "2026-03-12T00:00:00Z",
             };
-            vi.mocked(queryOne).mockResolvedValue(mockEntry);
+            // 第一次 queryOne: findFull → null（不存在）
+            // 第二次 queryOne: INSERT RETURNING
+            vi.mocked(queryOne)
+                .mockResolvedValueOnce(null)
+                .mockResolvedValueOnce(mockEntry);
             const result = await upsertEntry("dev-1", "default", "2026-03-12", "今天写了代码");
             expect(result).toEqual(mockEntry);
-            expect(queryOne).toHaveBeenCalledWith(expect.stringContaining("ON CONFLICT"), ["dev-1", null, "default", "2026-03-12", "今天写了代码"]);
+            // 第二次调用应该是 INSERT
+            const insertSql = vi.mocked(queryOne).mock.calls[1][0];
+            expect(insertSql).toContain("INSERT INTO ai_diary");
         });
-        it("appends to existing entry on conflict", async () => {
-            vi.mocked(queryOne).mockResolvedValue({ id: "d-1", full_content: "Earlier\n\nLater" });
-            await upsertEntry("dev-1", "default", "2026-03-12", "Later");
-            // The SQL uses string concatenation on conflict
-            const sql = vi.mocked(queryOne).mock.calls[0][0];
-            expect(sql).toContain("full_content || ");
+        it("appends to existing entry via UPDATE", async () => {
+            const existing = { id: "d-1", full_content: "Earlier" };
+            const updated = { id: "d-1", full_content: "Earlier\n\nLater" };
+            // 第一次 queryOne: findFull → 已存在
+            // 第二次 queryOne: UPDATE RETURNING
+            vi.mocked(queryOne)
+                .mockResolvedValueOnce(existing)
+                .mockResolvedValueOnce(updated);
+            const result = await upsertEntry("dev-1", "default", "2026-03-12", "Later");
+            expect(result.full_content).toContain("Later");
+            // 第二次调用应该是 UPDATE with string concat
+            const updateSql = vi.mocked(queryOne).mock.calls[1][0];
+            expect(updateSql).toContain("full_content || ");
         });
     });
     describe("findByDate", () => {

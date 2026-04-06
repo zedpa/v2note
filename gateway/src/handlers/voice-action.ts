@@ -325,7 +325,11 @@ async function executeQueryTodo(action: VoiceAction, ctx: ActionContext): Promis
     if (targetDate) {
       filtered = todos.filter((t: any) => {
         if (!t.scheduled_start) return false;
-        const todoDate = t.scheduled_start.split("T")[0];
+        // scheduled_start 可能是 string 或 Date 对象
+        const startStr = typeof t.scheduled_start === "string"
+          ? t.scheduled_start
+          : new Date(t.scheduled_start).toISOString();
+        const todoDate = startStr.split("T")[0];
         return todoDate === targetDate;
       });
     }

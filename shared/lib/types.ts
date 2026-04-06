@@ -177,6 +177,8 @@ export interface NoteItem {
   file_name: string | null
   created_at: string
   domain?: string | null
+  source?: string | null
+  source_type?: string | null
 }
 
 // Composite type for note detail

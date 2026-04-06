@@ -127,6 +127,17 @@ export function registerRecordRoutes(router: Router) {
     sendJson(res, items);
   });
 
+  // 获取用户的 domain 列表 + 每个 domain 的记录数（侧边栏文件夹）
+  router.get("/api/v1/records/domains", async (req, res) => {
+    const userId = getUserId(req);
+    if (!userId) {
+      sendJson(res, { domains: [] });
+      return;
+    }
+    const domains = await recordRepo.listUserDomainsWithCount(userId);
+    sendJson(res, { domains });
+  });
+
   // Get single record (with all associations)
   router.get("/api/v1/records/:id", async (req, res, params) => {
     const record = await recordRepo.findById(params.id);

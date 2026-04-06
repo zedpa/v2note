@@ -28,6 +28,10 @@ const config: CapacitorConfig = {
     CapacitorUpdater: {
       autoUpdate: false,
     },
+    LocalNotifications: {
+      smallIcon: "ic_stat_notification",
+      iconColor: "#FF6B2B",
+    },
   },
 };
 

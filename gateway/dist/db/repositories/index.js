@@ -26,4 +26,5 @@ export * as strikeTagRepo from "./strike-tag.js";
 export * as snapshotRepo from "./snapshot.js";
 export * as vocabularyRepo from "./vocabulary.js";
 export * as notificationRepo from "./notification.js";
+export * as chatMessageRepo from "./chat-message.js";
 //# sourceMappingURL=index.js.map

@@ -190,6 +190,44 @@ export async function updateCreatedAt(id, createdAt) {
     await execute(`UPDATE record SET created_at = $2, updated_at = now() WHERE id = $1`, [id, createdAt]);
 }
 /** 更新层级标签（L1/L2/L3 涌现结构反向标注） */
+/** 更新 record 的自动归类 domain */
+export async function updateDomain(id, domain) {
+    await execute(`UPDATE record SET domain = $1, updated_at = now() WHERE id = $2`, [domain, id]);
+}
+/** 查询用户已有的 domain 列表（去重，按使用频次降序） */
+export async function listUserDomains(userId) {
+    const rows = await query(`SELECT domain FROM record
+     WHERE user_id = $1 AND domain IS NOT NULL
+     GROUP BY domain ORDER BY count(*) DESC`, [userId]);
+    return rows.map(r => r.domain);
+}
+/** 查询用户 domain 列表 + 计数（供侧边栏文件夹展示） */
+export async function listUserDomainsWithCount(userId) {
+    return query(`SELECT domain, count(*)::int as count FROM record
+     WHERE user_id = $1 AND domain IS NOT NULL
+     GROUP BY domain ORDER BY count(*) DESC`, [userId]);
+}
+/** 批量替换 domain 前缀（rename/merge 用） */
+export async function batchUpdateDomain(userId, oldPrefix, newPrefix) {
+    // 精确匹配 + 子级路径匹配
+    const result = await execute(`UPDATE record SET
+       domain = $3 || SUBSTRING(domain FROM LENGTH($2) + 1),
+       updated_at = now()
+     WHERE user_id = $1 AND (domain = $2 OR domain LIKE $2 || '/%')`, [userId, oldPrefix, newPrefix]);
+    return result?.rowCount ?? 0;
+}
+/** 清空指定前缀的 domain（delete folder 用） */
+export async function clearDomainByPrefix(userId, prefix) {
+    const result = await execute(`UPDATE record SET domain = NULL, updated_at = now()
+     WHERE user_id = $1 AND (domain = $2 OR domain LIKE $2 || '/%')`, [userId, prefix]);
+    return result?.rowCount ?? 0;
+}
+/** 统计未分类记录数 */
+export async function countUncategorized(userId) {
+    const row = await queryOne(`SELECT count(*)::int as count FROM record
+     WHERE user_id = $1 AND domain IS NULL`, [userId]);
+    return row?.count ?? 0;
+}
 export async function updateHierarchyTags(id, tags) {
     await execute(`UPDATE record SET hierarchy_tags = $1::jsonb, updated_at = now() WHERE id = $2`, [JSON.stringify(tags), id]);
 }

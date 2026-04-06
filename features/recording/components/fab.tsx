@@ -79,6 +79,7 @@ export function FAB({
   const asrDoneTimerRef = useRef<NodeJS.Timeout | null>(null); // asr.done 超时检测
   const streamingRef = useRef(false);
   const preCaptureAbortRef = useRef(false);
+  const preCaptureDelayRef = useRef<NodeJS.Timeout | null>(null);
   const activeNotebookRef = useRef(activeNotebook);
   activeNotebookRef.current = activeNotebook;
   const sourceContextRef = useRef(sourceContext);
@@ -320,6 +321,10 @@ export function FAB({
   }, [recorder]);
 
   const stopPreCapture = useCallback(() => {
+    if (preCaptureDelayRef.current) {
+      clearTimeout(preCaptureDelayRef.current);
+      preCaptureDelayRef.current = null;
+    }
     preCaptureAbortRef.current = true;
     if (recorder.isActive.current) {
       recorder.cancelRecording();
@@ -555,6 +560,11 @@ export function FAB({
 
   const gestures = useFabGestures({
     onTap: () => {
+      // 短按：取消延迟启动的 pre-capture，避免 AudioWorkletNode 创建报错
+      if (preCaptureDelayRef.current) {
+        clearTimeout(preCaptureDelayRef.current);
+        preCaptureDelayRef.current = null;
+      }
       stopPreCapture();
     },
     onLongPressStart: () => {
@@ -611,9 +621,6 @@ export function FAB({
     return (
       <RecordingImmersive
         duration={displayDuration}
-        waveHeights={waveHeights}
-        confirmedText={confirmedText}
-        partialText={partialText}
         paused={lockedPaused}
         onTogglePause={toggleLockedPause}
         onCancel={() => {
@@ -886,7 +893,12 @@ export function FAB({
               onPointerDown={(e) => {
                 longPressTriggeredRef.current = false;
                 pointerIdRef.current = e.pointerId;
-                startPreCapture();
+                // 延迟启动 pre-capture，短按(tap)时会在 onTap 中清除，避免无谓的 AudioContext 创建
+                if (preCaptureDelayRef.current) clearTimeout(preCaptureDelayRef.current);
+                preCaptureDelayRef.current = setTimeout(() => {
+                  preCaptureDelayRef.current = null;
+                  startPreCapture();
+                }, 120);
                 handlers.onPointerDown(e);
               }}
               onClick={() => {
@@ -896,24 +908,24 @@ export function FAB({
               }}
               className={cn(
                 "relative flex items-center justify-center rounded-full select-none touch-none transition-all duration-300",
-                "text-white",
-                phase === "idle" && "w-14 h-14",
-                phase === "pressing" && "w-16 h-16 scale-105",
-                phase === "recording" && "w-14 h-14",
+                "text-white backdrop-blur-xl",
+                phase === "idle" && "w-16 h-16",
+                phase === "pressing" && "w-[70px] h-[70px] scale-105",
+                phase === "recording" && "w-16 h-16",
               )}
               style={{
                 background: phase === "recording"
-                  ? "#C45C5C"
-                  : "linear-gradient(135deg, #89502C, #C8845C)",
-                boxShadow: "0 8px 24px rgba(28, 28, 24, 0.06)",
+                  ? "rgba(196,92,92,0.75)"
+                  : "rgba(137,80,44,0.55)",
+                boxShadow: "0 8px 24px rgba(28, 28, 24, 0.08), inset 0 1px 0 rgba(255,255,255,0.15)",
               }}
             >
               {phase === "idle" ? (
-                <Mic className="w-6 h-6" />
+                <Mic className="w-8 h-8" />
               ) : (
                 <Mic className={cn(
                   "transition-all duration-200",
-                  phase === "recording" ? "w-6 h-6 animate-pulse" : "w-7 h-7",
+                  phase === "recording" ? "w-8 h-8 animate-pulse" : "w-9 h-9",
                 )} />
               )}
             </button>

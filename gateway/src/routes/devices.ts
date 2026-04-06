@@ -1,7 +1,6 @@
 import type { Router } from "../router.js";
 import { readBody, sendJson, getDeviceId } from "../lib/http-helpers.js";
 import { deviceRepo } from "../db/repositories/index.js";
-import { seedWelcomeDiaries } from "../handlers/welcome-seed.js";
 
 export function registerDeviceRoutes(router: Router) {
   // Register device（原子操作：防止并发重复创建欢迎日记）

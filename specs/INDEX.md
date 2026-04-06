@@ -10,7 +10,7 @@
 6. superseded 状态的 spec 已被合并，永远不要引用它们，使用 superseded_by 指向的文件
 -->
 
-> 最后更新：2026-04-04 | 共 88 个 spec（19 active / 4 draft / 34 completed / 29 superseded / 2 deprecated）
+> 最后更新：2026-04-06 | 共 93 个 spec（22 active / 4 draft / 37 completed / 29 superseded / 2 deprecated）
 
 ## 🔵 Active（当前有效，可直接引用和修改）
 
@@ -18,7 +18,7 @@
 |----|-------|--------|------|---------|
 | 050a | Todo — Core & Logic | todo | todo-core.md | 数据流/AI提取/去重/时间/子任务/Strike关联 |
 | 050b | Todo — UI & Interactions | todo | todo-ui.md | 界面交互 + 实施阶段 |
-| 051 | Chat System | chat | chat-system.md | |
+| 051 | Chat System | chat | chat-system.md | Header/Entry/Greeting/Skill |
 | 053b | Daily Report — Extended | report | daily-report-extended.md | 周月报/历史报告（Phase 2-4 未开始） |
 | 062 | AI 伴侣窗口 | ui | ai-companion-window.md | |
 | 064a | APP Mobile — Views | ui | app-mobile-views.md | 整体结构/顶栏/日记/待办/FAB |
@@ -33,6 +33,8 @@
 | 110 | UI/UX 全局审查与改进 | design | ui-ux-audit.md | 审查完毕,修复0% |
 | 112 | Recording Resilience — 录音防丢 | voice | recording-resilience.md | 本地缓存+断线重试+连接保护 |
 | 114 | 录音入口统一 | voice | voice-input-unify.md | 删InputBar死代码 + ChatView接gateway ASR + useVoiceToText hook |
+| 117 | 工具生态增强 | agent | tool-ecosystem-enhance.md | 读取工具+时间感知+认知层查询+描述优化 |
+| fix-rec-ui | Fix: 录音 UI 精简 | voice | fix-recording-ui.md | 长按半屏面板 + 常驻呼吸浮窗 |
 
 ## 🟡 Draft（规划中，尚未开始实施）
 
@@ -47,6 +49,8 @@
 
 | id | title | domain | file |
 |----|-------|--------|------|
+| fix-tag-limit | Fix: 标签系统清理 — 删除系统标签+限制5个 | cognitive | fix-tag-limit.md |
+| 118 | Chat Persistence — 对话持久化 | chat | chat-persistence.md |
 | 052 | Cold Start & Onboarding | onboarding | cold-start.md |
 | 053a | Daily Report — Core | report | daily-report-core.md |
 | 054a | Auth — Token & Session | auth | auth-core.md |
@@ -87,6 +91,8 @@
 | 103 | 语音控制 v2 | voice | voice-tools-v2.md |
 | 111 | Fix: Voice→Todo 管线接通 | voice | fix-voice-todo-pipeline.md |
 | 113 | 键盘弹出 & Viewport 适配 | ui | keyboard-viewport-adapt.md |
+| 115 | 产品重新定位 — 核心体验精简 | ui | product-repositioning.md |
+| 116 | Chat 工具调用 UI 重构 | chat | chat-tool-ui.md |
 
 ## ⛔ Superseded（已被合并，不要引用）
 

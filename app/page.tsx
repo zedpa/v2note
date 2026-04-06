@@ -4,10 +4,9 @@ import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
 import { initStatusBar } from "@/shared/lib/status-bar";
-import { WorkspaceHeader, type WorkspaceTab, type TopicFilter } from "@/features/workspace/components/workspace-header";
+import { WorkspaceHeader, type WorkspaceTab, type TodoViewMode } from "@/features/workspace/components/workspace-header";
 import { NotesTimeline } from "@/features/notes/components/notes-timeline";
 import { TodoWorkspace } from "@/features/todos/components/todo-workspace";
-import { TopicLifecycleView } from "@/features/workspace/components/topic-lifecycle-view";
 import { FAB } from "@/features/recording/components/fab";
 import { CommandSheet, type TodoCommand } from "@/features/todos/components/command-sheet";
 import { emit } from "@/features/recording/lib/events";
@@ -30,7 +29,13 @@ import { GoalList } from "@/features/goals/components/goal-list";
 import { fabNotify } from "@/shared/lib/fab-notify";
 import { getGatewayClient, type GatewayResponse } from "@/features/chat/lib/gateway-client";
 import { createTodo, updateTodo, deleteTodo } from "@/shared/lib/api/todos";
-import { getSettings } from "@/shared/lib/local-config";
+import { getSettings, setCurrentUserId } from "@/shared/lib/local-config";
+import {
+  scheduleDailyNotifications,
+  cancelDailyNotifications,
+  addNotificationClickListener,
+  requestNotificationPermission,
+} from "@/shared/lib/notifications";
 import { showUndoToast } from "@/features/todos/hooks/use-undo-toast";
 import { getCommandDefs } from "@/features/commands/lib/registry";
 import { on } from "@/features/recording/lib/events";
@@ -79,6 +84,37 @@ export default function Page() {
   const [chatMode, setChatMode] = useState<"review" | "command" | "insight">("review");
   const [chatSkill, setChatSkill] = useState<string | undefined>();
   const [selectedGoalId, setSelectedGoalId] = useState<string | null>(null);
+  const [domainFilter, setDomainFilter] = useState<string | null>(null);
+
+  // ── 文件夹列表：localStorage 缓存 + 事件刷新 ──
+  const [cachedDomains, setCachedDomains] = useState<Array<{ domain: string; count: number }>>(() => {
+    if (typeof window === "undefined") return [];
+    try {
+      return JSON.parse(localStorage.getItem("v2note:domains") || "[]");
+    } catch { return []; }
+  });
+  const fetchDomains = useCallback(() => {
+    api.get<{ domains: Array<{ domain: string; count: number }> }>("/api/v1/records/domains")
+      .then((res) => {
+        const domains = res.domains ?? [];
+        setCachedDomains(domains);
+        localStorage.setItem("v2note:domains", JSON.stringify(domains));
+      })
+      .catch(() => {});
+  }, []);
+  useEffect(() => {
+    if (!loggedIn) return;
+    fetchDomains();
+    // 手动文字输入时 processEntry 在后台运行，domain 可能延迟写入
+    // 额外延迟刷新确保 AI 处理完成后能拿到分类数据
+    let delayTimer: ReturnType<typeof setTimeout>;
+    const unsub = on("recording:processed", () => {
+      fetchDomains();
+      clearTimeout(delayTimer);
+      delayTimer = setTimeout(fetchDomains, 8000);
+    });
+    return () => { unsub(); clearTimeout(delayTimer); };
+  }, [loggedIn, fetchDomains]);
   // CommandSheet 状态（语音指令确认弹窗）
   const [commandSheetOpen, setCommandSheetOpen] = useState(false);
   const [commandSheetTranscript, setCommandSheetTranscript] = useState<string>("");
@@ -86,28 +122,13 @@ export default function Page() {
   const [commandSheetMode, setCommandSheetMode] = useState<"todo" | "agent" | "action">("todo");
   const [commandToolStatuses, setCommandToolStatuses] = useState<string[]>([]);
 
-  // 主题筛选（场景 10: localStorage 持久化）
-  const [topicFilter, setTopicFilter] = useState<TopicFilter | null>(() => {
-    if (typeof window === "undefined") return null;
-    try {
-      const stored = localStorage.getItem("v2note:topicFilter");
-      return stored ? JSON.parse(stored) : null;
-    } catch { return null; }
-  });
-
-  useEffect(() => {
-    if (topicFilter) {
-      localStorage.setItem("v2note:topicFilter", JSON.stringify(topicFilter));
-    } else {
-      localStorage.removeItem("v2note:topicFilter");
-    }
-  }, [topicFilter]);
-
   // Workspace: Segment tab (日记 | 待办)
   const [activeTab, setActiveTab] = useState<WorkspaceTab>(() => {
     if (typeof window === "undefined") return "diary";
     return (localStorage.getItem("v2note:activeTab") as WorkspaceTab) || "diary";
   });
+
+  const [todoViewMode, setTodoViewMode] = useState<TodoViewMode>("time");
 
   // 持久化 tab 选择
   useEffect(() => {
@@ -116,6 +137,11 @@ export default function Page() {
 
   /** null = voice notes timeline, string = diary notebook name */
   const [activeNotebook, setActiveNotebook] = useState<string | null>(null);
+
+  // ── Settings 按用户隔离 ──
+  useEffect(() => {
+    setCurrentUserId(loggedIn && user?.id ? user.id : null);
+  }, [loggedIn, user?.id]);
 
   // Onboarding state — 按用户维度判断，旧设备新用户也能触发冷启动
   const [isFirstTime, setIsFirstTime] = useState(false);
@@ -131,19 +157,73 @@ export default function Page() {
     initStatusBar();
   }, []);
 
-  // Auto-show daily report (7-10am, once per day)
+  // ── 日报定时自动弹出（时间从 settings 读取） ──
   useEffect(() => {
     if (!loggedIn) return;
-    const hour = new Date().getHours();
-    if (hour >= 7 && hour < 10) {
-      const today = new Date().toISOString().split("T")[0];
-      const key = `briefing_shown_${today}`;
-      if (!localStorage.getItem(key)) {
-        localStorage.setItem(key, "1");
-        setActiveOverlay("daily-report");
+    let cancelled = false;
+    getSettings().then((s) => {
+      if (cancelled) return;
+      const now = new Date();
+      const hour = now.getHours();
+      const today = now.toISOString().split("T")[0];
+      const morningH = s.morningBriefingHour ?? 6;
+      const eveningH = s.eveningSummaryHour ?? 22;
+
+      if (hour >= morningH && hour < morningH + 8) {
+        // 早报时段：morningH ~ morningH+8
+        const key = `v2note:morning_shown:${today}`;
+        if (!localStorage.getItem(key)) {
+          localStorage.setItem(key, "1");
+          setActiveOverlay("morning-briefing");
+        }
+      } else if (hour >= eveningH || hour < 4) {
+        // 晚报时段：eveningH ~ 次日4:00
+        const eveningDate = hour < 4
+          ? new Date(now.getTime() - 86400000).toISOString().split("T")[0]
+          : today;
+        const key = `v2note:evening_shown:${eveningDate}`;
+        if (!localStorage.getItem(key)) {
+          localStorage.setItem(key, "1");
+          setActiveOverlay("evening-summary");
+        }
       }
-    }
+    });
+    return () => { cancelled = true; };
   }, [loggedIn]);
+
+  // ── 本地通知调度 + 点击跳转 ──
+  useEffect(() => {
+    if (!loggedIn) return;
+    let removeListener: (() => void) | undefined;
+
+    (async () => {
+      const s = await getSettings();
+      // 调度通知（仅 native 生效）
+      if (s.dailyNotifications) {
+        const granted = await requestNotificationPermission();
+        if (granted) {
+          await scheduleDailyNotifications({
+            morningHour: s.morningBriefingHour ?? 6,
+            eveningHour: s.eveningSummaryHour ?? 22,
+            userName: user?.displayName ?? undefined,
+          });
+        }
+      } else {
+        await cancelDailyNotifications();
+      }
+
+      // 监听通知点击 → 打开日报
+      removeListener = await addNotificationClickListener((action) => {
+        if (action === "morning-briefing") {
+          setActiveOverlay("morning-briefing");
+        } else if (action === "evening-summary") {
+          setActiveOverlay("evening-summary");
+        }
+      });
+    })();
+
+    return () => { removeListener?.(); };
+  }, [loggedIn, user?.displayName]);
 
   // ── CommandSheet: 用 ref 避免闭包捕获过期值 ──
   const activeTabRef = useRef(activeTab);
@@ -215,9 +295,23 @@ export default function Page() {
             break;
           }
 
-          // Layer 3: action_results（voice_intent_type === "action"）
+          // Layer 2/3: action_results（voice_intent_type === "action"）
           if (payload.action_results && Array.isArray(payload.action_results)) {
-            const cmds = payload.action_results as TodoCommand[];
+            // ActionExecResult → TodoCommand 字段映射
+            const ACTION_MAP: Record<string, TodoCommand["action_type"]> = {
+              query_todo: "query", create_todo: "create",
+              complete_todo: "complete", modify_todo: "modify",
+            };
+            const cmds = (payload.action_results as any[]).map((r): TodoCommand => ({
+              action_type: ACTION_MAP[r.action] ?? r.action_type ?? r.action,
+              confidence: r.confidence ?? 1,
+              target_id: r.todo_id,
+              target_hint: r.target_hint,
+              changes: r.changes,
+              query_params: r.query_params,
+              query_result: r.items,  // ActionExecResult.items → TodoCommand.query_result
+              todo: r.todo,
+            }));
 
             getSettings().then((settings) => {
               if (!settings.confirm_before_execute) {
@@ -236,11 +330,13 @@ export default function Page() {
           break;
         }
 
-        // 3) tool.step — Agent 模式下的工具执行状态流
-        case "tool.step": {
-          const { toolName, status } = msg.payload;
-          setCommandToolStatuses((prev) => [...prev, `${toolName}: ${status}`]);
-          setCommandSheetMode("agent");
+        // 3) tool.status — 工具执行状态流（chat 流或 agent 模式）
+        case "tool.status" as string: {
+          const { label } = (msg as any).payload;
+          if (commandSheetOpenRef.current) {
+            setCommandToolStatuses((prev) => [...prev, label]);
+            setCommandSheetMode("agent");
+          }
           break;
         }
       }
@@ -485,12 +581,16 @@ export default function Page() {
   }, []);
   const handleTouchEnd = useCallback(
     (e: React.TouchEvent) => {
+      // 如果手势发生在可侧滑的待办项内，跳过全局手势，避免冲突
+      const target = e.target as HTMLElement;
+      if (target.closest?.("[data-testid='swipeable-task-item']")) return;
+
       const dx = e.changedTouches[0].clientX - touchStartX.current;
       const dy = e.changedTouches[0].clientY - touchStartY.current;
       // 忽略垂直滑动为主的手势
       if (Math.abs(dy) > Math.abs(dx)) return;
-      // 从屏幕左侧（30~200px，避开安卓系统返回手势区）右滑超过 60px → 打开侧边栏
-      if (touchStartX.current > 30 && touchStartX.current < 200 && dx > 60) {
+      // 从屏幕左侧（30~200px，避开安卓系统返回手势区）右滑超过 60px → 打开侧边栏（仅日记页）
+      if (activeTab === "diary" && touchStartX.current > 30 && touchStartX.current < 200 && dx > 60) {
         setShowSidebar(true);
         return;
       }
@@ -569,19 +669,14 @@ export default function Page() {
           if (user?.id) localStorage.setItem(`v2note:onboarded:${user.id}`, "true");
           localStorage.setItem("v2note:onboarded", "true");
           setIsFirstTime(false);
-          // 确保欢迎日记存在（Q5 正常完成时后端已创建，此处兜底）
-          api.post("/api/v1/onboarding/welcome-seed", {}).catch(() => {});
           setTimeout(() => emit("recording:processed"), 500);
         }}
         onSkip={() => {
           if (user?.id) localStorage.setItem(`v2note:onboarded:${user.id}`, "true");
           localStorage.setItem("v2note:onboarded", "true");
           setIsFirstTime(false);
-          // 跳过时前端主动创建欢迎日记
-          api.post("/api/v1/onboarding/welcome-seed", {})
-            .then(() => emit("recording:processed"))
-            .catch(() => {});
-          setTimeout(() => emit("recording:processed"), 500);
+          // 跳过时标记 onboarding 完成
+          api.post("/api/v1/onboarding/chat", { step: 2, answer: "" }).catch(() => {});
         }}
       />
     );
@@ -595,21 +690,11 @@ export default function Page() {
         onViewProfile={() => setActiveOverlay("user-settings")}
         onViewBriefing={() => setActiveOverlay("daily-report")}
         onViewSettings={() => setActiveOverlay("settings")}
-        onViewEvening={() => setActiveOverlay("evening-summary")}
         onViewSearch={() => setActiveOverlay("search")}
-        onViewGoal={(goalId) => {
-          setSelectedGoalId(goalId);
-          setActiveOverlay("goal-detail");
-        }}
-        onViewGoals={() => setActiveOverlay("goals")}
-        onOpenChat={handleOpenCommandChat}
-        onSelectTopic={(clusterId, title) => {
-          setTopicFilter({ clusterId, title });
-          setActiveTab("todo");
-        }}
-        onSelectToday={() => {
-          setTopicFilter(null);
-          setActiveTab("todo");
+        domains={cachedDomains}
+        onSelectDomain={(domain) => {
+          setDomainFilter(domain);
+          setActiveTab("diary");
         }}
         onLogout={logout}
         userName={user?.displayName}
@@ -618,17 +703,18 @@ export default function Page() {
       <OfflineBanner />
       <UpdateDialog update={update} onDismiss={dismiss} applying={applying} />
 
-      {/* Workspace Header: 头像 + Segment(日记|待办) + 搜索 + 通知 */}
+      {/* Workspace Header: 头像 + Segment(日记|待办) + 搜索 */}
       <WorkspaceHeader
         activeTab={activeTab}
         onTabChange={setActiveTab}
         onAvatarClick={() => setShowSidebar(true)}
         onChatClick={() => handleOpenCommandChat()}
         onSearchClick={() => setActiveOverlay("search")}
-        onNotificationClick={() => setActiveOverlay("notifications")}
         userName={user?.displayName}
-        topicFilter={topicFilter}
-        onClearTopicFilter={() => setTopicFilter(null)}
+        domainFilter={domainFilter}
+        onClearDomainFilter={() => setDomainFilter(null)}
+        todoViewMode={todoViewMode}
+        onTodoViewModeChange={setTodoViewMode}
       />
 
       {/* 工作区内容: 日记 or 待办 (swipeable) — 保持双 tab 挂载避免切换重载 */}
@@ -640,23 +726,16 @@ export default function Page() {
         <div className={activeTab === "diary" ? "bg-surface-low" : "hidden"}>
           <NotesTimeline
             notebook={activeNotebook}
-            clusterId={topicFilter?.clusterId}
-            domainFilter={undefined}
+            domainFilter={domainFilter}
             onOpenChat={handleOpenCommandChat}
             onOpenOverlay={openOverlay}
           />
         </div>
         <div className={activeTab === "todo" ? undefined : "hidden"}>
-          {topicFilter ? (
-            <TopicLifecycleView
-              clusterId={topicFilter.clusterId}
-              onOpenChat={handleOpenCommandChat}
-            />
-          ) : (
-            <TodoWorkspace
-              onOpenChat={handleOpenCommandChat}
-            />
-          )}
+          <TodoWorkspace
+            onOpenChat={handleOpenCommandChat}
+            viewMode={todoViewMode}
+          />
         </div>
       </main>
 
@@ -768,7 +847,7 @@ export default function Page() {
       ) : activeOverlay === "evening-summary" ? (
         <EveningSummary key="evening-summary" onClose={closeOverlay} />
       ) : activeOverlay === "daily-report" ? (
-        <SmartDailyReport key="daily-report" onClose={closeOverlay} onOpenChat={(msg) => { closeOverlay(); setTimeout(() => setActiveOverlay("chat"), 100); }} />
+        <SmartDailyReport key="daily-report" onClose={closeOverlay} />
       ) : activeOverlay === "notifications" ? (
         <NotificationCenter
           key="notifications"

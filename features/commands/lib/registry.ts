@@ -14,6 +14,7 @@ export interface CommandContext {
   startReview?: (dateRange: { start: string; end: string }) => void;
   showHelp?: () => void;
   openOverlay?: (name: string, args?: string[]) => void;
+  clearChat?: () => void;
 }
 
 export interface CommandResult {
@@ -89,6 +90,11 @@ export function executeCommand(
     case "help": {
       ctx.showHelp?.();
       return { handled: true, command: commandName };
+    }
+
+    case "clear": {
+      ctx.clearChat?.();
+      return { handled: true, command: commandName, message: "聊天历史已清空" };
     }
 
     // View commands → open overlay

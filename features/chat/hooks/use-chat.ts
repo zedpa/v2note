@@ -5,14 +5,31 @@ import { getGatewayClient, type GatewayResponse } from "@/features/chat/lib/gate
 import { getDeviceId } from "@/shared/lib/device";
 import { loadLocalConfig } from "@/shared/lib/local-config";
 import { getCommandDefs } from "@/features/commands/lib/registry";
+import { fetchChatHistory, clearChatHistory, type ChatHistoryMessage } from "@/shared/lib/api/chat";
+import * as chatCache from "@/features/chat/lib/chat-cache";
+import type { ChatCacheMessage } from "@/features/chat/lib/chat-cache";
+
+/** 消息内嵌 part 类型 */
+export type MessagePart =
+  | { type: "text"; text: string }
+  | {
+      type: "tool-call";
+      callId: string;
+      toolName: string;
+      label: string;
+      status: "running" | "done" | "error";
+      result?: string;
+      durationMs?: number;
+    }
+  | { type: "step-start" };
 
 export interface ChatMessage {
   id: string;
-  role: "user" | "assistant" | "tool-status" | "plan";
+  role: "user" | "assistant" | "plan";
   content: string;
   timestamp: Date;
-  /** 工具状态消息的工具名（用于图标显示） */
-  toolName?: string;
+  /** 结构化内容（工具调用 + 文本交替） */
+  parts?: MessagePart[];
   /** Plan 消息的结构化数据 */
   plan?: {
     planId: string;
@@ -41,6 +58,8 @@ export function useChat(
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [streaming, setStreaming] = useState(false);
   const [connected, setConnected] = useState(false);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
   const streamingTextRef = useRef("");
   const unsubRef = useRef<(() => void) | null>(null);
   const responseTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -53,6 +72,43 @@ export function useChat(
   dateRangeRef.current = dateRange;
   // Generation counter to prevent stale async disconnect from overriding new connect
   const connectGenRef = useRef(0);
+  // 当前用户 ID（从 auth token 解析，用于缓存）
+  const userIdRef = useRef<string | null>(null);
+  // 是否已加载过历史（避免重复加载）
+  const historyLoadedRef = useRef(false);
+
+  // 从 localStorage auth token 解析 userId
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("voicenote:auth");
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        userIdRef.current = parsed.user?.id ?? null;
+      }
+    } catch { /* ignore */ }
+  }, []);
+
+  // 缓存消息转 ChatMessage
+  const fromCacheMsg = useCallback((m: ChatHistoryMessage | ChatCacheMessage): ChatMessage => ({
+    id: m.id,
+    role: m.role as "user" | "assistant",
+    content: m.content,
+    timestamp: new Date(m.created_at),
+    parts: m.parts as MessagePart[] | undefined,
+  }), []);
+
+  // 写入缓存（静默失败）
+  const cacheMsg = useCallback((role: "user" | "assistant", content: string, id?: string) => {
+    const userId = userIdRef.current;
+    if (!userId || !content) return;
+    chatCache.put({
+      id: id ?? crypto.randomUUID(),
+      userId,
+      role,
+      content,
+      created_at: new Date().toISOString(),
+    }).catch(() => {});
+  }, []);
 
   const clearResponseTimeout = useCallback(() => {
     if (responseTimeoutRef.current) {
@@ -95,9 +151,17 @@ export function useChat(
         setMessages((prev) => {
           const last = prev[prev.length - 1];
           if (last?.role === "assistant") {
+            // 更新 parts 中最后一个 text part，或追加新 text part
+            const parts = [...(last.parts ?? [])];
+            const lastPart = parts[parts.length - 1];
+            if (lastPart?.type === "text") {
+              parts[parts.length - 1] = { type: "text", text: streamingTextRef.current };
+            } else {
+              parts.push({ type: "text", text: streamingTextRef.current });
+            }
             return [
               ...prev.slice(0, -1),
-              { ...last, content: streamingTextRef.current },
+              { ...last, content: streamingTextRef.current, parts },
             ];
           }
           return prev;
@@ -106,36 +170,82 @@ export function useChat(
       }
       case "tool.status" as string: {
         clearResponseTimeout();
-        const { toolName, label } = (msg as any).payload;
-        // 添加临时工具状态消息（streaming 结束时自动移除）
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: `tool-${Date.now()}`,
-            role: "tool-status",
-            content: label,
-            toolName,
-            timestamp: new Date(),
-          },
-        ]);
+        const { toolName, label, callId } = (msg as any).payload;
+        // 工具开始执行：在当前 assistant 消息的 parts 中追加 tool-call part
+        // 同时重置 streamingTextRef 以便后续文本作为新 text part
+        streamingTextRef.current = "";
+        setMessages((prev) => {
+          const last = prev[prev.length - 1];
+          if (last?.role === "assistant") {
+            const parts: MessagePart[] = [...(last.parts ?? [])];
+            parts.push({
+              type: "tool-call",
+              callId: callId ?? `tc-${Date.now()}`,
+              toolName,
+              label,
+              status: "running",
+            });
+            return [...prev.slice(0, -1), { ...last, parts }];
+          }
+          return prev;
+        });
+        break;
+      }
+      case "tool.done" as string: {
+        const { callId, success, message: resultMsg, durationMs } = (msg as any).payload;
+        setMessages((prev) => {
+          const last = prev[prev.length - 1];
+          if (last?.role === "assistant" && last.parts) {
+            const parts = last.parts.map((p): MessagePart => {
+              if (p.type === "tool-call" && p.callId === callId) {
+                return { ...p, status: success ? "done" : "error", result: resultMsg, durationMs };
+              }
+              return p;
+            });
+            return [...prev.slice(0, -1), { ...last, parts }];
+          }
+          return prev;
+        });
         break;
       }
       case "chat.done": {
         clearResponseTimeout();
         setStreaming(false);
+        const finalText = streamingTextRef.current || msg.payload?.full_text || "";
         streamingTextRef.current = "";
-        // 移除 tool-status + 空内容兜底
         setMessages((prev) => {
-          const filtered = prev.filter((m) => m.role !== "tool-status");
-          const last = filtered[filtered.length - 1];
+          // 将所有 running 的 tool-call parts 切换为 done
+          const updated = prev.map((m): ChatMessage => {
+            if (m.role === "assistant" && m.parts) {
+              const hasRunning = m.parts.some((p) => p.type === "tool-call" && p.status === "running");
+              if (hasRunning) {
+                return {
+                  ...m,
+                  parts: m.parts.map((p): MessagePart =>
+                    p.type === "tool-call" && p.status === "running"
+                      ? { ...p, status: "done" }
+                      : p,
+                  ),
+                };
+              }
+            }
+            return m;
+          });
+          // 空内容兜底
+          const last = updated[updated.length - 1];
           if (last?.role === "assistant" && !last.content) {
+            const fallback = msg.payload?.full_text || "抱歉，我没能回复你。请稍后再试。";
             return [
-              ...filtered.slice(0, -1),
-              { ...last, content: msg.payload?.full_text || "抱歉，我没能回复你。请稍后再试。" },
+              ...updated.slice(0, -1),
+              { ...last, content: fallback },
             ];
           }
-          return filtered;
+          return updated;
         });
+        // AI 回复写入本地缓存
+        if (finalText) {
+          cacheMsg("assistant", finalText);
+        }
         break;
       }
       case "plan.proposed": {
@@ -143,7 +253,7 @@ export function useChat(
         setStreaming(false);
         const { planId: ppId, intent: ppIntent, steps: ppSteps } = (msg as any).payload;
         setMessages((prev) => [
-          ...prev.filter((m) => m.role !== "tool-status"),
+          ...prev,
           {
             id: `plan-${ppId}`,
             role: "plan" as const,
@@ -266,50 +376,62 @@ export function useChat(
     const localConfig = await loadLocalConfig();
     if (gen !== connectGenRef.current) return;
 
-    sessionStartedRef.current = true;
-    setStreaming(true);
-    streamingTextRef.current = "";
+    // ── 历史加载（command 模式） ──
+    if (mode === "command" && !historyLoadedRef.current) {
+      historyLoadedRef.current = true;
+      const userId = userIdRef.current;
 
-    // For command mode with initialMessage: show as AI greeting, wait for user input
-    if (mode === "command" && options?.initialMessage) {
-      aiPreambleRef.current = options.initialMessage;
-      sessionStartedRef.current = false;
-      setStreaming(false);
-      streamingTextRef.current = "";
-      setMessages([
-        {
-          id: crypto.randomUUID(),
-          role: "assistant",
-          content: options.initialMessage,
-          timestamp: new Date(),
-        },
-      ]);
-      // Don't send chat.start yet — wait for user's first message
-      return;
+      // 1. 先从 IndexedDB 缓存加载（毫秒级）
+      if (userId) {
+        try {
+          const cached = await chatCache.getRecent(userId, 30);
+          if (cached.length > 0) {
+            setMessages(cached.reverse().map(fromCacheMsg));
+          }
+        } catch { /* IndexedDB 不可用，降级 */ }
+      }
+
+      // 2. 后台从服务端同步（补齐新消息）
+      try {
+        const res = await fetchChatHistory({ limit: 30 });
+        if (gen !== connectGenRef.current) return;
+        if (res.messages.length > 0) {
+          const serverMessages = res.messages.reverse().map(fromCacheMsg);
+          setMessages(serverMessages);
+          setHasMore(res.has_more);
+          if (userId) {
+            chatCache.putBatch(
+              res.messages.map((m) => ({
+                id: m.id,
+                userId,
+                role: m.role,
+                content: m.content,
+                parts: m.parts,
+                created_at: m.created_at,
+              })),
+            ).catch(() => {});
+          }
+        } else {
+          setHasMore(false);
+        }
+      } catch {
+        // 网络失败，缓存数据已展示
+      }
     }
 
-    // Review mode or command without initialMessage: start streaming immediately
-    setMessages([
-      {
-        id: crypto.randomUUID(),
-        role: "assistant",
-        content: "",
-        timestamp: new Date(),
-      },
-    ]);
-
+    // 发 chat.start 仅做 session 初始化（不流式），等用户发消息走 chat.message
+    sessionStartedRef.current = false;
+    setStreaming(false);
     client.send({
       type: "chat.start",
       payload: {
         deviceId,
         mode,
         dateRange,
-        initialMessage: options?.initialMessage,
         skill: options?.skill,
         localConfig,
       },
     });
-    armResponseTimeout("请求超时，AI暂未返回。请重试或检查网关状态。");
   }, [
     dateRange,
     options?.mode,
@@ -320,17 +442,62 @@ export function useChat(
     handleGatewayMessage,
   ]);
 
+  // 上滑加载更多历史消息
+  const loadMore = useCallback(async () => {
+    if (loadingHistory || !hasMore) return;
+    const userId = userIdRef.current;
+    if (!userId) return;
+
+    setLoadingHistory(true);
+    try {
+      // 找到当前最早的消息
+      const currentMessages = messages;
+      const oldest = currentMessages[0];
+      if (!oldest) { setLoadingHistory(false); return; }
+
+      // 先从缓存查
+      const cached = await chatCache.getBefore(userId, oldest.timestamp.toISOString(), 30);
+      if (cached.length >= 30) {
+        setMessages((prev) => [...cached.reverse().map(fromCacheMsg), ...prev]);
+        setLoadingHistory(false);
+        return;
+      }
+
+      // 缓存不足，从服务端拉取
+      const res = await fetchChatHistory({ limit: 30, before: oldest.id });
+      if (res.messages.length > 0) {
+        const older = res.messages.reverse().map(fromCacheMsg);
+        setMessages((prev) => [...older, ...prev]);
+        // 写入缓存
+        chatCache.putBatch(
+          res.messages.map((m) => ({
+            id: m.id, userId, role: m.role, content: m.content,
+            parts: m.parts, created_at: m.created_at,
+          })),
+        ).catch(() => {});
+      }
+      setHasMore(res.has_more);
+    } catch {
+      // 网络失败静默
+    } finally {
+      setLoadingHistory(false);
+    }
+  }, [loadingHistory, hasMore, messages, fromCacheMsg]);
+
   const send = useCallback(async (text: string) => {
     // Add user message immediately
+    const userMsgId = crypto.randomUUID();
     setMessages((prev) => [
       ...prev,
       {
-        id: crypto.randomUUID(),
+        id: userMsgId,
         role: "user",
         content: text,
         timestamp: new Date(),
       },
     ]);
+    // 写入本地缓存
+    cacheMsg("user", text, userMsgId);
 
     let deviceId: string;
     try {
@@ -380,29 +547,11 @@ export function useChat(
       },
     ]);
 
-    // If gateway session not started yet (e.g. "/" bootstrap or AI preamble), send chat.start instead of chat.message
-    if (!sessionStartedRef.current) {
-      const localConfig = await loadLocalConfig();
-      const preamble = aiPreambleRef.current;
-      aiPreambleRef.current = null;
-      client.send({
-        type: "chat.start",
-        payload: {
-          deviceId,
-          mode: "command",
-          dateRange: dateRangeRef.current,
-          initialMessage: text,
-          assistantPreamble: preamble ?? undefined,
-          localConfig,
-        },
-      });
-      sessionStartedRef.current = true;
-    } else {
-      client.send({
-        type: "chat.message",
-        payload: { text, deviceId },
-      });
-    }
+    // 统一走 chat.message
+    client.send({
+      type: "chat.message",
+      payload: { text, deviceId },
+    });
     armResponseTimeout("请求超时，AI暂未返回。请稍后重试。");
   }, [armResponseTimeout, clearResponseTimeout]);
 
@@ -459,5 +608,17 @@ export function useChat(
     );
   }, []);
 
-  return { messages, send, streaming, connected, connect, disconnect, confirmPlan };
+  const clearHistory = useCallback(async () => {
+    setMessages([]);
+    setHasMore(false);
+    sessionStartedRef.current = false;
+    historyLoadedRef.current = false;
+    const userId = userIdRef.current;
+    if (userId) {
+      chatCache.clearByUser(userId).catch(() => {});
+    }
+    clearChatHistory().catch((e) => console.warn("[chat] Clear history API failed:", e));
+  }, []);
+
+  return { messages, send, streaming, connected, connect, disconnect, confirmPlan, loadMore, loadingHistory, hasMore, clearHistory };
 }

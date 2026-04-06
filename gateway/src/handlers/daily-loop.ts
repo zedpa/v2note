@@ -1,13 +1,12 @@
 /**
  * Daily Loop Handler — generates morning briefings and evening summaries.
  *
- * 设计原则：
- * - 晨间简报：聚焦今天要做的事（行动导向）
- * - 晚间回顾：聚焦今天发生了什么 + 预告未完成工作（认知+行动回顾）
+ * v2 简化版：精简 prompt，移除认知报告/视角轮换/转达/目标等复杂逻辑
  */
 
 import { chatCompletion, type ChatMessage } from "../ai/provider.js";
-import { todoRepo, recordRepo, memoryRepo, goalRepo } from "../db/repositories/index.js";
+import { todoRepo, recordRepo } from "../db/repositories/index.js";
+import { generateChatDiary } from "./chat-daily-diary.js";
 
 /** pg 驱动对 timestamp 列返回 Date 对象，需安全转为 string 以支持 startsWith 筛选 */
 export function toDateString(v: unknown): string | null {
@@ -17,63 +16,24 @@ export function toDateString(v: unknown): string | null {
   return null;
 }
 import * as briefingRepo from "../db/repositories/daily-briefing.js";
-import { MemoryManager } from "../memory/manager.js";
 import { loadSoul } from "../soul/manager.js";
 import { loadProfile } from "../profile/manager.js";
-import { generateAlerts } from "../cognitive/alerts.js";
-import { generateCognitiveReport } from "../cognitive/report.js";
-import { aiDiaryRepo } from "../db/repositories/index.js";
-import { autoCollectVocabulary } from "../cognitive/auto-vocabulary.js";
 import { safeParseJson } from "../lib/text-utils.js";
 
 // ── Types ──
 
 export interface BriefingResult {
   greeting: string;
-  /** 今日最重要的 3-5 件事（排好优先级） */
   today_focus: string[];
-  /** 活跃目标简况：目标名 + 今日相关待办数 */
-  goal_progress: Array<{
-    title: string;
-    pending_count: number;
-    today_todos: string[];
-  }>;
-  /** 逾期 / 昨日遗留事项 */
   carry_over: string[];
-  /** 待转达 */
-  relay_pending: Array<{
-    person: string;
-    context: string;
-    todoId: string;
-  }>;
-  /** AI 可协助的事项建议 */
-  ai_suggestions: string[];
-  stats: { yesterday_done: number; yesterday_total: number; streak: number };
+  stats: { yesterday_done: number; yesterday_total: number };
 }
 
 export interface SummaryResult {
-  /** 今日回顾：完成了什么 */
+  headline: string;
   accomplishments: string[];
-  /** 认知收获：今天的思考、领悟、想法变化 */
-  cognitive_highlights: string[];
-  /** 目标维度：哪些目标推进了 */
-  goal_updates: Array<{
-    title: string;
-    completed_count: number;
-    remaining_count: number;
-    note: string;
-  }>;
-  /** 需要关注：跳过多次 / 有阻力的事项 */
-  attention_needed: string[];
-  /** 转达状态 */
-  relay_summary: string[];
-  stats: { done: number; new_records: number; new_strikes: number; relays_completed: number };
-  /** 明日预告：结构化的明日待办预览 */
-  tomorrow_preview: {
-    scheduled: string[];
-    carry_over: string[];
-    follow_up: string[];
-  };
+  tomorrow_preview: string[];
+  stats: { done: number; new_records: number };
 }
 
 // ── Morning Briefing ──
@@ -101,11 +61,9 @@ export async function generateMorningBriefing(
   }
 
   const now = new Date();
-  const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000)
-    .toISOString()
-    .split("T")[0];
+  const yesterday = new Date(now.getTime() - 86400000).toISOString().split("T")[0];
 
-  // 1. 待办事项（今日排期 / 逾期 / 未排期）
+  // 1. 待办事项
   const pendingTodos = userId
     ? await todoRepo.findPendingByUser(userId)
     : await todoRepo.findPendingByDevice(deviceId);
@@ -116,152 +74,47 @@ export async function generateMorningBriefing(
   const overdue = pendingTodos.filter((t) =>
     t.scheduled_end ? new Date(t.scheduled_end) < now : false,
   );
-  const unscheduled = pendingTodos.filter((t) => !t.scheduled_start);
-  const relayTodos = pendingTodos.filter(
-    (t) => (t as any).category === "relay",
-  );
 
-  // 2. 活跃目标 + 每个目标下的今日待办
-  let goalContext = "";
-  try {
-    const activeGoals = userId
-      ? await goalRepo.findActiveByUser(userId)
-      : await goalRepo.findActiveByDevice(deviceId);
-    if (activeGoals.length > 0) {
-      const topGoals = activeGoals.slice(0, 5);
-      const allTodosForGoals = await goalRepo.findTodosByGoalIds(topGoals.map((g) => g.id));
-      const goalLines: string[] = [];
-      for (const g of topGoals) {
-        const todos = allTodosForGoals.filter((t) => t.parent_id === g.id);
-        const pending = todos.filter((t) => !t.done);
-        const done = todos.filter((t) => t.done);
-        goalLines.push(
-          `- ${g.title}（已完成${done.length}/${todos.length}）待办: ${pending.slice(0, 3).map((t) => t.text).join("、") || "无"}`,
-        );
-      }
-      goalContext = `\n## 活跃目标\n${goalLines.join("\n")}`;
-    }
-  } catch {
-    // non-critical
-  }
+  // 2. 昨日统计 + 用户信息（并行加载）
+  const [yesterdayStats, soul, profile] = await Promise.all([
+    (userId
+      ? todoRepo.countByUserDateRange(userId, `${yesterday}T00:00:00Z`, `${yesterday}T23:59:59Z`)
+      : todoRepo.countByDateRange(deviceId, `${yesterday}T00:00:00Z`, `${yesterday}T23:59:59Z`)
+    ),
+    loadSoul(deviceId, userId).catch(() => null),
+    loadProfile(deviceId, userId).catch(() => null),
+  ]);
 
-  // 3. Soul + Profile（个性化）
-  let soulContent = "";
-  let profileContent = "";
-  try {
-    const [soul, profile] = await Promise.all([
-      loadSoul(deviceId, userId).catch(() => null),
-      loadProfile(deviceId, userId).catch(() => null),
-    ]);
-    soulContent = soul?.content ?? "";
-    profileContent = profile?.content ?? "";
-  } catch {
-    // non-critical
-  }
-
-  // 4. 昨日统计
-  const yesterdayStart = `${yesterday}T00:00:00Z`;
-  const yesterdayEnd = `${yesterday}T23:59:59Z`;
-  const yesterdayStats = userId
-    ? await todoRepo.countByUserDateRange(userId, yesterdayStart, yesterdayEnd)
-    : await todoRepo.countByDateRange(deviceId, yesterdayStart, yesterdayEnd);
-
-  // 5. 连续记录天数（单次 SQL 查询）
-  let streak = 0;
-  try {
-    streak = await todoRepo.getStreak({ userId: userId ?? undefined, deviceId });
-  } catch {
-    // non-critical
-  }
-
-  // 6. 构建 AI prompt — 聚焦今天
+  // 3. 构建 AI prompt
   const dayOfWeek = ["日", "一", "二", "三", "四", "五", "六"][now.getDay()];
   const dateStr = `${now.getMonth() + 1}月${now.getDate()}日 周${dayOfWeek}`;
 
-  const formatTodo = (t: any) => {
-    const domain = t.domain ? `[${t.domain}]` : "";
-    const impact = t.impact ? `(影响:${t.impact})` : "";
-    const aiTag = t.ai_actionable ? " *AI可协助*" : "";
-    return `${domain} ${t.text} ${impact}${aiTag}`.trim();
-  };
+  const todosText = pendingTodos.length > 0
+    ? pendingTodos.slice(0, 10).map((t) => `- ${t.text}`).join("\n")
+    : "暂无待办";
 
-  const todosContext = [
-    todayScheduled.length > 0
-      ? `今日排期(${todayScheduled.length}): ${todayScheduled.map(formatTodo).join("; ")}`
-      : "",
-    overdue.length > 0
-      ? `逾期待处理(${overdue.length}): ${overdue.map(formatTodo).join("; ")}`
-      : "",
-    unscheduled.length > 0
-      ? `未排期(${unscheduled.length}): ${unscheduled.slice(0, 10).map(formatTodo).join("; ")}`
-      : "",
-  ]
-    .filter(Boolean)
-    .join("\n");
-
-  const aiActionableItems = pendingTodos.filter((t: any) => t.ai_actionable);
-  const aiActionableContext = aiActionableItems.length > 0
-    ? `\n\n## AI可协助的事项\n${aiActionableItems.map((t: any) => `- ${t.text}`).join("\n")}`
-    : "";
-
-  const relayContext =
-    relayTodos.length > 0
-      ? relayTodos
-          .map((t) => {
-            const meta = (t as any).relay_meta;
-            return `- ${t.text} (${meta?.direction === "outgoing" ? "需转达给" : "来自"}${meta?.target_person || meta?.source_person || "未知"})`;
-          })
-          .join("\n")
-      : "无";
+  const soulHint = soul?.content ? `\n用户画像: ${soul.content.slice(0, 200)}` : "";
+  const profileHint = profile?.content ? `\n用户偏好: ${profile.content.slice(0, 200)}` : "";
 
   const messages: ChatMessage[] = [
     {
       role: "system",
-      content: `你是用户身边的朋友，正在生成晨间简报。
-
-核心目的：问候 + 提供情绪价值 + 显示今日安排（引导用户安排待办）。
-${soulContent ? `<user_soul>\n${soulContent}\n</user_soul>\n` : ""}${profileContent ? `<user_profile>\n${profileContent}\n</user_profile>\n` : ""}
-语言风格：
-- 口语化，短句，有呼吸感。可以用"嗯、啊、诶、确实、不过、话说回来"
-- 不要用"加油""你已经做得很好了""一切都会好的"这类空洞鼓励
-- 两句陈述配一句问句的节奏。有时候不问问题就是最好的
-- greeting 是核心——像一个了解你的朋友说的第一句话，自然、有温度、不正式
-
-内容规则：
-- greeting：个性化问候，包含日期。如果有遗留/逾期，轻描淡写提一句就好，不要制造焦虑
-- today_focus：从待办中提取最重要的 3-5 件事。如果待办很少或没有，写一句引导语如"今天想做点什么？"
-- goal_progress：有目标就列，没有就空数组。用一句自然的话说进度，不要只是数字
-- carry_over：逾期/昨日遗留。语气轻松，不是催债
-- ai_suggestions：如果有 AI 可协助的事就写，否则留空。不要硬凑建议
-- 不要建议用户"记录一下""把这个写下来"——记录是自然发生的，不是被建议的
-
-返回 JSON：
+      content: `根据待办数据生成个性化晨间问候。返回纯 JSON，不要 markdown 包裹。${soulHint}${profileHint}
 {
-  "greeting": "一句自然的问候",
-  "today_focus": ["今日安排，3-5条，没有就写引导语"],
-  "goal_progress": [{"title":"目标名","pending_count":数字,"today_todos":["相关待办"]}],
-  "carry_over": ["遗留事项，语气轻松"],
-  "relay_pending": [{"person":"人名","context":"事由","todoId":"id"}],
-  "ai_suggestions": ["AI可以帮忙的事，不硬凑"],
-  "stats": {"yesterday_done": 数字, "yesterday_total": 数字, "streak": 数字}
+  "greeting": "≤15字，自然口语问候，包含日期，结合用户画像个性化",
+  "today_focus": ["待办原文，按时间排序，最多5条。无待办时写一句引导语"],
+  "carry_over": ["逾期待办，语气轻松"],
+  "stats": {"yesterday_done": 数字, "yesterday_total": 数字}
 }
 空类别返回空数组。`,
     },
     {
       role: "user",
       content: `今天: ${dateStr}
-
-## 待办事项
-${todosContext || "暂无待办"}
-${goalContext}
-
-## 待转达
-${relayContext}
-${aiActionableContext}
-
-## 昨日统计
-完成: ${yesterdayStats.done}/${yesterdayStats.total}
-连续记录: ${streak} 天`,
+待办(${pendingTodos.length}):
+${todosText}
+逾期(${overdue.length}): ${overdue.map((t) => t.text).join("、") || "无"}
+昨日: ${yesterdayStats.done}/${yesterdayStats.total} 完成`,
     },
   ];
 
@@ -277,25 +130,8 @@ ${aiActionableContext}
       throw new Error("AI 返回格式异常");
     }
 
-    // 确保 stats 不为空
     if (!parsed.stats) {
-      parsed.stats = {
-        yesterday_done: yesterdayStats.done,
-        yesterday_total: yesterdayStats.total,
-        streak,
-      };
-    }
-
-    // 补全 relay todoId
-    if (parsed.relay_pending && relayTodos.length > 0) {
-      for (const rp of parsed.relay_pending) {
-        if (!rp.todoId) {
-          const match = relayTodos.find(
-            (t) => t.text.includes(rp.person) || t.text.includes(rp.context),
-          );
-          if (match) rp.todoId = match.id;
-        }
-      }
+      parsed.stats = { yesterday_done: yesterdayStats.done, yesterday_total: yesterdayStats.total };
     }
 
     // Cache
@@ -309,23 +145,11 @@ ${aiActionableContext}
   } catch (err: any) {
     console.error(`[daily-loop] AI briefing generation failed: ${err.message}`);
 
-    // Fallback：直接用原始数据
     const fallback: BriefingResult = {
       greeting: `早上好！今天是${dateStr}`,
       today_focus: todayScheduled.slice(0, 5).map((t) => t.text),
-      goal_progress: [],
       carry_over: overdue.map((t) => t.text),
-      relay_pending: relayTodos.map((t) => ({
-        person: (t as any).relay_meta?.target_person || "",
-        context: t.text,
-        todoId: t.id,
-      })),
-      ai_suggestions: [],
-      stats: {
-        yesterday_done: yesterdayStats.done,
-        yesterday_total: yesterdayStats.total,
-        streak,
-      },
+      stats: { yesterday_done: yesterdayStats.done, yesterday_total: yesterdayStats.total },
     };
 
     try { await briefingRepo.upsert(deviceId, today, "morning", fallback, userId); } catch { /* ignore */ }
@@ -341,9 +165,7 @@ export async function generateEveningSummary(
   forceRefresh?: boolean,
 ): Promise<SummaryResult> {
   const today = new Date().toISOString().split("T")[0];
-  const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000)
-    .toISOString()
-    .split("T")[0];
+  const tomorrow = new Date(Date.now() + 86400000).toISOString().split("T")[0];
 
   // 当日持久缓存（仅 forceRefresh 时跳过）
   if (!forceRefresh) {
@@ -381,220 +203,38 @@ export async function generateEveningSummary(
     // non-critical
   }
 
-  // 3. 仍然待处理的事项
-  const pending = userId
-    ? await todoRepo.findPendingByUser(userId)
-    : await todoRepo.findPendingByDevice(deviceId);
-
-  // 4. 转达状态
-  const relayTodos = allTodos.filter(
-    (t) => (t as any).category === "relay",
-  );
-  const relaysCompleted = relayTodos.filter(
-    (t) => t.done && t.completed_at && toDateString(t.completed_at)?.startsWith(today),
-  ).length;
-  const relaysPending = relayTodos.filter((t) => !t.done);
-
-  // 5. Soul + Profile
-  let soulContent = "";
-  let profileContent = "";
-  try {
-    const [soul, profile] = await Promise.all([
-      loadSoul(deviceId, userId).catch(() => null),
-      loadProfile(deviceId, userId).catch(() => null),
-    ]);
-    soulContent = soul?.content ?? "";
-    profileContent = profile?.content ?? "";
-  } catch {
-    // non-critical
-  }
-
-  // 6. 认知报告（今日 Strike 统计、想法变化、新主题）— 回顾的核心
-  let cognitiveSection = "";
-  let totalStrikes = 0;
-  try {
-    const ownerOpts = userId ? { userId } : { deviceId };
-    const report = await generateCognitiveReport(ownerOpts);
-    if (!report.is_empty) {
-      const lines: string[] = [];
-      const { today_strikes: ts } = report;
-      totalStrikes = ts.perceive + ts.judge + ts.realize + ts.intend + ts.feel;
-      if (totalStrikes > 0) {
-        lines.push(`今日思考: 感知${ts.perceive}次, 判断${ts.judge}次, 领悟${ts.realize}次, 意图${ts.intend}个, 感受${ts.feel}次`);
-      }
-      if (report.contradictions.length > 0) {
-        const cList = report.contradictions.slice(0, 3).map(
-          (c) => `「${c.strikeA_nucleus.slice(0, 20)}」↔「${c.strikeB_nucleus.slice(0, 20)}」`,
-        );
-        lines.push(`想法变化: ${cList.join("; ")}`);
-      }
-      if (report.cluster_changes.length > 0) {
-        lines.push(`新涌现主题: ${report.cluster_changes.map((c) => c.name).join(", ")}`);
-      }
-      if (report.behavior_drift.completion_rate > 0) {
-        lines.push(`行动完成率: ${Math.round(report.behavior_drift.completion_rate * 100)}%`);
-      }
-      if (lines.length > 0) {
-        cognitiveSection = `\n## 今日认知统计\n${lines.join("\n")}\n请用"想法演进""新的联系""思路变化"等温和表述编入 cognitive_highlights。如果有领悟(realize)，重点提及。`;
-      }
-    }
-  } catch {
-    // non-critical
-  }
-
-  // 6b. 认知矛盾提醒（供回顾反思）
-  let alertSection = "";
-  try {
-    const alerts = await generateAlerts(userId ? { userId } : { deviceId });
-    if (alerts.length > 0) {
-      const alertLines = alerts.slice(0, 3).map((a) => {
-        const aShort = a.strikeA.nucleus.slice(0, 30);
-        const bShort = a.strikeB.nucleus.slice(0, 30);
-        return `- 关于「${aShort}」和「${bShort}」，你的想法有些变化`;
-      });
-      alertSection = `\n## 思考变化\n${alertLines.join("\n")}\n请在 cognitive_highlights 中温和提及。`;
-    }
-  } catch {
-    // non-critical
-  }
-
-  // 6c. AI 日记中的认知摘要
-  let cognitiveDigest = "";
-  try {
-    const diaryEntry = userId
-      ? await aiDiaryRepo.findByUser(userId, "ai-self", today)
-      : await aiDiaryRepo.findFull(deviceId, "ai-self", today);
-    if (diaryEntry?.full_content) {
-      const lines = diaryEntry.full_content
-        .split("\n")
-        .filter((l) => l.includes("[认知摘要]"))
-        .map((l) => l.replace("[认知摘要]", "").trim());
-      if (lines.length > 0) {
-        cognitiveDigest = `\n## 今日思考发现\n${lines.join("；")}`;
-      }
-    }
-  } catch {
-    // non-critical
-  }
-
-  // 7. 目标维度回顾
-  let goalSection = "";
-  try {
-    const activeGoals = userId
-      ? await goalRepo.findActiveByUser(userId)
-      : await goalRepo.findActiveByDevice(deviceId);
-    if (activeGoals.length > 0) {
-      const topGoals = activeGoals.slice(0, 5);
-      const allTodosForGoals = await goalRepo.findTodosByGoalIds(topGoals.map((g) => g.id));
-      const goalLines: string[] = [];
-      for (const g of topGoals) {
-        const todos = allTodosForGoals.filter((t) => t.parent_id === g.id);
-        const completedToday = todos.filter(
-          (t) => t.done && toDateString(t.completed_at)?.startsWith(today),
-        );
-        const remaining = todos.filter((t) => !t.done);
-        goalLines.push(
-          `- ${g.title}: 今日完成${completedToday.length}项, 剩余${remaining.length}项`,
-        );
-      }
-      goalSection = `\n## 目标进度\n${goalLines.join("\n")}\n请在 goal_updates 中总结每个目标的推进情况。`;
-    }
-  } catch {
-    // non-critical
-  }
-
-  // 8. 跳过 alert + 结果追踪
-  let skipAlertSection = "";
-  let resultTrackingSection = "";
-  try {
-    const ownerOpts = userId ? { userId } : { deviceId };
-    const { getSkipAlerts, getResultTrackingPrompts } = await import("../cognitive/action-tracking.js");
-    const [skipAlerts, resultPrompts] = await Promise.all([
-      getSkipAlerts(ownerOpts),
-      getResultTrackingPrompts(ownerOpts),
-    ]);
-    if (skipAlerts.length > 0) {
-      skipAlertSection = `\n## 需要关注的行动\n${skipAlerts.map((a) => `- ${a.description}`).join("\n")}\n请在 attention_needed 中温和提及。`;
-    }
-    if (resultPrompts.length > 0) {
-      resultTrackingSection = `\n## 待跟进结果\n${resultPrompts.map((p) => `- ${p.prompt}`).join("\n")}\n请在 tomorrow_preview.follow_up 中包含。`;
-    }
-  } catch {
-    // non-critical
-  }
-
-  // 9. 明日排期（提前查询明日待办）
+  // 3. 明日排期 + 用户信息
+  const [pending, soul, profile] = await Promise.all([
+    (userId ? todoRepo.findPendingByUser(userId) : todoRepo.findPendingByDevice(deviceId)),
+    loadSoul(deviceId, userId).catch(() => null),
+    loadProfile(deviceId, userId).catch(() => null),
+  ]);
   const tomorrowScheduled = pending.filter((t) =>
     toDateString(t.scheduled_start)?.startsWith(tomorrow),
   );
-  const tomorrowSection = tomorrowScheduled.length > 0
-    ? `\n## 明日已排期\n${tomorrowScheduled.slice(0, 5).map((t) => `- ${t.text}`).join("\n")}`
-    : "";
 
-  // 10. 随机选择一种回顾视角
-  const perspectives = [
-    { name: "成就感", instruction: "聚焦完成了什么，让用户感受到'今天没白过'。哪怕只做了一件事，也值得被看到。" },
-    { name: "成长线", instruction: "聚焦今天的思考变化和认知发现。用户今天想明白了什么、态度有了什么转变？像朋友一样说'你今天那个想法挺有意思的'。" },
-    { name: "连接感", instruction: "聚焦今天和人的互动、转达事项。如果有和人相关的事，围绕关系来总结。没有就跳过，换成成就感视角。" },
-    { name: "节奏感", instruction: "聚焦今天的时间投入和精力分配。做了多少事、记录了多少想法、在哪个目标上花了心思。像回顾一天的'运动轨迹'。" },
-  ];
-  const todayPerspective = perspectives[new Date().getDay() % perspectives.length];
+  // 4. 构建 AI prompt
+  const soulHint = soul?.content ? `\n用户画像: ${soul.content.slice(0, 200)}` : "";
+  const profileHint = profile?.content ? `\n用户偏好: ${profile.content.slice(0, 200)}` : "";
 
   const messages: ChatMessage[] = [
     {
       role: "system",
-      content: `你是用户身边的朋友，正在生成晚间回顾。
-
-核心目的：让用户感受到今天的价值 + 提供情绪价值 + 帮用户安心入睡。
-聚焦**已完成的事**，而不是未完成的。未完成的放在 tomorrow_preview 里，语气是"明天继续"而不是"你还没做完"。
-${soulContent ? `<user_soul>\n${soulContent}\n</user_soul>\n` : ""}${profileContent ? `<user_profile>\n${profileContent}\n</user_profile>\n` : ""}
-今日回顾视角：「${todayPerspective.name}」
-${todayPerspective.instruction}
-
-语言风格：
-- 口语化，短句，有呼吸感
-- 不要用"加油""你已经做得很好了""一切都会好的"这类空洞鼓励
-- 如果用户今天什么都没做——不要说"没关系明天继续"，就陪着。"今天就这样了"比"明天会更好"真诚
-- 如果用户做了很多——跟他一起开心，"卧槽今天效率真高"比"恭喜你完成了很多任务"有温度
-- 不要建议"记录一下""把这个写下来"
-- 认知发现用自然语言转述，不要用"Strike""Bond"等技术术语
-
-情绪判断：
-- 如果今日完成数>0：肯定具体的事，不要泛泛表扬
-- 如果今日完成数=0 但有记录：聚焦思考本身的价值
-- 如果什么都没有：一句简短的陪伴就够了，不要长篇大论
-- attention_needed：温和提及，不制造压力。"这个事搁了几天了"比"你需要关注这个"好
-
-返回 JSON：
+      content: `根据数据生成个性化晚间总结。返回纯 JSON，不要 markdown 包裹。${soulHint}${profileHint}
 {
-  "accomplishments": ["今日完成的事，具体到事项名"],
-  "cognitive_highlights": ["今日思考/想法/发现，用朋友的口吻"],
-  "goal_updates": [{"title":"目标名","completed_count":今日完成数,"remaining_count":剩余数,"note":"一句自然的话"}],
-  "attention_needed": ["搁了几天的事，温和提及"],
-  "relay_summary": ["转达状态"],
-  "stats": {"done": 数字, "new_records": 数字, "new_strikes": 数字, "relays_completed": 数字},
-  "tomorrow_preview": {
-    "scheduled": ["明日已排期"],
-    "carry_over": ["今天没做完的，明天继续"],
-    "follow_up": ["需要跟进的"]
-  }
+  "headline": "≤25字，一句话总结今天，结合用户画像个性化",
+  "accomplishments": ["完成的事，具体到事项名"],
+  "tomorrow_preview": ["明日排期/待处理，最多3条"],
+  "stats": {"done": 数字, "new_records": 数字}
 }
-空类别返回空数组/空对象。`,
+完成为空时 accomplishments 返回空数组。无明日安排时 tomorrow_preview 返回空数组。`,
     },
     {
       role: "user",
-      content: `## 今日完成 (${todayDone.length})
-${todayDone.map((t) => `- ${t.text}`).join("\n") || "无"}
-
-## 仍待处理 (${pending.length})
-${pending.slice(0, 10).map((t) => `- ${t.text}`).join("\n") || "无"}
-
-## 转达状态
-已完成: ${relaysCompleted}, 待处理: ${relaysPending.length}
-${relaysPending.map((t) => `- ${t.text}`).join("\n") || "无待转达"}
-
-## 今日新记录: ${newRecordCount} 条
-${cognitiveDigest}${cognitiveSection}${alertSection}${goalSection}${skipAlertSection}${resultTrackingSection}${tomorrowSection}`,
+      content: `今日完成(${todayDone.length}): ${todayDone.map((t) => t.text).join("、") || "无"}
+今日记录: ${newRecordCount} 条
+明日排期(${tomorrowScheduled.length}): ${tomorrowScheduled.slice(0, 5).map((t) => t.text).join("、") || "无"}
+待处理(${pending.length}): ${pending.slice(0, 5).map((t) => t.text).join("、") || "无"}`,
     },
   ];
 
@@ -610,53 +250,22 @@ ${cognitiveDigest}${cognitiveSection}${alertSection}${goalSection}${skipAlertSec
       throw new Error("AI 返回格式异常");
     }
 
-    // 确保 stats 不为空
     if (!parsed.stats) {
-      parsed.stats = {
-        done: todayDone.length,
-        new_records: newRecordCount,
-        new_strikes: totalStrikes,
-        relays_completed: relaysCompleted,
-      };
+      parsed.stats = { done: todayDone.length, new_records: newRecordCount };
     }
-
-    // 确保 tomorrow_preview 结构存在
     if (!parsed.tomorrow_preview) {
-      parsed.tomorrow_preview = {
-        scheduled: tomorrowScheduled.slice(0, 5).map((t) => t.text),
-        carry_over: pending.slice(0, 5).map((t) => t.text),
-        follow_up: [],
-      };
+      parsed.tomorrow_preview = tomorrowScheduled.slice(0, 3).map((t) => t.text);
     }
 
     // Cache
     try { await briefingRepo.upsert(deviceId, today, "evening", parsed, userId); } catch { /* ignore */ }
 
-    // 将 tomorrow_preview 存入 memory，供明日简报参考
-    try {
-      const preview = parsed.tomorrow_preview;
-      const seeds = [
-        ...preview.scheduled.map((s) => `[排期] ${s}`),
-        ...preview.carry_over.map((s) => `[遗留] ${s}`),
-        ...preview.follow_up.map((s) => `[跟进] ${s}`),
-      ];
-      if (seeds.length > 0) {
-        const memoryManager = new MemoryManager();
-        await memoryManager.maybeCreateMemory(
-          deviceId,
-          `明日预告: ${seeds.join("; ")}`,
-          today,
-          userId,
-        );
-      }
-    } catch {
-      // non-critical
+    // 异步生成聊天日记（不阻塞 evening summary 返回）
+    if (userId) {
+      generateChatDiary(deviceId, userId, today).catch(e =>
+        console.warn(`[daily-loop] Chat diary failed: ${e.message}`),
+      );
     }
-
-    // 自动词汇收集（不阻塞返回）
-    autoCollectVocabulary(deviceId, userId).catch((err) => {
-      console.warn(`[daily-loop] Auto vocabulary collection failed: ${err.message}`);
-    });
 
     console.log(`[daily-loop] Evening summary generated for ${deviceId}`);
     return parsed;
@@ -664,22 +273,10 @@ ${cognitiveDigest}${cognitiveSection}${alertSection}${goalSection}${skipAlertSec
     console.error(`[daily-loop] AI summary generation failed: ${err.message}`);
 
     const fallback: SummaryResult = {
+      headline: todayDone.length > 0 ? `今天完成了${todayDone.length}件事` : "安静的一天",
       accomplishments: todayDone.slice(0, 5).map((t) => t.text),
-      cognitive_highlights: [],
-      goal_updates: [],
-      attention_needed: [],
-      relay_summary: relaysPending.map((t) => `待转达: ${t.text}`),
-      stats: {
-        done: todayDone.length,
-        new_records: newRecordCount,
-        new_strikes: totalStrikes,
-        relays_completed: relaysCompleted,
-      },
-      tomorrow_preview: {
-        scheduled: tomorrowScheduled.slice(0, 5).map((t) => t.text),
-        carry_over: pending.slice(0, 5).map((t) => t.text),
-        follow_up: [],
-      },
+      tomorrow_preview: tomorrowScheduled.slice(0, 3).map((t) => t.text),
+      stats: { done: todayDone.length, new_records: newRecordCount },
     };
 
     try { await briefingRepo.upsert(deviceId, today, "evening", fallback, userId); } catch { /* ignore */ }

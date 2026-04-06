@@ -22,6 +22,36 @@
       ]
     },
     {
+      "title": "日报",
+      "key": "daily",
+      "fields": [
+        {
+          "key": "morningBriefingHour",
+          "label": "早报时间",
+          "type": "number",
+          "default": 6,
+          "min": 4,
+          "max": 12,
+          "suffix": "点"
+        },
+        {
+          "key": "eveningSummaryHour",
+          "label": "晚报时间",
+          "type": "number",
+          "default": 22,
+          "min": 18,
+          "max": 23,
+          "suffix": "点"
+        },
+        {
+          "key": "dailyNotifications",
+          "label": "日报推送通知",
+          "type": "toggle",
+          "default": true
+        }
+      ]
+    },
+    {
       "title": "录音",
       "key": "recording",
       "fields": [

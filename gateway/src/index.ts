@@ -5,7 +5,10 @@ import { WebSocketServer, WebSocket } from "ws";
 import { config } from "dotenv";
 import { processEntry, refineTodoCommands, type ProcessPayload, type ProcessResult } from "./handlers/process.js";
 import { todoRepo } from "./db/repositories/index.js";
-import { startChat, sendChatMessage, endChat, type ChatStartPayload } from "./handlers/chat.js";
+import { initChat, sendChatMessage, endChat, type ChatStartPayload } from "./handlers/chat.js";
+import { chatMessageRepo } from "./db/repositories/index.js";
+import { maybeCompress } from "./handlers/chat-compression.js";
+import { shouldTriggerMemory } from "./handlers/chat-memory-trigger.js";
 import { aggregateTodos } from "./handlers/todo.js";
 import { startASR, sendAudioChunk, stopASR, cancelASR, type ASRMode } from "./handlers/asr.js";
 import { getSession } from "./session/manager.js";
@@ -43,6 +46,7 @@ import { registerOnboardingRoutes } from "./routes/onboarding.js";
 import { registerTopicRoutes } from "./routes/topics.js";
 import { registerVocabularyRoutes } from "./routes/vocabulary.js";
 import { registerNotificationRoutes } from "./routes/notifications.js";
+import { registerChatRoutes } from "./routes/chat.js";
 import { getProactiveEngine } from "./proactive/engine.js";
 import { verifyAccessToken } from "./auth/jwt.js";
 import { generateAiStatus } from "./handlers/reflect.js";
@@ -95,6 +99,7 @@ type GatewayMessage =
 type GatewayResponse =
   | { type: "process.result"; payload: ProcessResult }
   | { type: "chat.chunk"; payload: { text: string } }
+  | { type: "chat.ready"; payload: Record<string, never> }
   | { type: "chat.done"; payload: { full_text: string } }
   | { type: "todo.result"; payload: { diary_entry: string } }
   | { type: "asr.partial"; payload: { text: string; sentenceId: number } }
@@ -109,7 +114,8 @@ type GatewayResponse =
   | { type: "proactive.evening_summary"; payload: { text: string } }
   | { type: "reflect.question"; payload: { question: string } }
   | { type: "ai.status"; payload: { text: string } }
-  | { type: "tool.status"; payload: { toolName: string; label: string } }
+  | { type: "tool.status"; payload: { toolName: string; label: string; callId: string } }
+  | { type: "tool.done"; payload: { toolName: string; callId: string; success: boolean; message: string; durationMs: number } }
   | { type: "auth.ok"; payload: { userId: string } }
   | { type: "action.result"; payload: { action: string; success: boolean; summary: string; todo_id?: string } }
   | { type: "todo.created"; payload: { todoId: string; text: string } }
@@ -150,6 +156,7 @@ registerOnboardingRoutes(router);
 registerTopicRoutes(router);
 registerVocabularyRoutes(router);
 registerNotificationRoutes(router);
+registerChatRoutes(router);
 
 // ── HTTP Server ──
 
@@ -315,29 +322,31 @@ wss.on("connection", (ws) => {
 
         case "chat.start": {
           (msg.payload as any).userId = authedUserId;
-          let fullText = "";
           try {
-            const stream = await startChat(msg.payload);
-            await iterateStreamWithTimeout(stream, (chunk) => {
-              if (chunk.startsWith("\x00TOOL_STATUS:")) {
-                const parts = chunk.slice(13).split(":", 2);
-                send(ws, { type: "tool.status", payload: { toolName: parts[0], label: parts[1] } });
-                return;
-              }
-              fullText += chunk;
-              send(ws, { type: "chat.chunk", payload: { text: chunk } });
-            });
-          } catch (streamErr: any) {
-            console.error(`[gateway] chat.start stream error:`, streamErr.message);
-            if (!fullText) fullText = "抱歉，我现在有点忙，稍后再试。";
+            await initChat(msg.payload);
+            send(ws, { type: "chat.ready", payload: {} });
+          } catch (err: any) {
+            console.error(`[gateway] chat.start init error:`, err.message);
+            send(ws, { type: "error", payload: { message: "会话初始化失败" } });
           }
-          const session = getSession(msg.payload.deviceId);
-          session.context.addMessage({ role: "assistant", content: fullText });
-          send(ws, { type: "chat.done", payload: { full_text: fullText } });
           break;
         }
 
         case "chat.message": {
+          // 持久化用户消息（先于 AI 处理）
+          if (authedUserId && msg.payload.text) {
+            chatMessageRepo.saveMessage(authedUserId, "user", msg.payload.text).catch(e =>
+              console.warn(`[chat] Failed to persist user msg: ${e.message}`),
+            );
+            // 即时记忆触发：关键词快筛 + 异步 maybeCreateMemory
+            if (shouldTriggerMemory(msg.payload.text)) {
+              const session = getSession(msg.payload.deviceId);
+              const today = new Date().toISOString().split("T")[0];
+              session.memoryManager.maybeCreateMemory(
+                msg.payload.deviceId, msg.payload.text, today, authedUserId,
+              ).catch(e => console.warn(`[chat] Memory trigger failed: ${e.message}`));
+            }
+          }
           let fullText = "";
           try {
             const stream = await sendChatMessage(
@@ -346,8 +355,17 @@ wss.on("connection", (ws) => {
             );
             await iterateStreamWithTimeout(stream, (chunk) => {
               if (chunk.startsWith("\x00TOOL_STATUS:")) {
-                const parts = chunk.slice(13).split(":", 2);
-                send(ws, { type: "tool.status", payload: { toolName: parts[0], label: parts[1] } });
+                const parts = chunk.slice(13).split(":", 3);
+                send(ws, { type: "tool.status", payload: { toolName: parts[0], label: parts[1], callId: parts[2] ?? "" } });
+                return;
+              }
+              if (chunk.startsWith("\x00TOOL_DONE:")) {
+                const parts = chunk.slice(11).split(":", 5);
+                send(ws, { type: "tool.done", payload: {
+                  toolName: parts[0], callId: parts[1] ?? "",
+                  success: parts[2] === "true", message: parts[3] ?? "",
+                  durationMs: parseInt(parts[4] ?? "0", 10),
+                } });
                 return;
               }
               fullText += chunk;
@@ -360,6 +378,14 @@ wss.on("connection", (ws) => {
           const session = getSession(msg.payload.deviceId);
           session.context.addMessage({ role: "assistant", content: fullText });
           send(ws, { type: "chat.done", payload: { full_text: fullText } });
+          // 持久化 AI 回复（异步）
+          if (fullText && authedUserId) {
+            chatMessageRepo.saveMessage(authedUserId, "assistant", fullText).catch(e =>
+              console.warn(`[chat] Failed to persist assistant msg: ${e.message}`),
+            );
+            // 异步检查并执行压缩（不阻塞响应）
+            maybeCompress(authedUserId).catch(() => {});
+          }
           break;
         }
 

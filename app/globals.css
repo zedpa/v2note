@@ -112,6 +112,8 @@
     /* Shadows */
     --shadow-ambient: rgba(28, 28, 24, 0.06);
     --shadow-ambient-lg: rgba(28, 28, 24, 0.08);
+    /* Shimmer accent (deer) */
+    --shimmer-accent: #C8845C;
   }
 
   .dark {
@@ -195,6 +197,8 @@
     /* Time slot tags (dark) */
     --tag-anytime: 25 5% 52% / 0.15;
     --tag-anytime-text: 25 5% 55%;
+    /* Shimmer accent (deer-dark, 暗色下降低亮度避免刺眼) */
+    --shimmer-accent: #89502C;
     --tag-morning: 18 55% 57% / 0.2;
     --tag-morning-text: 30 50% 80%;
     --tag-afternoon: 210 35% 63% / 0.15;
@@ -454,12 +458,12 @@
 
 /* Pure view — breathe opacity for time display */
 @keyframes breathe {
-  0%, 100% { opacity: 0.75; }
-  50% { opacity: 1; }
+  0%, 100% { opacity: 0.75; box-shadow: 0 0 12px rgba(196,92,92,0.3); }
+  50% { opacity: 1; box-shadow: 0 0 28px rgba(196,92,92,0.6); }
 }
 
 .animate-breathe {
-  animation: breathe 4s ease-in-out infinite;
+  animation: breathe 2.5s ease-in-out infinite;
 }
 
 /* AI 在线呼吸灯 */
@@ -611,4 +615,41 @@ body::before {
 
 .dark .todo-card-ppt:active {
   box-shadow: 1px 1px 0 hsl(var(--border) / 0.6);
+}
+
+/* ============================================
+   TOOL CALL CARD — shimmer + collapse
+   ============================================ */
+
+@keyframes shimmer-text {
+  0% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.shimmer-text {
+  background: linear-gradient(
+    120deg,
+    hsl(var(--muted-foreground)) 30%,
+    var(--shimmer-accent) 50%,
+    hsl(var(--muted-foreground)) 70%
+  );
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: shimmer-text 1.5s linear infinite;
+}
+
+.tool-detail-wrapper {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 150ms ease-out;
+}
+
+.tool-detail-wrapper[data-open="true"] {
+  grid-template-rows: 1fr;
+}
+
+.tool-detail-inner {
+  overflow: hidden;
 }

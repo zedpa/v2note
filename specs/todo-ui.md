@@ -27,23 +27,26 @@ updated: 2026-04-04
 - **时间视图 (TimeView)**: 以"今天"为锚点，日期轴横向滑动，任务按时段分组（随时/上午/下午/晚上）
 - **项目视图 (ProjectView)**: 以目标/项目为容器，每个项目是一张卡片，内含子任务列表
 
-两个视图通过右上角按钮无缝切换，共享底层数据和操作。
+两个视图通过顶部 Segment 的"待办"下拉菜单切换，共享底层数据和操作。
 
 ### 1.2 信息架构
 
 ```
 app/page.tsx
-  └── TopNav: [日记 | 待办] 分段器 + 视图切换按钮
+  └── TopNav: [日记 | 待办▼] 分段器
+      └── 待办激活时: 点击"待办▼"弹出视图选择菜单
+          ├── 日期视图 (默认)
+          └── 项目视图
   └── 待办 Tab 激活时:
-      ├── TimeView (默认)
+      ├── TimeView (日期视图，默认)
       │   ├── TimeViewHeader: 星期X + 月份年份 + 日历按钮
       │   ├── CalendarStrip: 无限滚动日期条
       │   ├── TimeBlock × 4: 随时/上午/下午/晚上
       │   └── (底部留白)
-      └── ProjectView (切换后) — 水平轮播/瀑布流
+      └── ProjectView (项目视图) — 瀑布流
           ├── ProjectCard × N
           ├── InboxCard: "其他"虚拟项目
-          └── PageDots
+          └── (底部留白)
 ```
 
 ### 1.3 时段分配规则
@@ -130,11 +133,16 @@ When  用户点击该任务的 checkbox
 Then  checkbox 变为勾选状态，文字添加删除线，项目计数 -1（乐观更新）
 ```
 
-### 场景 1.7: 视图切换 <!-- ✅ completed -->
+### 场景 1.7: 视图切换 — Segment 下拉菜单 <!-- ✅ completed -->
 ```
-Given 用户在时间视图
-When  点击右上角切换按钮
-Then  时间视图淡出 + 向左平移，项目视图淡入 + 从右平移
+Given 用户在待办 Tab（当前为日期视图）
+When  点击顶部 Segment 的"待办▼"按钮
+Then  弹出下拉菜单，显示"日期视图"和"项目视图"两个选项
+  And 当前选中的视图高亮（primary 色）
+When  选择"项目视图"
+Then  菜单关闭，切换到项目视图
+  And viewMode 状态由 page.tsx 管理，通过 props 传递给 TodoWorkspace
+注意: 日记 Tab 时点击"待办"直接切换 Tab，不弹菜单
 ```
 
 ### 场景 1.8: 任务详情编辑 <!-- ✅ completed -->
@@ -265,6 +273,18 @@ const PROJECT_COLORS = [
 那么 (Then)   全屏展示该项目的所有待办
 并且 (And)    全屏视图支持左右滑动切换项目
 并且 (And)    可以返回瀑布流
+```
+
+### 场景 1.18b: 项目详情页创建待办 <!-- ✅ completed (bug fix) -->
+```
+Given 用户在项目视图，点击项目卡片头部进入项目详情 Sheet
+When  点击详情页中的"添加任务"按钮
+Then  先关闭项目详情 Sheet，再打开 TodoCreateSheet
+  And TodoCreateSheet 的 parent_id 预设为当前项目 ID
+  And 创建参数类型与 store.create 完全匹配（text/scheduled_start/estimated_minutes/priority/parent_id）
+Bug 修复: 此前 ProjectDetailSheet(shadcn Sheet, z-50) 与 TodoCreateSheet(fixed z-50) 同时打开时，
+  TodoCreateSheet 的 backdrop(z-40) 被 ProjectDetailSheet overlay 遮挡导致无法交互。
+  修复方案: handleAdd 先调 setDetailGroup(null) 关闭详情页再打开创建面板。
 ```
 
 ### 1.7 优先级编辑器 (P2, 🟡 待开发)

@@ -6,42 +6,54 @@ import { api } from "@/shared/lib/api";
 interface BriefingResult {
   greeting: string;
   today_focus: string[];
-  goal_progress: Array<{
-    title: string;
-    pending_count: number;
-    today_todos: string[];
-  }>;
   carry_over: string[];
-  relay_pending: Array<{
-    person: string;
-    context: string;
-    todoId: string;
-  }>;
-  ai_suggestions: string[];
-  stats: { yesterday_done: number; yesterday_total: number; streak: number };
+  stats: { yesterday_done: number; yesterday_total: number };
 }
 
 interface SummaryResult {
+  headline: string;
   accomplishments: string[];
-  cognitive_highlights: string[];
-  goal_updates: Array<{
-    title: string;
-    completed_count: number;
-    remaining_count: number;
-    note: string;
-  }>;
-  attention_needed: string[];
-  relay_summary: string[];
-  stats: { done: number; new_records: number; new_strikes: number; relays_completed: number };
-  tomorrow_preview: {
-    scheduled: string[];
-    carry_over: string[];
-    follow_up: string[];
-  };
+  tomorrow_preview: string[];
+  stats: { done: number; new_records: number };
 }
 
+// ── localStorage 缓存工具 ──
+
+interface CachedReport<T> {
+  date: string;
+  data: T;
+}
+
+function loadCached<T>(key: string): T | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    const cached: CachedReport<T> = JSON.parse(raw);
+    const today = new Date().toISOString().split("T")[0];
+    if (cached.date === today) return cached.data;
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function saveCache<T>(key: string, data: T): void {
+  try {
+    const today = new Date().toISOString().split("T")[0];
+    localStorage.setItem(key, JSON.stringify({ date: today, data }));
+  } catch { /* ignore */ }
+}
+
+const BRIEFING_CACHE_KEY = "v2note:daily:briefing";
+const SUMMARY_CACHE_KEY = "v2note:daily:summary";
+
+// ── Hooks ──
+
 export function useDailyBriefing() {
-  const [briefing, setBriefing] = useState<BriefingResult | null>(null);
+  const [briefing, setBriefing] = useState<BriefingResult | null>(
+    () => loadCached<BriefingResult>(BRIEFING_CACHE_KEY),
+  );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -52,6 +64,7 @@ export function useDailyBriefing() {
       const qs = forceRefresh ? "?refresh=true" : "";
       const data = await api.get<BriefingResult>(`/api/v1/daily/briefing${qs}`);
       setBriefing(data);
+      saveCache(BRIEFING_CACHE_KEY, data);
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -67,7 +80,9 @@ export function useDailyBriefing() {
 }
 
 export function useEveningSummary() {
-  const [summary, setSummary] = useState<SummaryResult | null>(null);
+  const [summary, setSummary] = useState<SummaryResult | null>(
+    () => loadCached<SummaryResult>(SUMMARY_CACHE_KEY),
+  );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -78,6 +93,7 @@ export function useEveningSummary() {
       const qs = forceRefresh ? "?refresh=true" : "";
       const data = await api.get<SummaryResult>(`/api/v1/daily/evening-summary${qs}`);
       setSummary(data);
+      saveCache(SUMMARY_CACHE_KEY, data);
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -90,8 +106,4 @@ export function useEveningSummary() {
   }, [fetchSummary]);
 
   return { summary, loading, error, refresh: fetchSummary };
-}
-
-export async function markRelayDone(todoId: string): Promise<void> {
-  await api.patch(`/api/v1/daily/relays/${todoId}`);
 }

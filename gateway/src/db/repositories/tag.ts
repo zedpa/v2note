@@ -47,6 +47,14 @@ export async function findByRecordIds(recordIds: string[]): Promise<Array<{ reco
   );
 }
 
+export async function countByRecordId(recordId: string): Promise<number> {
+  const row = await queryOne<{ count: string }>(
+    `SELECT COUNT(*)::text AS count FROM record_tag WHERE record_id = $1`,
+    [recordId],
+  );
+  return parseInt(row?.count ?? "0", 10);
+}
+
 export async function addToRecord(recordId: string, tagId: string): Promise<void> {
   await execute(
     `INSERT INTO record_tag (record_id, tag_id) VALUES ($1, $2)

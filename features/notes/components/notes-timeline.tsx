@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useRef, useCallback, useEffect, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { MapPin, Clock, Trash2, X, CheckCircle2, Mic, Paperclip, MoreVertical, Pencil, Copy, RotateCcw, AlertTriangle, HardDrive } from "lucide-react";
+import { MapPin, Clock, Trash2, X, CheckCircle2, Mic, Paperclip, MoreVertical, Pencil, Copy, RotateCcw, AlertTriangle, HardDrive, Bot, Globe, Quote } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useNotes } from "@/features/notes/hooks/use-notes";
 import { useNoteDetail } from "@/features/notes/hooks/use-note-detail";
@@ -11,6 +11,7 @@ import { fabNotify } from "@/shared/lib/fab-notify";
 import { getAudioByRecordId, deleteAudio, addWavHeader, type PendingAudio } from "@/features/recording/lib/audio-cache";
 import { retryRecordAudio, deleteRecords } from "@/shared/lib/api/records";
 import type { NoteItem } from "@/shared/lib/types";
+import { useConfirmDialog } from "@/shared/components/confirm-dialog";
 import { InsightCard } from "./insight-card";
 import { MarkdownContent } from "@/shared/components/markdown-content";
 import { api } from "@/shared/lib/api";
@@ -19,7 +20,6 @@ import { fetchCognitiveStats, type CognitiveStats } from "@/shared/lib/api/cogni
 interface NotesTimelineProps {
   filter?: string;
   notebook?: string | null;
-  clusterId?: string | null;
   domainFilter?: string | null;
   onOpenChat?: (initial?: string) => void;
   onOpenOverlay?: (name: string) => void;
@@ -42,8 +42,8 @@ function parseDayGroup(dateStr: string): { day: number; monthWeekday: string } {
   return { day, monthWeekday: `${month}月 周${weekday}` };
 }
 
-export function NotesTimeline({ filter, notebook, clusterId, domainFilter, onOpenChat, onOpenOverlay }: NotesTimelineProps) {
-  const { notes, loading, deleteNotes, updateNote } = useNotes(notebook, clusterId);
+export function NotesTimeline({ filter, notebook, domainFilter, onOpenChat, onOpenOverlay }: NotesTimelineProps) {
+  const { notes, loading, deleteNotes, updateNote } = useNotes(notebook);
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [deleting, setDeleting] = useState(false);
@@ -95,9 +95,11 @@ export function NotesTimeline({ filter, notebook, clusterId, domainFilter, onOpe
     if (filter && filter !== "全部") {
       filtered = filtered.filter((n) => n.tags.includes(filter));
     }
-    // 维度筛选
+    // 维度筛选（前缀匹配：选"工作"会匹配"工作"和"工作/v2note"）
     if (domainFilter) {
-      filtered = filtered.filter((n) => n.domain === domainFilter);
+      filtered = filtered.filter((n) =>
+        n.domain === domainFilter || n.domain?.startsWith(domainFilter + "/"),
+      );
     }
 
     const map = new Map<string, NoteItem[]>();
@@ -284,6 +286,7 @@ function TimelineCard({
   const { detail, loading: detailLoading } = useNoteDetail(expanded ? note.id : null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const longPressTriggered = useRef(false);
+  const { confirm, ConfirmDialog } = useConfirmDialog();
 
   // Menu & edit state
   const [menuPos, setMenuPos] = useState<{ x: number; y: number } | null>(null);
@@ -354,12 +357,11 @@ function TimelineCard({
     setMenuPos(null);
   }, [note.short_summary, note.title]);
 
-  const handleDeleteSingle = useCallback(() => {
+  const handleDeleteSingle = useCallback(async () => {
     setMenuPos(null);
-    if (confirm("确定删除这条记录？")) {
-      onDelete();
-    }
-  }, [onDelete]);
+    const ok = await confirm({ description: "确定删除这条记录？", confirmText: "删除", destructive: true });
+    if (ok) onDelete();
+  }, [onDelete, confirm]);
 
   // pending_retry: 录音未处理，显示播放条+重试按钮
   const [retrying, setRetrying] = useState(false);
@@ -396,7 +398,8 @@ function TimelineCard({
     if (!localCache) return;
     if (note.status === "pending_retry") {
       // 未处理的录音：确认后删除缓存+record
-      if (!confirm("该录音尚未处理，删除后无法恢复，确定？")) return;
+      const ok = await confirm({ description: "该录音尚未处理，删除后无法恢复，确定？", confirmText: "删除", destructive: true });
+      if (!ok) return;
       try {
         await deleteAudio(localCache.id);
         await deleteRecords([note.id]);
@@ -420,51 +423,54 @@ function TimelineCard({
 
   if (note.status === "pending_retry") {
     return (
-      <div
-        className="rounded-2xl p-5 bg-card shadow-sm border border-orange-200/50 animate-card-enter"
-        style={{ animationDelay: `${index * 60}ms` }}
-      >
-        <div className="flex items-center gap-2 mb-3">
-          <AlertTriangle className="w-4 h-4 text-orange-500" />
-          <span className="text-sm text-orange-600 font-medium">录音未处理</span>
-          <span className="flex-1" />
-          <button
-            type="button"
-            onClick={handleRetry}
-            disabled={retrying || !localCache}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-medium disabled:opacity-50 transition-opacity"
-          >
-            {retrying ? (
-              <div className="w-3.5 h-3.5 rounded-full border-2 border-primary-foreground/30 border-t-primary-foreground animate-spin" />
-            ) : (
-              <RotateCcw className="w-3.5 h-3.5" />
-            )}
-            {retrying ? "重试中..." : "重试"}
-          </button>
-        </div>
-        {localCache && (
-          <MiniAudioPlayer recordId={note.id} localPcmData={localCache.pcmData} />
-        )}
-        <div className="flex items-center gap-1.5 mt-3 text-muted-foreground/60">
-          <Clock className="w-3 h-3" />
-          <span className="text-[11px] font-mono tabular-nums">{note.time}</span>
-          {note.duration_seconds != null && note.duration_seconds > 0 && (
-            <>
-              <span>·</span>
-              <Mic className="w-3 h-3" />
-              <span className="text-[11px]">{formatDuration(note.duration_seconds)}</span>
-            </>
+      <>
+        <div
+          className="rounded-2xl p-5 bg-card shadow-sm border border-orange-200/50 animate-card-enter"
+          style={{ animationDelay: `${index * 60}ms` }}
+        >
+          <div className="flex items-center gap-2 mb-3">
+            <AlertTriangle className="w-4 h-4 text-orange-500" />
+            <span className="text-sm text-orange-600 font-medium">录音未处理</span>
+            <span className="flex-1" />
+            <button
+              type="button"
+              onClick={handleRetry}
+              disabled={retrying || !localCache}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-medium disabled:opacity-50 transition-opacity"
+            >
+              {retrying ? (
+                <div className="w-3.5 h-3.5 rounded-full border-2 border-primary-foreground/30 border-t-primary-foreground animate-spin" />
+              ) : (
+                <RotateCcw className="w-3.5 h-3.5" />
+              )}
+              {retrying ? "重试中..." : "重试"}
+            </button>
+          </div>
+          {localCache && (
+            <MiniAudioPlayer recordId={note.id} localPcmData={localCache.pcmData} />
           )}
-          <span className="flex-1" />
-          <button
-            type="button"
-            onClick={handleDeleteLocalAudio}
-            className="text-[11px] text-destructive/60 hover:text-destructive transition-colors"
-          >
-            删除
-          </button>
+          <div className="flex items-center gap-1.5 mt-3 text-muted-foreground/60">
+            <Clock className="w-3 h-3" />
+            <span className="text-[11px] font-mono tabular-nums">{note.time}</span>
+            {note.duration_seconds != null && note.duration_seconds > 0 && (
+              <>
+                <span>·</span>
+                <Mic className="w-3 h-3" />
+                <span className="text-[11px]">{formatDuration(note.duration_seconds)}</span>
+              </>
+            )}
+            <span className="flex-1" />
+            <button
+              type="button"
+              onClick={handleDeleteLocalAudio}
+              className="text-[11px] text-destructive/60 hover:text-destructive transition-colors"
+            >
+              删除
+            </button>
+          </div>
         </div>
-      </div>
+        <ConfirmDialog />
+      </>
     );
   }
 
@@ -528,11 +534,30 @@ function TimelineCard({
           {/* Meta row: time · duration/type · location · tags + menu button */}
           <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground/70 mb-2 flex-wrap">
             <span className="font-mono tabular-nums">{note.time}</span>
-            {note.file_url ? (
+            {/* 来源图标：AI聊天 / 附件 / 网页 / 摘录 */}
+            {(note.source === "chat" || note.source === "chat_tool") ? (
+              <>
+                <span>·</span>
+                <Bot className="w-3 h-3 text-primary/70" />
+                <span>AI</span>
+              </>
+            ) : note.file_url ? (
               <>
                 <span>·</span>
                 <Paperclip className="w-3 h-3" />
                 <span className="truncate max-w-[80px]">{note.file_name || "附件"}</span>
+              </>
+            ) : note.source === "url" ? (
+              <>
+                <span>·</span>
+                <Globe className="w-3 h-3 text-blue-500/70" />
+                <span>网页</span>
+              </>
+            ) : note.source_type === "material" ? (
+              <>
+                <span>·</span>
+                <Quote className="w-3 h-3 text-amber-500/70" />
+                <span>摘录</span>
               </>
             ) : note.duration_seconds != null && note.duration_seconds > 0 ? (
               <>
@@ -540,13 +565,7 @@ function TimelineCard({
                 <Mic className="w-3 h-3" />
                 <span>{formatDuration(note.duration_seconds)}</span>
               </>
-            ) : (
-              <>
-                <span>·</span>
-                <Paperclip className="w-3 h-3" />
-                <span>文字</span>
-              </>
-            )}
+            ) : null}
             {note.location && (
               <>
                 <span>·</span>
@@ -568,7 +587,7 @@ function TimelineCard({
               </>
             )}
             {/* Spacer + three-dot menu button */}
-            {expanded && !selectionMode && (
+            {!selectionMode && (
               <>
                 <span className="flex-1" />
                 <button
@@ -757,6 +776,7 @@ function TimelineCard({
         </>,
         document.body,
       )}
+      <ConfirmDialog />
     </div>
   );
 }

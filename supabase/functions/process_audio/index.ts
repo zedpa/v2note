@@ -247,7 +247,7 @@ const buildSystemPrompt = (userType: string | null, availableTags: string[]): st
   const jsonFormat = `请返回 JSON 格式（不要包含 markdown 代码块标记）：
 {
   "short_summary": "一句话概括内容（15-30字）",
-  "tags": ["从可用标签中选择"],
+  "tags": ["从可用标签中选择，最多5个"],
   "todos": ["待办事项"],
   "ideas": ["想法灵感"]
 }`;
@@ -257,7 +257,7 @@ const buildSystemPrompt = (userType: string | null, availableTags: string[]): st
 ${jsonFormat}
 
 规则：
-- tags: 只能从以下可用标签中选择（不能创建新标签）。${tagsListStr}
+- tags: 最多选择5个最相关的标签。只能从以下可用标签中选择（不能创建新标签）。${tagsListStr}
 - todos: 积极提取行动事项 — 包括需要打的电话、要跟进的客户、需要准备的材料、要安排的会议等，即使表述较隐含也应提取
 - ideas: 提取管理洞察 — 团队问题模式、客户风险信号、市场机会、流程改进建议
 - 日常寒暄、重复性事务不提取为 ideas`;
@@ -268,7 +268,7 @@ ${jsonFormat}
 ${jsonFormat}
 
 规则：
-- tags: 只能从以下可用标签中选择（不能创建新标签）。${tagsListStr}
+- tags: 最多选择5个最相关的标签。只能从以下可用标签中选择（不能创建新标签）。${tagsListStr}
 - todos: 保守提取 — 仅提取用户明确说出"我需要做…"、"记得要…"等明确待办
 - ideas: 积极提取所有创意种子 — 包括灵感片段、概念联想、观察发现、比喻意象、情绪感受、素材线索
 - 创作者的随想和联想都有价值，即使不完整也应作为灵感保留`;
@@ -279,7 +279,7 @@ ${jsonFormat}
 ${jsonFormat}
 
 规则：
-- tags: 只能从以下可用标签中选择（不能创建新标签）。${tagsListStr}
+- tags: 最多选择5个最相关的标签。只能从以下可用标签中选择（不能创建新标签）。${tagsListStr}
 - todos: 提取文本中提到的任何待办/行动事项，没有则为空数组
 - ideas: 仅提取真正有创意、有启发性的想法或灵感
 - 日常事务记录不需要生成灵感，返回空数组`;
@@ -319,11 +319,12 @@ const callOpenAi = async (transcript: string, availableTags: string[], userType:
     throw new Error(`Failed to parse OpenAI response as JSON: ${content}`);
   }
 
-  // Filter tags to only those in the available list
+  // Filter tags to only those in the available list, hard cap at 5
   const rawTags = Array.isArray(parsed.tags) ? parsed.tags.map(String) : [];
-  const filteredTags = availableTags.length > 0
+  const filteredTags = (availableTags.length > 0
     ? rawTags.filter((t) => availableTags.includes(t))
-    : rawTags;
+    : rawTags
+  ).slice(0, 5);
 
   const shortSummary = typeof parsed.short_summary === "string"
     ? parsed.short_summary

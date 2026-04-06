@@ -14,6 +14,7 @@ export interface Record {
     digested_at: string | null;
     file_url: string | null;
     file_name: string | null;
+    domain?: string | null;
     hierarchy_tags?: Array<{
         label: string;
         level: number;
@@ -80,6 +81,21 @@ export declare function findByUserAndSource(userId: string, source: string): Pro
 /** 更新 created_at（用于控制欢迎日记排序） */
 export declare function updateCreatedAt(id: string, createdAt: string): Promise<void>;
 /** 更新层级标签（L1/L2/L3 涌现结构反向标注） */
+/** 更新 record 的自动归类 domain */
+export declare function updateDomain(id: string, domain: string | null): Promise<void>;
+/** 查询用户已有的 domain 列表（去重，按使用频次降序） */
+export declare function listUserDomains(userId: string): Promise<string[]>;
+/** 查询用户 domain 列表 + 计数（供侧边栏文件夹展示） */
+export declare function listUserDomainsWithCount(userId: string): Promise<Array<{
+    domain: string;
+    count: number;
+}>>;
+/** 批量替换 domain 前缀（rename/merge 用） */
+export declare function batchUpdateDomain(userId: string, oldPrefix: string, newPrefix: string): Promise<number>;
+/** 清空指定前缀的 domain（delete folder 用） */
+export declare function clearDomainByPrefix(userId: string, prefix: string): Promise<number>;
+/** 统计未分类记录数 */
+export declare function countUncategorized(userId: string): Promise<number>;
 export declare function updateHierarchyTags(id: string, tags: Array<{
     label: string;
     level: number;

@@ -1,14 +1,31 @@
 /**
  * Local configuration storage layer.
- * Stores user-specific data (soul, skills, tools, settings, identity) locally.
+ * 所有用户数据按 userId 隔离存储。
  * Built on top of the cross-platform storage abstraction.
  */
 
 import { getItem, setItem, removeItem } from "./storage";
 
-// ── Storage Keys ──
+// ── User Scope ──
 
-const KEYS = {
+let _currentUserId: string | null = null;
+
+/** 登录后调用，所有 config 读写自动按 userId 隔离 */
+export function setCurrentUserId(userId: string | null): void {
+  _currentUserId = userId;
+}
+
+export function getCurrentUserId(): string | null {
+  return _currentUserId;
+}
+
+/** 生成按用户隔离的 storage key */
+function scopedKey(base: string): string {
+  return _currentUserId ? `${base}:${_currentUserId}` : base;
+}
+
+// ── 旧全局 key（仅用于迁移） ──
+const LEGACY_KEYS = {
   soul: "config:soul",
   user: "config:user",
   tools: "config:tools",
@@ -76,6 +93,12 @@ export interface LocalSettings {
   language: string;
   /** 执行动作前弹窗确认（默认 true）。关闭后静默执行 + toast 通知 */
   confirm_before_execute: boolean;
+  /** 早报自动弹出时间（小时，0-23），默认 6 */
+  morningBriefingHour: number;
+  /** 晚报自动弹出时间（小时，0-23），默认 22 */
+  eveningSummaryHour: number;
+  /** 是否开启日报本地通知推送（默认 true） */
+  dailyNotifications: boolean;
   [key: string]: unknown;
 }
 
@@ -103,6 +126,9 @@ const DEFAULT_SETTINGS: LocalSettings = {
   theme: "system",
   language: "zh-CN",
   confirm_before_execute: true,
+  morningBriefingHour: 6,
+  eveningSummaryHour: 22,
+  dailyNotifications: true,
 };
 
 // ── Generic typed get/set ──
@@ -121,55 +147,75 @@ async function setTyped<T>(key: string, value: T): Promise<void> {
   await setItem(key, JSON.stringify(value));
 }
 
+/**
+ * 读取 scoped key，若为空且有 userId，尝试从旧全局 key 迁移。
+ * 迁移是一次性的：读到旧数据后写入新 key。
+ */
+async function getScopedWithMigration<T>(base: string): Promise<T | null> {
+  const key = scopedKey(base);
+  const stored = await getTyped<T>(key);
+  if (stored) return stored;
+
+  // 向后兼容：从旧全局 key 迁移
+  if (_currentUserId) {
+    const legacy = await getTyped<T>(base);
+    if (legacy) {
+      await setTyped(key, legacy);
+      return legacy;
+    }
+  }
+  return null;
+}
+
 // ── Soul ──
 
 export async function getSoul(): Promise<LocalSoul | null> {
-  return getTyped<LocalSoul>(KEYS.soul);
+  return getScopedWithMigration<LocalSoul>(LEGACY_KEYS.soul);
 }
 
 export async function setSoul(soul: LocalSoul): Promise<void> {
-  await setTyped(KEYS.soul, soul);
+  await setTyped(scopedKey(LEGACY_KEYS.soul), soul);
 }
 
 // ── User Profile ──
 
 export async function getUserProfile(): Promise<LocalUser | null> {
-  return getTyped<LocalUser>(KEYS.user);
+  return getScopedWithMigration<LocalUser>(LEGACY_KEYS.user);
 }
 
 export async function setUserProfile(user: LocalUser): Promise<void> {
-  await setTyped(KEYS.user, user);
+  await setTyped(scopedKey(LEGACY_KEYS.user), user);
 }
 
 // ── Tools ──
 
 export async function getTools(): Promise<LocalTools | null> {
-  return getTyped<LocalTools>(KEYS.tools);
+  return getScopedWithMigration<LocalTools>(LEGACY_KEYS.tools);
 }
 
 export async function setTools(tools: LocalTools): Promise<void> {
-  await setTyped(KEYS.tools, tools);
+  await setTyped(scopedKey(LEGACY_KEYS.tools), tools);
 }
 
 // ── Skills ──
 
 export async function getSkills(): Promise<LocalSkills | null> {
-  return getTyped<LocalSkills>(KEYS.skills);
+  return getScopedWithMigration<LocalSkills>(LEGACY_KEYS.skills);
 }
 
 export async function setSkills(skills: LocalSkills): Promise<void> {
-  await setTyped(KEYS.skills, skills);
+  await setTyped(scopedKey(LEGACY_KEYS.skills), skills);
 }
 
 // ── Settings ──
 
 export async function getSettings(): Promise<LocalSettings> {
-  const stored = await getTyped<LocalSettings>(KEYS.settings);
+  const stored = await getScopedWithMigration<LocalSettings>(LEGACY_KEYS.settings);
   return { ...DEFAULT_SETTINGS, ...stored };
 }
 
 export async function setSettings(settings: LocalSettings): Promise<void> {
-  await setTyped(KEYS.settings, settings);
+  await setTyped(scopedKey(LEGACY_KEYS.settings), settings);
 }
 
 export async function updateSettings(
@@ -177,18 +223,18 @@ export async function updateSettings(
 ): Promise<LocalSettings> {
   const current = await getSettings();
   const updated = { ...current, ...partial };
-  await setTyped(KEYS.settings, updated);
+  await setTyped(scopedKey(LEGACY_KEYS.settings), updated);
   return updated;
 }
 
 // ── Identity ──
 
 export async function getIdentity(): Promise<LocalIdentity | null> {
-  return getTyped<LocalIdentity>(KEYS.identity);
+  return getScopedWithMigration<LocalIdentity>(LEGACY_KEYS.identity);
 }
 
 export async function setIdentity(identity: LocalIdentity): Promise<void> {
-  await setTyped(KEYS.identity, identity);
+  await setTyped(scopedKey(LEGACY_KEYS.identity), identity);
 }
 
 // ── Bulk Operations ──
@@ -215,15 +261,16 @@ export async function loadLocalConfig(): Promise<LocalConfig> {
  * Check if local config has been initialized.
  */
 export async function isConfigInitialized(): Promise<boolean> {
-  const soul = await getItem(KEYS.soul);
+  const soul = await getSoul();
   return soul !== null;
 }
 
 /**
- * Clear all local config (for reset/logout).
+ * Clear current user's local config (for logout).
  */
 export async function clearAllConfig(): Promise<void> {
+  const bases = Object.values(LEGACY_KEYS);
   await Promise.all(
-    Object.values(KEYS).map((key) => removeItem(key)),
+    bases.map((base) => removeItem(scopedKey(base))),
   );
 }
