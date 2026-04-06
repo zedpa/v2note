@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Send, Mic, Paperclip, Camera, Image, FileText, Link, X } from "lucide-react";
+import { Send, Mic, Paperclip, Camera, Image, FileText, Link, X, Quote } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { executeCommand, getCommandDefs } from "@/features/commands/lib/registry";
 import type { CommandContext } from "@/features/commands/lib/registry";
@@ -65,6 +65,7 @@ export function TextBottomSheet({
   const [showSkillPanel, setShowSkillPanel] = useState(false);
   const [detectedUrl, setDetectedUrl] = useState<string | null>(null);
   const [attachment, setAttachment] = useState<{ name: string; file: File } | null>(null);
+  const [isPasted, setIsPasted] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -103,6 +104,7 @@ export function TextBottomSheet({
       setShowSkillPanel(false);
       setDetectedUrl(null);
       setAttachment(null);
+      setIsPasted(false);
     }
   }, [open]);
 
@@ -148,6 +150,10 @@ export function TextBottomSheet({
     const ta = e.target;
     ta.style.height = "auto";
     ta.style.height = Math.min(ta.scrollHeight, 160) + "px";
+  }, []);
+
+  const handlePaste = useCallback(() => {
+    setIsPasted(true);
   }, []);
 
   const handleSubmit = useCallback(async () => {
@@ -228,6 +234,30 @@ export function TextBottomSheet({
       return;
     }
 
+    // 粘贴内容 → 标记为摘录（material）
+    if (isPasted) {
+      setSubmitting(true);
+      setText("");
+      setIsPasted(false);
+      onClose();
+      const pid = startAiPipeline();
+      try {
+        await api.post("/api/v1/ingest", {
+          type: "text",
+          content: trimmed,
+          source_type: "material",
+        });
+        fabNotify.success("摘录已保存");
+        renewAiPipeline(pid);
+        emit("recording:processed");
+      } catch (err: any) {
+        fabNotify.error(`保存失败: ${err.message}`);
+      } finally {
+        setSubmitting(false);
+      }
+      return;
+    }
+
     // Normal text → create manual note
     setSubmitting(true);
     setText("");
@@ -243,7 +273,7 @@ export function TextBottomSheet({
     } finally {
       setSubmitting(false);
     }
-  }, [text, submitting, attachment, commandContext, onStartReview, onClose, onCommandMode, activeNotebook]);
+  }, [text, submitting, attachment, isPasted, commandContext, onStartReview, onClose, onCommandMode, activeNotebook]);
 
   const handleImportUrl = useCallback(() => {
     if (!detectedUrl) return;
@@ -430,6 +460,21 @@ export function TextBottomSheet({
             </div>
           )}
 
+          {/* 粘贴摘录提示 */}
+          {isPasted && !attachment && !detectedUrl && text.trim() && (
+            <div className="flex items-center gap-2 mb-3 px-3 py-2 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200/50 dark:border-amber-800/30">
+              <Quote className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+              <p className="text-xs text-amber-700 dark:text-amber-300 flex-1">检测到粘贴内容，将标记为摘录</p>
+              <button
+                type="button"
+                onClick={() => setIsPasted(false)}
+                className="text-[11px] px-2 py-0.5 rounded-full text-muted-foreground hover:text-foreground transition-colors"
+              >
+                取消标记
+              </button>
+            </div>
+          )}
+
           {/* URL preview */}
           {detectedUrl && !attachment && (
             <div className="flex items-center gap-2 mb-3 px-3 py-2 rounded-xl bg-secondary">
@@ -463,6 +508,7 @@ export function TextBottomSheet({
               autoFocus
               value={text}
               onChange={handleInput}
+              onPaste={handlePaste}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) {
                   e.preventDefault();

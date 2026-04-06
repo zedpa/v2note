@@ -9,6 +9,11 @@ import {
   updateSettings as saveSettings,
   type LocalSettings,
 } from "@/shared/lib/local-config";
+import {
+  scheduleDailyNotifications,
+  cancelDailyNotifications,
+  requestNotificationPermission,
+} from "@/shared/lib/notifications";
 import { SwipeBack } from "@/shared/components/swipe-back";
 import schema from "../lib/settings-schema.json";
 
@@ -41,6 +46,30 @@ export function SettingsEditor({ onClose, onThemeChange }: SettingsEditorProps) 
 
       if (key === "theme" && onThemeChange) {
         onThemeChange(value as string);
+      }
+
+      // 通知相关字段变更时重新调度
+      if (key === "dailyNotifications" || key === "morningBriefingHour" || key === "eveningSummaryHour") {
+        if (updated.dailyNotifications) {
+          const granted = await requestNotificationPermission();
+          if (granted) {
+            await scheduleDailyNotifications({
+              morningHour: updated.morningBriefingHour,
+              eveningHour: updated.eveningSummaryHour,
+            });
+          } else {
+            // 权限被拒，关闭开关
+            if (key === "dailyNotifications") {
+              const reverted = { ...updated, dailyNotifications: false };
+              setSettings(reverted);
+              await saveSettings(reverted);
+              fabNotify.error("通知权限未授权");
+              return;
+            }
+          }
+        } else {
+          await cancelDailyNotifications();
+        }
       }
     } catch {
       fabNotify.error("保存失败");

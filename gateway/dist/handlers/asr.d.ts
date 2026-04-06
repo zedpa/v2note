@@ -5,7 +5,7 @@ export type ASRMode = "realtime" | "upload";
  * - realtime: spawn Python realtime ASR subprocess for streaming recognition.
  * - upload: just accumulate PCM chunks; transcribe when recording stops.
  */
-export declare function startASR(clientWs: WsWebSocket, deviceId: string, locationText?: string, mode?: ASRMode, notebook?: string, userId?: string, sourceContext?: "todo" | "timeline" | "chat" | "review"): Promise<void>;
+export declare function startASR(clientWs: WsWebSocket, deviceId: string, locationText?: string, mode?: ASRMode, notebook?: string, userId?: string, sourceContext?: "todo" | "timeline" | "chat" | "review", saveAudio?: boolean): Promise<void>;
 /**
  * Forward binary PCM audio chunk.
  * - realtime: writes to Python subprocess stdin
@@ -18,6 +18,11 @@ export declare function sendAudioChunk(deviceId: string, chunk: Buffer, sourceWs
  * - upload: transcribe accumulated audio via Python subprocess
  */
 export declare function stopASR(clientWs: WsWebSocket, deviceId: string, saveAudio?: boolean, forceCommand?: boolean): Promise<void>;
+/**
+ * Transcribe a WAV audio buffer via Python DashScope SDK subprocess.
+ * Pipes WAV data to stdin, reads JSON result from stdout.
+ */
+export declare function transcribeAudioFile(wavBuffer: Buffer, vocabularyId?: string): Promise<string>;
 /**
  * Cancel ASR session.
  */

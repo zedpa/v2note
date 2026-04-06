@@ -13,6 +13,9 @@ interface ProjectViewProps {
   onPress: (todo: TodoDTO) => void;
   onCreate: (params: {
     text: string;
+    scheduled_start?: string;
+    estimated_minutes?: number;
+    priority?: number;
     parent_id?: string;
   }) => Promise<any>;
   onPostpone: (id: string) => void;
@@ -40,6 +43,8 @@ export function ProjectView({
 
   const handleAdd = useCallback((parentId?: string) => {
     setCreateParentId(parentId);
+    // 先关闭详情页，避免 z-index 层叠导致创建面板被遮挡
+    setDetailGroup(null);
     setCreateOpen(true);
   }, []);
 

@@ -13,6 +13,11 @@ export interface ToolContext {
     userId?: string;
     sessionId: string;
     planId?: string;
+    /** 对话历史（由 registry 注入，save_conversation 等工具需要） */
+    getMessages?: () => Array<{
+        role: string;
+        content: string;
+    }>;
 }
 /** 工具执行结果 */
 export interface ToolCallResult {

@@ -60,7 +60,7 @@ describe("dedupCreate (level=0 待办去重)", () => {
         const existing = makeTodo("联系张总确认合同细节", "todo-existing");
         mockQuery.mockResolvedValue([existing]);
         mockGetEmbedding.mockResolvedValue([0.1, 0.2, 0.3]);
-        mockCosineSimilarity.mockReturnValue(0.72); // ≥ 0.65
+        mockCosineSimilarity.mockReturnValue(0.90); // ≥ 0.85
         const result = await dedupCreate(baseFields);
         expect(result.action).toBe("matched");
         expect(result.todo.id).toBe("todo-existing");
@@ -71,7 +71,7 @@ describe("dedupCreate (level=0 待办去重)", () => {
         const existing = makeTodo("去超市买菜", "todo-existing");
         mockQuery.mockResolvedValue([existing]);
         mockGetEmbedding.mockResolvedValue([0.1, 0.2, 0.3]);
-        mockCosineSimilarity.mockReturnValue(0.15); // < 0.65
+        mockCosineSimilarity.mockReturnValue(0.50); // < 0.85
         const result = await dedupCreate(baseFields);
         expect(result.action).toBe("created");
         expect(result.todo.text).toBe(baseFields.text);
@@ -109,7 +109,7 @@ describe("dedupCreate (level=0 待办去重)", () => {
         mockGetEmbedding.mockResolvedValue([0.1, 0.2, 0.3]);
         let callIdx = 0;
         mockCosineSimilarity.mockImplementation(() => {
-            return [0.2, 0.78, 0.1][callIdx++];
+            return [0.2, 0.92, 0.1][callIdx++];
         });
         const result = await dedupCreate(baseFields);
         expect(result.action).toBe("matched");

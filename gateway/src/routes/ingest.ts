@@ -242,7 +242,7 @@ export function registerIngestRoutes(router: Router) {
           device_id: deviceId,
           user_id: userId ?? undefined,
           status: "completed",
-          source: "manual",
+          source: "url",
           source_type: "material",
         });
 

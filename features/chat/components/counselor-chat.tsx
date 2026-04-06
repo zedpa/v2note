@@ -3,7 +3,6 @@
 import { useState, useRef, useEffect, useCallback, type ReactNode } from "react";
 import { LuluLogo } from "@/components/brand/lulu-logo";
 import { api } from "@/shared/lib/api";
-import { useKeyboardOffset } from "@/shared/hooks/use-keyboard-offset";
 
 interface Message {
   role: "user" | "assistant";
@@ -76,8 +75,6 @@ export default function CounselorChat({ context, onClose }: CounselorChatProps) 
   const [loading, setLoading] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const messagesRef = useRef<Message[]>(messages);
-  const { offset: bottomOffset, viewportHeight, isKeyboardOpen } = useKeyboardOffset();
-
   // Keep ref in sync for cleanup
   useEffect(() => {
     messagesRef.current = messages;
@@ -85,7 +82,7 @@ export default function CounselorChat({ context, onClose }: CounselorChatProps) 
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, isKeyboardOpen]);
+  }, [messages]);
 
   // Save conversation on unmount (close)
   useEffect(() => {
@@ -136,7 +133,7 @@ export default function CounselorChat({ context, onClose }: CounselorChatProps) 
   }, [input, loading]);
 
   return (
-    <div className="relative bg-cream text-bark" style={{ height: viewportHeight }}>
+    <div className="relative bg-cream text-bark" style={{ height: "var(--app-height, 100dvh)" }}>
       {/* Header — 固定顶部 */}
       <div className="sticky top-0 z-10 flex items-center justify-between px-4 py-3 border-b border-brand-border bg-cream/80 backdrop-blur-[12px] select-none">
         <div className="flex items-center gap-2">

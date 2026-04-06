@@ -3,9 +3,12 @@ import { availableParallelism } from "node:os";
 import { createServer } from "node:http";
 import { WebSocketServer, WebSocket } from "ws";
 import { config } from "dotenv";
-import { processEntry } from "./handlers/process.js";
+import { processEntry, refineTodoCommands } from "./handlers/process.js";
 import { todoRepo } from "./db/repositories/index.js";
-import { startChat, sendChatMessage, endChat } from "./handlers/chat.js";
+import { initChat, sendChatMessage, endChat } from "./handlers/chat.js";
+import { chatMessageRepo } from "./db/repositories/index.js";
+import { maybeCompress } from "./handlers/chat-compression.js";
+import { shouldTriggerMemory } from "./handlers/chat-memory-trigger.js";
 import { aggregateTodos } from "./handlers/todo.js";
 import { startASR, sendAudioChunk, stopASR, cancelASR } from "./handlers/asr.js";
 import { getSession } from "./session/manager.js";
@@ -43,6 +46,7 @@ import { registerOnboardingRoutes } from "./routes/onboarding.js";
 import { registerTopicRoutes } from "./routes/topics.js";
 import { registerVocabularyRoutes } from "./routes/vocabulary.js";
 import { registerNotificationRoutes } from "./routes/notifications.js";
+import { registerChatRoutes } from "./routes/chat.js";
 import { getProactiveEngine } from "./proactive/engine.js";
 import { verifyAccessToken } from "./auth/jwt.js";
 import { generateAiStatus } from "./handlers/reflect.js";
@@ -104,6 +108,7 @@ function startWorker() {
     registerTopicRoutes(router);
     registerVocabularyRoutes(router);
     registerNotificationRoutes(router);
+    registerChatRoutes(router);
     // ── HTTP Server ──
     const server = createServer(async (req, res) => {
         // CORS for all requests (including /health and non-router paths)
@@ -250,37 +255,43 @@ function startWorker() {
                     }
                     case "chat.start": {
                         msg.payload.userId = authedUserId;
-                        let fullText = "";
                         try {
-                            const stream = await startChat(msg.payload);
-                            await iterateStreamWithTimeout(stream, (chunk) => {
-                                if (chunk.startsWith("\x00TOOL_STATUS:")) {
-                                    const parts = chunk.slice(13).split(":", 2);
-                                    send(ws, { type: "tool.status", payload: { toolName: parts[0], label: parts[1] } });
-                                    return;
-                                }
-                                fullText += chunk;
-                                send(ws, { type: "chat.chunk", payload: { text: chunk } });
-                            });
+                            await initChat(msg.payload);
+                            send(ws, { type: "chat.ready", payload: {} });
                         }
-                        catch (streamErr) {
-                            console.error(`[gateway] chat.start stream error:`, streamErr.message);
-                            if (!fullText)
-                                fullText = "抱歉，我现在有点忙，稍后再试。";
+                        catch (err) {
+                            console.error(`[gateway] chat.start init error:`, err.message);
+                            send(ws, { type: "error", payload: { message: "会话初始化失败" } });
                         }
-                        const session = getSession(msg.payload.deviceId);
-                        session.context.addMessage({ role: "assistant", content: fullText });
-                        send(ws, { type: "chat.done", payload: { full_text: fullText } });
                         break;
                     }
                     case "chat.message": {
+                        // 持久化用户消息（先于 AI 处理）
+                        if (authedUserId && msg.payload.text) {
+                            chatMessageRepo.saveMessage(authedUserId, "user", msg.payload.text).catch(e => console.warn(`[chat] Failed to persist user msg: ${e.message}`));
+                            // 即时记忆触发：关键词快筛 + 异步 maybeCreateMemory
+                            if (shouldTriggerMemory(msg.payload.text)) {
+                                const session = getSession(msg.payload.deviceId);
+                                const today = new Date().toISOString().split("T")[0];
+                                session.memoryManager.maybeCreateMemory(msg.payload.deviceId, msg.payload.text, today, authedUserId).catch(e => console.warn(`[chat] Memory trigger failed: ${e.message}`));
+                            }
+                        }
                         let fullText = "";
                         try {
                             const stream = await sendChatMessage(msg.payload.deviceId, msg.payload.text);
                             await iterateStreamWithTimeout(stream, (chunk) => {
                                 if (chunk.startsWith("\x00TOOL_STATUS:")) {
-                                    const parts = chunk.slice(13).split(":", 2);
-                                    send(ws, { type: "tool.status", payload: { toolName: parts[0], label: parts[1] } });
+                                    const parts = chunk.slice(13).split(":", 3);
+                                    send(ws, { type: "tool.status", payload: { toolName: parts[0], label: parts[1], callId: parts[2] ?? "" } });
+                                    return;
+                                }
+                                if (chunk.startsWith("\x00TOOL_DONE:")) {
+                                    const parts = chunk.slice(11).split(":", 5);
+                                    send(ws, { type: "tool.done", payload: {
+                                            toolName: parts[0], callId: parts[1] ?? "",
+                                            success: parts[2] === "true", message: parts[3] ?? "",
+                                            durationMs: parseInt(parts[4] ?? "0", 10),
+                                        } });
                                     return;
                                 }
                                 fullText += chunk;
@@ -295,6 +306,12 @@ function startWorker() {
                         const session = getSession(msg.payload.deviceId);
                         session.context.addMessage({ role: "assistant", content: fullText });
                         send(ws, { type: "chat.done", payload: { full_text: fullText } });
+                        // 持久化 AI 回复（异步）
+                        if (fullText && authedUserId) {
+                            chatMessageRepo.saveMessage(authedUserId, "assistant", fullText).catch(e => console.warn(`[chat] Failed to persist assistant msg: ${e.message}`));
+                            // 异步检查并执行压缩（不阻塞响应）
+                            maybeCompress(authedUserId).catch(() => { });
+                        }
                         break;
                     }
                     case "chat.end": {
@@ -311,7 +328,7 @@ function startWorker() {
                         console.log(`[asr.start] notebook=${msg.payload.notebook}, mode=${msg.payload.mode}, sourceContext=${msg.payload.sourceContext}`);
                         connectionDeviceMap.set(ws, msg.payload.deviceId);
                         proactiveEngine.registerDevice(msg.payload.deviceId, ws, authedUserId);
-                        await startASR(ws, msg.payload.deviceId, msg.payload.locationText, msg.payload.mode, msg.payload.notebook, authedUserId, msg.payload.sourceContext);
+                        await startASR(ws, msg.payload.deviceId, msg.payload.locationText, msg.payload.mode, msg.payload.notebook, authedUserId, msg.payload.sourceContext, msg.payload.saveAudio);
                         break;
                     }
                     case "asr.stop": {
@@ -327,6 +344,17 @@ function startWorker() {
                         if (deviceId) {
                             cancelASR(deviceId, ws);
                             connectionDeviceMap.delete(ws);
+                        }
+                        break;
+                    }
+                    case "todo.refine": {
+                        try {
+                            const refined = await refineTodoCommands(msg.payload.commands, msg.payload.modificationText);
+                            send(ws, { type: "process.result", payload: { todo_commands: refined, voice_intent_type: "action" } });
+                        }
+                        catch (err) {
+                            console.error(`[gateway] todo.refine error:`, err.message);
+                            send(ws, { type: "error", payload: { message: `修改失败: ${err.message}` } });
                         }
                         break;
                     }

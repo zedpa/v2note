@@ -38,7 +38,7 @@ export type GatewayMessage =
   | { type: "chat.message"; payload: { text: string; deviceId: string } }
   | { type: "chat.end"; payload: { deviceId: string } }
   | { type: "todo.aggregate"; payload: { deviceId: string } }
-  | { type: "asr.start"; payload: { deviceId: string; locationText?: string; mode?: "realtime" | "upload"; notebook?: string; sourceContext?: "todo" | "timeline" | "chat" | "review" } }
+  | { type: "asr.start"; payload: { deviceId: string; locationText?: string; mode?: "realtime" | "upload"; notebook?: string; sourceContext?: "todo" | "timeline" | "chat" | "review"; saveAudio?: boolean } }
   | { type: "asr.stop"; payload: { deviceId: string; saveAudio?: boolean; forceCommand?: boolean } }
   | { type: "asr.cancel"; payload: { deviceId: string } }
   | { type: "plan.confirm"; payload: { deviceId: string; planId: string; action: "execute_all" | "execute_modified" | "abandon"; modifications?: Array<{ stepIndex: number; description?: string; deleted?: boolean }> } }
@@ -62,6 +62,8 @@ export type GatewayResponse =
   | { type: "reflect.question"; payload: { question: string } }
   | { type: "ai.status"; payload: { text: string } }
   | { type: "tool.step"; payload: { stepIndex: number; totalSteps: number; toolName: string; status: string; result?: string } }
+  | { type: "tool.status"; payload: { toolName: string; label: string; callId: string } }
+  | { type: "tool.done"; payload: { toolName: string; callId: string; success: boolean; message: string; durationMs: number } }
   | { type: "plan.proposed"; payload: { planId: string; intent: string; steps: Array<{ index: number; description: string; toolName?: string; needsConfirm?: boolean }> } }
   | { type: "plan.step_done"; payload: { planId: string; stepIndex: number; status: string; result?: string } }
   | { type: "plan.done"; payload: { planId: string; status: string } }
@@ -100,6 +102,7 @@ export class GatewayClient {
   private _connected = false;
   private _connectPromise: Promise<void> | null = null;
   private pendingMessages: GatewayMessage[] = [];
+  private pendingBinaryData: ArrayBuffer[] = [];
   private reconnectAttempts = 0;
   private _authRefreshing = false;
   private _unsubAuthLogout: (() => void) | null = null;
@@ -153,6 +156,13 @@ export class GatewayClient {
                 this.ws?.send(JSON.stringify(pending));
               }
               this.pendingMessages = [];
+            }
+            // Flush pending binary data (PCM chunks queued during disconnect)
+            if (this.pendingBinaryData.length > 0) {
+              for (const chunk of this.pendingBinaryData) {
+                this.ws?.send(chunk);
+              }
+              this.pendingBinaryData = [];
             }
             resolve();
           };
@@ -227,7 +237,7 @@ export class GatewayClient {
   }
 
   /** Wait until WebSocket is open (with timeout). */
-  async waitForReady(timeoutMs = 5000): Promise<boolean> {
+  async waitForReady(timeoutMs = 8000): Promise<boolean> {
     if (this._connected) return true;
     if (!this._connectPromise) this.connect();
     const timeout = new Promise<void>((r) => setTimeout(r, timeoutMs));
@@ -249,11 +259,18 @@ export class GatewayClient {
     }
   }
 
-  /** Send binary data (e.g. PCM audio chunks) */
+  /** Send binary data (e.g. PCM audio chunks). Queues if WS not open. */
   sendBinary(data: ArrayBuffer): void {
     if (!getAccessToken()) return;
     if (this.ws?.readyState === WebSocket.OPEN) {
       this.ws.send(data);
+    } else {
+      // 缓冲二进制数据，上限 300 块（约 30 秒 @ 100ms/块）
+      if (this.pendingBinaryData.length >= 300) {
+        this.pendingBinaryData.shift(); // FIFO 丢弃最早的块
+      }
+      this.pendingBinaryData.push(data);
+      console.warn("[gateway-client] Binary queued, WS not open");
     }
   }
 
@@ -283,6 +300,7 @@ export class GatewayClient {
     }
     this._connected = false;
     this.pendingMessages = [];
+    this.pendingBinaryData = [];
     this.reconnectAttempts = 0;
     // 清理 auth 事件监听
     this._unsubAuthLogout?.();

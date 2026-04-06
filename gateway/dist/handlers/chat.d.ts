@@ -31,11 +31,10 @@ export interface ChatStartPayload {
     };
 }
 /**
- * Start a review/insight chat session.
- * Loads memory, soul, and skills into the session context.
- * Returns the initial AI greeting.
+ * Initialize a chat session: load context, build system prompt, restore history.
+ * Does NOT generate any AI response — all messages go through handleChatMessage.
  */
-export declare function startChat(payload: ChatStartPayload): Promise<AsyncGenerator<string, void, undefined>>;
+export declare function initChat(payload: ChatStartPayload): Promise<void>;
 /**
  * Send a message in an ongoing chat session.
  */

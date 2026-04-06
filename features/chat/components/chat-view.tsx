@@ -1,10 +1,10 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
-import { ArrowLeft, Send, Mic, MicOff } from "lucide-react";
+import { ArrowLeft, Send, Mic, Square, X } from "lucide-react";
+import { useVoiceToText } from "@/features/recording/hooks/use-voice-to-text";
 import { cn } from "@/lib/utils";
 import { useChat } from "@/features/chat/hooks/use-chat";
-import { useKeyboardOffset } from "@/shared/hooks/use-keyboard-offset";
 import { ChatBubble } from "./chat-bubble";
 import { PlanCard } from "./plan-card";
 import { SwipeBack } from "@/shared/components/swipe-back";
@@ -35,21 +35,37 @@ interface ChatViewProps {
 
 export function ChatView({ dateRange, onClose, initialMessage, title, mode: modeProp, commandContext, mood, moodText, deerState, skill }: ChatViewProps) {
   const resolvedMode = modeProp ?? (initialMessage ? "command" : "review");
-  const { messages, send, streaming, connected, connect, disconnect, confirmPlan } =
+  const { messages, send, streaming, connected, connect, disconnect, confirmPlan, loadMore, loadingHistory, hasMore, clearHistory } =
     useChat(dateRange, {
       mode: resolvedMode,
       initialMessage,
       skill,
     });
   const [input, setInput] = useState("");
-  const [skillSuggestions, setSkillSuggestions] = useState<typeof CHAT_SKILLS>([]);
-  const [listening, setListening] = useState(false);
-  const recognitionRef = useRef<any>(null);
+  /** 已选中的 skill，等用户发消息时附带 */
+  const [activeSkill, setActiveSkill] = useState<{ name: string; label: string } | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
-  // 键盘偏移 + 可视区域高度（驱动整体布局）
-  const { offset: bottomOffset, viewportHeight, isKeyboardOpen } = useKeyboardOffset();
+  // 语音转文字（gateway ASR）
+  const voice = useVoiceToText({
+    onTranscript: (text) => setInput((prev) => prev ? prev + text : text),
+    sourceContext: "chat",
+  });
+
+  // 键盘弹出时自动滚动到底部
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const onResize = () => {
+      // 键盘弹出/收起时滚动到底部
+      if (scrollRef.current) {
+        scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+      }
+    };
+    vv.addEventListener("resize", onResize);
+    return () => vv.removeEventListener("resize", onResize);
+  }, []);
 
   // Detect if the command list is showing (last assistant message contains command list)
   const commandDefs = useMemo(() => getCommandDefs(), []);
@@ -68,62 +84,44 @@ export function ChatView({ dateRange, onClose, initialMessage, title, mode: mode
     send(text);
   }, [send, commandContext]);
 
-  // "/" in chat input → show skill suggestions
+  // "/" → 显示命令菜单（第一级），点 skills 后切到技能列表（第二级）
+  type SlashMenu = "commands" | "skills" | null;
+  const [slashMenu, setSlashMenu] = useState<SlashMenu>(null);
+
   useEffect(() => {
     if (input === "/") {
-      setSkillSuggestions(CHAT_SKILLS);
-    } else if (input.startsWith("/") && input.length > 1) {
-      const partial = input.slice(1).toLowerCase();
-      setSkillSuggestions(
-        CHAT_SKILLS.filter(s =>
-          s.label.toLowerCase().includes(partial) ||
-          s.keyword.toLowerCase().includes(partial) ||
-          s.name.toLowerCase().includes(partial),
-        ),
-      );
-    } else {
-      setSkillSuggestions([]);
+      setSlashMenu("commands");
+    } else if (!input.startsWith("/")) {
+      setSlashMenu(null);
     }
   }, [input]);
 
-  const handleSkillChip = useCallback((skillName: string, _label: string) => {
+  const handleSkillChip = useCallback((skillName: string, label: string) => {
     setInput("");
-    setSkillSuggestions([]);
-    send(`/skill:${skillName}`);
-  }, [send]);
-
-  // Connect on mount
-  useEffect(() => {
-    connect();
-    return () => {
-      disconnect();
-    };
-  }, [connect, disconnect]);
-
-  // 锁定背景滚动，防止键盘弹出时推动整个页面
-  useEffect(() => {
-    const scrollY = window.scrollY;
-    document.body.style.overflow = "hidden";
-    document.body.style.position = "fixed";
-    document.body.style.top = `-${scrollY}px`;
-    document.body.style.left = "0";
-    document.body.style.right = "0";
-    return () => {
-      document.body.style.overflow = "";
-      document.body.style.position = "";
-      document.body.style.top = "";
-      document.body.style.left = "";
-      document.body.style.right = "";
-      window.scrollTo(0, scrollY);
-    };
+    setSlashMenu(null);
+    setActiveSkill({ name: skillName, label });
+    inputRef.current?.focus();
   }, []);
 
-  // Auto-scroll to bottom on new messages or keyboard open
+  // Connect on mount only (不依赖 connect/disconnect 避免重复连接)
+  const connectRef = useRef(connect);
+  const disconnectRef = useRef(disconnect);
+  connectRef.current = connect;
+  disconnectRef.current = disconnect;
+  useEffect(() => {
+    connectRef.current();
+    return () => {
+      disconnectRef.current();
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Auto-scroll to bottom on new messages
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [messages, isKeyboardOpen]);
+  }, [messages]);
 
   // Detect slash commands in AI responses and execute them
   const prevStreamingRef = useRef(streaming);
@@ -143,61 +141,58 @@ export function ChatView({ dateRange, onClose, initialMessage, title, mode: mode
     }
   }, [streaming, messages, commandContext]);
 
+  // 合并 commandContext + 聊天内部命令（如 /clear）
+  const mergedCommandContext = useMemo(() => ({
+    ...commandContext,
+    clearChat: clearHistory,
+  }), [commandContext, clearHistory]);
+
   const handleSend = useCallback(() => {
     const trimmed = input.trim();
     if (!trimmed || streaming) return;
 
-    if (initialMessage && commandContext && trimmed.startsWith("/")) {
-      const result = executeCommand(trimmed, commandContext);
+    if (trimmed.startsWith("/")) {
+      const result = executeCommand(trimmed, mergedCommandContext);
       if (result?.handled) {
         setInput("");
         return;
       }
     }
 
-    send(trimmed);
+    // 有激活的 skill → 附带 skill 前缀
+    if (activeSkill) {
+      send(`/skill:${activeSkill.name} ${trimmed}`);
+      setActiveSkill(null);
+    } else {
+      send(trimmed);
+    }
     setInput("");
     inputRef.current?.focus();
-  }, [input, streaming, initialMessage, commandContext, send]);
-
-  const hasSpeechAPI =
-    typeof window !== "undefined" &&
-    !!((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition);
+  }, [input, streaming, mergedCommandContext, send, activeSkill]);
 
   const toggleVoice = useCallback(() => {
-    if (listening) {
-      recognitionRef.current?.stop();
-      setListening(false);
-      return;
+    if (voice.recording) {
+      voice.stop();
+    } else {
+      voice.start();
     }
-    const SR =
-      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SR) return;
-    const recognition = new SR();
-    recognition.lang = "zh-CN";
-    recognition.interimResults = true;
-    recognition.continuous = false;
-    recognition.onresult = (e: any) => {
-      const transcript = Array.from(e.results as SpeechRecognitionResultList)
-        .map((r: any) => r[0].transcript)
-        .join("");
-      setInput(transcript);
+  }, [voice]);
+
+  // 组件卸载时自动取消录音
+  useEffect(() => {
+    return () => {
+      voice.cancel();
     };
-    recognition.onend = () => setListening(false);
-    recognition.onerror = () => setListening(false);
-    recognitionRef.current = recognition;
-    recognition.start();
-    setListening(true);
-  }, [listening]);
+  }, []);
 
   return (
     <SwipeBack onClose={onClose}>
-      {/* 主容器 — 高度跟随 visualViewport，键盘弹出时自动缩小 */}
+      {/* 主容器 — 始终全屏高度，键盘通过输入区 padding 挤压消息区 */}
       <div
         className="fixed inset-x-0 top-0 flex flex-col bg-surface"
-        style={{ height: viewportHeight }}
+        style={{ height: "100dvh" }}
       >
-        {/* ── Header: 极简 — "路路" + 呼吸状态灯 ── */}
+        {/* ── Header: 极简 — "路路" + 呼吸状态灯，始终固定顶部 ── */}
         <header
           className="shrink-0 flex items-center gap-3 px-5 h-[56px] pt-safe"
           style={{
@@ -235,24 +230,50 @@ export function ChatView({ dateRange, onClose, initialMessage, title, mode: mode
         <div
           ref={scrollRef}
           className="flex-1 overflow-y-auto px-5 py-4"
+          onScroll={(e) => {
+            const el = e.currentTarget;
+            if (el.scrollTop < 80 && hasMore && !loadingHistory) {
+              loadMore();
+            }
+          }}
         >
-          {messages.map((msg, i) =>
-            msg.role === "plan" && msg.plan ? (
-              <PlanCard
-                key={msg.id}
-                planId={msg.plan.planId}
-                intent={msg.plan.intent}
-                steps={msg.plan.steps}
-                onConfirm={(action, mods) => confirmPlan(msg.plan!.planId, action, mods)}
-              />
-            ) : (
-              <ChatBubble
-                key={msg.id}
-                message={msg}
-                streaming={streaming && i === messages.length - 1 && msg.role === "assistant"}
-              />
-            ),
+          {/* 上滑加载指示器 */}
+          {loadingHistory && (
+            <div className="text-center text-xs text-muted-foreground py-2">加载更多...</div>
           )}
+          {!hasMore && messages.length > 0 && (
+            <div className="text-center text-xs text-muted-foreground py-2">已是最早的消息</div>
+          )}
+          {messages.map((msg, i) => {
+            // 日期分隔线
+            let dateSeparator: React.ReactNode = null;
+            if (i === 0 || (i > 0 && getDateLabel(msg.timestamp) !== getDateLabel(messages[i - 1].timestamp))) {
+              dateSeparator = (
+                <div className="text-center text-xs text-muted-foreground py-3 select-none">
+                  {getDateLabel(msg.timestamp)}
+                </div>
+              );
+            }
+            return msg.role === "plan" && msg.plan ? (
+              <div key={msg.id}>
+                {dateSeparator}
+                <PlanCard
+                  planId={msg.plan.planId}
+                  intent={msg.plan.intent}
+                  steps={msg.plan.steps}
+                  onConfirm={(action, mods) => confirmPlan(msg.plan!.planId, action, mods)}
+                />
+              </div>
+            ) : (
+              <div key={msg.id}>
+                {dateSeparator}
+                <ChatBubble
+                  message={msg}
+                  streaming={streaming && i === messages.length - 1 && msg.role === "assistant"}
+                />
+              </div>
+            );
+          })}
 
           {/* Clickable command chips */}
           {showCommandChips && !streaming && (
@@ -269,99 +290,174 @@ export function ChatView({ dateRange, onClose, initialMessage, title, mode: mode
               ))}
             </div>
           )}
-
-          {/* Spacer so messages don't hide behind input bar */}
-          <div className="shrink-0 h-[80px]" />
         </div>
-      </div>
 
-      {/* ── 底部输入区: 毛玻璃控制中心 ── */}
-      <div
-        className="fixed left-0 right-0 z-50 px-5 py-3 pb-safe bg-surface/85 backdrop-blur-[20px]"
-        style={{
-          bottom: `${bottomOffset}px`,
-          WebkitBackdropFilter: "blur(20px)",
-          borderTop: "1px solid rgba(255,255,255,0.05)",
-        }}
-      >
-        {/* Skill suggestions — "/" 快捷键触发 */}
-        {skillSuggestions.length > 0 && (
-          <div className="flex gap-2 flex-wrap mb-2">
-            {skillSuggestions.map((s) => (
+        {/* ── 底部输入区: flex 内部元素，键盘弹出时通过 padding 推高 ── */}
+        <div
+          className="shrink-0 px-5 py-3 bg-surface/85 backdrop-blur-[20px]"
+          style={{
+            paddingBottom: "calc(var(--kb-offset, 0px) + env(safe-area-inset-bottom, 0px) + 12px)",
+            transition: "padding-bottom 150ms ease-out",
+            WebkitBackdropFilter: "blur(20px)",
+            borderTop: "1px solid rgba(255,255,255,0.05)",
+          }}
+        >
+          {/* "/" 命令菜单 — 第一级 */}
+          {slashMenu === "commands" && (
+            <div className="flex gap-2 flex-wrap mb-2">
               <button
-                key={s.name}
                 type="button"
-                onClick={() => handleSkillChip(s.name, s.label)}
+                onClick={() => { setInput(""); setSlashMenu("skills"); }}
                 className="px-3 py-1.5 rounded-full bg-deer/10 text-deer text-xs font-medium hover:bg-deer/20 active:bg-deer/30 transition-colors select-none"
               >
-                {s.label}
+                /skills
               </button>
-            ))}
-          </div>
-        )}
-        <div className="flex items-end gap-3">
-          {/* 输入框 — 胶囊形 */}
-          <textarea
-            ref={inputRef}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                handleSend();
-              }
-            }}
-            placeholder="输入你的想法..."
-            rows={1}
-            enterKeyHint="send"
-            className="flex-1 bg-surface-lowest rounded-full px-5 py-2.5 text-[15px] text-on-surface outline-none resize-none placeholder:text-muted-accessible/50 max-h-24"
-            style={{
-              minHeight: "44px",
-              border: "1px solid rgba(255,255,255,0.08)",
-            }}
-            disabled={streaming}
-          />
-          {/* 语音按钮 — 品牌色底板突出 */}
-          {hasSpeechAPI && !input.trim() && (
-            <button
-              type="button"
-              onClick={toggleVoice}
+              <button
+                type="button"
+                onClick={() => { setInput(""); setSlashMenu(null); clearHistory(); }}
+                className="px-3 py-1.5 rounded-full bg-deer/10 text-deer text-xs font-medium hover:bg-deer/20 active:bg-deer/30 transition-colors select-none"
+              >
+                /clear
+              </button>
+            </div>
+          )}
+          {/* "/" 命令菜单 — 第二级：技能选择 */}
+          {slashMenu === "skills" && (
+            <div className="flex gap-2 flex-wrap mb-2">
+              <button
+                type="button"
+                onClick={() => setSlashMenu("commands")}
+                className="px-2 py-1.5 rounded-full text-muted-accessible text-xs hover:bg-surface-high transition-colors select-none"
+                aria-label="返回"
+              >
+                <ArrowLeft size={14} />
+              </button>
+              {CHAT_SKILLS.map((s) => (
+                <button
+                  key={s.name}
+                  type="button"
+                  onClick={() => handleSkillChip(s.name, s.label)}
+                  className={cn(
+                    "px-3 py-1.5 rounded-full text-xs font-medium transition-colors select-none",
+                    activeSkill?.name === s.name
+                      ? "bg-deer text-white"
+                      : "bg-deer/10 text-deer hover:bg-deer/20 active:bg-deer/30",
+                  )}
+                >
+                  {s.label}
+                </button>
+              ))}
+            </div>
+          )}
+          {/* 已选 skill 标记 */}
+          {activeSkill && !slashMenu && (
+            <div className="flex items-center gap-1.5 mb-2">
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-deer/15 text-deer text-xs font-medium">
+                {activeSkill.label}
+                <button
+                  type="button"
+                  onClick={() => setActiveSkill(null)}
+                  className="ml-0.5 hover:text-deer/60"
+                  aria-label="取消技能"
+                >
+                  <X size={12} />
+                </button>
+              </span>
+              <span className="text-[11px] text-muted-accessible">发送消息时将使用此技能</span>
+            </div>
+          )}
+          {/* 录音实时转写预览 */}
+          {voice.recording && (voice.confirmedText || voice.partialText) && (
+            <div className="px-2 pb-2 text-center">
+              <span className="text-sm text-on-surface/70">{voice.confirmedText}</span>
+              <span className="text-sm text-on-surface/35">{voice.partialText}</span>
+            </div>
+          )}
+          <div className="flex items-end gap-3">
+            {/* 输入框 — 胶囊形 */}
+            <textarea
+              ref={inputRef}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSend();
+                }
+              }}
+              placeholder="输入你的想法..."
+              rows={1}
+              enterKeyHint="send"
+              className="flex-1 bg-surface-lowest rounded-full px-5 py-2.5 text-[15px] text-on-surface outline-none resize-none placeholder:text-muted-accessible/50 max-h-24"
+              style={{
+                minHeight: "44px",
+                border: "1px solid rgba(255,255,255,0.08)",
+              }}
               disabled={streaming}
-              className={cn(
-                "flex items-center justify-center w-10 h-10 rounded-full transition-colors shrink-0",
-                listening
-                  ? "bg-maple/20 text-maple"
-                  : "bg-deer/15 text-deer hover:bg-deer/30",
-              )}
-              aria-label={listening ? "停止语音" : "语音输入"}
-            >
-              {listening ? <MicOff size={18} /> : <Mic size={18} />}
-            </button>
-          )}
-          {/* 发送按钮 — 品牌渐变 */}
-          {(input.trim() || !hasSpeechAPI) && (
-            <button
-              type="button"
-              onClick={handleSend}
-              disabled={!input.trim() || streaming}
-              className={cn(
-                "flex items-center justify-center w-10 h-10 rounded-full transition-colors shrink-0",
-                input.trim() && !streaming
-                  ? "text-white"
-                  : "bg-surface-high text-muted-accessible",
-              )}
-              style={
-                input.trim() && !streaming
-                  ? { background: "linear-gradient(135deg, #89502C, #C8845C)" }
-                  : undefined
-              }
-              aria-label="发送"
-            >
-              <Send size={16} />
-            </button>
-          )}
+            />
+            {/* 语音按钮 — gateway ASR，44×44px 触控区 */}
+            {!input.trim() && !voice.recording && (
+              <button
+                type="button"
+                onClick={toggleVoice}
+                disabled={streaming}
+                className="flex items-center justify-center w-11 h-11 rounded-full bg-deer/15 text-deer hover:bg-deer/30 transition-colors shrink-0"
+                aria-label="语音输入"
+              >
+                <Mic size={20} />
+              </button>
+            )}
+            {/* 录音中 — 停止按钮 */}
+            {voice.recording && (
+              <button
+                type="button"
+                onClick={toggleVoice}
+                className="flex items-center justify-center w-11 h-11 rounded-full bg-maple/20 text-maple animate-pulse shrink-0"
+                aria-label="停止录音"
+              >
+                <Square size={18} className="fill-current" />
+              </button>
+            )}
+            {/* 发送按钮 — 品牌渐变，44×44px */}
+            {input.trim() && !voice.recording && (
+              <button
+                type="button"
+                onClick={handleSend}
+                disabled={!input.trim() || streaming}
+                className={cn(
+                  "flex items-center justify-center w-11 h-11 rounded-full transition-colors shrink-0",
+                  input.trim() && !streaming
+                    ? "text-white"
+                    : "bg-surface-high text-muted-accessible",
+                )}
+                style={
+                  input.trim() && !streaming
+                    ? { background: "linear-gradient(135deg, #89502C, #C8845C)" }
+                    : undefined
+                }
+                aria-label="发送"
+              >
+                <Send size={18} />
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </SwipeBack>
   );
+}
+
+/** 格式化日期分隔线标签 */
+function getDateLabel(date: Date): string {
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const target = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const diff = today.getTime() - target.getTime();
+  const days = Math.floor(diff / 86400000);
+
+  if (days === 0) return "今天";
+  if (days === 1) return "昨天";
+
+  const weekdays = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
+  return `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日 ${weekdays[date.getDay()]}`;
 }

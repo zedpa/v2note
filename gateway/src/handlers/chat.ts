@@ -14,6 +14,7 @@ import { recordRepo } from "../db/repositories/index.js";
 import { transcriptRepo } from "../db/repositories/index.js";
 import { pendingIntentRepo } from "../db/repositories/index.js";
 import { todoRepo } from "../db/repositories/index.js";
+import { chatMessageRepo } from "../db/repositories/index.js";
 import { createDefaultRegistry } from "../tools/definitions/index.js";
 import type { ToolContext } from "../tools/types.js";
 import { mayProfileUpdate } from "../lib/text-utils.js";
@@ -156,13 +157,12 @@ ${contextBlock}
 }
 
 /**
- * Start a review/insight chat session.
- * Loads memory, soul, and skills into the session context.
- * Returns the initial AI greeting.
+ * Initialize a chat session: load context, build system prompt, restore history.
+ * Does NOT generate any AI response — all messages go through handleChatMessage.
  */
-export async function startChat(
+export async function initChat(
   payload: ChatStartPayload,
-): Promise<AsyncGenerator<string, void, undefined>> {
+): Promise<void> {
   const session = getSession(payload.deviceId);
   session.mode = "chat";
   session.userId = payload.userId;
@@ -297,70 +297,33 @@ export async function startChat(
   // Set up session context
   session.context.setSystemPrompt(systemPrompt);
 
-  if (payload.mode === "decision") {
-    // Decision mode: deep cognitive graph traversal for decision support
-    const userId = payload.userId ?? payload.deviceId;
-    const question = payload.initialMessage?.trim() || "帮我分析这个问题";
-    const decisionCtx = await gatherDecisionContext(question, userId);
-    const decisionPrompt = buildDecisionPrompt(decisionCtx);
-
-    // Override system prompt with decision-specific prompt
-    session.context.setSystemPrompt(decisionPrompt);
-    session.context.addMessage({ role: "user", content: question });
-  } else if (payload.mode === "command") {
-    const trimmedMsg = payload.initialMessage?.trim() || "";
-    const isGreeting = !trimmedMsg || trimmedMsg === "/";
-
-    if (isGreeting) {
-      // 问候模式：加载最近日记 + 待办，生成个性化问候
-      const greetingPrompt = await buildGreetingPrompt(
-        payload.userId,
-        payload.deviceId,
-        transcriptSummary,
-      );
-      session.context.addMessage({ role: "user", content: greetingPrompt });
-    } else {
-      // 正常命令模式
-      if (payload.assistantPreamble) {
-        session.context.addMessage({ role: "assistant", content: payload.assistantPreamble });
+  // ── 上下文恢复：从 DB 加载历史摘要 + 最近消息（command 模式） ──
+  if (payload.mode === "command" && payload.userId) {
+    try {
+      // 1. 加载所有 context-summary（压缩摘要）
+      const summaries = await chatMessageRepo.getContextSummaries(payload.userId);
+      if (summaries.length > 0) {
+        const summaryText = summaries.map(s => s.content).join("\n\n");
+        session.context.addMessage({
+          role: "system",
+          content: `[历史对话摘要]\n${summaryText}`,
+        });
       }
-      session.context.addMessage({ role: "user", content: trimmedMsg });
-    }
-  } else {
-    // Review/insight mode: load transcript context then stream initial review
-    if (transcriptSummary) {
-      session.context.addMessage({
-        role: "user",
-        content: `以下是 ${payload.dateRange.start} 到 ${payload.dateRange.end} 期间的记录内容：\n\n${transcriptSummary}\n\n请基于这些内容开始复盘对话。`,
-      });
-    } else {
-      session.context.addMessage({
-        role: "user",
-        content: `请开始 ${payload.dateRange.start} 到 ${payload.dateRange.end} 的复盘。这段时间暂无录音记录。`,
-      });
+      // 2. 加载最近 20 条未压缩消息
+      const recentMessages = await chatMessageRepo.getUncompressedMessages(payload.userId, 20);
+      // 按时间正序注入
+      for (const msg of recentMessages.reverse()) {
+        if (msg.role === "user" || msg.role === "assistant") {
+          session.context.addMessage({ role: msg.role, content: msg.content });
+        }
+      }
+      console.log(`[chat] Context restored: ${summaries.length} summaries + ${recentMessages.length} recent messages`);
+    } catch (err: any) {
+      console.warn(`[chat] Context restore failed: ${err.message}`);
     }
   }
 
-  // Stream initial response
-  // Deep skill（review/insight）→ 预取上下文 + 推理模型（无工具）
-  const deepSkill = activeSkills.find(s => DEEP_SKILLS.has(s.name));
-  if (deepSkill && (payload.mode === "review" || payload.mode === "insight")) {
-    const userMsg = transcriptSummary
-      ? `以下是 ${payload.dateRange.start} 到 ${payload.dateRange.end} 期间的记录内容：\n\n${transcriptSummary}\n\n请基于这些内容开始。`
-      : `请开始 ${payload.dateRange.start} 到 ${payload.dateRange.end} 的分析。这段时间暂无录音记录。`;
-    return streamDeepSkill(session, payload.deviceId, deepSkill, userMsg);
-  }
-
-  // 其他模式走工具链
-  let initialTier: ModelTier | undefined;
-  const hasDeepSkill = activeSkills.some(s => DEEP_SKILLS.has(s.name));
-  if (payload.mode === "review" || payload.mode === "insight" || payload.mode === "decision" || hasDeepSkill) {
-    initialTier = "chat";
-  } else if (payload.mode === "command") {
-    const trimmed = payload.initialMessage?.trim() || "";
-    if (!trimmed || trimmed === "/") initialTier = "agent"; // 问候用快速模型
-  }
-  return streamWithNativeTools(session, payload.deviceId, initialTier);
+  // Session 初始化完成，等待 chat.message
 }
 
 // ── Deep Skill 上下文预取 + 无工具流式生成 ──────────────────────────
@@ -514,20 +477,20 @@ export async function sendChatMessage(
     throw new Error("No active chat session");
   }
 
-  // Skill 显式激活："/skill:xxx" 格式（从 chat 输入框 "/" 快捷键触发）
-  const skillMatch = text.match(/^\/skill:(\S+)$/);
+  // Skill 显式激活："/skill:xxx" 或 "/skill:xxx 用户文本" 格式
+  const skillMatch = text.match(/^\/skill:(\S+)(?:\s+(.+))?$/s);
   if (skillMatch) {
     const explicitSkill = findSkillByName(skillMatch[1]);
     if (explicitSkill) {
-      console.log(`[chat] Skill activated (explicit): ${explicitSkill.name}`);
+      const userText = skillMatch[2]?.trim() || "";
+      const userPrompt = userText || "请根据以上技能指导开始。";
+      console.log(`[chat] Skill activated (explicit): ${explicitSkill.name}${userText ? ` with text: ${userText.slice(0, 50)}` : ""}`);
       if (DEEP_SKILLS.has(explicitSkill.name)) {
-        // Deep skill: 预取上下文 → 推理模型（无工具）
-        return streamDeepSkill(session, deviceId, explicitSkill, "请根据以上技能指导开始。");
+        return streamDeepSkill(session, deviceId, explicitSkill, userPrompt);
       }
-      // 普通 skill: 走工具链
       session.context.addMessage({
         role: "user",
-        content: `[系统：已激活「${explicitSkill.name}」技能]\n\n${explicitSkill.prompt}\n\n---\n\n请根据以上技能指导开始。`,
+        content: `[系统：已激活「${explicitSkill.name}」技能]\n\n${explicitSkill.prompt}\n\n---\n\n${userPrompt}`,
       });
       return streamWithNativeTools(session, deviceId);
     }
@@ -632,6 +595,7 @@ async function* streamWithNativeTools(
     deviceId,
     userId: session.userId,
     sessionId: session.id,
+    getMessages: () => session.context.getHistory(),
   };
 
   // 将注册表导出为 AI SDK tools 格式（绑定执行上下文）
@@ -673,7 +637,9 @@ export async function endChat(deviceId: string): Promise<void> {
 
   const history = session.context.getHistory();
   if (history.length > 0) {
+    // 只取 user/assistant 消息，排除 system（含用户画像，会导致 AI 把用户名当成自己的名字）
     const summary = history
+      .filter((m) => m.role === "user" || m.role === "assistant")
       .map((m) => `${m.role}: ${m.content.slice(0, 200)}`)
       .join("\n");
 
@@ -697,9 +663,8 @@ export async function endChat(deviceId: string): Promise<void> {
         console.warn(`[chat] Profile update failed: ${e.message}`);
       });
     }
-    appendToDiary(deviceId, "ai-self", `[对话摘要] ${summary.slice(0, 500)}`, userId).catch((e) => {
-      console.warn(`[chat] Diary append failed: ${e.message}`);
-    });
+    // 场景 6.4: endChat 不再调用 appendToDiary（改为每日汇总）
+    // appendToDiary 已移至 daily-loop 的 chat 日记总结
 
   }
 

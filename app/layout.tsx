@@ -3,6 +3,7 @@ import type { Metadata, Viewport } from "next";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
 
+import { ViewportHeightManager } from "@/components/layout/viewport-height-manager";
 import "./globals.css";
 
 // Editorial Serenity 字体系统 — 系统字体 fallback（避免构建时依赖 Google Fonts）
@@ -36,6 +37,7 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
+          <ViewportHeightManager />
           {children}
           <Toaster position="bottom-center" />
         </ThemeProvider>

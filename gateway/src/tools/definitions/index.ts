@@ -18,6 +18,14 @@ import { createProjectTool } from "./create-project.js";
 import { createLinkTool } from "./create-link.js";
 import { searchTool } from "./search.js";
 import { confirmTool } from "./confirm.js";
+import { getCurrentTimeTool } from "./get-current-time.js";
+import { viewRecordTool } from "./view-record.js";
+import { viewTodoTool } from "./view-todo.js";
+import { viewGoalTool } from "./view-goal.js";
+import { saveConversationTool } from "./save-conversation.js";
+import { manageFolderTool } from "./manage-folder.js";
+import { moveRecordTool } from "./move-record.js";
+import { listFoldersTool } from "./list-folders.js";
 import { webSearchToolDef } from "../../web/web-search-tool.js";
 import { fetchUrlToolDef } from "../../web/fetch-url-tool.js";
 import { getSearchProvider } from "../../web/search-provider.js";
@@ -38,8 +46,19 @@ export const ALL_TOOL_DEFINITIONS = [
   createLinkTool,
   // 搜索
   searchTool,
+  // 查看
+  viewRecordTool,
+  viewTodoTool,
+  viewGoalTool,
+  // 对话保存
+  saveConversationTool,
+  // 文件夹管理
+  manageFolderTool,
+  moveRecordTool,
+  listFoldersTool,
   // 系统
   confirmTool,
+  getCurrentTimeTool,
 ];
 
 /** 创建并初始化全量工具注册表（含条件注册的 web 工具） */

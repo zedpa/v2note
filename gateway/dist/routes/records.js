@@ -97,6 +97,16 @@ export function registerRecordRoutes(router) {
         }));
         sendJson(res, items);
     });
+    // 获取用户的 domain 列表 + 每个 domain 的记录数（侧边栏文件夹）
+    router.get("/api/v1/records/domains", async (req, res) => {
+        const userId = getUserId(req);
+        if (!userId) {
+            sendJson(res, { domains: [] });
+            return;
+        }
+        const domains = await recordRepo.listUserDomainsWithCount(userId);
+        sendJson(res, { domains });
+    });
     // Get single record (with all associations)
     router.get("/api/v1/records/:id", async (req, res, params) => {
         const record = await recordRepo.findById(params.id);
@@ -120,6 +130,82 @@ export function registerRecordRoutes(router) {
         const body = await readBody(req);
         const record = await recordRepo.create({ device_id: deviceId, user_id: userId ?? undefined, ...body });
         sendJson(res, { id: record.id }, 201);
+    });
+    // Retry audio: receive WAV, transcribe, process
+    router.post("/api/v1/records/:id/retry-audio", async (req, res, params) => {
+        const deviceId = getDeviceId(req);
+        const userId = getUserId(req);
+        const record = await recordRepo.findById(params.id);
+        if (!record) {
+            sendJson(res, { error: "Record not found" }, 404);
+            return;
+        }
+        if (record.status !== "pending_retry") {
+            sendJson(res, { error: "Record already processed" }, 409);
+            return;
+        }
+        try {
+            // 读取 request body 为 Buffer（WAV 二进制数据）
+            const chunks = [];
+            for await (const chunk of req) {
+                chunks.push(typeof chunk === "string" ? Buffer.from(chunk) : chunk);
+            }
+            const wavBuffer = Buffer.concat(chunks);
+            if (wavBuffer.length < 100) {
+                sendJson(res, { error: "Audio data too small" }, 400);
+                return;
+            }
+            // 更新 record 状态
+            await recordRepo.updateFields(record.id, { status: "processing" });
+            // 查询热词
+            const { getVocabularyIdForDevice } = await import("../cognitive/vocabulary-sync.js");
+            const vocabularyId = await getVocabularyIdForDevice(deviceId);
+            // 转写
+            const { transcribeAudioFile } = await import("../handlers/asr.js");
+            const transcript = await transcribeAudioFile(wavBuffer, vocabularyId);
+            if (!transcript.trim()) {
+                await recordRepo.updateFields(record.id, { status: "completed" });
+                sendJson(res, { recordId: record.id, transcript: "" });
+                return;
+            }
+            // 创建 transcript
+            await transcriptRepo.create({
+                record_id: record.id,
+                text: transcript,
+                language: "zh",
+            });
+            // 上传 OSS
+            try {
+                const { uploadPCM, isOssConfigured } = await import("../storage/oss.js");
+                if (isOssConfigured()) {
+                    // WAV 去掉 44 字节 header 得到 PCM
+                    const pcmData = wavBuffer.subarray(44);
+                    const audioUrl = await uploadPCM(deviceId, [pcmData]);
+                    await recordRepo.updateFields(record.id, { audio_path: audioUrl });
+                }
+            }
+            catch (err) {
+                console.error("[retry-audio] OSS upload failed:", err);
+            }
+            // 触发 AI 处理（后台）
+            processEntry({
+                text: transcript,
+                deviceId,
+                userId: userId ?? undefined,
+                recordId: record.id,
+                notebook: record.notebook ?? undefined,
+                forceCommand: false,
+                sourceContext: "timeline",
+            }).catch((err) => {
+                console.error("[retry-audio] Process error:", err);
+            });
+            sendJson(res, { recordId: record.id, transcript });
+        }
+        catch (err) {
+            console.error("[retry-audio] Failed:", err);
+            await recordRepo.updateFields(record.id, { status: "pending_retry" });
+            sendJson(res, { error: err.message }, 500);
+        }
     });
     // Create manual note (content + optional AI processing)
     router.post("/api/v1/records/manual", async (req, res) => {

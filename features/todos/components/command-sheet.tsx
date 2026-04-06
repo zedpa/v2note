@@ -203,19 +203,26 @@ export function CommandSheet({
                   <p className="mb-4 text-sm text-white/60 leading-relaxed">{transcript}</p>
                 )}
 
-                {/* Loading */}
+                {/* Loading — shimmer 动画 */}
                 <div className="flex items-center gap-3">
                   <Sparkles className="h-5 w-5 text-indigo-400 animate-pulse" />
-                  <span className="text-white/80 text-sm">
-                    {mode === "agent" ? "正在执行..." : "正在识别..."}
+                  <span className="shimmer-text text-sm font-medium">
+                    {mode === "agent"
+                      ? toolStatuses.length > 0
+                        ? toolStatuses[toolStatuses.length - 1]
+                        : "正在执行..."
+                      : "路路正在分析语音指令..."}
                   </span>
                 </div>
 
-                {/* Agent 模式：工具状态流 */}
-                {mode === "agent" && toolStatuses.length > 0 && (
-                  <div className="mt-4 space-y-2">
-                    {toolStatuses.map((status, i) => (
-                      <div key={i} className="text-xs text-white/50">{status}</div>
+                {/* 已完成的工具步骤 */}
+                {toolStatuses.length > 1 && (
+                  <div className="mt-3 space-y-1.5">
+                    {toolStatuses.slice(0, -1).map((status, i) => (
+                      <div key={i} className="flex items-center gap-2 py-0.5">
+                        <Check className="h-3.5 w-3.5 text-green-500 shrink-0" />
+                        <span className="text-sm text-white/50">{status}</span>
+                      </div>
                     ))}
                   </div>
                 )}

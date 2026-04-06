@@ -17,6 +17,8 @@ import { RecordingImmersive } from "./recording-immersive";
 import type { CommandContext } from "@/features/commands/lib/registry";
 import { fabNotify, onFabNotify, type FabNotification } from "@/shared/lib/fab-notify";
 import { startAiPipeline, renewAiPipeline, endAiPipeline } from "@/shared/lib/ai-processing";
+import { saveAudio, mergeChunks, checkCacheSize, markCompleted, getAudioByRecordId, type PendingAudio } from "@/features/recording/lib/audio-cache";
+import { createRecord } from "@/shared/lib/api/records";
 
 function formatDuration(s: number) {
   const m = Math.floor(s / 60);
@@ -72,8 +74,12 @@ export function FAB({
   const commandReleaseRef = useRef(false);
 
   const preBufferRef = useRef<ArrayBuffer[]>([]);
+  const fullBufferRef = useRef<ArrayBuffer[]>([]); // 累积完整录音（本地缓存用）
+  const cacheIdRef = useRef<string | null>(null);   // 当前录音的 IndexedDB 缓存 ID
+  const asrDoneTimerRef = useRef<NodeJS.Timeout | null>(null); // asr.done 超时检测
   const streamingRef = useRef(false);
   const preCaptureAbortRef = useRef(false);
+  const preCaptureDelayRef = useRef<NodeJS.Timeout | null>(null);
   const activeNotebookRef = useRef(activeNotebook);
   activeNotebookRef.current = activeNotebook;
   const sourceContextRef = useRef(sourceContext);
@@ -123,6 +129,39 @@ export function FAB({
     });
   }, []);
 
+  // App 启动时检查 pending 缓存，补创建占位 record
+  useEffect(() => {
+    import("@/features/recording/lib/audio-cache").then(async ({ getAllPending, updateRecordId, checkCacheSize }) => {
+      try {
+        const pending = await getAllPending();
+        for (const item of pending) {
+          if (item.recordId) continue; // 已有占位 record
+          try {
+            const result = await createRecord({
+              status: "pending_retry",
+              source: "voice",
+              duration_seconds: item.duration,
+              notebook: item.notebook ?? undefined,
+            });
+            if (result?.id) {
+              await updateRecordId(item.id, result.id);
+            }
+          } catch {
+            // 网络仍不可用，下次再试
+          }
+        }
+        if (pending.length > 0) {
+          emit("recording:uploaded"); // 刷新时间线
+        }
+        // 缓存大小提醒
+        const overSize = await checkCacheSize();
+        if (overSize) {
+          fabNotify.info("本地录音缓存较多，可在日记菜单中清理");
+        }
+      } catch { /* IndexedDB 不可用 */ }
+    });
+  }, []);
+
   useEffect(() => {
     const client = getGatewayClient();
     if (!client.connected) client.connect();
@@ -137,13 +176,22 @@ export function FAB({
           setPartialText("");
           break;
         case "asr.done": {
+          // 清除 asr.done 超时检测
+          if (asrDoneTimerRef.current) { clearTimeout(asrDoneTimerRef.current); asrDoneTimerRef.current = null; }
+
+          // 关联 recordId 到本地缓存
+          if (msg.payload.recordId && cacheIdRef.current) {
+            import("@/features/recording/lib/audio-cache").then(({ updateRecordId }) => {
+              if (cacheIdRef.current) updateRecordId(cacheIdRef.current, msg.payload.recordId);
+            }).catch(() => {});
+          }
+
           if (commandReleaseRef.current) {
             commandReleaseRef.current = false;
             setDisplayDuration(0);
             setConfirmedText("");
             setPartialText("");
             resetRef.current();
-            // 统一走 CommandSheet 弹窗：通过自定义事件通知 page.tsx
             window.dispatchEvent(new CustomEvent("v2note:forceCommand", {
               detail: { transcript: (msg.payload.transcript || "").trim() },
             }));
@@ -152,19 +200,19 @@ export function FAB({
 
           if (msg.payload.recordId) {
             emit("recording:uploaded");
-            // Show processing capsule
             setProcessing(true);
             setWittyText(
               WITTY_PROCESSING[
                 Math.floor(Math.random() * WITTY_PROCESSING.length)
               ],
             );
-            // 全局管道状态：开始
             pipelineIdRef.current = startAiPipeline();
           }
           break;
         }
         case "asr.error":
+          // 清除超时检测
+          if (asrDoneTimerRef.current) { clearTimeout(asrDoneTimerRef.current); asrDoneTimerRef.current = null; }
           fabNotify.error(`识别错误: ${msg.payload.message}`);
           stopTimers();
           setDisplayDuration(0);
@@ -177,12 +225,19 @@ export function FAB({
           setWittyText("");
           resetRef.current();
           if (pipelineIdRef.current) { endAiPipeline(pipelineIdRef.current); pipelineIdRef.current = null; }
+          // 触发失败处理（保留本地缓存供重试）
+          handleRecordingFailure(msg.payload.message);
           break;
         case "process.result":
           emit("recording:processed");
           fabNotify.success("处理完成");
           setProcessing(false);
           setWittyText("");
+          // 标记本地缓存为已完成（不自动删除，由用户决定）
+          if (cacheIdRef.current) {
+            markCompleted(cacheIdRef.current).catch(() => {});
+            cacheIdRef.current = null;
+          }
           // 全局管道：续期（digest + todo 投影还在跑）
           if (pipelineIdRef.current) renewAiPipeline(pipelineIdRef.current);
           break;
@@ -222,6 +277,8 @@ export function FAB({
 
   const startPreCapture = useCallback(async () => {
     preBufferRef.current = [];
+    fullBufferRef.current = [];
+    cacheIdRef.current = crypto.randomUUID();
     streamingRef.current = false;
     preCaptureAbortRef.current = false;
     gwClientRef.current = null;
@@ -230,6 +287,9 @@ export function FAB({
       await recorder.startRecording({
         onPCMData: (chunk) => {
           if (pausedRef.current) return;
+
+          // 始终累积到 fullBuffer（本地缓存用）
+          fullBufferRef.current.push(chunk.slice(0));
 
           if (!streamingRef.current) {
             preBufferRef.current.push(chunk.slice(0));
@@ -261,6 +321,10 @@ export function FAB({
   }, [recorder]);
 
   const stopPreCapture = useCallback(() => {
+    if (preCaptureDelayRef.current) {
+      clearTimeout(preCaptureDelayRef.current);
+      preCaptureDelayRef.current = null;
+    }
     preCaptureAbortRef.current = true;
     if (recorder.isActive.current) {
       recorder.cancelRecording();
@@ -304,6 +368,7 @@ export function FAB({
         await recorder.startRecording({
           onPCMData: (chunk) => {
             if (pausedRef.current) return;
+            fullBufferRef.current.push(chunk.slice(0));
             client.sendBinary(chunk);
             const view = new Int16Array(chunk);
             let sum = 0;
@@ -337,6 +402,61 @@ export function FAB({
     }
   }, [recorder, startTimers, stopTimers, stopPreCapture]);
 
+  // 录音失败时的处理：保存本地缓存 + 创建占位 record
+  const handleRecordingFailure = useCallback(async (reason: string) => {
+    const chunks = fullBufferRef.current;
+    const id = cacheIdRef.current;
+    if (!id || chunks.length === 0) return;
+
+    // 录音 < 1 秒不缓存
+    const totalBytes = chunks.reduce((sum, c) => sum + c.byteLength, 0);
+    const durationSec = totalBytes / (16000 * 2); // 16kHz 16-bit mono
+    if (durationSec < 1) return;
+
+    try {
+      const pcmData = mergeChunks(chunks);
+      const entry: PendingAudio = {
+        id,
+        pcmData,
+        duration: Math.round(durationSec),
+        sourceContext: sourceContextRef.current as PendingAudio["sourceContext"],
+        forceCommand: false,
+        notebook: activeNotebookRef.current ?? null,
+        createdAt: new Date().toISOString(),
+        status: "pending",
+        lastError: reason,
+      };
+      await saveAudio(entry);
+
+      // 尝试创建占位 record
+      try {
+        const result = await createRecord({
+          status: "pending_retry",
+          source: "voice",
+          duration_seconds: Math.round(durationSec),
+          notebook: activeNotebookRef.current ?? undefined,
+        });
+        if (result?.id) {
+          const { updateRecordId } = await import("@/features/recording/lib/audio-cache");
+          await updateRecordId(id, result.id);
+        }
+      } catch {
+        // 网络完全断开，占位 record 也创建不了，下次启动时补
+      }
+
+      emit("recording:uploaded");
+      fabNotify.info("录音已保存，网络恢复后可重试");
+
+      // 检查缓存大小
+      const overSize = await checkCacheSize();
+      if (overSize) {
+        fabNotify.info("本地录音缓存较多，可在日记菜单中清理");
+      }
+    } catch (err) {
+      console.error("[fab] Failed to save audio cache:", err);
+    }
+  }, []);
+
   const finishRecording = useCallback(
     async (asCommand: boolean) => {
       stopTimers();
@@ -346,10 +466,41 @@ export function FAB({
       preBufferRef.current = [];
       gwClientRef.current = null;
 
+      // 保存录音到本地缓存
+      const chunks = fullBufferRef.current;
+      const cacheId = cacheIdRef.current;
+      const totalBytes = chunks.reduce((sum, c) => sum + c.byteLength, 0);
+      const durationSec = totalBytes / (16000 * 2);
+
+      // 录音 >= 1 秒才缓存
+      if (cacheId && durationSec >= 1) {
+        try {
+          const pcmData = mergeChunks(chunks);
+          await saveAudio({
+            id: cacheId,
+            pcmData,
+            duration: Math.round(durationSec),
+            sourceContext: sourceContextRef.current as PendingAudio["sourceContext"],
+            forceCommand: asCommand,
+            notebook: activeNotebookRef.current ?? null,
+            createdAt: new Date().toISOString(),
+            status: "pending",
+          });
+        } catch (err) {
+          console.error("[fab] Failed to save audio cache:", err);
+        }
+      }
+
       try {
         recorder.stopRecording();
         const deviceId = await getDeviceId();
         const client = getGatewayClient();
+
+        if (!client.connected) {
+          // WS 断开，触发失败流程
+          handleRecordingFailure("WS 连接断开");
+          return;
+        }
 
         if (asCommand) {
           commandReleaseRef.current = true;
@@ -361,12 +512,20 @@ export function FAB({
           setConfirmedText("");
           setPartialText("");
         }
+
+        // 设置 asr.done 超时检测（15 秒）
+        if (asrDoneTimerRef.current) clearTimeout(asrDoneTimerRef.current);
+        asrDoneTimerRef.current = setTimeout(() => {
+          asrDoneTimerRef.current = null;
+          handleRecordingFailure("识别超时");
+        }, 15000);
       } catch (err: any) {
         commandReleaseRef.current = false;
         fabNotify.error(`录音结束失败: ${err.message}`);
+        handleRecordingFailure(err.message);
       }
     },
-    [recorder, stopTimers],
+    [recorder, stopTimers, handleRecordingFailure],
   );
 
   const cancelRecording = useCallback(async () => {
@@ -376,6 +535,8 @@ export function FAB({
     commandReleaseRef.current = false;
     streamingRef.current = false;
     preBufferRef.current = [];
+    fullBufferRef.current = [];
+    cacheIdRef.current = null;
     gwClientRef.current = null;
 
     recorder.cancelRecording();
@@ -399,6 +560,11 @@ export function FAB({
 
   const gestures = useFabGestures({
     onTap: () => {
+      // 短按：取消延迟启动的 pre-capture，避免 AudioWorkletNode 创建报错
+      if (preCaptureDelayRef.current) {
+        clearTimeout(preCaptureDelayRef.current);
+        preCaptureDelayRef.current = null;
+      }
       stopPreCapture();
     },
     onLongPressStart: () => {
@@ -455,9 +621,6 @@ export function FAB({
     return (
       <RecordingImmersive
         duration={displayDuration}
-        waveHeights={waveHeights}
-        confirmedText={confirmedText}
-        partialText={partialText}
         paused={lockedPaused}
         onTogglePause={toggleLockedPause}
         onCancel={() => {
@@ -667,10 +830,11 @@ export function FAB({
 
       {/* ─── FAB Button ─── */}
       <div
-        className="fixed bottom-[54px] left-1/2 z-40"
+        className="fixed left-1/2 z-40"
         style={{
+          bottom: "calc(54px + var(--kb-offset, 0px))",
           transform: `translateX(-50%) translateX(${fabOffsetX}px) translateY(${fabOffsetY}px)`,
-          transition: phase === "recording" ? "none" : "transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)",
+          transition: phase === "recording" ? "none" : "transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), bottom 150ms ease-out",
         }}
       >
         {/* Processing capsule / Notify capsule */}
@@ -729,7 +893,12 @@ export function FAB({
               onPointerDown={(e) => {
                 longPressTriggeredRef.current = false;
                 pointerIdRef.current = e.pointerId;
-                startPreCapture();
+                // 延迟启动 pre-capture，短按(tap)时会在 onTap 中清除，避免无谓的 AudioContext 创建
+                if (preCaptureDelayRef.current) clearTimeout(preCaptureDelayRef.current);
+                preCaptureDelayRef.current = setTimeout(() => {
+                  preCaptureDelayRef.current = null;
+                  startPreCapture();
+                }, 120);
                 handlers.onPointerDown(e);
               }}
               onClick={() => {
@@ -739,24 +908,24 @@ export function FAB({
               }}
               className={cn(
                 "relative flex items-center justify-center rounded-full select-none touch-none transition-all duration-300",
-                "text-white",
-                phase === "idle" && "w-14 h-14",
-                phase === "pressing" && "w-16 h-16 scale-105",
-                phase === "recording" && "w-14 h-14",
+                "text-white backdrop-blur-xl",
+                phase === "idle" && "w-16 h-16",
+                phase === "pressing" && "w-[70px] h-[70px] scale-105",
+                phase === "recording" && "w-16 h-16",
               )}
               style={{
                 background: phase === "recording"
-                  ? "#C45C5C"
-                  : "linear-gradient(135deg, #89502C, #C8845C)",
-                boxShadow: "0 8px 24px rgba(28, 28, 24, 0.06)",
+                  ? "rgba(196,92,92,0.75)"
+                  : "rgba(137,80,44,0.55)",
+                boxShadow: "0 8px 24px rgba(28, 28, 24, 0.08), inset 0 1px 0 rgba(255,255,255,0.15)",
               }}
             >
               {phase === "idle" ? (
-                <Mic className="w-6 h-6" />
+                <Mic className="w-8 h-8" />
               ) : (
                 <Mic className={cn(
                   "transition-all duration-200",
-                  phase === "recording" ? "w-6 h-6 animate-pulse" : "w-7 h-7",
+                  phase === "recording" ? "w-8 h-8 animate-pulse" : "w-9 h-9",
                 )} />
               )}
             </button>

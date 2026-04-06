@@ -25,7 +25,7 @@ export interface Device {
 export interface Record {
   id: string
   device_id: string
-  status: 'uploading' | 'uploaded' | 'processing' | 'completed' | 'failed' | 'error'
+  status: 'uploading' | 'uploaded' | 'processing' | 'completed' | 'failed' | 'error' | 'pending_retry' | 'expired'
   audio_path: string | null
   duration_seconds: number | null
   location_text: string | null
@@ -177,6 +177,8 @@ export interface NoteItem {
   file_name: string | null
   created_at: string
   domain?: string | null
+  source?: string | null
+  source_type?: string | null
 }
 
 // Composite type for note detail

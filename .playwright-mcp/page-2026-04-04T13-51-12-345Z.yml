@@ -1,0 +1,39 @@
+- generic [ref=e1]:
+  - generic [ref=e49]:
+    - banner [ref=e50]:
+      - generic [ref=e51]:
+        - button "打开侧边栏" [ref=e52] [cursor=pointer]: Z
+        - generic [ref=e53]:
+          - button "日记" [ref=e54] [cursor=pointer]
+          - button "待办" [ref=e55] [cursor=pointer]
+        - generic [ref=e56]:
+          - button "AI 对话" [active] [ref=e57] [cursor=pointer]:
+            - img "路路 Logo" [ref=e58]
+          - button "搜索" [ref=e87] [cursor=pointer]:
+            - img [ref=e88]
+          - button "通知" [ref=e91] [cursor=pointer]:
+            - img [ref=e92]
+    - main [ref=e95]:
+      - generic [ref=e97]:
+        - generic [ref=e98]: Failed to fetch
+        - button "重试" [ref=e99] [cursor=pointer]
+    - button [ref=e101] [cursor=pointer]:
+      - img [ref=e102]
+    - button "Choose File" [ref=e105]
+    - generic [ref=e106]:
+      - generic [ref=e107]:
+        - banner [ref=e108]:
+          - button "返回" [ref=e109] [cursor=pointer]:
+            - img [ref=e110]
+          - generic [ref=e113]: 路路
+        - generic [ref=e116]:
+          - generic [ref=e117]: 🦌
+          - paragraph [ref=e120]: 连接服务器超时，请检查网络后重试。
+      - generic [ref=e123]:
+        - textbox "输入你的想法..." [ref=e124]
+        - button "语音输入" [ref=e125] [cursor=pointer]:
+          - img [ref=e126]
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=e44] [cursor=pointer]:
+    - img [ref=e45]
+  - alert [ref=e48]

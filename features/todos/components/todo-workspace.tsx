@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
+// ViewMode type is exported for use by workspace-header
 import { useTodoStore } from "../hooks/use-todo-store";
 import { useViewedDates } from "../hooks/use-viewed-dates";
 import type { TodoDTO } from "../lib/todo-types";
@@ -9,16 +10,16 @@ import { ProjectView } from "./project-view";
 import { TodoEditSheet } from "./todo-edit-sheet";
 import { showUndoToast } from "../hooks/use-undo-toast";
 
-type ViewMode = "time" | "project";
+export type ViewMode = "time" | "project";
 
 interface TodoWorkspaceProps {
   onOpenChat?: (message: string) => void;
+  viewMode?: ViewMode;
 }
 
-export function TodoWorkspace({ onOpenChat }: TodoWorkspaceProps) {
+export function TodoWorkspace({ onOpenChat, viewMode = "time" }: TodoWorkspaceProps) {
   const store = useTodoStore();
   const { viewedDates, markViewed } = useViewedDates();
-  const [viewMode, setViewMode] = useState<ViewMode>("time");
   const [editTodo, setEditTodo] = useState<TodoDTO | null>(null);
   const [editOpen, setEditOpen] = useState(false);
 
@@ -73,10 +74,6 @@ export function TodoWorkspace({ onOpenChat }: TodoWorkspaceProps) {
     setEditTodo(null);
   }, []);
 
-  const handleToggleView = useCallback(() => {
-    setViewMode((v) => (v === "time" ? "project" : "time"));
-  }, []);
-
   if (store.loading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -101,33 +98,6 @@ export function TodoWorkspace({ onOpenChat }: TodoWorkspaceProps) {
 
   return (
     <div data-testid="todo-workspace">
-      {/* 视图切换按钮 — 固定在右上角 */}
-      <div className="flex justify-end px-5 pb-2">
-        <button
-          data-testid="view-toggle"
-          onClick={handleToggleView}
-          className="flex h-10 w-10 items-center justify-center rounded-xl border border-border text-muted-foreground transition-colors active:bg-card active:text-foreground"
-          aria-label={viewMode === "time" ? "切换到项目视图" : "切换到时间视图"}
-        >
-          {viewMode === "time" ? (
-            // 项目图标
-            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8">
-              <rect x="4" y="4" width="16" height="16" rx="2" />
-              <line x1="4" y1="9" x2="20" y2="9" />
-              <line x1="9" y1="14" x2="15" y2="14" />
-              <line x1="9" y1="18" x2="13" y2="18" />
-            </svg>
-          ) : (
-            // 时间图标
-            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8">
-              <circle cx="12" cy="12" r="10" />
-              <polyline points="12 6 12 12 16 14" />
-            </svg>
-          )}
-        </button>
-      </div>
-
-      {/* 视图内容 */}
       {viewMode === "time" ? (
         <TimeView
           selectedDate={store.selectedDate}

@@ -187,7 +187,7 @@ export function registerIngestRoutes(router) {
                     device_id: deviceId,
                     user_id: userId ?? undefined,
                     status: "completed",
-                    source: "manual",
+                    source: "url",
                     source_type: "material",
                 });
                 await transcriptRepo.create({

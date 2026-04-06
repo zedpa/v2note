@@ -895,9 +895,12 @@ export async function createRecurrenceInstance(
   template: Todo,
   date: string,
 ): Promise<Todo> {
-  // 拼接日期 + 模板的时间部分
-  const timePart = template.scheduled_start
-    ? template.scheduled_start.split("T")[1] ?? "09:00:00"
+  // 拼接日期 + 模板的时间部分（scheduled_start 可能是 string 或 Date）
+  const startStr = template.scheduled_start
+    ? (typeof template.scheduled_start === "string" ? template.scheduled_start : new Date(template.scheduled_start as any).toISOString())
+    : null;
+  const timePart = startStr
+    ? startStr.split("T")[1] ?? "09:00:00"
     : "09:00:00";
   const scheduledStart = `${date}T${timePart}`;
 

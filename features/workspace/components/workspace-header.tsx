@@ -1,29 +1,23 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Search, Bell, X } from "lucide-react";
+import { useState, useRef, useEffect } from "react";
+import { Search, X, MessageCircle, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { LuluLogo } from "@/components/brand/lulu-logo";
-import { onAiProcessingChange } from "@/shared/lib/ai-processing";
 
 export type WorkspaceTab = "diary" | "todo";
-
-export interface TopicFilter {
-  clusterId: string;
-  title: string;
-}
+export type TodoViewMode = "time" | "project";
 
 interface WorkspaceHeaderProps {
   activeTab: WorkspaceTab;
   onTabChange: (tab: WorkspaceTab) => void;
   onAvatarClick: () => void;
-  onChatClick: () => void;
+  onChatClick?: () => void;
   onSearchClick: () => void;
-  onNotificationClick: () => void;
   userName?: string | null;
-  hasUnread?: boolean;
-  topicFilter?: TopicFilter | null;
-  onClearTopicFilter?: () => void;
+  domainFilter?: string | null;
+  onClearDomainFilter?: () => void;
+  todoViewMode?: TodoViewMode;
+  onTodoViewModeChange?: (mode: TodoViewMode) => void;
 }
 
 export function WorkspaceHeader({
@@ -32,20 +26,27 @@ export function WorkspaceHeader({
   onAvatarClick,
   onChatClick,
   onSearchClick,
-  onNotificationClick,
   userName,
-  hasUnread,
-  topicFilter,
-  onClearTopicFilter,
+  domainFilter,
+  onClearDomainFilter,
+  todoViewMode = "time",
+  onTodoViewModeChange,
 }: WorkspaceHeaderProps) {
   const initial = userName?.charAt(0)?.toUpperCase() || "U";
+  const [showViewMenu, setShowViewMenu] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
 
-  // 监听全局 AI 处理状态
-  const [aiProcessing, setAiProcessing] = useState(false);
-  useEffect(() => onAiProcessingChange(setAiProcessing), []);
-  // 主题筛选态：Tab 文字变为 脉络|进展（spec 1.5）
-  const leftLabel = topicFilter ? "脉络" : "日记";
-  const rightLabel = topicFilter ? "进展" : "待办";
+  // 点击外部关闭菜单
+  useEffect(() => {
+    if (!showViewMenu) return;
+    const handler = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setShowViewMenu(false);
+      }
+    };
+    document.addEventListener("pointerdown", handler);
+    return () => document.removeEventListener("pointerdown", handler);
+  }, [showViewMenu]);
 
   return (
     <header
@@ -74,33 +75,68 @@ export function WorkspaceHeader({
                 : "text-muted-accessible",
             )}
           >
-            {leftLabel}
+            日记
           </button>
-          <button
-            onClick={() => onTabChange("todo")}
-            className={cn(
-              "flex-1 h-full rounded-full text-sm font-medium transition-all duration-200",
-              activeTab === "todo"
-                ? "bg-surface-lowest text-on-surface shadow-sm"
-                : "text-muted-accessible",
+          <div className="flex-1 h-full relative" ref={menuRef}>
+            <button
+              onClick={() => {
+                if (activeTab === "todo") {
+                  setShowViewMenu((v) => !v);
+                } else {
+                  onTabChange("todo");
+                }
+              }}
+              className={cn(
+                "w-full h-full rounded-full text-sm font-medium transition-all duration-200 flex items-center justify-center gap-0.5",
+                activeTab === "todo"
+                  ? "bg-surface-lowest text-on-surface shadow-sm"
+                  : "text-muted-accessible",
+              )}
+            >
+              待办
+              {activeTab === "todo" && (
+                <ChevronDown size={12} className={cn("transition-transform duration-200", showViewMenu && "rotate-180")} />
+              )}
+            </button>
+            {/* 视图选择下拉菜单 */}
+            {showViewMenu && (
+              <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-28 bg-background border border-border rounded-xl shadow-xl py-1 z-50 animate-in fade-in zoom-in-95 duration-150">
+                <button
+                  type="button"
+                  onClick={() => { onTodoViewModeChange?.("time"); setShowViewMenu(false); }}
+                  className={cn(
+                    "w-full px-3 py-2 text-sm text-left transition-colors",
+                    todoViewMode === "time" ? "text-primary font-medium" : "text-foreground hover:bg-secondary/60",
+                  )}
+                >
+                  日期视图
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { onTodoViewModeChange?.("project"); setShowViewMenu(false); }}
+                  className={cn(
+                    "w-full px-3 py-2 text-sm text-left transition-colors",
+                    todoViewMode === "project" ? "text-primary font-medium" : "text-foreground hover:bg-secondary/60",
+                  )}
+                >
+                  项目视图
+                </button>
+              </div>
             )}
-          >
-            {rightLabel}
-          </button>
+          </div>
         </div>
 
-        {/* 右侧: 路路AI + 搜索 + 通知 */}
+        {/* 右侧: AI聊天 + 搜索 */}
         <div className="flex items-center gap-1 shrink-0">
-          <button
-            onClick={onChatClick}
-            className="relative w-9 h-9 flex items-center justify-center rounded-full text-muted-accessible hover:text-on-surface transition-colors"
-            aria-label="AI 对话"
-          >
-            {aiProcessing && (
-              <span className="absolute inset-1.5 rounded-full border-[1.5px] border-deer/50 animate-ping" />
-            )}
-            <LuluLogo size={20} variant="light" className={aiProcessing ? "animate-pulse" : ""} />
-          </button>
+          {onChatClick && (
+            <button
+              onClick={onChatClick}
+              className="w-9 h-9 flex items-center justify-center rounded-full text-deer hover:text-deer/80 transition-colors"
+              aria-label="AI 聊天"
+            >
+              <MessageCircle size={18} />
+            </button>
+          )}
           <button
             onClick={onSearchClick}
             className="w-9 h-9 flex items-center justify-center rounded-full text-muted-accessible hover:text-on-surface transition-colors"
@@ -108,27 +144,17 @@ export function WorkspaceHeader({
           >
             <Search size={18} />
           </button>
-          <button
-            onClick={onNotificationClick}
-            className="relative w-9 h-9 flex items-center justify-center rounded-full text-muted-accessible hover:text-on-surface transition-colors"
-            aria-label="通知"
-          >
-            <Bell size={18} />
-            {hasUnread && (
-              <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-maple" />
-            )}
-          </button>
         </div>
       </div>
 
-      {/* 主题筛选药丸（spec 1.5） */}
-      {topicFilter && (
+      {/* 文件夹筛选药丸 */}
+      {domainFilter && (
         <div className="flex items-center px-4 pb-2">
           <button
-            onClick={onClearTopicFilter}
-            className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-forest/10 text-forest text-xs font-medium transition-colors hover:bg-forest/15"
+            onClick={onClearDomainFilter}
+            className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-deer/10 text-deer text-xs font-medium transition-colors hover:bg-deer/15"
           >
-            <span>🌿 {topicFilter.title}</span>
+            <span>{domainFilter}</span>
             <X size={12} />
           </button>
         </div>

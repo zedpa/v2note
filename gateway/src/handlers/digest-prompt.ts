@@ -6,8 +6,12 @@
 
 import { buildDateAnchor } from "../lib/date-anchor.js";
 
-export function buildDigestPrompt(): string {
+export function buildDigestPrompt(existingDomains?: string[]): string {
   const dateAnchor = buildDateAnchor();
+
+  const domainHint = existingDomains && existingDomains.length > 0
+    ? `\n\n## 已有分类（优先使用这些名称）\n${existingDomains.map(d => `- ${d}`).join("\n")}`
+    : "";
 
   return `你是一个认知记录提取器。将用户的原始输入拆解为 Strike（认知触动）列表。
 
@@ -57,10 +61,19 @@ ${dateAnchor}
 - type: causal | contradiction | resonance | evolution | supports | context_of | elaborates | triggers | resolves | depends_on | perspective_of
 - strength: 0-1
 
+## domain（自动归类）
+
+根据内容语义判断这段输入属于哪个分类，输出为 domain 字段（顶层字段，非 strike 内部）。
+- 一级分类：简短中文，如 "工作"、"生活"、"学习"、"健康"
+- 可带二级路径：如 "工作/项目A"、"生活/旅行"
+- 若无法判断，返回 null
+- 仅当内容明确属于某个已有分类时才复用，不确定时创建新分类
+
 ## 输出
 
 返回纯 JSON。不要包含 markdown 代码块、思考过程、解释或任何非 JSON 文字。
 {
+  "domain": "工作/采购",
   "strikes": [
     {"nucleus": "铝价又涨了5%", "polarity": "perceive", "confidence": 0.9, "tags": ["铝", "成本"]},
     {"nucleus": "明天下午3点找张总确认报价", "polarity": "intend", "confidence": 0.9, "tags": ["张总", "报价"], "field": {"granularity": "action", "scheduled_start": "（查表获取明天日期）T15:00:00", "person": "张总", "priority": "high"}}
@@ -68,7 +81,7 @@ ${dateAnchor}
   "bonds": [{"source_idx": 0, "target_idx": 1, "type": "triggers", "strength": 0.8}]
 }
 
-只有 polarity="intend" 需要 field 对象，其他 polarity 不需要。`;
+只有 polarity="intend" 需要 field 对象，其他 polarity 不需要。${domainHint}`;
 }
 
 export function buildCrossLinkPrompt(): string {

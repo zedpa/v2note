@@ -22,7 +22,7 @@ export interface ProcessPayload {
     audioUrl?: string;
     deviceId: string;
     userId?: string;
-    recordId: string;
+    recordId?: string;
     notebook?: string;
     localConfig?: LocalConfigPayload;
     forceCommand?: boolean;
@@ -109,3 +109,7 @@ export interface ExtractedTodo {
  * Layer 3: 其余 → AI 分类 + 存日记 + 条件 Digest
  */
 export declare function processEntry(payload: ProcessPayload): Promise<ProcessResult>;
+/**
+ * 修改已识别的待办指令 — 用户在 CommandSheet 中输入文字修改
+ */
+export declare function refineTodoCommands(currentCommands: TodoCommand[], modificationText: string): Promise<TodoCommand[]>;

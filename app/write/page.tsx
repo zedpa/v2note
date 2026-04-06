@@ -552,9 +552,9 @@ export default function WritePage() {
 
   return (
     <PCLayout>
-    <div className="min-h-dvh bg-cream flex flex-col">
+    <div className="bg-cream flex flex-col overflow-hidden" style={{ height: "var(--app-height, 100dvh)" }}>
       <div
-        className="w-full max-w-[680px] mx-auto px-6 pb-16 flex flex-col flex-1 relative"
+        className="w-full max-w-[680px] mx-auto px-6 pb-16 flex flex-col flex-1 relative overflow-y-auto"
         onDragEnter={handleDragEnter}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
@@ -720,7 +720,7 @@ export default function WritePage() {
 
         {/* Toast */}
         {toast && (
-          <div className="fixed bottom-8 left-1/2 -translate-x-1/2 text-sm text-bark/80 bg-sand px-4 py-2 rounded-lg shadow-sm animate-card-enter">
+          <div className="fixed left-1/2 -translate-x-1/2 text-sm text-bark/80 bg-sand px-4 py-2 rounded-lg shadow-sm animate-card-enter" style={{ bottom: "calc(2rem + var(--kb-offset, 0px))" }}>
             ✓ 路路收到了{toastText ? ` · 关于${toastText}` : ''}
           </div>
         )}

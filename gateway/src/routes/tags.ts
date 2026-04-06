@@ -3,9 +3,14 @@ import { readBody, sendJson } from "../lib/http-helpers.js";
 import { tagRepo } from "../db/repositories/index.js";
 
 export function registerTagRoutes(router: Router) {
-  // Add tag to record
+  // Add tag to record (max 5 per record)
   router.post("/api/v1/records/:id/tags", async (req, res, params) => {
     const { name } = await readBody<{ name: string }>(req);
+    const count = await tagRepo.countByRecordId(params.id);
+    if (count >= 5) {
+      sendJson(res, { error: "每条记录最多 5 个标签" }, 400);
+      return;
+    }
     const tag = await tagRepo.upsert(name);
     await tagRepo.addToRecord(params.id, tag.id);
     sendJson(res, { ok: true }, 201);

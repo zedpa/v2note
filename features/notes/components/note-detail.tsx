@@ -7,6 +7,7 @@ import { api } from "@/shared/lib/api";
 import { useNoteDetail } from "@/features/notes/hooks/use-note-detail";
 import { useNoteEditor } from "@/features/notes/hooks/use-note-editor";
 import { SwipeBack } from "@/shared/components/swipe-back";
+import { useConfirmDialog } from "@/shared/components/confirm-dialog";
 
 /** file_url 是否为图片 */
 function isImageUrl(url: string): boolean {
@@ -23,6 +24,8 @@ interface NoteDetailProps {
 export function NoteDetail({ recordId, onClose, onDeleted }: NoteDetailProps) {
   const { detail, loading, refetch } = useNoteDetail(recordId);
   const editor = useNoteEditor(detail, refetch);
+
+  const { confirm, ConfirmDialog } = useConfirmDialog();
 
   // Inline edit state
   const [editSummary, setEditSummary] = useState("");
@@ -55,7 +58,8 @@ export function NoteDetail({ recordId, onClose, onDeleted }: NoteDetailProps) {
   const timeStr = `${dt.getHours().toString().padStart(2, "0")}:${dt.getMinutes().toString().padStart(2, "0")}`;
 
   const handleDelete = async () => {
-    if (!confirm("确定删除这条笔记吗？")) return;
+    const ok = await confirm({ description: "确定删除这条笔记吗？", confirmText: "删除", destructive: true });
+    if (!ok) return;
     try {
       await api.delete("/api/v1/records", { ids: [recordId] });
       onDeleted?.();
@@ -66,6 +70,7 @@ export function NoteDetail({ recordId, onClose, onDeleted }: NoteDetailProps) {
   };
 
   return (
+    <>
     <SwipeBack onClose={onClose}>
       {/* Header */}
       <div className="sticky top-0 bg-background/80 backdrop-blur-xl z-10 pt-safe border-b border-border/50">
@@ -146,21 +151,23 @@ export function NoteDetail({ recordId, onClose, onDeleted }: NoteDetailProps) {
               {tag.name} &times;
             </button>
           ))}
-          <div className="flex items-center gap-1">
-            <input
-              type="text"
-              value={newTag}
-              onChange={(e) => setNewTag(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && newTag.trim()) {
-                  editor.addTag(newTag.trim());
-                  setNewTag("");
-                }
-              }}
-              placeholder="+ 标签"
-              className="w-16 text-[11px] px-2 py-1 rounded-full bg-secondary outline-none placeholder:text-muted-foreground"
-            />
-          </div>
+          {tags.length < 5 && (
+            <div className="flex items-center gap-1">
+              <input
+                type="text"
+                value={newTag}
+                onChange={(e) => setNewTag(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && newTag.trim()) {
+                    editor.addTag(newTag.trim());
+                    setNewTag("");
+                  }
+                }}
+                placeholder="+ 标签"
+                className="w-16 text-[11px] px-2 py-1 rounded-full bg-secondary outline-none placeholder:text-muted-foreground"
+              />
+            </div>
+          )}
         </div>
 
         {/* Summary — editable */}
@@ -291,5 +298,7 @@ export function NoteDetail({ recordId, onClose, onDeleted }: NoteDetailProps) {
 
       </div>
     </SwipeBack>
+    <ConfirmDialog />
+    </>
   );
 }

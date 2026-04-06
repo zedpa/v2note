@@ -4,7 +4,8 @@ import { updateSettings } from "@/shared/lib/api/device";
 
 const STORAGE_KEY = "tags:custom";
 
-export const SYSTEM_TAGS = ["待办", "灵感", "复盘"] as const;
+/** 每条记录最多允许的标签数 */
+export const MAX_TAGS_PER_RECORD = 5;
 
 export async function getCustomTags(): Promise<string[]> {
   const raw = await getItem(STORAGE_KEY);
@@ -37,7 +38,7 @@ export async function removeCustomTag(name: string): Promise<void> {
 }
 
 export function getAvailableTags(customTags: string[]): string[] {
-  return [...SYSTEM_TAGS, ...customTags];
+  return [...customTags];
 }
 
 function syncToDb(tags: string[]) {

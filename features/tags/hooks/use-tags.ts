@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback } from "react";
 import {
-  SYSTEM_TAGS,
   getCustomTags,
   addCustomTag,
   removeCustomTag,
@@ -36,21 +35,15 @@ export function useTags() {
   const addTag = useCallback(async (name: string) => {
     const trimmed = name.trim();
     if (!trimmed) return;
-    if ((SYSTEM_TAGS as readonly string[]).includes(trimmed)) return;
     if (customTags.includes(trimmed)) return;
     await addCustomTag(trimmed);
     setCustomTags((prev) => [...prev, trimmed]);
   }, [customTags]);
 
   const removeTag = useCallback(async (name: string) => {
-    if ((SYSTEM_TAGS as readonly string[]).includes(name)) return;
     await removeCustomTag(name);
     setCustomTags((prev) => prev.filter((t) => t !== name));
   }, []);
 
-  const isSystemTag = useCallback((name: string) => {
-    return (SYSTEM_TAGS as readonly string[]).includes(name);
-  }, []);
-
-  return { tags, customTags, loading, addTag, removeTag, isSystemTag, refetch: fetchTags };
+  return { tags, customTags, loading, addTag, removeTag, refetch: fetchTags };
 }

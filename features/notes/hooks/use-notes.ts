@@ -83,6 +83,8 @@ export function useNotes(notebook?: string | null, clusterId?: string | null) {
           file_name: r.file_name ?? null,
           created_at: r.created_at,
           domain: r.domain ?? null,
+          source: r.source ?? null,
+          source_type: r.source_type ?? null,
         };
       });
 

@@ -1,17 +1,19 @@
 "use client";
 
-import { Play, Square, X, Check, Mic } from "lucide-react";
+import { useState } from "react";
+import { Mic, X, Play, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface RecordingImmersiveProps {
   duration: number;
-  waveHeights: number[];
-  confirmedText: string;
-  partialText: string;
   paused: boolean;
   onTogglePause: () => void;
   onCancel: () => void;
   onDone: () => void;
+  // 保留旧 props 签名兼容，不使用
+  waveHeights?: number[];
+  confirmedText?: string;
+  partialText?: string;
 }
 
 function formatDuration(s: number) {
@@ -22,142 +24,90 @@ function formatDuration(s: number) {
 
 export function RecordingImmersive({
   duration,
-  waveHeights,
-  confirmedText,
-  partialText,
   paused,
   onTogglePause,
   onCancel,
   onDone,
 }: RecordingImmersiveProps) {
+  // 点击呼吸图标 → 暂停并展开；点击继续 → 收起
+  // paused 由父组件控制
+
   return (
     <div
-      className="fixed inset-0 z-50"
-      style={{ top: "calc(44px + env(safe-area-inset-top, 0px))" }}
+      className="fixed left-1/2 z-40"
+      style={{
+        bottom: "calc(54px + var(--kb-offset, 0px))",
+        transform: "translateX(-50%)",
+      }}
     >
-      {/* Background */}
-      <div className="absolute inset-0 bg-[#0a0a0f]" />
-      <div
-        className="absolute inset-0 transition-opacity duration-500"
-        style={{
-          background: paused
-            ? "radial-gradient(circle at 50% 45%, rgba(249,115,22,0.06) 0%, transparent 60%)"
-            : "radial-gradient(circle at 50% 45%, rgba(249,115,22,0.18) 0%, transparent 55%)",
-        }}
-      />
-
-      <div className="absolute inset-0 flex flex-col items-center px-8">
-        {/* Status badge */}
-        <div className="mt-8 mb-6">
-          <div className="flex items-center gap-2.5 px-4 py-2 rounded-full border border-white/12 bg-white/5 animate-chip-fly-in">
-            {paused ? (
+      {paused ? (
+        // ─── 展开态：暂停控制面板 ───
+        <div className="flex flex-col items-center animate-in fade-in zoom-in-95 duration-200">
+          <div
+            className="rounded-2xl px-6 py-4 flex flex-col items-center gap-3"
+            style={{ background: "rgba(10,10,15,0.95)" }}
+          >
+            {/* 暂停状态 + 时长 */}
+            <div className="flex items-center gap-2">
               <div className="w-2 h-2 rounded-full bg-amber-500" />
-            ) : (
-              <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
-            )}
-            <span className="text-[13px] tracking-[0.2em] text-white/60 uppercase font-medium">
-              {paused ? "已暂停" : "常驻录音"}
-            </span>
+              <span className="text-sm text-white/60 tracking-widest">⏸ {formatDuration(duration)}</span>
+            </div>
+
+            {/* 三个按钮横排 */}
+            <div className="flex items-center gap-5">
+              {/* 取消 */}
+              <button
+                type="button"
+                onClick={onCancel}
+                className="w-14 h-14 rounded-2xl flex items-center justify-center transition-all duration-200 active:scale-90 border border-red-500/30 bg-red-500/10 text-red-400 hover:bg-red-500/20"
+                aria-label="取消录音"
+              >
+                <X className="w-6 h-6" />
+              </button>
+
+              {/* 继续 */}
+              <button
+                type="button"
+                onClick={onTogglePause}
+                className="w-16 h-16 rounded-[20px] flex items-center justify-center transition-all duration-200 active:scale-90 border border-white/20 bg-white/10 text-white hover:bg-white/15"
+                aria-label="继续录音"
+              >
+                <Play className="w-7 h-7 ml-0.5" />
+              </button>
+
+              {/* 保存 */}
+              <button
+                type="button"
+                onClick={onDone}
+                className="w-14 h-14 rounded-2xl flex items-center justify-center transition-all duration-200 active:scale-90 border border-emerald-500/30 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20"
+                aria-label="保存录音"
+              >
+                <Check className="w-6 h-6" />
+              </button>
+            </div>
           </div>
         </div>
-
-        {/* Timer — massive */}
-        <p className={cn(
-          "text-7xl font-mono font-extralight tabular-nums tracking-[0.2em] transition-colors duration-300",
-          paused ? "text-white/40" : "text-white/90",
-        )}>
-          {formatDuration(duration)}
-        </p>
-
-        {/* Waveform — large, full-width */}
-        <div className="flex-shrink-0 w-full max-w-md mt-10 mb-8 rounded-3xl border border-white/10 bg-white/[0.04] backdrop-blur-sm px-5 py-6">
-          <div className="flex items-center justify-center gap-[4px] h-24">
-            {waveHeights.map((h, i) => {
-              const centerDist = Math.abs(i - 15.5) / 15.5;
-              const falloff = 1 - centerDist * 0.35;
-              const finalH = Math.max(4, h * falloff * 1.6);
-              return (
-                <div
-                  key={i}
-                  className="rounded-full transition-all duration-[80ms]"
-                  style={{
-                    width: "4px",
-                    height: `${finalH}px`,
-                    backgroundColor: `rgba(249,115,22,${paused ? 0.15 : 0.35 + (finalH / 90) * 0.65})`,
-                  }}
-                />
-              );
-            })}
+      ) : (
+        // ─── 收起态：呼吸录音指示器 ───
+        <button
+          type="button"
+          onClick={onTogglePause}
+          className="flex flex-col items-center gap-1"
+          aria-label="点击暂停录音"
+        >
+          <div
+            className="w-16 h-16 rounded-full flex items-center justify-center text-white backdrop-blur-xl animate-breathe"
+            style={{
+              background: "rgba(196,92,92,0.75)",
+            }}
+          >
+            <Mic className="w-8 h-8" />
           </div>
-        </div>
-
-        {/* Transcript */}
-        {(confirmedText || partialText) && (
-          <div className="w-full max-w-md px-5 py-4 rounded-2xl border border-white/8 bg-white/[0.03] mb-8">
-            <p className="text-center leading-relaxed">
-              <span className="text-[15px] text-white/80">{confirmedText}</span>
-              <span className="text-[15px] text-white/30">{partialText}</span>
-            </p>
-          </div>
-        )}
-
-        {/* Spacer */}
-        <div className="flex-1" />
-
-        {/* Controls */}
-        <div className="w-full max-w-sm flex items-center justify-center gap-8 mb-6">
-          {/* Cancel */}
-          <button
-            type="button"
-            onClick={onCancel}
-            className={cn(
-              "w-16 h-16 rounded-2xl flex items-center justify-center transition-all duration-200 active:scale-90",
-              "border border-red-500/30 bg-red-500/10 text-red-400",
-              "hover:bg-red-500/20",
-            )}
-            aria-label="取消录音"
-          >
-            <X className="w-7 h-7" />
-          </button>
-
-          {/* Pause/Resume — center, largest */}
-          <button
-            type="button"
-            onClick={onTogglePause}
-            className={cn(
-              "w-20 h-20 rounded-[24px] flex items-center justify-center transition-all duration-200 active:scale-90",
-              "border border-white/20 bg-white/10 text-white",
-              "hover:bg-white/15 shadow-2xl",
-            )}
-            aria-label={paused ? "继续录音" : "暂停录音"}
-          >
-            {paused ? (
-              <Mic className="w-9 h-9" />
-            ) : (
-              <Square className="w-8 h-8 fill-current" />
-            )}
-          </button>
-
-          {/* Done */}
-          <button
-            type="button"
-            onClick={onDone}
-            className={cn(
-              "w-16 h-16 rounded-2xl flex items-center justify-center transition-all duration-200 active:scale-90",
-              "border border-emerald-500/30 bg-emerald-500/10 text-emerald-400",
-              "hover:bg-emerald-500/20",
-            )}
-            aria-label="完成录音"
-          >
-            <Check className="w-7 h-7" />
-          </button>
-        </div>
-
-        {/* Hint text */}
-        <p className="text-[13px] text-white/35 tracking-wide mb-safe pb-8">
-          {paused ? "点击麦克风继续 · 左侧取消 · 右侧完成" : "点击方块暂停录音"}
-        </p>
-      </div>
+          <span className="text-xs font-mono text-muted-accessible tabular-nums">
+            {formatDuration(duration)}
+          </span>
+        </button>
+      )}
     </div>
   );
 }

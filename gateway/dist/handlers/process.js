@@ -1,11 +1,10 @@
 import { chatCompletion } from "../ai/provider.js";
 import { appendToDiary } from "../diary/manager.js";
-import { recordRepo, summaryRepo, todoRepo, strikeRepo, bondRepo, strikeTagRepo } from "../db/repositories/index.js";
-import { classifyVoiceIntent, executeVoiceAction } from "./voice-action.js";
+import { recordRepo, summaryRepo, todoRepo, tagRepo } from "../db/repositories/index.js";
+import { classifyVoiceIntent, executeVoiceAction, matchTodoByHint } from "./voice-action.js";
 import { safeParseJson } from "../lib/text-utils.js";
-import { buildTodoExtractPrompt } from "./todo-extract-prompt.js";
+import { buildTodoExtractPrompt, buildTodoRefinePrompt } from "./todo-extract-prompt.js";
 import { buildUnifiedProcessPrompt } from "./unified-process-prompt.js";
-import { projectIntendStrike } from "../cognitive/todo-projector.js";
 // v2: CLEANUP_SYSTEM_PROMPT 不再单独使用 — 文本清理已合并到统一 prompt 中
 /**
  * Process a single diary entry: clean transcript text, save summary, trigger digest.
@@ -33,45 +32,101 @@ export async function processEntry(payload) {
                 console.error(`[process] Layer 1 failed, returning error: ${err.message}`);
                 result.error = `待办识别失败: ${err.message}`;
             }
-            await recordRepo.updateStatus(payload.recordId, "completed");
+            if (payload.recordId) {
+                await recordRepo.updateStatus(payload.recordId, "completed");
+            }
             console.log(`[process][⏱ layer1-total] ${Date.now() - t0}ms`);
             return result;
         }
         // ── Layer 2: 全量 Agent 模式（上滑手势） ──────────────────────
+        // 只分类 + 提取，不执行。写入操作由前端确认后走 REST API
+        // 查询操作直接执行并返回结果
         if (payload.forceCommand) {
             console.log(`[process] Layer 2: Agent command mode`);
             result.voice_intent_type = "action";
             try {
-                // 全部走 AI 意图分类 + 执行（forceCommand=true 跳过正则预筛）
                 const intentResult = await classifyVoiceIntent(payload.text, true);
                 if (intentResult.actions.length > 0) {
-                    const actionResults = await Promise.all(intentResult.actions.map((action) => executeVoiceAction(action, {
-                        userId: payload.userId,
-                        deviceId: payload.deviceId,
-                        recordId: payload.recordId,
-                    })));
-                    result.action_results = actionResults;
+                    const ACTION_TYPE_MAP = {
+                        create_todo: "create", complete_todo: "complete",
+                        modify_todo: "modify", query_todo: "query",
+                    };
+                    const todoCommands = [];
+                    const actionResults = [];
+                    for (const action of intentResult.actions) {
+                        const mappedType = ACTION_TYPE_MAP[action.type];
+                        // 查询操作直接执行
+                        if (mappedType === "query") {
+                            const queryResult = await executeVoiceAction(action, {
+                                userId: payload.userId,
+                                deviceId: payload.deviceId,
+                                recordId: payload.recordId,
+                            });
+                            todoCommands.push({
+                                action_type: "query",
+                                confidence: action.confidence,
+                                query_params: action.query_params,
+                                query_result: queryResult.items?.map((t) => ({
+                                    id: t.id, text: t.text,
+                                    scheduled_start: t.scheduled_start,
+                                    done: t.done, priority: t.priority,
+                                })),
+                            });
+                            actionResults.push(queryResult);
+                            continue;
+                        }
+                        // 写入操作（create/complete/modify）→ 提取信息返回前端确认
+                        // complete/modify 需要先匹配 target_id
+                        let targetId;
+                        if ((mappedType === "complete" || mappedType === "modify") && action.target_hint) {
+                            const match = await matchTodoByHint(action.target_hint, {
+                                userId: payload.userId,
+                                deviceId: payload.deviceId,
+                            });
+                            targetId = match?.id;
+                        }
+                        todoCommands.push({
+                            action_type: mappedType ?? "create",
+                            confidence: action.confidence,
+                            target_hint: action.target_hint,
+                            target_id: targetId,
+                            todo: mappedType === "create" ? {
+                                text: action.changes?.text ?? action.original_text,
+                                scheduled_start: action.changes?.scheduled_start,
+                                priority: action.changes?.priority,
+                            } : undefined,
+                            changes: mappedType === "modify" ? action.changes : undefined,
+                        });
+                    }
+                    result.todo_commands = todoCommands;
+                    if (actionResults.length > 0) {
+                        result.action_results = actionResults;
+                    }
                 }
             }
             catch (err) {
                 console.error(`[process] Layer 2 failed: ${err.message}`);
                 result.error = `指令执行失败: ${err.message}`;
             }
-            await recordRepo.updateStatus(payload.recordId, "completed");
+            if (payload.recordId) {
+                await recordRepo.updateStatus(payload.recordId, "completed");
+            }
             console.log(`[process][⏱ layer2-total] ${Date.now() - t0}ms`);
             return result;
         }
-        // ── Layer 3: 统一 AI 调用（分类+清理+拆解+归类 一次完成）──────
-        // v2: 不再分 3 步串行调用，让模型全权判断是否拆解、如何归类
-        console.log(`[process] Layer 3: Unified AI processing`);
+        // ── Layer 3: 统一 AI 调用（v3: Record 为原子单位，不再拆解 Strike）──
+        console.log(`[process] Layer 3: Unified AI processing (v3 no-strike)`);
         // 1. 加载上下文
-        const [pendingTodosL3, activeGoalsL3] = await Promise.all([
+        const [pendingTodosL3, activeGoalsL3, existingDomains] = await Promise.all([
             payload.userId
                 ? todoRepo.findPendingByUser(payload.userId)
                 : todoRepo.findPendingByDevice(payload.deviceId),
             payload.userId
                 ? todoRepo.findActiveGoalsByUser(payload.userId)
                 : todoRepo.findActiveGoalsByDevice(payload.deviceId),
+            payload.userId
+                ? recordRepo.listUserDomains(payload.userId)
+                : Promise.resolve([]),
         ]);
         const unifiedCtx = {
             activeGoals: activeGoalsL3.slice(0, 20).map(g => ({ id: g.id, title: g.text })),
@@ -80,6 +135,7 @@ export async function processEntry(payload) {
                 text: t.text,
                 scheduled_start: t.scheduled_start ?? undefined,
             })),
+            existingDomains,
         };
         // 2. 单次 AI 调用
         const unifiedPrompt = buildUnifiedProcessPrompt(unifiedCtx);
@@ -106,9 +162,10 @@ export async function processEntry(payload) {
         const intentType = parsed.intent_type ?? "record";
         result.voice_intent_type = intentType;
         result.summary = parsed.summary;
-        console.log(`[process] Unified result: intent=${intentType}, strikes=${parsed.strikes?.length ?? 0}, commands=${parsed.commands?.length ?? 0}, reason="${parsed.decomposition_reason ?? ""}"`);
+        result.tags = parsed.tags;
+        console.log(`[process] Result: intent=${intentType}, domain=${parsed.domain ?? "null"}, todos=${parsed.todos?.length ?? 0}, commands=${parsed.commands?.length ?? 0}, tags=${parsed.tags?.length ?? 0}`);
         // 4. 保存 summary
-        if (result.summary) {
+        if (result.summary && payload.recordId) {
             try {
                 const existing = await summaryRepo.findByRecordId(payload.recordId);
                 if (existing) {
@@ -126,16 +183,43 @@ export async function processEntry(payload) {
                 console.warn(`[process] Summary save failed: ${err.message}`);
             }
         }
-        // 5. 处理指令（action/mixed 时）
-        // 记录 create_todo 命令，避免 intend strike 投影时重复创建
-        const hasCreateTodoCommand = new Set();
-        if ((intentType === "action" || intentType === "mixed") && parsed.commands && parsed.commands.length > 0) {
-            for (const cmd of parsed.commands) {
-                if (cmd.action_type === "create_todo") {
-                    hasCreateTodoCommand.add("create_todo");
+        // 5. 保存 domain
+        if (parsed.domain && payload.recordId) {
+            await recordRepo.updateDomain(payload.recordId, parsed.domain).catch((e) => console.warn(`[process] Domain save failed: ${e.message}`));
+        }
+        // 6. 保存 tags → record_tag
+        if (parsed.tags && parsed.tags.length > 0 && payload.recordId) {
+            for (const label of parsed.tags) {
+                try {
+                    const tag = await tagRepo.upsert(label);
+                    await tagRepo.addToRecord(payload.recordId, tag.id);
+                }
+                catch {
+                    // tag 写入失败不阻塞
                 }
             }
-            // 将统一结果中的 commands 转为 voice-action 执行
+        }
+        // 7. 创建 todos（直接从 AI 输出创建，不经过 Strike 投影）
+        if (parsed.todos && parsed.todos.length > 0) {
+            for (const t of parsed.todos) {
+                try {
+                    await todoRepo.dedupCreate({
+                        text: t.text,
+                        user_id: payload.userId,
+                        device_id: payload.deviceId,
+                        record_id: payload.recordId,
+                        scheduled_start: t.scheduled_start,
+                        priority: t.priority === "high" ? 5 : t.priority === "medium" ? 3 : t.priority === "low" ? 1 : undefined,
+                        parent_id: t.goal_id ?? undefined,
+                    });
+                }
+                catch (err) {
+                    console.warn(`[process] Todo create failed: ${err.message}`);
+                }
+            }
+        }
+        // 8. 处理指令（action/mixed 时）
+        if ((intentType === "action" || intentType === "mixed") && parsed.commands && parsed.commands.length > 0) {
             const actionResults = [];
             for (const cmd of parsed.commands) {
                 try {
@@ -158,7 +242,7 @@ export async function processEntry(payload) {
                 }
             }
             result.action_results = actionResults;
-            // 也转为 todo_commands 格式，供 CommandSheet 显示
+            // 转为 todo_commands 格式，供 CommandSheet 显示
             result.todo_commands = parsed.commands.map(cmd => ({
                 action_type: cmd.action_type,
                 confidence: cmd.confidence,
@@ -167,101 +251,11 @@ export async function processEntry(payload) {
                 changes: cmd.changes,
             }));
         }
-        // 6. 写入 Strikes + Bonds（直接写 DB，跳过 digest.ts 管道）
-        // 统一调用已经完成了 AI 拆解，不需要再调 digestRecords
-        if (parsed.strikes && parsed.strikes.length > 0) {
-            const uid = payload.userId;
-            const strikeIds = [];
-            for (const s of parsed.strikes) {
-                try {
-                    // 去重：同 source_id + 同 nucleus 不重复创建
-                    if (uid) {
-                        const exists = await strikeRepo.existsBySourceAndNucleus(payload.recordId, s.nucleus);
-                        if (exists) {
-                            console.log(`[process] Strike dedup: "${s.nucleus.slice(0, 30)}" already exists`);
-                            continue;
-                        }
-                    }
-                    // 将 AI 输出的 goal_id 合并到 field 中，保持 Strike 表结构不变
-                    // goal_id 存在 field.matched_goal_id 中，供后续查询和关联使用
-                    const strikeField = { ...(s.field ?? {}) };
-                    if (s.goal_id) {
-                        strikeField.matched_goal_id = s.goal_id;
-                    }
-                    const strike = await strikeRepo.create({
-                        source_id: payload.recordId,
-                        user_id: uid ?? payload.deviceId,
-                        nucleus: s.nucleus,
-                        polarity: s.polarity,
-                        salience: s.confidence,
-                        confidence: s.confidence,
-                        field: Object.keys(strikeField).length > 0 ? strikeField : undefined,
-                    });
-                    strikeIds.push(strike.id);
-                    // 写标签
-                    if (s.tags && s.tags.length > 0) {
-                        await strikeTagRepo.createMany(s.tags.map(label => ({ strike_id: strike.id, label })));
-                    }
-                    // intend 类型 → 投影为 todo/goal
-                    // 如果 commands 已包含 create_todo，跳过投影避免重复创建
-                    if (s.polarity === "intend" && !hasCreateTodoCommand.has("create_todo")) {
-                        projectIntendStrike(strike, uid).catch(err => console.warn(`[process] Todo projection failed: ${err.message}`));
-                    }
-                    // 非 intend 类型 + 有 goal_id → 创建 Strike 与目标的关联 Bond
-                    // 这让非待办类的认知（perceive/judge/realize）也能挂靠到目标下
-                    if (s.polarity !== "intend" && s.goal_id) {
-                        try {
-                            // 找到目标对应的 cluster_id（目标在 todo 表中，cluster_id 指向聚类 Strike）
-                            const goal = await todoRepo.findById(s.goal_id);
-                            if (goal?.cluster_id) {
-                                await bondRepo.create({
-                                    source_strike_id: strike.id,
-                                    target_strike_id: goal.cluster_id,
-                                    type: "context_of",
-                                    strength: 0.7,
-                                });
-                            }
-                        }
-                        catch {
-                            // goal 查找失败不阻塞
-                        }
-                    }
-                }
-                catch (err) {
-                    console.warn(`[process] Strike write failed: ${err.message}`);
-                }
-            }
-            // 写 Bonds
-            if (parsed.bonds && parsed.bonds.length > 0 && strikeIds.length >= 2) {
-                for (const b of parsed.bonds) {
-                    const sourceId = strikeIds[b.source_idx];
-                    const targetId = strikeIds[b.target_idx];
-                    if (sourceId && targetId) {
-                        try {
-                            await bondRepo.create({
-                                source_strike_id: sourceId,
-                                target_strike_id: targetId,
-                                type: b.type,
-                                strength: b.strength,
-                            });
-                        }
-                        catch (err) {
-                            console.warn(`[process] Bond write failed: ${err.message}`);
-                        }
-                    }
-                }
-            }
-            // 标记 record 已消化（不再需要 digest.ts 二次处理）
-            try {
-                await recordRepo.claimForDigest([payload.recordId]);
-            }
-            catch {
-                // 可能已被 claim，忽略
-            }
+        // 9. Update record status
+        if (payload.recordId) {
+            await recordRepo.updateStatus(payload.recordId, "completed");
         }
-        // 7. Update record status
-        await recordRepo.updateStatus(payload.recordId, "completed");
-        // 8. Append to daily diary
+        // 10. Append to daily diary
         const diaryLine = result.summary
             ? `[${new Date().toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })}] ${result.summary}`
             : `[${new Date().toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })}] ${payload.text.slice(0, 200)}`;
@@ -271,19 +265,19 @@ export async function processEntry(payload) {
         });
     }
     catch (err) {
-        console.error(`[process] Fatal error processing record ${payload.recordId}:`, err);
-        try {
-            await recordRepo.updateStatus(payload.recordId, "error");
-        }
-        catch {
-            console.error("[process] Also failed to update record status to error");
+        console.error(`[process] Fatal error processing record ${payload.recordId ?? "N/A"}:`, err);
+        if (payload.recordId) {
+            try {
+                await recordRepo.updateStatus(payload.recordId, "error");
+            }
+            catch {
+                console.error("[process] Also failed to update record status to error");
+            }
         }
         result.error = err.message;
     }
     return result;
 }
-// v2: shouldDigestImmediately 不再需要 — Layer 3 统一调用已直接写入 Strikes，
-// 不再触发 digest.ts 管道。Tier2 batch-analyze 仍由 daily-cycle/proactive 触发。
 // ── Layer 1: 待办全能模式 ─────────────────────────────────────────
 async function todoFullMode(payload) {
     // 1. 加载上下文：用户未完成待办 + 活跃目标
@@ -381,5 +375,23 @@ async function todoFullMode(payload) {
         }
     }
     return { commands, actionResults };
+}
+/**
+ * 修改已识别的待办指令 — 用户在 CommandSheet 中输入文字修改
+ */
+export async function refineTodoCommands(currentCommands, modificationText) {
+    const messages = [
+        { role: "system", content: buildTodoRefinePrompt(currentCommands) },
+        { role: "user", content: modificationText },
+    ];
+    const response = await chatCompletion(messages, { json: true, temperature: 0.2, timeout: 15000, tier: "fast" });
+    if (!response?.content)
+        return currentCommands;
+    const parsed = safeParseJson(response.content);
+    if (!parsed?.commands || !Array.isArray(parsed.commands)) {
+        console.error("[refine] Failed to parse refine response:", response.content.slice(0, 200));
+        return currentCommands;
+    }
+    return parsed.commands;
 }
 //# sourceMappingURL=process.js.map

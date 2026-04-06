@@ -5,6 +5,7 @@ import { X, Tag, Send } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { createManualNote } from "@/features/notes/lib/manual-note";
 import { useTags } from "@/features/tags/hooks/use-tags";
+import { MAX_TAGS_PER_RECORD } from "@/features/tags/lib/tag-manager";
 import { fabNotify } from "@/shared/lib/fab-notify";
 import { SwipeBack } from "@/shared/components/swipe-back";
 
@@ -25,9 +26,11 @@ export function TextEditor({ onClose }: TextEditorProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const toggleTag = (tag: string) => {
-    setSelectedTags((prev) =>
-      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag],
-    );
+    setSelectedTags((prev) => {
+      if (prev.includes(tag)) return prev.filter((t) => t !== tag);
+      if (prev.length >= MAX_TAGS_PER_RECORD) return prev;
+      return [...prev, tag];
+    });
   };
 
   const handleSave = useCallback(
@@ -128,21 +131,28 @@ export function TextEditor({ onClose }: TextEditorProps) {
         {showTagPicker && (
           <div className="border-t border-border/30 bg-secondary/30 px-4 py-3">
             <div className="flex flex-wrap gap-2">
-              {tags.map((tag) => (
-                <button
-                  type="button"
-                  key={tag}
-                  onClick={() => toggleTag(tag)}
-                  className={cn(
-                    "px-3 py-1.5 rounded-full text-xs font-medium transition-all",
-                    selectedTags.includes(tag)
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-secondary text-secondary-foreground hover:bg-secondary/70",
-                  )}
-                >
-                  {tag}
-                </button>
-              ))}
+              {tags.map((tag) => {
+                const selected = selectedTags.includes(tag);
+                const disabled = !selected && selectedTags.length >= MAX_TAGS_PER_RECORD;
+                return (
+                  <button
+                    type="button"
+                    key={tag}
+                    onClick={() => toggleTag(tag)}
+                    disabled={disabled}
+                    className={cn(
+                      "px-3 py-1.5 rounded-full text-xs font-medium transition-all",
+                      selected
+                        ? "bg-primary text-primary-foreground"
+                        : disabled
+                          ? "bg-secondary/50 text-muted-foreground/40 cursor-not-allowed"
+                          : "bg-secondary text-secondary-foreground hover:bg-secondary/70",
+                    )}
+                  >
+                    {tag}
+                  </button>
+                );
+              })}
             </div>
           </div>
         )}

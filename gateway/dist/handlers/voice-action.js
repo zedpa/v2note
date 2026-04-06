@@ -44,7 +44,7 @@ ${dateAnchor}
       "confidence": 0.0-1.0,
       "target_hint": "匹配关键词（人名/事项关键词）",
       "changes": {
-        "text": "【create_todo 必填】纯净的待办内容，动词开头，去掉指令前缀",
+        "text": "【create_todo 必填】纯净行动描述，动词开头，去掉指令前缀和时间/日期/频率/紧急度（已提取为独立字段）",
         "scheduled_start": "ISO 时间（优先用户原话精确到分钟，参照锚点表解析优先级）",
         "priority": 1-5
       },
@@ -56,10 +56,11 @@ ${dateAnchor}
 }
 
 ## 关键约束
-- create_todo 时 changes.text **必填**，内容是提炼后的待办（动词开头），不是指令原文
-  ✅ 用户说"帮我记一下明天去开会" → changes.text = "明天去开会"
-  ✅ 用户说"提醒我下周找张总" → changes.text = "下周找张总"
-  ❌ changes.text = "帮我记一下明天去开会"（不要保留指令前缀）
+- create_todo 时 changes.text **必填**，是纯净行动描述（动词开头），去掉指令前缀和时间/日期/频率/紧急度
+  ✅ 用户说"帮我记一下明天去开会" → changes.text = "去开会"，scheduled_start = 明天
+  ✅ 用户说"提醒我下周找张总" → changes.text = "找张总"，scheduled_start = 下周
+  ❌ changes.text = "明天去开会"（"明天"已在 scheduled_start）
+  ❌ changes.text = "帮我记一下明天去开会"（指令前缀 + 时间）
 - scheduled_start：日期从锚点表查找，时刻以用户原话为准精确到分钟
 - delete_todo 和批量修改的 risk_level 为 "high"，其余为 "low"
 - record 类型时 actions 为空数组
@@ -67,8 +68,8 @@ ${dateAnchor}
 }
 export async function classifyVoiceIntent(text, forceAction) {
     // v2 方案B：去掉正则预筛，全部走 AI 分类
-    // 仅对极短文本（≤2字）跳过分类（无实质内容）
-    if (text.length <= 2) {
+    // 仅对极短文本（≤1字）跳过分类（如"嗯""哦"等无意义输入）
+    if (text.length <= 1) {
         return { type: "record", actions: [] };
     }
     const messages = [
@@ -237,7 +238,11 @@ async function executeQueryTodo(action, ctx) {
             filtered = todos.filter((t) => {
                 if (!t.scheduled_start)
                     return false;
-                const todoDate = t.scheduled_start.split("T")[0];
+                // scheduled_start 可能是 string 或 Date 对象
+                const startStr = typeof t.scheduled_start === "string"
+                    ? t.scheduled_start
+                    : new Date(t.scheduled_start).toISOString();
+                const todoDate = startStr.split("T")[0];
                 return todoDate === targetDate;
             });
         }

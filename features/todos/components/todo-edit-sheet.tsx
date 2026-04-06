@@ -5,7 +5,6 @@ import {
   Calendar, Clock, Trash2, Sparkles,
 } from "lucide-react";
 import { updateTodo, deleteTodo } from "@/shared/lib/api/todos";
-import { useKeyboardOffset } from "@/shared/hooks/use-keyboard-offset";
 import type { TodoDTO } from "../lib/todo-types";
 import { localTzOffset } from "../lib/time-slots";
 import { PrioritySelector } from "./priority-selector";
@@ -34,7 +33,6 @@ export function TodoEditSheet({ todo, open, onClose, onUpdated, onAskAI }: TodoE
   const [saving, setSaving] = useState(false);
   const dateRef = useRef<HTMLInputElement>(null);
   const timeRef = useRef<HTMLInputElement>(null);
-  const { offset: kbOffset } = useKeyboardOffset();
 
   const syncFromTodo = useCallback((t: TodoDTO) => {
     setText(t.text);
@@ -109,7 +107,7 @@ export function TodoEditSheet({ todo, open, onClose, onUpdated, onAskAI }: TodoE
       <div
         data-testid="todo-edit-sheet"
         className="fixed inset-x-0 bottom-0 z-50 max-h-[85vh] overflow-y-auto rounded-t-[24px] bg-[hsl(var(--card))] px-5 pb-safe pt-3"
-        style={{ boxShadow: "0 -4px 24px rgba(0,0,0,0.5)", bottom: `${kbOffset}px` }}
+        style={{ boxShadow: "0 -4px 24px rgba(0,0,0,0.5)", bottom: "var(--kb-offset, 0px)", transition: "bottom 150ms ease-out" }}
       >
         {/* Drag handle */}
         <div className="mx-auto mb-5 h-1 w-10 rounded-full bg-muted-foreground/20" />

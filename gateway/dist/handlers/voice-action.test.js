@@ -47,12 +47,14 @@ describe("场景 1: classifyVoiceIntent — 记录型", () => {
     it("should_classify_as_record_when_no_action_intent", async () => {
         const { classifyVoiceIntent } = await import("./voice-action.js");
         const { chatCompletion } = await import("../ai/provider.js");
-        // 规则预筛：无指令关键词，直接返回 record，不调用 AI
+        // v2: 全部走 AI 分类，AI 判断为 record
+        chatCompletion.mockResolvedValue({
+            content: JSON.stringify({ type: "record", record_text: "", actions: [] }),
+        });
         const result = await classifyVoiceIntent("今天和张总开会，他说原材料涨了15%");
         expect(result.type).toBe("record");
         expect(result.actions).toHaveLength(0);
-        // 验证没有调用 AI（规则预筛跳过）
-        expect(chatCompletion).not.toHaveBeenCalled();
+        expect(chatCompletion).toHaveBeenCalledTimes(1);
     });
 });
 // ══════════════════════════════════════════════════════════════════════

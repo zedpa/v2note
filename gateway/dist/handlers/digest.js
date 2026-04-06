@@ -12,7 +12,8 @@ import { linkNewStrikesToGoals } from "../cognitive/goal-auto-link.js";
 import { getSession } from "../session/manager.js";
 import { updateSoul } from "../soul/manager.js";
 import { updateProfile } from "../profile/manager.js";
-import { maySoulUpdate, mayProfileUpdate, safeParseJson } from "../lib/text-utils.js";
+import { mayProfileUpdate, safeParseJson } from "../lib/text-utils.js";
+import { shouldUpdateSoulStrict } from "../cognitive/self-evolution.js";
 import { TIER2_STRIKE_THRESHOLD } from "../cognitive/batch-analyze.js";
 import { writeStrikeEmbedding } from "../cognitive/embed-writer.js";
 /**
@@ -80,9 +81,11 @@ export async function digestRecords(recordIds, context) {
         }
         const combinedText = textParts.join("\n\n---\n\n");
         console.log(`[digest][⏱ load-text] ${Date.now() - dt0}ms — text: ${combinedText.length} chars`);
+        // ── Step 1.5: 查询用户已有 domain 列表（供 AI 保持分类一致性）──
+        const existingDomains = await recordRepo.listUserDomains(userId).catch(() => []);
         // ── Step 2: AI decomposition (1 次调用) ─────────────────────
         const digestMessages = [
-            { role: "system", content: buildDigestPrompt() },
+            { role: "system", content: buildDigestPrompt(existingDomains) },
             { role: "user", content: combinedText },
         ];
         const dtAi = Date.now();
@@ -102,6 +105,11 @@ export async function digestRecords(recordIds, context) {
         }
         rawStrikes = parsed.strikes ?? [];
         rawBonds = parsed.bonds ?? [];
+        // ── 写入 record.domain（自动归类）──
+        const recordDomain = parsed.domain ?? null;
+        if (recordDomain && validIds[0]) {
+            await recordRepo.updateDomain(validIds[0], recordDomain).catch((e) => console.warn("[digest] Failed to update record domain:", e));
+        }
         if (rawStrikes.length === 0) {
             console.log("[digest] AI returned no strikes, skipping");
             // record 已在 Step 0 被 claimForDigest 标记为 digested
@@ -207,7 +215,7 @@ export async function digestRecords(recordIds, context) {
             memoryManager
                 .maybeCreateMemory(context.deviceId, combinedText, today, context.userId)
                 .catch((e) => console.warn("[digest] Memory creation failed:", e.message));
-            if (maySoulUpdate(combinedText)) {
+            if (shouldUpdateSoulStrict([combinedText])) {
                 updateSoul(context.deviceId, combinedText, context.userId).catch((e) => console.warn("[digest] Soul update failed:", e.message));
             }
             if (mayProfileUpdate(combinedText)) {

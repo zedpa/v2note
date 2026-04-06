@@ -41,7 +41,7 @@ const sessions = new Map();
  * - realtime: spawn Python realtime ASR subprocess for streaming recognition.
  * - upload: just accumulate PCM chunks; transcribe when recording stops.
  */
-export async function startASR(clientWs, deviceId, locationText, mode = "realtime", notebook, userId, sourceContext) {
+export async function startASR(clientWs, deviceId, locationText, mode = "realtime", notebook, userId, sourceContext, saveAudio) {
     const asrT0 = Date.now();
     const apiKey = process.env.DASHSCOPE_API_KEY;
     if (!apiKey)
@@ -76,6 +76,7 @@ export async function startASR(clientWs, deviceId, locationText, mode = "realtim
         audioChunkCount: 0,
         preFlushBuffer: [],
         saveAudio: false,
+        transcriptOnly: saveAudio === false,
         startTime: Date.now(),
         sourceContext,
     };
@@ -352,6 +353,41 @@ async function finishRealtimeASR(clientWs, deviceId, expectedTaskId) {
         cleanupSessionFiles(session);
         return;
     }
+    // transcript-only 模式：只返回文本，不创建 record / 不触发 AI 处理
+    if (session.transcriptOnly) {
+        const lastSentence = session.sentences[session.sentences.length - 1];
+        const durationMs = lastSentence?.end_time ?? 0;
+        sendToClient(clientWs, {
+            type: "asr.done",
+            payload: { transcript, recordId: "", duration: Math.round(durationMs / 1000) },
+        });
+        cleanupSessionFiles(session);
+        return;
+    }
+    // 指令模式：不创建 record，不存音频，只执行 processEntry Layer 2
+    if (session.forceCommand) {
+        sendToClient(clientWs, {
+            type: "asr.done",
+            payload: { transcript, recordId: "", duration: 0 },
+        });
+        cleanupSessionFiles(session);
+        processEntry({
+            text: transcript,
+            deviceId: session.deviceId,
+            userId: session.userId,
+            notebook: session.notebook,
+            forceCommand: true,
+            sourceContext: session.sourceContext,
+        })
+            .then((result) => {
+            sendToClient(clientWs, { type: "process.result", payload: result });
+        })
+            .catch((err) => {
+            console.error("[asr] forceCommand process error:", err);
+            sendToClient(clientWs, { type: "error", payload: { message: err.message } });
+        });
+        return;
+    }
     // Calculate duration from last sentence end_time
     const lastSentence = session.sentences[session.sentences.length - 1];
     const durationMs = lastSentence?.end_time ?? 0;
@@ -395,6 +431,41 @@ async function finishUploadASR(clientWs, deviceId, expectedTaskId) {
             payload: { transcript: "", recordId: "", duration: 0 },
         });
         sessions.delete(deviceId);
+        return;
+    }
+    // transcript-only 模式
+    if (session.transcriptOnly) {
+        sendToClient(clientWs, {
+            type: "asr.done",
+            payload: { transcript, recordId: "", duration: durationSeconds },
+        });
+        cleanupSessionFiles(session);
+        sessions.delete(deviceId);
+        return;
+    }
+    // 指令模式：不创建 record，只执行 processEntry Layer 2
+    if (session.forceCommand) {
+        sendToClient(clientWs, {
+            type: "asr.done",
+            payload: { transcript, recordId: "", duration: durationSeconds },
+        });
+        cleanupSessionFiles(session);
+        sessions.delete(deviceId);
+        processEntry({
+            text: transcript,
+            deviceId: session.deviceId,
+            userId: session.userId,
+            notebook: session.notebook,
+            forceCommand: true,
+            sourceContext: session.sourceContext,
+        })
+            .then((result) => {
+            sendToClient(clientWs, { type: "process.result", payload: result });
+        })
+            .catch((err) => {
+            console.error("[asr] forceCommand process error:", err);
+            sendToClient(clientWs, { type: "error", payload: { message: err.message } });
+        });
         return;
     }
     // Check for voice commands
@@ -543,7 +614,7 @@ function pcmToWavFromBuffer(pcmData) {
  * Transcribe a WAV audio buffer via Python DashScope SDK subprocess.
  * Pipes WAV data to stdin, reads JSON result from stdout.
  */
-async function transcribeAudioFile(wavBuffer, vocabularyId) {
+export async function transcribeAudioFile(wavBuffer, vocabularyId) {
     const apiKey = process.env.DASHSCOPE_API_KEY;
     if (!apiKey)
         throw new Error("Missing DASHSCOPE_API_KEY");

@@ -249,6 +249,7 @@ export async function generateWithTools(messages, tools, opts) {
 }
 // ── Tool 名称 → 用户可见的中文提示 ──────────────────────────
 const TOOL_LABELS = {
+    // ── 已有 ──
     web_search: "🔍 正在联网搜索…",
     fetch_url: "🌐 正在获取网页内容…",
     search: "📋 正在查找相关记录…",
@@ -258,6 +259,21 @@ const TOOL_LABELS = {
     update_todo: "✏️ 正在更新待办…",
     update_goal: "🎯 正在更新目标…",
     delete_record: "🗑️ 正在删除…",
+    // ── 补全现有缺失 ──
+    create_record: "📝 正在创建日记…",
+    update_record: "📝 正在更新日记…",
+    delete_todo: "🗑️ 正在取消待办…",
+    create_link: "🔗 正在建立关联…",
+    confirm: "✅ 正在处理确认…",
+    // ── 新增工具 ──
+    get_current_time: "🕐 正在获取时间…",
+    view_record: "📖 正在读取日记…",
+    view_todo: "📖 正在读取待办…",
+    view_goal: "📖 正在读取目标…",
+    save_conversation: "📝 正在保存对话内容…",
+    manage_folder: "📂 正在管理分类…",
+    move_record: "📂 正在移动日记…",
+    list_folders: "📂 正在查看分类…",
 };
 /**
  * 手动 tool call 循环（绕过 AI SDK maxSteps 的 DashScope 兼容性 bug）
@@ -351,7 +367,7 @@ export async function* streamWithTools(messages, tools, opts) {
         const toolResultMessages = [];
         for (const [callId, { name, args: rawArgs }] of toolInputBuffers) {
             const label = TOOL_LABELS[name] ?? `正在执行 ${name}…`;
-            yield `\x00TOOL_STATUS:${name}:${label}`;
+            yield `\x00TOOL_STATUS:${name}:${label}:${callId}`;
             console.log(`[ai] Tool call step=${step}: ${name}(${rawArgs.slice(0, 100)})`);
             let parsedArgs = {};
             try {
@@ -360,6 +376,7 @@ export async function* streamWithTools(messages, tools, opts) {
             catch {
                 console.warn(`[ai] Failed to parse tool args for ${name}: ${rawArgs.slice(0, 100)}`);
             }
+            const toolStartTime = Date.now();
             let toolResult = { success: false, message: "工具执行失败" };
             try {
                 const toolDef = tools[name];
@@ -371,7 +388,12 @@ export async function* streamWithTools(messages, tools, opts) {
                 console.error(`[ai] Tool "${name}" execution error:`, err.message);
                 toolResult = { success: false, message: `工具执行失败: ${err.message}` };
             }
+            const durationMs = Date.now() - toolStartTime;
             console.log(`[ai] Tool result: ${name} →`, JSON.stringify(toolResult).slice(0, 150));
+            // 发送 TOOL_DONE 标记（success:message:durationMs）
+            const toolSuccess = toolResult?.success !== false;
+            const toolMessage = (toolResult?.message ?? "").replace(/:/g, "：");
+            yield `\x00TOOL_DONE:${name}:${callId}:${toolSuccess}:${toolMessage}:${durationMs}`;
             toolResultMessages.push({
                 tool_call_id: callId,
                 toolName: name,

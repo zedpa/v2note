@@ -1,249 +1,126 @@
 /**
- * cold-start-onboarding spec 测试
- * 覆盖场景 1-5: 5问流程、种子数据、系统初始化、跳过、已完成用户
+ * Onboarding v3 测试 — 两步引导
+ * Step 1: 存名字
+ * Step 2: 调用 process pipeline，返回 AI 拆解结果
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 // ── Mocks ─────────────────────────────────────────────────────────────
-const mockQuery = vi.fn().mockResolvedValue([]);
-const mockQueryOne = vi.fn().mockResolvedValue(null);
-const mockExecute = vi.fn().mockResolvedValue(undefined);
-vi.mock("../db/pool.js", () => ({
-    query: (...args) => mockQuery(...args),
-    queryOne: (...args) => mockQueryOne(...args),
-    execute: (...args) => mockExecute(...args),
-}));
+const mockUpsertOnboardingField = vi.fn().mockResolvedValue(undefined);
+const mockRecordCreate = vi.fn().mockResolvedValue({ id: "rec-1" });
+const mockTranscriptCreate = vi.fn().mockResolvedValue({ id: "t-1" });
 vi.mock("../db/repositories/index.js", () => ({
-    recordRepo: {
-        create: vi.fn().mockResolvedValue({ id: "rec-1" }),
-        findById: vi.fn(),
-        markDigested: vi.fn(),
-        updateStatus: vi.fn(),
-    },
-    strikeRepo: { create: vi.fn(), findActive: vi.fn().mockResolvedValue([]) },
-    bondRepo: { createMany: vi.fn().mockResolvedValue([]) },
-    strikeTagRepo: { createMany: vi.fn() },
-    summaryRepo: { findByRecordId: vi.fn().mockResolvedValue(null) },
-    transcriptRepo: {
-        findByRecordIds: vi.fn().mockResolvedValue([]),
-        create: vi.fn().mockResolvedValue({ id: "t-1", record_id: "rec-1", text: "" }),
-    },
     userProfileRepo: {
-        findByUser: vi.fn(),
-        upsertByUser: vi.fn(),
-        upsertOnboardingField: vi.fn(),
+        upsertOnboardingField: (...args) => mockUpsertOnboardingField(...args),
     },
-    todoRepo: {
-        createGoalAsTodo: vi.fn().mockImplementation((fields) => Promise.resolve({ id: `todo-${fields.domain}`, ...fields, done: false, created_at: new Date().toISOString() })),
+    recordRepo: {
+        create: (...args) => mockRecordCreate(...args),
+    },
+    transcriptRepo: {
+        create: (...args) => mockTranscriptCreate(...args),
     },
 }));
-vi.mock("../ai/provider.js", () => ({
-    chatCompletion: vi.fn().mockResolvedValue({ content: '{"strikes":[],"bonds":[]}' }),
-}));
-vi.mock("../diary/manager.js", () => ({
-    appendToDiary: vi.fn().mockResolvedValue(undefined),
-}));
-vi.mock("./digest.js", () => ({
-    digestRecords: vi.fn().mockResolvedValue(undefined),
+const mockProcessEntry = vi.fn().mockResolvedValue({
+    summary: "想法摘要",
+    todos: ["写报告"],
+    tags: ["工作"],
+});
+vi.mock("./process.js", () => ({
+    processEntry: (...args) => mockProcessEntry(...args),
 }));
 // =====================================================================
-// 场景 1: 5 问对话流程 — handler 处理每步回答
-// =====================================================================
-describe("场景1: Onboarding 回答处理", () => {
+describe("Onboarding v3: 两步引导", () => {
     beforeEach(() => {
         vi.clearAllMocks();
     });
-    it("should_store_name_in_profile_when_step_is_1", async () => {
-        const { handleOnboardingAnswer } = await import("./onboarding.js");
-        const result = await handleOnboardingAnswer({
+    // ── Step 1 ──
+    it("should_save_name_when_step_1", async () => {
+        const { handleOnboardingChat } = await import("./onboarding.js");
+        const result = await handleOnboardingChat({
             userId: "user-1",
             deviceId: "dev-1",
             step: 1,
             answer: "小明",
         });
-        expect(result.ok).toBe(true);
-        expect(result.recordCreated).toBe(false); // Q1 不创建日记
-        // 验证 profile name 被存储
-        const { userProfileRepo } = await import("../db/repositories/index.js");
-        expect(vi.mocked(userProfileRepo.upsertOnboardingField)).toHaveBeenCalledWith("user-1", "name", "小明");
+        expect(result.step).toBe(1);
+        expect(result.done).toBe(false);
+        if (result.step === 1) {
+            expect(result.name).toBe("小明");
+        }
+        expect(mockUpsertOnboardingField).toHaveBeenCalledWith("user-1", "name", "小明", "dev-1");
     });
-    it("should_create_record_and_trigger_digest_when_step_is_2", async () => {
-        const { handleOnboardingAnswer } = await import("./onboarding.js");
-        const result = await handleOnboardingAnswer({
+    it("should_use_default_name_when_step_1_empty", async () => {
+        const { handleOnboardingChat } = await import("./onboarding.js");
+        const result = await handleOnboardingChat({
             userId: "user-1",
             deviceId: "dev-1",
-            step: 2,
-            answer: "我是一名产品经理，在一家创业公司工作",
+            step: 1,
+            answer: "",
         });
-        expect(result.ok).toBe(true);
-        expect(result.recordCreated).toBe(true);
-        // 验证 Digest 被触发
-        const { digestRecords } = await import("./digest.js");
-        expect(vi.mocked(digestRecords)).toHaveBeenCalled();
-    });
-    it("should_create_record_for_steps_3_4_5", async () => {
-        const { handleOnboardingAnswer } = await import("./onboarding.js");
-        for (const step of [3, 4, 5]) {
-            vi.clearAllMocks();
-            const result = await handleOnboardingAnswer({
-                userId: "user-1",
-                deviceId: "dev-1",
-                step,
-                answer: `回答第${step}题`,
-            });
-            expect(result.ok).toBe(true);
-            expect(result.recordCreated).toBe(true);
+        expect(result.step).toBe(1);
+        expect(result.done).toBe(false);
+        if (result.step === 1) {
+            expect(result.name).toBe("用户");
         }
     });
-    it("should_store_pain_points_when_step_is_4", async () => {
-        const { handleOnboardingAnswer } = await import("./onboarding.js");
-        await handleOnboardingAnswer({
+    // ── Step 2 ──
+    it("should_process_thought_and_return_result_when_step_2", async () => {
+        const { handleOnboardingChat } = await import("./onboarding.js");
+        const result = await handleOnboardingChat({
             userId: "user-1",
             deviceId: "dev-1",
-            step: 4,
-            answer: "我总是拖延，想法太散了",
+            step: 2,
+            answer: "明天要交报告，还没开始写",
         });
-        const { userProfileRepo } = await import("../db/repositories/index.js");
-        expect(vi.mocked(userProfileRepo.upsertOnboardingField)).toHaveBeenCalledWith("user-1", "pain_points", "我总是拖延，想法太散了");
-    });
-    it("should_mark_onboarding_done_when_step_is_5", async () => {
-        const { handleOnboardingAnswer } = await import("./onboarding.js");
-        await handleOnboardingAnswer({
-            userId: "user-1",
-            deviceId: "dev-1",
-            step: 5,
-            answer: "晚上睡前",
-        });
-        const { userProfileRepo } = await import("../db/repositories/index.js");
-        expect(vi.mocked(userProfileRepo.upsertOnboardingField)).toHaveBeenCalledWith("user-1", "onboarding_done", "true");
-    });
-});
-// =====================================================================
-// 场景 2: 冷启动种子数据 — 立即 Digest
-// =====================================================================
-describe("场景2: 冷启动立即 Digest", () => {
-    beforeEach(() => {
-        vi.clearAllMocks();
-    });
-    it("should_trigger_immediate_digest_for_all_onboarding_answers", async () => {
-        const { handleOnboardingAnswer } = await import("./onboarding.js");
-        // Q2-Q5 都应该创建 record 并触发 digest
-        for (const step of [2, 3, 4, 5]) {
-            vi.clearAllMocks();
-            await handleOnboardingAnswer({
-                userId: "user-1",
-                deviceId: "dev-1",
-                step,
-                answer: `Answer for step ${step}`,
-            });
-            const { digestRecords } = await import("./digest.js");
-            expect(vi.mocked(digestRecords)).toHaveBeenCalledTimes(1);
+        expect(result.step).toBe(2);
+        expect(result.done).toBe(true);
+        if (result.step === 2) {
+            expect(result.summary).toBe("想法摘要");
+            expect(result.todos).toEqual(["写报告"]);
+            expect(result.tags).toEqual(["工作"]);
+            expect(result.recordId).toBe("rec-1");
         }
+        // 验证 record + transcript 被创建
+        expect(mockRecordCreate).toHaveBeenCalledWith(expect.objectContaining({ user_id: "user-1", source: "manual" }));
+        expect(mockTranscriptCreate).toHaveBeenCalledWith(expect.objectContaining({ record_id: "rec-1" }));
+        // 验证 processEntry 被调用
+        expect(mockProcessEntry).toHaveBeenCalledWith(expect.objectContaining({
+            text: "明天要交报告，还没开始写",
+            recordId: "rec-1",
+        }));
+        // 验证 onboarding_done 被标记
+        expect(mockUpsertOnboardingField).toHaveBeenCalledWith("user-1", "onboarding_done", "true", "dev-1");
     });
-});
-// =====================================================================
-// 场景 4: 跳过机制
-// =====================================================================
-describe("场景4: 跳过机制", () => {
-    it("should_handle_skip_without_creating_record", async () => {
-        const { handleOnboardingAnswer } = await import("./onboarding.js");
-        const result = await handleOnboardingAnswer({
-            userId: "user-1",
-            deviceId: "dev-1",
-            step: 3,
-            answer: "", // 空回答 = 跳过
-        });
-        expect(result.ok).toBe(true);
-        expect(result.recordCreated).toBe(false);
-        expect(result.skipped).toBe(true);
-    });
-});
-// =====================================================================
-// top-level-dimensions 场景 1: Q2 创建种子维度
-// =====================================================================
-describe("top-level-dimensions 场景1: seedDimensionGoals", () => {
-    beforeEach(() => {
-        vi.clearAllMocks();
-    });
-    it("should_seed_work_and_startup_dimensions_when_q2_mentions_them", async () => {
-        const { handleOnboardingAnswer } = await import("./onboarding.js");
-        const { todoRepo } = await import("../db/repositories/index.js");
-        await handleOnboardingAnswer({
+    it("should_mark_done_when_step_2_empty_skip", async () => {
+        const { handleOnboardingChat } = await import("./onboarding.js");
+        const result = await handleOnboardingChat({
             userId: "user-1",
             deviceId: "dev-1",
             step: 2,
-            answer: "我在铸造厂上班，业余做自己的产品",
+            answer: "",
         });
-        // seedDimensionGoals 是 fire-and-forget，等它完成
-        await vi.waitFor(() => {
-            expect(todoRepo.createGoalAsTodo).toHaveBeenCalled();
+        expect(result.step).toBe(2);
+        expect(result.done).toBe(true);
+        // 不创建 record
+        expect(mockRecordCreate).not.toHaveBeenCalled();
+        expect(mockProcessEntry).not.toHaveBeenCalled();
+        // 标记完成
+        expect(mockUpsertOnboardingField).toHaveBeenCalledWith("user-1", "onboarding_done", "true", "dev-1");
+    });
+    it("should_still_complete_when_process_fails", async () => {
+        mockProcessEntry.mockRejectedValueOnce(new Error("AI failed"));
+        const { handleOnboardingChat } = await import("./onboarding.js");
+        const result = await handleOnboardingChat({
+            userId: "user-1",
+            deviceId: "dev-1",
+            step: 2,
+            answer: "一些想法",
         });
-        const calls = vi.mocked(todoRepo.createGoalAsTodo).mock.calls;
-        const domains = calls.map((c) => c[0].domain);
-        expect(domains).toContain("工作");
-        expect(domains).toContain("创业");
-        // 兜底"生活"
-        expect(domains).toContain("生活");
-        // 每个都是 level=1
-        for (const call of calls) {
-            expect(call[0].level).toBe(1);
-            expect(call[0].status).toBe("active");
-            expect(call[0].user_id).toBe("user-1");
+        expect(result.step).toBe(2);
+        expect(result.done).toBe(true);
+        // 无 AI 结果但不报错
+        if (result.step === 2) {
+            expect(result.summary).toBeUndefined();
         }
-    });
-    it("should_always_include_life_as_fallback_dimension", async () => {
-        const { handleOnboardingAnswer } = await import("./onboarding.js");
-        const { todoRepo } = await import("../db/repositories/index.js");
-        // 只提到投资，没有"生活"关键词
-        await handleOnboardingAnswer({
-            userId: "user-1",
-            deviceId: "dev-1",
-            step: 2,
-            answer: "主要是炒币和投资理财",
-        });
-        await vi.waitFor(() => {
-            expect(todoRepo.createGoalAsTodo).toHaveBeenCalled();
-        });
-        const calls = vi.mocked(todoRepo.createGoalAsTodo).mock.calls;
-        const domains = calls.map((c) => c[0].domain);
-        expect(domains).toContain("投资");
-        expect(domains).toContain("生活");
-    });
-    it("should_cap_dimensions_at_6", async () => {
-        const { handleOnboardingAnswer } = await import("./onboarding.js");
-        const { todoRepo } = await import("../db/repositories/index.js");
-        // 命中所有维度的关键词
-        await handleOnboardingAnswer({
-            userId: "user-1",
-            deviceId: "dev-1",
-            step: 2,
-            answer: "上班做项目开会，学习课程培训，创业融资，带娃家庭，运动锻炼，购物搬家，炒币投资",
-        });
-        await vi.waitFor(() => {
-            expect(todoRepo.createGoalAsTodo).toHaveBeenCalled();
-        });
-        const calls = vi.mocked(todoRepo.createGoalAsTodo).mock.calls;
-        expect(calls.length).toBeLessThanOrEqual(6);
-    });
-});
-// =====================================================================
-// 场景 6: 冷启动期 process.ts 立即 Digest
-// =====================================================================
-describe("场景6: 冷启动期 shouldDigestImmediately 改造", () => {
-    it("should_always_digest_when_record_count_below_20", () => {
-        // 测试 shouldDigestImmediately 函数
-        // 冷启动期：record 数 < 20，无论 text 长度都应返回 true
-        // 这个函数将在 process.ts 中被修改
-        // 此处验证逻辑：短文本 + 冷启动 → true
-        const isColdStart = true;
-        const textLength = 10; // 很短
-        const shouldDigest = isColdStart || textLength > 80;
-        expect(shouldDigest).toBe(true);
-    });
-    it("should_not_always_digest_when_past_cold_start", () => {
-        const isColdStart = false;
-        const textLength = 10;
-        const shouldDigest = isColdStart || textLength > 80;
-        expect(shouldDigest).toBe(false);
     });
 });
 //# sourceMappingURL=onboarding.test.js.map

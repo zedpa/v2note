@@ -23,6 +23,8 @@ export async function createRecord(fields: {
   status?: string;
   source?: string;
   location_text?: string;
+  duration_seconds?: number;
+  notebook?: string;
 }): Promise<{ id: string }> {
   return api.post("/api/v1/records", fields);
 }
@@ -49,4 +51,37 @@ export async function deleteRecords(ids: string[]): Promise<{ deleted: number }>
 
 export async function searchRecords(q: string): Promise<any[]> {
   return api.get(`/api/v1/records/search?q=${encodeURIComponent(q)}`);
+}
+
+/** 重试录音：上传 WAV 二进制到 gateway 转写+处理 */
+export async function retryRecordAudio(
+  recordId: string,
+  wavData: ArrayBuffer,
+): Promise<{ recordId: string; transcript: string }> {
+  // 需要直接 fetch（非 JSON body）
+  const { getGatewayHttpUrl } = await import("../gateway-url");
+  const { getAccessToken } = await import("../auth");
+  const { getApiDeviceId } = await import("../api");
+
+  const base = getGatewayHttpUrl();
+  const headers: Record<string, string> = {
+    "Content-Type": "application/octet-stream",
+  };
+  const token = getAccessToken();
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+  const deviceId = getApiDeviceId();
+  if (deviceId) headers["X-Device-Id"] = deviceId;
+
+  const res = await fetch(`${base}/api/v1/records/${recordId}/retry-audio`, {
+    method: "POST",
+    headers,
+    body: wavData,
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: "Unknown error" }));
+    throw new Error(err.error || `HTTP ${res.status}`);
+  }
+
+  return res.json();
 }
