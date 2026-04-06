@@ -603,13 +603,13 @@ export default function Page() {
   );
 
   // PC redirect
-  const [pcRedirecting] = useState(() => {
-    if (typeof window === "undefined") return false;
-    return window.innerWidth >= 768;
-  });
+  const [pcRedirecting, setPcRedirecting] = useState(false);
   useEffect(() => {
-    if (pcRedirecting) router.replace("/write");
-  }, [pcRedirecting, router]);
+    if (window.innerWidth >= 768) {
+      setPcRedirecting(true);
+      router.replace("/write");
+    }
+  }, [router]);
 
   if (pcRedirecting) {
     return (
