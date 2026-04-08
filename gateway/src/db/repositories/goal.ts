@@ -61,10 +61,7 @@ export async function findByDevice(deviceId: string): Promise<Goal[]> {
 
 export async function findById(id: string): Promise<Goal | null> {
   return queryOne<Goal>(
-    `SELECT id, device_id, text AS title, parent_id, status,
-            COALESCE(category, 'speech') AS source, cluster_id,
-            created_at, COALESCE(updated_at, created_at) AS updated_at
-     FROM todo WHERE id = $1 AND level >= 1`,
+    `${SELECT_AS_GOAL} AND id = $1`,
     [id],
   );
 }

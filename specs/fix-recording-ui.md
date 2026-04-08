@@ -1,7 +1,7 @@
 ---
 id: "fix-rec-ui"
 title: "Fix: 录音 UI 精简 — 长按半屏 + 常驻轻量浮窗"
-status: active
+status: completed
 domain: voice
 dependencies: ["app-mobile-views.md"]
 superseded_by: null
@@ -155,9 +155,10 @@ updated: 2026-04-06
 ```
 
 ## 删除清单
-- [ ] `recording-immersive.tsx` 中的波形渲染（waveHeights map）
-- [ ] `recording-immersive.tsx` 中的实时转写区域（confirmedText/partialText）
-- [ ] `fab.tsx` 中常驻录音的 ASR 实时文字传递（如适用）
+- [x] `recording-immersive.tsx` 中的波形渲染（waveHeights map）— 已在之前版本删除
+- [x] `recording-immersive.tsx` 中的实时转写区域（confirmedText/partialText）— 已在之前版本删除，本次清理了兼容 props
+- [x] `fab.tsx` 中常驻录音的 ASR 实时文字传递 — 已不传递给 RecordingImmersive
+- [x] `fab.tsx` 中移除了未使用的 `Send` import
 
 ## 边界条件
 - [ ] 常驻录音期间用户切换 tab（diary↔todo）：呼吸指示器应始终可见
@@ -166,8 +167,8 @@ updated: 2026-04-06
 - [ ] 录音暂停后 app 进入后台再回来：暂停状态应保持
 
 ## Implementation Phases
-- [ ] Phase 1: 常驻录音改为呼吸浮窗（重写 RecordingImmersive → RecordingFloat）
-- [ ] Phase 2: 长按录音全屏 → 底部半屏面板
+- [x] Phase 1: 常驻录音改为呼吸浮窗（重写 RecordingImmersive → RecordingFloat）
+- [x] Phase 2: 长按录音全屏 → 底部半屏面板
 
 ## 备注
 - 两个改动独立，Phase 1 优先（常驻录音问题更严重）

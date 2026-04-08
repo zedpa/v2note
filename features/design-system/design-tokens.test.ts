@@ -32,7 +32,7 @@ describe("design-visual-alignment: 场景 1.3 — Tailwind 设计 token", () => 
   it("should_have_shadow_ambient_token", () => {
     const shadows = theme.boxShadow as any;
     expect(shadows.ambient).toBeDefined();
-    expect(shadows.ambient).toContain("rgba(28, 28, 24");
+    expect(shadows.ambient).toContain("var(--shadow-ambient)");
   });
 
   it("should_have_font_families_matching_editorial_serenity", () => {

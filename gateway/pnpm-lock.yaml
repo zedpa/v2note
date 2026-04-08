@@ -14,6 +14,9 @@ importers:
       '@ai-sdk/openai-compatible':
         specifier: ^2.0.37
         version: 2.0.37(zod@3.25.76)
+      '@date-fns/tz':
+        specifier: ^1.4.1
+        version: 1.4.1
       '@mozilla/readability':
         specifier: ^0.6.0
         version: 0.6.0
@@ -29,6 +32,9 @@ importers:
       bullmq:
         specifier: ^5.70.4
         version: 5.70.4
+      date-fns:
+        specifier: ^4.1.0
+        version: 4.1.0
       dotenv:
         specifier: ^16.4.7
         version: 16.6.1
@@ -265,6 +271,9 @@ packages:
   '@csstools/css-tokenizer@4.0.0':
     resolution: {integrity: sha512-QxULHAm7cNu72w97JUNCBFODFaXpbDg+dP8b/oWFAZ2MTRppA3U00Y2L1HqaS4J6yBqxwa/Y3nMBaxVKbB/NsA==}
     engines: {node: '>=20.19.0'}
+
+  '@date-fns/tz@1.4.1':
+    resolution: {integrity: sha512-P5LUNhtbj6YfI3iJjw5EL9eUAG6OitD0W3fWQcpQjDRc/QIsL0tRNuO1PcDvPccWL1fSTXXdE1ds+l95DV/OFA==}
 
   '@emnapi/core@1.9.0':
     resolution: {integrity: sha512-0DQ98G9ZQZOxfUcQn1waV2yS8aWdZ6kJMbYCJB3oUBecjWYO1fqJ+a1DRfPF3O5JEkwqwP1A9QEN/9mYm2Yd0w==}
@@ -1223,6 +1232,9 @@ packages:
   data-urls@7.0.0:
     resolution: {integrity: sha512-23XHcCF+coGYevirZceTVD7NdJOqVn+49IHyxgszm+JIiHLoB2TkmPtsYkNWT1pvRSGkc35L6NHs0yHkN2SumA==}
     engines: {node: ^20.19.0 || ^22.12.0 || >=24.0.0}
+
+  date-fns@4.1.0:
+    resolution: {integrity: sha512-Ukq0owbQXxa/U3EGtsdVBkR1w7KOQ5gIBqdH2hkvknzZPYvBxb/aa6E8L7tmjFtkwZBu3UXBbjIgPo/Ez4xaNg==}
 
   dateformat@2.2.0:
     resolution: {integrity: sha512-GODcnWq3YGoTnygPfi02ygEiRxqUxpJwuRHjdhJYuxpcZmDq4rjBiXYmbCCzStxo176ixfLT6i4NPwQooRySnw==}
@@ -3236,6 +3248,8 @@ snapshots:
 
   '@csstools/css-tokenizer@4.0.0': {}
 
+  '@date-fns/tz@1.4.1': {}
+
   '@emnapi/core@1.9.0':
     dependencies:
       '@emnapi/wasi-threads': 1.2.0
@@ -4130,6 +4144,8 @@ snapshots:
       whatwg-url: 16.0.1
     transitivePeerDependencies:
       - '@noble/hashes'
+
+  date-fns@4.1.0: {}
 
   dateformat@2.2.0: {}
 

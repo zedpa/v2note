@@ -10,6 +10,7 @@ import { normalizeBondTypes, decayBondStrength, decaySalience } from "./maintena
 import { generateCognitiveReport, type CognitiveReport } from "./report.js";
 import { appendToDiary } from "../diary/manager.js";
 import * as todoRepo from "../db/repositories/todo.js";
+import { today as tzToday } from "../lib/tz.js";
 
 export interface CognitiveCycleResult {
   batchAnalyze: BatchAnalyzeResult | null;
@@ -143,7 +144,7 @@ async function generateRecurringInstances(
   if (templates.length === 0) return 0;
 
   const today = new Date();
-  const todayStr = today.toISOString().split("T")[0];
+  const todayStr = tzToday();
   let created = 0;
 
   for (const template of templates) {

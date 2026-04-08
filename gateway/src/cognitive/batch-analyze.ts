@@ -12,7 +12,6 @@ import { chatCompletion } from "../ai/provider.js";
 import {
   strikeRepo,
   bondRepo,
-  strikeTagRepo,
   todoRepo,
   snapshotRepo,
   tagRepo,
@@ -440,36 +439,21 @@ export async function runBatchAnalyze(userId: string): Promise<BatchAnalyzeResul
       }
     }
 
-    // 7i. cluster_tags — 写入 strike_tag + 传播到 record_tag（让 timeline 展示聚类标签）
+    // 7i. cluster_tags — strike_tag 已弃用，只传播到 record_tag
     const clusterTags = Array.isArray(output.cluster_tags) ? output.cluster_tags : [];
     for (const ct of clusterTags) {
       if (!knownClusterIds.has(ct.cluster_id) || !ct.tags?.length) continue;
-      try {
-        await strikeTagRepo.createMany(
-          ct.tags.map((label) => ({
-            strike_id: ct.cluster_id,
-            label,
-            confidence: 0.8,
-            created_by: "batch-analyze",
-          })),
-        );
-      } catch (e) {
-        // 标签可能已存在
-      }
 
       // 传播：cluster 名称 → 成员 strike 的 source record → record_tag
       try {
-        // 从 nucleus 中提取聚类名（格式 "[名称] 描述"）
         const clusterStrike = newStrikeRows.find((s) => s.id === ct.cluster_id)
           ?? await strikeRepo.findById(ct.cluster_id);
         if (!clusterStrike) continue;
         const nameMatch = clusterStrike.nucleus.match(/^\[(.+?)\]/);
         const clusterName = nameMatch?.[1] ?? clusterStrike.nucleus.slice(0, 20);
 
-        // upsert tag
         const tag = await tagRepo.upsert(clusterName);
 
-        // 查找该 cluster 的所有成员 strike 的 source record
         const memberRecords = await dbQuery<{ source_id: string }>(
           `SELECT DISTINCT s.source_id FROM bond b
            JOIN strike s ON s.id = b.target_strike_id
@@ -479,6 +463,8 @@ export async function runBatchAnalyze(userId: string): Promise<BatchAnalyzeResul
         );
 
         for (const mr of memberRecords) {
+          const count = await tagRepo.countByRecordId(mr.source_id);
+          if (count >= 5) continue;
           await tagRepo.addToRecord(mr.source_id, tag.id);
         }
       } catch (e) {

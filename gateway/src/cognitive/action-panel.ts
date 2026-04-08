@@ -1,5 +1,6 @@
 import { strikeRepo, bondRepo, todoRepo } from "../db/repositories/index.js";
 import { query } from "../db/pool.js";
+import { todayRange } from "../lib/tz.js";
 import type { StrikeEntry } from "../db/repositories/strike.js";
 import type { Todo } from "../db/repositories/todo.js";
 
@@ -92,10 +93,7 @@ export async function computeActionPanel(userId: string): Promise<ActionPanel> {
   const allActions: RankedAction[] = [];
   const goalActionCounts = new Map<string, number>();
 
-  const todayStart = new Date();
-  todayStart.setHours(0, 0, 0, 0);
-  const todayEnd = new Date();
-  todayEnd.setHours(23, 59, 59, 999);
+  const { start: todayStartISO, end: todayEndISO } = todayRange();
 
   for (const goal of goalStrikes) {
     let count = 0;
@@ -161,20 +159,20 @@ export async function computeActionPanel(userId: string): Promise<ActionPanel> {
   allActions.sort((a, b) => {
     const aScheduledToday =
       a.scheduledStart &&
-      a.scheduledStart >= todayStart.toISOString() &&
-      a.scheduledStart <= todayEnd.toISOString();
+      a.scheduledStart >= todayStartISO &&
+      a.scheduledStart <= todayEndISO;
     const bScheduledToday =
       b.scheduledStart &&
-      b.scheduledStart >= todayStart.toISOString() &&
-      b.scheduledStart <= todayEnd.toISOString();
+      b.scheduledStart >= todayStartISO &&
+      b.scheduledStart <= todayEndISO;
 
     // Scheduled today → highest
     if (aScheduledToday && !bScheduledToday) return -1;
     if (!aScheduledToday && bScheduledToday) return 1;
 
     // Has approaching deadline → next
-    const aDeadlineSoon = a.deadline && a.deadline <= todayEnd.toISOString();
-    const bDeadlineSoon = b.deadline && b.deadline <= todayEnd.toISOString();
+    const aDeadlineSoon = a.deadline && a.deadline <= todayEndISO;
+    const bDeadlineSoon = b.deadline && b.deadline <= todayEndISO;
     if (aDeadlineSoon && !bDeadlineSoon) return -1;
     if (!aDeadlineSoon && bDeadlineSoon) return 1;
 
@@ -203,11 +201,11 @@ export async function computeActionPanel(userId: string): Promise<ActionPanel> {
     let symbol: ActionItem["symbol"] = "flexible";
     if (
       a.scheduledStart &&
-      a.scheduledStart >= todayStart.toISOString() &&
-      a.scheduledStart <= todayEnd.toISOString()
+      a.scheduledStart >= todayStartISO &&
+      a.scheduledStart <= todayEndISO
     ) {
       symbol = "scheduled";
-    } else if (a.deadline && a.deadline <= todayEnd.toISOString()) {
+    } else if (a.deadline && a.deadline <= todayEndISO) {
       symbol = "next";
     }
     return {

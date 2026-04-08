@@ -14,6 +14,7 @@ import type {
   SnapshotPattern,
   NewStrikeRow,
 } from "../db/repositories/snapshot.js";
+import { toLocalDate } from "../lib/tz.js";
 
 export interface BatchAnalyzeInput {
   existing_structure: {
@@ -193,7 +194,7 @@ export function buildBatchAnalyzeMessages(
     }
     const materialTag = s.source_type === "material" ? "[素材] " : "";
     const tagStr = s.tags.length > 0 ? ` #${s.tags.join(" #")}` : "";
-    const dateStr = typeof s.created_at === "string" ? s.created_at.split("T")[0] : new Date(s.created_at).toISOString().split("T")[0];
+    const dateStr = toLocalDate(s.created_at);
     parts.push(`- [${s.id}] ${materialTag}[${s.polarity}] ${s.nucleus}${tagStr} (${dateStr})`);
   }
 

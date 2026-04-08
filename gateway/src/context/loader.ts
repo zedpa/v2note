@@ -15,6 +15,7 @@ import { goalRepo } from "../db/repositories/index.js";
 import { extractKeywords } from "../lib/text-utils.js";
 import { semanticSearch } from "../memory/embeddings.js";
 import type { ContextMode } from "./tiers.js";
+import { formatDateWithRelative } from "../lib/date-anchor.js";
 
 /** Memory limits per mode */
 const MEMORY_LIMITS: Record<ContextMode, number> = {
@@ -68,9 +69,11 @@ export async function loadWarmContext(opts: {
   const ranked = await rankMemories(rawMemories, opts.inputText, memoryLimit);
 
   // Format as context strings
-  const memories = ranked.map(
-    (m) => `[${m.source_date ?? "未知日期"}] ${m.content}`,
-  );
+  const memories = ranked.map((m) => {
+    if (!m.source_date) return `[日期未知] ${m.content}`;
+    const label = formatDateWithRelative(new Date(m.source_date));
+    return `[${label}] ${m.content}`;
+  });
 
   const goals = activeGoals.map((g) => ({ id: g.id, title: g.title }));
 

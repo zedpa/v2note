@@ -3,6 +3,7 @@ import { query, queryOne, execute } from "../pool.js";
 export interface MemoryEntry {
   id: string;
   device_id: string;
+  user_id: string | null;
   content: string;
   source_date: string | null;
   importance: number;
@@ -66,6 +67,13 @@ export async function findByUser(
     `SELECT * FROM memory WHERE user_id = $1
      ORDER BY importance DESC LIMIT $2`,
     [userId, limit ?? 50],
+  );
+}
+
+export async function findById(id: string): Promise<MemoryEntry | null> {
+  return queryOne<MemoryEntry>(
+    `SELECT * FROM memory WHERE id = $1`,
+    [id],
   );
 }
 

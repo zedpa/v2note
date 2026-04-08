@@ -61,6 +61,26 @@ export async function countUnreadByUser(userId: string): Promise<number> {
   return parseInt(row?.cnt ?? "0", 10);
 }
 
+/** 检查今天是否已发过指定类型的通知（按用户或设备去重） */
+export async function hasTodayNotification(
+  type: string,
+  userId?: string | null,
+  deviceId?: string,
+): Promise<boolean> {
+  const row = userId
+    ? await queryOne<{ cnt: string }>(
+        `SELECT COUNT(*) as cnt FROM notification
+         WHERE user_id = $1 AND type = $2 AND created_at::date = CURRENT_DATE`,
+        [userId, type],
+      )
+    : await queryOne<{ cnt: string }>(
+        `SELECT COUNT(*) as cnt FROM notification
+         WHERE device_id = $1 AND type = $2 AND created_at::date = CURRENT_DATE`,
+        [deviceId, type],
+      );
+  return parseInt(row?.cnt ?? "0", 10) > 0;
+}
+
 // ── Write ──
 
 /** 创建通知 */

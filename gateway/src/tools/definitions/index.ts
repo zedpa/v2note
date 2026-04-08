@@ -19,9 +19,8 @@ import { createLinkTool } from "./create-link.js";
 import { searchTool } from "./search.js";
 import { confirmTool } from "./confirm.js";
 import { getCurrentTimeTool } from "./get-current-time.js";
-import { viewRecordTool } from "./view-record.js";
-import { viewTodoTool } from "./view-todo.js";
-import { viewGoalTool } from "./view-goal.js";
+import { viewTool } from "./view.js";
+import { updateUserInfoTool } from "./update-user-info.js";
 import { saveConversationTool } from "./save-conversation.js";
 import { manageFolderTool } from "./manage-folder.js";
 import { moveRecordTool } from "./move-record.js";
@@ -46,10 +45,10 @@ export const ALL_TOOL_DEFINITIONS = [
   createLinkTool,
   // 搜索
   searchTool,
-  // 查看
-  viewRecordTool,
-  viewTodoTool,
-  viewGoalTool,
+  // 统一查看
+  viewTool,
+  // 用户画像
+  updateUserInfoTool,
   // 对话保存
   saveConversationTool,
   // 文件夹管理

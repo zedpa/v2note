@@ -7,6 +7,8 @@
 import { chatCompletion, type ChatMessage } from "../ai/provider.js";
 import { todoRepo, recordRepo } from "../db/repositories/index.js";
 import { generateChatDiary } from "./chat-daily-diary.js";
+import { fmt } from "../lib/date-anchor.js";
+import { dayRange } from "../lib/tz.js";
 
 /** pg 驱动对 timestamp 列返回 Date 对象，需安全转为 string 以支持 startsWith 筛选 */
 export function toDateString(v: unknown): string | null {
@@ -43,7 +45,11 @@ export async function generateMorningBriefing(
   userId?: string,
   forceRefresh?: boolean,
 ): Promise<BriefingResult> {
-  const today = new Date().toISOString().split("T")[0];
+  const now = new Date();
+  const today = fmt(now);
+  const yesterdayDate = new Date(now);
+  yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+  const yesterday = fmt(yesterdayDate);
 
   // 当日持久缓存（仅 forceRefresh 时跳过）
   if (!forceRefresh) {
@@ -60,9 +66,6 @@ export async function generateMorningBriefing(
     }
   }
 
-  const now = new Date();
-  const yesterday = new Date(now.getTime() - 86400000).toISOString().split("T")[0];
-
   // 1. 待办事项
   const pendingTodos = userId
     ? await todoRepo.findPendingByUser(userId)
@@ -77,10 +80,12 @@ export async function generateMorningBriefing(
 
   // 2. 昨日统计 + 用户信息（并行加载）
   const [yesterdayStats, soul, profile] = await Promise.all([
-    (userId
-      ? todoRepo.countByUserDateRange(userId, `${yesterday}T00:00:00Z`, `${yesterday}T23:59:59Z`)
-      : todoRepo.countByDateRange(deviceId, `${yesterday}T00:00:00Z`, `${yesterday}T23:59:59Z`)
-    ),
+    (() => {
+      const yd = dayRange(yesterday);
+      return userId
+        ? todoRepo.countByUserDateRange(userId, yd.start, yd.end)
+        : todoRepo.countByDateRange(deviceId, yd.start, yd.end);
+    })(),
     loadSoul(deviceId, userId).catch(() => null),
     loadProfile(deviceId, userId).catch(() => null),
   ]);
@@ -93,15 +98,19 @@ export async function generateMorningBriefing(
     ? pendingTodos.slice(0, 10).map((t) => `- ${t.text}`).join("\n")
     : "暂无待办";
 
-  const soulHint = soul?.content ? `\n用户画像: ${soul.content.slice(0, 200)}` : "";
-  const profileHint = profile?.content ? `\n用户偏好: ${profile.content.slice(0, 200)}` : "";
+  const soulBlock = soul?.content
+    ? `\n<user_soul>${soul.content.slice(0, 200)}</user_soul>`
+    : "";
+  const profileBlock = profile?.content
+    ? `\n<user_profile>${profile.content.slice(0, 200)}</user_profile>`
+    : "";
 
   const messages: ChatMessage[] = [
     {
       role: "system",
-      content: `根据待办数据生成个性化晨间问候。返回纯 JSON，不要 markdown 包裹。${soulHint}${profileHint}
+      content: `根据用户画像生成个性化晨间问候。返回纯 JSON，不要 markdown 包裹。${soulBlock}${profileBlock}
 {
-  "greeting": "≤15字，自然口语问候，包含日期，结合用户画像个性化",
+  "greeting": "≤30字，基于用户画像的个性化问候，包含日期，语气自然温暖。不要提待办数量。",
   "today_focus": ["待办原文，按时间排序，最多5条。无待办时写一句引导语"],
   "carry_over": ["逾期待办，语气轻松"],
   "stats": {"yesterday_done": 数字, "yesterday_total": 数字}
@@ -164,8 +173,11 @@ export async function generateEveningSummary(
   userId?: string,
   forceRefresh?: boolean,
 ): Promise<SummaryResult> {
-  const today = new Date().toISOString().split("T")[0];
-  const tomorrow = new Date(Date.now() + 86400000).toISOString().split("T")[0];
+  const now = new Date();
+  const today = fmt(now);
+  const tomorrowDate = new Date(now);
+  tomorrowDate.setDate(tomorrowDate.getDate() + 1);
+  const tomorrow = fmt(tomorrowDate);
 
   // 当日持久缓存（仅 forceRefresh 时跳过）
   if (!forceRefresh) {
@@ -214,15 +226,19 @@ export async function generateEveningSummary(
   );
 
   // 4. 构建 AI prompt
-  const soulHint = soul?.content ? `\n用户画像: ${soul.content.slice(0, 200)}` : "";
-  const profileHint = profile?.content ? `\n用户偏好: ${profile.content.slice(0, 200)}` : "";
+  const soulBlock = soul?.content
+    ? `\n<user_soul>${soul.content.slice(0, 200)}</user_soul>`
+    : "";
+  const profileBlock = profile?.content
+    ? `\n<user_profile>${profile.content.slice(0, 200)}</user_profile>`
+    : "";
 
   const messages: ChatMessage[] = [
     {
       role: "system",
-      content: `根据数据生成个性化晚间总结。返回纯 JSON，不要 markdown 包裹。${soulHint}${profileHint}
+      content: `根据用户画像生成个性化晚间回顾。返回纯 JSON，不要 markdown 包裹。${soulBlock}${profileBlock}
 {
-  "headline": "≤25字，一句话总结今天，结合用户画像个性化",
+  "headline": "≤30字，基于用户画像的温暖晚间回顾，语气俏皮自然。做了很多→跟他一起开心；什么都没做→'今天就这样了'比'无事项完成'真诚一万倍。绝对不要说'无事项完成''亦无待办遗留'这种公文腔。",
   "accomplishments": ["完成的事，具体到事项名"],
   "tomorrow_preview": ["明日排期/待处理，最多3条"],
   "stats": {"done": 数字, "new_records": 数字}
@@ -273,7 +289,7 @@ export async function generateEveningSummary(
     console.error(`[daily-loop] AI summary generation failed: ${err.message}`);
 
     const fallback: SummaryResult = {
-      headline: todayDone.length > 0 ? `今天完成了${todayDone.length}件事` : "安静的一天",
+      headline: todayDone.length > 0 ? `今天搞定了${todayDone.length}件事，不错嘛` : "今天就这样了，也挺好的",
       accomplishments: todayDone.slice(0, 5).map((t) => t.text),
       tomorrow_preview: tomorrowScheduled.slice(0, 3).map((t) => t.text),
       stats: { done: todayDone.length, new_records: newRecordCount },

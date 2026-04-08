@@ -16,6 +16,7 @@ id: "NNN"
 title: ""
 status: draft            # draft | active | completed | superseded | deprecated
 domain: ""               # todo | chat | auth | cognitive | agent | ui | infra | voice | onboarding | report | design | goal
+risk: medium             # low（纯UI/已有模式）| medium（新功能/bug修复）| high（新模块/数据模型变更/跨模块）
 dependencies: []         # 例如 ["003-auth.md", "012-voice-routing.md"]
 superseded_by: null       # 被哪个 spec 替代，例如 "020-todo-system.md"
 created: YYYY-MM-DD
@@ -53,6 +54,17 @@ updated: YYYY-MM-DD
 那么 (Then)   [系统应如何优雅处理]
 并且 (And)    [不应发生什么]
 ```
+
+## 验收行为（E2E 锚点）
+
+> 以下描述纯用户视角的操作路径，不涉及内部实现，用于生成独立的 E2E 测试。
+> E2E 测试必须在实现代码之前生成，且实现阶段禁止修改 E2E 测试。
+
+### 行为 1: [用户操作描述]
+1. 用户打开 [页面]
+2. 用户 [操作]
+3. 页面应显示 [预期结果]
+4. 刷新后 [持久化预期]
 
 ## 边界条件
 - [ ] 空输入

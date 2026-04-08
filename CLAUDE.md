@@ -31,7 +31,7 @@ v2note/
 
 ## 🔴 核心开发流程（Spec-Driven Development）
 
-**所有新功能和 bug 修复，必须遵循以下 5 阶段流程：**
+**所有新功能和 bug 修复，必须遵循以下 6 阶段流程：**
 
 ### Phase 1: 读取 Spec
 1. **必须**先用工具读取 `specs/INDEX.md`，按 domain 查找是否已有 active/draft 状态的 spec
@@ -45,35 +45,116 @@ v2note/
 对于 bug 修复任务，不要污染功能 spec，采用**临时 spec → 修复 → 回写**的流程：
 1. 在 `specs/` 下创建临时 spec 文件，命名 `fix-<简述>.md`，status 设为 `active`，记录 bug 现象、复现条件、修复方案
 2. 按正常 Phase 2-4 流程修复（写测试 → 实现 → 验证）
-3. 修复完成后，将修复结果（场景 + 边界条件）**回写到对应的模块 spec** 中（如 `todo-core.md`、`chat-system.md`）
-4. 临时 fix spec 标记为 `status: completed`，不再维护
-5. 同步更新 `INDEX.md`（添加时放 Active，完成后移到 Completed）
+3. ⚠️ **回归测试强制**：每个 bug 修复**必须**留下至少一个永久性测试用例，测试用例的 describe 块中标注 `regression: fix-<简述>`，确保该 bug 永远不会回归
+4. 修复完成后，将修复结果（场景 + 边界条件）**回写到对应的模块 spec** 中（如 `todo-core.md`、`chat-system.md`）
+5. 临时 fix spec 标记为 `status: completed`，不再维护
+6. 同步更新 `INDEX.md`（添加时放 Active，完成后移到 Completed）
 
-### Phase 2: 生成测试（先于实现代码）
-1. 根据 spec 中的每个场景，生成对应的测试用例
-2. 前端测试放在对应 feature 目录内：`features/xxx/xxx.test.ts`
-3. 后端/纯逻辑测试放在 `gateway/src/` 对应目录内
+### Phase 1b: Spec 审查（Agent 自审）
+1. Spec 写完后，**立即**用 `code-review-global` Agent 审查 spec 变更
+2. 审查要点：场景完整性、边界条件覆盖、与现有 spec 的一致性、接口约定可行性
+3. 主 Agent 根据审查结果修改 spec
+4. 修改完成后，将 spec 展示给用户确认
+5. ⚠️ 用户看到的 spec 必须已经经过审查和修正，不要让用户替你找问题
+
+### Phase 2a: 生成 E2E 验收测试（独立于实现）
+1. 从 spec 的「验收行为（E2E 锚点）」部分，生成 E2E 测试到 `e2e/` 目录
+2. E2E 测试只描述**用户可见的操作和结果**，不涉及内部实现细节
+3. 这一步必须在写任何实现代码之前完成
+4. **生成 E2E 测试后暂停，等待用户确认是否准确反映验收标准**
+5. ⚠️ 后续实现阶段**禁止修改 E2E 测试**，只能让代码通过它
+
+### Phase 2b: 生成单元测试 + 实现代码（sdd-implementer Agent）
+**必须使用 `sdd-implementer` Agent 执行此阶段**，确保实现与 E2E 测试的上下文完全隔离。
+1. 调用 sdd-implementer Agent，传入 spec 文件路径
+2. Agent 独立读取 spec + CLAUDE.md + 相关代码，**禁止读取 e2e/ 目录**
+3. Agent 为每个场景生成单元测试（`features/xxx/xxx.test.ts` 或 `gateway/src/`）
 4. 命名格式：`should_[期望行为]_when_[条件]`
-5. **生成测试后暂停，等待用户确认测试是否准确反映需求**
+5. Agent 运行测试确认失败（红色），然后编写最小实现让测试通过
+6. Agent 完成后返回实现报告，主 Agent 检查异常后进入 Phase 3
+7. 如果是 `risk: low` 的任务，可跳过用户确认，直接进入实现
 
-### Phase 3: 实现代码
-1. 运行测试确认全部失败（红色阶段）
-2. 编写最小实现让测试通过
-3. 每完成一个测试用例就运行一次测试
+### Phase 3: 对抗性审查（code-review-global Agent）
+**必须使用 `code-review-global` Agent 执行此阶段**，确保审查视角独立于实现。
+1. 用 code-review-global Agent 审查本次 diff
+2. 审查重点：可能的 bug、未覆盖的边界条件、E2E 测试未捕获的失败路径
+3. 如果发现问题 → 主 Agent 补充测试用例 → 修复代码 → 重新验证
+4. 审查结果记录在本次任务的输出中
 
 ### Phase 4: 验证循环
-1. 运行 `pnpm test` 或 `npm run verify`
-2. 如果测试失败：
-   - 分析失败原因（读取错误输出）
-   - 修改实现代码（不是修改测试！）
+1. 运行 `pnpm test` 或 `npm run verify`（**全量**单元测试 → tsc → eslint）
+   - ⚠️ 必须跑全量测试，不能只跑当前 feature 的测试。全量测试是回归防护网。
+2. 运行 `npx playwright test`（**全量** E2E 验收测试）
+   - ⚠️ 同理，必须跑全部 E2E，确保新改动没有破坏已有功能。
+3. 如果测试失败：
+   - 先区分：是**当前 feature 的测试**失败，还是**其他模块的回归测试**失败
+   - 回归测试失败 → 说明本次改动引入了回归 bug，优先修复，**不得删除或修改已有回归测试**
+   - 当前 feature 测试失败 → 修改实现代码（不是修改测试！不是修改 E2E！）
    - 重新运行测试
    - 最多循环 5 次
-3. 如果 5 次后仍有失败，向用户报告具体问题
-4. 全部通过后，运行 TypeScript 类型检查
+4. 如果 5 次后仍有失败，向用户报告具体问题
+5. 全部通过后，运行 TypeScript 类型检查
 
 ### Phase 5: 收尾
 1. 更新 spec 状态为 ✅ completed
 2. 如果实现过程中发现 spec 遗漏的场景，补充到 spec 中
+3. 如果是 bug 修复，必须在 `specs/buglog.md` 追加一条记录
+4. 如果本次实现中出现过测试失败→修复的循环，分析根因并沉淀：
+   - 是 spec 描述不清？→ 改进 spec 对应部分
+   - 是 Agent 理解偏差？→ 追加到本文件「已知陷阱」部分
+   - 是测试覆盖不足？→ 追加边界场景到 spec
+
+### Phase 6: 流程回顾（用户参与）
+
+每次任务完成后，向用户展示简要回顾：
+
+1. **本次执行摘要**：
+   - spec 名称 + 改动文件数 + 测试数量
+   - 验证循环次数（重试了几次）
+   - E2E 通过/失败情况
+   - 对抗性审查发现的问题数
+
+2. **流程问题自检**（Agent 自评）：
+   - 哪个阶段耗时最长？是否有重复劳动？
+   - spec 是否足够清晰支撑实现？
+   - 测试是否真正覆盖了用户意图？
+
+3. **用户反馈**：
+   - 用户评估本次流程是否顺畅，指出需要改进的环节
+   - 如果用户提出流程改进建议 → **直接修改 CLAUDE.md 对应规则**
+
+4. **改进记录**：
+   - 将本次流程改进写入 `specs/buglog.md`（标注为「流程改进」类型）
+
+## 📋 Bug Log 机制
+
+1. 每次 bug 修复完成后，必须在 `specs/buglog.md` 追加一条记录（格式见该文件）
+2. 每天首次开始任务时，检查 buglog.md 中「已提炼: ❌」的条目：
+   - 如果同类 bug 出现 2 次以上 → 提炼为通用规则，写入下方「已知陷阱」
+   - 如果某条教训具有通用性（不限于特定 bug）→ 立即提炼
+3. 提炼后将对应条目标记为「已提炼: ✅」
+
+## 🛡️ 已知陷阱（从历史错误中沉淀）
+
+每次功能验收失败或 bug 修复后，如果教训具有通用性，必须在此追加一条规则：
+- 格式：`- [领域] 具体规则描述 (来源: fix-xxx.md 或日期)`
+- 规则应具体可执行，不要写泛泛的"注意 xxx"
+
+（随项目迭代持续积累，以下为初始条目）
+- [测试] 禁止同一个 Agent 在同一上下文中既写实现又写 E2E 测试，防止"自我对齐"假绿
+- [共享组件] 修改任何被 2+ 个 feature 引用的组件前，必须 grep 所有引用方并在 spec 中列出影响范围
+- [删除操作] spec 中涉及删除必须明确标注 soft/hard delete，默认 soft
+- [回归] Phase 4 必须跑全量测试，不能只跑当前 feature；回归测试失败优先级高于新 feature 测试失败 (来源: 2026-04-08 流程讨论)
+- [流程] Phase 1b spec 审查必须前台等待结果，禁止后台化与实现并行。审查的价值是拦截 spec 偏差，后台化等于跳过审查 (来源: 2026-04-08 fix-tag-overflow)
+- [日期] gateway 中日期计算禁止使用 `toISOString().split("T")[0]`（返回 UTC）和 `created_at.split("T")[0]`（DB 可能返回 UTC ISO）。必须使用 `lib/tz.ts` 导出函数：`today()`, `daysAgo(n)`, `toLocalDate(d)`, `todayRange()`, `dayRange()`, `weekRange()`, `monthRange()`。tz.ts 硬编码 Asia/Shanghai 不依赖 process.env.TZ。DB 连接池已设 `SET timezone = 'Asia/Shanghai'` (来源: fix-timezone-systematic)
+- [模板] 共享 prompt 模板（如 `templates.ts`）有多个消费者时，更新占位符必须同步更新所有消费者的 `.replace()` 逻辑，否则 AI 会收到未替换的 `{变量名}` 字面量 (来源: fix-morning-briefing)
+
+## 🎯 风险分级
+
+Spec frontmatter 中的 `risk` 字段决定流程自动化程度：
+- `risk: low`（纯 UI 样式、已有模式重复）→ 跳过用户确认测试步骤，全自动跑完出报告
+- `risk: medium`（新功能到已有模块、bug 修复）→ 正常 SDD 流程，默认值
+- `risk: high`（新模块、数据模型变更、跨模块交互）→ 每个 Phase 都需要用户确认
 
 ## 🧪 测试规范
 

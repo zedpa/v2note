@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { today } from "../lib/tz.js";
 
 vi.mock("../ai/provider.js", () => ({
   chatCompletion: vi.fn().mockResolvedValue({ content: "Summary line 1\nSummary line 2" }),
@@ -51,11 +52,11 @@ describe("diary manager", () => {
     });
 
     it("uses today's date", async () => {
-      const today = new Date().toISOString().split("T")[0];
+      const todayStr = today();
       await appendToDiary("dev-1", "ai-self", "AI observation");
 
       const [, , date] = vi.mocked(aiDiaryRepo.upsertEntry).mock.calls[0];
-      expect(date).toBe(today);
+      expect(date).toBe(todayStr);
     });
   });
 

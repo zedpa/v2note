@@ -18,6 +18,8 @@ import { chatMessageRepo } from "../db/repositories/index.js";
 import { createDefaultRegistry } from "../tools/definitions/index.js";
 import type { ToolContext } from "../tools/types.js";
 import { mayProfileUpdate } from "../lib/text-utils.js";
+import { fmt, formatDateWithRelative } from "../lib/date-anchor.js";
+import { today, daysAgo } from "../lib/tz.js";
 import { shouldUpdateSoulStrict } from "../cognitive/self-evolution.js";
 import { gatherDecisionContext, buildDecisionPrompt } from "../cognitive/decision.js";
 import { generateAlerts } from "../cognitive/alerts.js";
@@ -202,7 +204,7 @@ export async function initChat(
       for (const t of transcripts) {
         const record = records.find((r) => r.id === t.record_id);
         const date = record
-          ? new Date(record.created_at).toLocaleDateString("zh-CN")
+          ? formatDateWithRelative(new Date(record.created_at))
           : "";
         const entry = `[${date}] ${t.text}`;
         if (joined.length + entry.length > MAX_TRANSCRIPT_CHARS) {
@@ -258,7 +260,7 @@ export async function initChat(
         : await pendingIntentRepo.findPendingByDevice(payload.deviceId);
       if (pendingIntents.length > 0) {
         const lines = pendingIntents.slice(0, 5).map((pi) => {
-          const date = new Date(pi.created_at).toLocaleDateString("zh-CN");
+          const date = formatDateWithRelative(new Date(pi.created_at));
           return `- [${pi.intent_type}] "${pi.text}"${pi.context ? ` (${pi.context})` : ""} (${date}, id: ${pi.id})`;
         });
         pendingIntentContext = `\n## 待确认意图\n以下是用户近期提到但未确认的愿望/目标，在对话中自然地跟进（不要一开口就问，找合适时机）：\n${lines.join("\n")}\n不要逐条审问用户，自然聊天中确认即可。确认后使用 confirm 工具处理。`;
@@ -309,11 +311,23 @@ export async function initChat(
           content: `[历史对话摘要]\n${summaryText}`,
         });
       }
-      // 2. 加载最近 20 条未压缩消息
+      // 2. 加载最近 20 条未压缩消息（按时间正序注入，跨天插入日期分隔）
       const recentMessages = await chatMessageRepo.getUncompressedMessages(payload.userId, 20);
-      // 按时间正序注入
+      const nowDate = new Date();
+      let lastDateStr = "";
       for (const msg of recentMessages.reverse()) {
         if (msg.role === "user" || msg.role === "assistant") {
+          // 检测日期切换，插入分隔标记
+          const msgDate = new Date(msg.created_at);
+          const msgDateStr = fmt(msgDate);
+          if (msgDateStr !== lastDateStr) {
+            const label = formatDateWithRelative(msgDate, nowDate);
+            session.context.addMessage({
+              role: "system",
+              content: `[以下是 ${label} 的对话]`,
+            });
+            lastDateStr = msgDateStr;
+          }
           session.context.addMessage({ role: msg.role, content: msg.content });
         }
       }
@@ -340,15 +354,14 @@ async function prefetchDeepSkillContext(
   deviceId: string,
 ): Promise<string> {
   const parts: string[] = [];
-  const now = new Date();
-  const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
-  const today = now.toISOString().split("T")[0];
+  const weekAgo = daysAgo(7);
+  const todayStr = today();
 
   // 1. 最近 7 天日记
   try {
     const records = userId
-      ? await recordRepo.findByUserAndDateRange(userId, `${weekAgo}T00:00:00`, `${today}T23:59:59`)
-      : await recordRepo.findByDeviceAndDateRange(deviceId, `${weekAgo}T00:00:00`, `${today}T23:59:59`);
+      ? await recordRepo.findByUserAndDateRange(userId, `${weekAgo}T00:00:00`, `${todayStr}T23:59:59`)
+      : await recordRepo.findByDeviceAndDateRange(deviceId, `${weekAgo}T00:00:00`, `${todayStr}T23:59:59`);
     if (records.length > 0) {
       const recordIds = records.map(r => r.id);
       const transcripts = await transcriptRepo.findByRecordIds(recordIds);
@@ -356,7 +369,7 @@ async function prefetchDeepSkillContext(
         let joined = "";
         for (const t of transcripts) {
           const record = records.find(r => r.id === t.record_id);
-          const date = record ? new Date(record.created_at).toLocaleDateString("zh-CN") : "";
+          const date = record ? formatDateWithRelative(new Date(record.created_at)) : "";
           const entry = `[${date}] ${t.text}`;
           if (joined.length + entry.length > MAX_TRANSCRIPT_CHARS) {
             joined += `\n...（已截断，共${transcripts.length}条记录）`;
@@ -377,7 +390,7 @@ async function prefetchDeepSkillContext(
     if (todos.length > 0) {
       const lines = todos.slice(0, 15).map(t => {
         const dueInfo = t.scheduled_start
-          ? ` (${new Date(t.scheduled_start).toLocaleDateString("zh-CN")})`
+          ? ` (${fmt(new Date(t.scheduled_start))})`
           : "";
         return `- ${t.text}${dueInfo}`;
       });

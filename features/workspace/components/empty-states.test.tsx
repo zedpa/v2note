@@ -32,13 +32,13 @@ describe("empty-state text verification", () => {
     expect(src).toContain("/ 5");
   });
 
-  // 场景 6: 侧边栏方向区 — 温暖文案
-  it("should_have_warm_sidebar_direction_empty_text", () => {
+  // 场景 6: 侧边栏 — 自动归类文件夹（方向区已重构为分类视图）
+  it("should_have_auto_categorization_in_sidebar", () => {
     const src = readFileSync(
       resolve(__dirname, "../../sidebar/components/sidebar-drawer.tsx"),
       "utf-8",
     );
-    expect(src).toContain("持续记录后，AI 会发现你的关注方向");
+    expect(src).toContain("自动归类");
     expect(src).not.toContain("暂无数据");
   });
 });

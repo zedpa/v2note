@@ -29,7 +29,7 @@ export function useTodoStore() {
 
   // ===== 数据获取 =====
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (): Promise<boolean> => {
     try {
       setLoading(true);
       setError(null);
@@ -42,8 +42,10 @@ export function useTodoStore() {
 
       setAllTodos(todosData);
       setProjects(projectsData);
+      return true;
     } catch (e: any) {
       setError(e.message ?? "加载待办失败");
+      return false;
     } finally {
       setLoading(false);
     }

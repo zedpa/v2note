@@ -25,6 +25,24 @@ function addDays(base: Date, n: number): Date {
  * - "这周六" → 本周六；若今天已过周六 → 下周六
  * - "下周X" → 下一个自然周的周X
  */
+/**
+ * 格式化日期并附带相对标记（今天/昨天）。
+ * 用于 AI 上下文注入，让 AI 直观判断时间关系。
+ */
+export function formatDateWithRelative(date: Date, today?: Date): string {
+  const ref = today ?? new Date();
+  const dateStr = fmt(date);
+  const todayStr = fmt(ref);
+
+  const yesterday = new Date(ref);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yesterdayStr = fmt(yesterday);
+
+  if (dateStr === todayStr) return `${dateStr} 今天`;
+  if (dateStr === yesterdayStr) return `${dateStr} 昨天`;
+  return dateStr;
+}
+
 export function buildDateAnchor(referenceDate?: Date): string {
   const now = referenceDate ?? new Date();
   const today = fmt(now);

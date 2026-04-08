@@ -5,6 +5,7 @@
  */
 
 import { query } from "../db/pool.js";
+import { today } from "../lib/tz.js";
 
 export interface CognitiveReport {
   today_strikes: {
@@ -30,8 +31,6 @@ export interface CognitiveReport {
   };
   is_empty: boolean;
 }
-
-const today = () => new Date().toISOString().split("T")[0];
 
 export async function generateCognitiveReport(
   opts: { userId?: string; deviceId?: string },

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 // ViewMode type is exported for use by workspace-header
 import { useTodoStore } from "../hooks/use-todo-store";
 import { useViewedDates } from "../hooks/use-viewed-dates";
@@ -15,10 +15,17 @@ export type ViewMode = "time" | "project";
 interface TodoWorkspaceProps {
   onOpenChat?: (message: string) => void;
   viewMode?: ViewMode;
+  /** 注册刷新函数，供父组件调用（下拉刷新） */
+  onRegisterRefresh?: (fn: () => Promise<boolean>) => void;
 }
 
-export function TodoWorkspace({ onOpenChat, viewMode = "time" }: TodoWorkspaceProps) {
+export function TodoWorkspace({ onOpenChat, viewMode = "time", onRegisterRefresh }: TodoWorkspaceProps) {
   const store = useTodoStore();
+
+  // 注册刷新函数供父组件调用（下拉刷新）
+  useEffect(() => {
+    onRegisterRefresh?.(() => store.refresh());
+  }, [onRegisterRefresh, store.refresh]);
   const { viewedDates, markViewed } = useViewedDates();
   const [editTodo, setEditTodo] = useState<TodoDTO | null>(null);
   const [editOpen, setEditOpen] = useState(false);
@@ -45,7 +52,7 @@ export function TodoWorkspace({ onOpenChat, viewMode = "time" }: TodoWorkspacePr
       const todo = store.allTodos.find((t) => t.id === id);
       showUndoToast({
         message: `已推迟「${todo?.text?.slice(0, 15) ?? "待办"}」到明天`,
-        onUndo: () => store.refresh(),
+        onUndo: () => { store.refresh(); },
       });
     },
     [store],

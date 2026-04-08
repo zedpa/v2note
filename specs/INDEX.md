@@ -10,7 +10,7 @@
 6. superseded 状态的 spec 已被合并，永远不要引用它们，使用 superseded_by 指向的文件
 -->
 
-> 最后更新：2026-04-06 | 共 93 个 spec（22 active / 4 draft / 37 completed / 29 superseded / 2 deprecated）
+> 最后更新：2026-04-08 | 共 94 个 spec（21 active / 5 draft / 38 completed / 29 superseded / 2 deprecated）
 
 ## 🔵 Active（当前有效，可直接引用和修改）
 
@@ -34,7 +34,7 @@
 | 112 | Recording Resilience — 录音防丢 | voice | recording-resilience.md | 本地缓存+断线重试+连接保护 |
 | 114 | 录音入口统一 | voice | voice-input-unify.md | 删InputBar死代码 + ChatView接gateway ASR + useVoiceToText hook |
 | 117 | 工具生态增强 | agent | tool-ecosystem-enhance.md | 读取工具+时间感知+认知层查询+描述优化 |
-| fix-rec-ui | Fix: 录音 UI 精简 | voice | fix-recording-ui.md | 长按半屏面板 + 常驻呼吸浮窗 |
+| 119 | 认知 Wiki — 从原子拆解到知识编译 | cognitive | cognitive-wiki.md | Wiki编译替代Strike拆解+Cluster聚类，自顶向下拆分 |
 
 ## 🟡 Draft（规划中，尚未开始实施）
 
@@ -50,6 +50,7 @@
 | id | title | domain | file |
 |----|-------|--------|------|
 | fix-tag-limit | Fix: 标签系统清理 — 删除系统标签+限制5个 | cognitive | fix-tag-limit.md |
+| fix-tag-overflow | Fix: AI 标签超限+strike_tag弃用 | cognitive | fix-tag-overflow.md |
 | 118 | Chat Persistence — 对话持久化 | chat | chat-persistence.md |
 | 052 | Cold Start & Onboarding | onboarding | cold-start.md |
 | 053a | Daily Report — Core | report | daily-report-core.md |
@@ -93,6 +94,14 @@
 | 113 | 键盘弹出 & Viewport 适配 | ui | keyboard-viewport-adapt.md |
 | 115 | 产品重新定位 — 核心体验精简 | ui | product-repositioning.md |
 | 116 | Chat 工具调用 UI 重构 | chat | chat-tool-ui.md |
+| fix-rec-ui | Fix: 录音 UI 精简 | voice | fix-recording-ui.md |
+| fix-chat-intent | Fix: 复合日记意图误判为查询指令 | agent | fix-chat-intent.md |
+| fix-ai-memory-time | Fix: AI 记忆时间错乱 | cognitive | fix-ai-memory-time.md |
+| fix-agent-tool-behavior | Fix: AI 工具调用异常 | agent | fix-agent-tool-behavior.md |
+| fix-daily-report-notify | Fix: 早报通知未持久化+重复发送 | report | fix-daily-report-notify.md |
+| fix-morning-briefing | Fix: 早报时区错位+问候语风格 | report | fix-morning-briefing.md |
+| fix-calendar-swipe | Fix: 日历滑动与Tab切换手势冲突 | ui | fix-calendar-swipe-conflict.md |
+| fix-tz | Fix: 系统性时区问题 | infra | fix-timezone-systematic.md |
 
 ## ⛔ Superseded（已被合并，不要引用）
 

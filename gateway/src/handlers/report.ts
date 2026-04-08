@@ -7,6 +7,10 @@ import { chatCompletion, type ChatMessage } from "../ai/provider.js";
 import { todoRepo, recordRepo } from "../db/repositories/index.js";
 import { toDateString } from "./daily-loop.js";
 import { MORNING_PROMPT, EVENING_PROMPT } from "../prompts/templates.js";
+import { fmt } from "../lib/date-anchor.js";
+import { dayRange } from "../lib/tz.js";
+import { loadSoul } from "../soul/manager.js";
+import { loadProfile } from "../profile/manager.js";
 
 // ── Mode 路由 ──
 
@@ -34,15 +38,22 @@ export async function generateMorningReport(
   userId?: string,
 ): Promise<any> {
   const now = new Date();
-  const today = now.toISOString().split("T")[0];
-  const yesterday = new Date(now.getTime() - 86400000).toISOString().split("T")[0];
+  const today = fmt(now);
+  const yesterdayDate = new Date(now);
+  yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+  const yesterday = fmt(yesterdayDate);
 
-  const [pendingTodos, yesterdayStats] = await Promise.all([
+  const [pendingTodos, yesterdayStats, soul, profile] = await Promise.all([
     (userId ? todoRepo.findPendingByUser(userId) : todoRepo.findPendingByDevice(deviceId)).catch(() => []),
-    (userId
-      ? todoRepo.countByUserDateRange(userId, `${yesterday}T00:00:00Z`, `${yesterday}T23:59:59Z`)
-      : todoRepo.countByDateRange(deviceId, `${yesterday}T00:00:00Z`, `${yesterday}T23:59:59Z`)
-    ).catch(() => ({ done: 0, total: 0 })),
+    (() => {
+      const yd = dayRange(yesterday);
+      return (userId
+        ? todoRepo.countByUserDateRange(userId, yd.start, yd.end)
+        : todoRepo.countByDateRange(deviceId, yd.start, yd.end)
+      ).catch(() => ({ done: 0, total: 0 }));
+    })(),
+    loadSoul(deviceId, userId).catch(() => null),
+    loadProfile(deviceId, userId).catch(() => null),
   ]);
 
   const todayScheduled = pendingTodos.filter((t) =>
@@ -57,10 +68,14 @@ export async function generateMorningReport(
     : "暂无待办";
 
   const statsText = `done: ${yesterdayStats.done}, total: ${yesterdayStats.total}`;
+  const soulText = soul?.content ? soul.content.slice(0, 200) : "";
+  const profileText = profile?.content ? profile.content.slice(0, 200) : "";
 
   const systemPrompt = MORNING_PROMPT
     .replace("{pendingTodos}", pendingText)
-    .replace("{yesterdayStats}", statsText);
+    .replace("{yesterdayStats}", statsText)
+    .replace("{soul}", soulText)
+    .replace("{profile}", profileText);
 
   const messages: ChatMessage[] = [
     { role: "system", content: systemPrompt },
@@ -98,12 +113,16 @@ export async function generateEveningReport(
   userId?: string,
 ): Promise<any> {
   const now = new Date();
-  const today = now.toISOString().split("T")[0];
-  const tomorrow = new Date(now.getTime() + 86400000).toISOString().split("T")[0];
+  const today = fmt(now);
+  const tomorrowDate = new Date(now);
+  tomorrowDate.setDate(tomorrowDate.getDate() + 1);
+  const tomorrow = fmt(tomorrowDate);
 
-  const [allTodos, pendingTodos] = await Promise.all([
+  const [allTodos, pendingTodos, soul, profile] = await Promise.all([
     (userId ? todoRepo.findByUser(userId) : todoRepo.findByDevice(deviceId)).catch(() => []),
     (userId ? todoRepo.findPendingByUser(userId) : todoRepo.findPendingByDevice(deviceId)).catch(() => []),
+    loadSoul(deviceId, userId).catch(() => null),
+    loadProfile(deviceId, userId).catch(() => null),
   ]);
 
   const todayDone = allTodos.filter(
@@ -130,10 +149,15 @@ export async function generateEveningReport(
 
   const pendingText = pendingTodos.slice(0, 5).map((t) => `- ${t.text}`).join("\n") || "无";
 
+  const soulText = soul?.content ? soul.content.slice(0, 200) : "";
+  const profileText = profile?.content ? profile.content.slice(0, 200) : "";
+
   const systemPrompt = EVENING_PROMPT
     .replace("{todayDone}", doneText)
     .replace("{todayPending}", pendingText)
-    .replace("{newRecordCount}", String(newRecordCount));
+    .replace("{newRecordCount}", String(newRecordCount))
+    .replace("{soul}", soulText)
+    .replace("{profile}", profileText);
 
   const messages: ChatMessage[] = [
     { role: "system", content: systemPrompt },

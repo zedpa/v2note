@@ -15,6 +15,14 @@ export interface LocalConfigPayload {
 
 export type SourceContext = "todo" | "timeline" | "chat" | "review";
 
+/** 按页面上下文定义可用的 command 类型白名单，后续由 localConfig 覆盖 */
+const DEFAULT_COMMAND_WHITELIST: Record<string, string[]> = {
+  timeline: ["create_todo", "modify_todo"],
+  todo: ["create_todo", "complete_todo", "modify_todo", "query_todo"],
+  chat: ["create_todo", "complete_todo", "modify_todo", "query_todo"],
+  review: ["create_todo", "modify_todo"],
+};
+
 export interface ProcessPayload {
   text: string;
   audioUrl?: string;
@@ -313,9 +321,9 @@ export async function processEntry(payload: ProcessPayload): Promise<ProcessResu
       );
     }
 
-    // 6. 保存 tags → record_tag
+    // 6. 保存 tags → record_tag（最多5个）
     if (parsed.tags && parsed.tags.length > 0 && payload.recordId) {
-      for (const label of parsed.tags) {
+      for (const label of parsed.tags.slice(0, 5)) {
         try {
           const tag = await tagRepo.upsert(label);
           await tagRepo.addToRecord(payload.recordId, tag.id);
@@ -344,10 +352,14 @@ export async function processEntry(payload: ProcessPayload): Promise<ProcessResu
       }
     }
 
-    // 8. 处理指令（action/mixed 时）
-    if ((intentType === "action" || intentType === "mixed") && parsed.commands && parsed.commands.length > 0) {
+    // 8. 处理指令（仅 action 时，mixed 已废弃 → 归入 record）
+    // 按页面上下文过滤可用的 command 类型
+    const whitelist = DEFAULT_COMMAND_WHITELIST[payload.sourceContext ?? "timeline"] ?? ["create_todo", "modify_todo"];
+    const filteredCommands = (parsed.commands ?? []).filter(cmd => whitelist.includes(cmd.action_type));
+
+    if (intentType === "action" && filteredCommands.length > 0) {
       const actionResults: ActionExecResult[] = [];
-      for (const cmd of parsed.commands) {
+      for (const cmd of filteredCommands) {
         try {
           const actionResult = await executeVoiceAction(
             {
@@ -372,7 +384,7 @@ export async function processEntry(payload: ProcessPayload): Promise<ProcessResu
       result.action_results = actionResults;
 
       // 转为 todo_commands 格式，供 CommandSheet 显示
-      result.todo_commands = parsed.commands.map(cmd => ({
+      result.todo_commands = filteredCommands.map(cmd => ({
         action_type: cmd.action_type as any,
         confidence: cmd.confidence,
         target_hint: cmd.target_hint,

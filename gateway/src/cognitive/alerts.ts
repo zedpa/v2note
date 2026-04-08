@@ -3,6 +3,7 @@
  */
 
 import { query } from "../db/pool.js";
+import { toLocalDate } from "../lib/tz.js";
 import type { StrikeEntry } from "../db/repositories/strike.js";
 import type { BondEntry } from "../db/repositories/bond.js";
 
@@ -26,8 +27,7 @@ interface RecentContradiction extends BondEntry {
 }
 
 function formatDate(dateStr: string): string {
-  const d = new Date(dateStr);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  return toLocalDate(dateStr);
 }
 
 export async function generateAlerts(

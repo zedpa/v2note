@@ -9,8 +9,6 @@ import { chatCompletion, type ChatMessage } from "../ai/provider.js";
 import {
   strikeRepo,
   bondRepo,
-  strikeTagRepo,
-  tagRepo,
   recordRepo,
   transcriptRepo,
   summaryRepo,
@@ -26,12 +24,13 @@ import { mayProfileUpdate, safeParseJson } from "../lib/text-utils.js";
 import { shouldUpdateSoulStrict } from "../cognitive/self-evolution.js";
 import { TIER2_STRIKE_THRESHOLD } from "../cognitive/batch-analyze.js";
 import { writeStrikeEmbedding } from "../cognitive/embed-writer.js";
+import { today as tzToday } from "../lib/tz.js";
 
 interface RawStrike {
   nucleus: string;
   polarity: string;
   confidence: number;
-  tags: string[];
+  tags?: string[]; // 已弃用，兼容旧 AI 返回
   field?: Record<string, any>;
 }
 
@@ -201,27 +200,6 @@ export async function digestRecords(
         // 异步写入 embedding（不阻塞主流程）
         void writeStrikeEmbedding(entry.id, s.nucleus);
 
-        // Write tags to strike_tag + record_tag（标签立刻在前端可见）
-        if (s.tags && s.tags.length > 0) {
-          await strikeTagRepo.createMany(
-            s.tags.map((label) => ({
-              strike_id: entry.id,
-              label,
-            })),
-          );
-          // 同步写 record_tag，让时间线立刻展示标签
-          if (validIds[0]) {
-            for (const label of s.tags) {
-              try {
-                const tag = await tagRepo.upsert(label);
-                await tagRepo.addToRecord(validIds[0], tag.id);
-              } catch (_e) {
-                // record_tag 写入失败不阻塞主流程
-              }
-            }
-          }
-        }
-
         // 收集 intend Strike，后面并行投影
         if (s.polarity === "intend") {
           intendEntries.push({ entry, idx: i });
@@ -282,7 +260,7 @@ export async function digestRecords(
 
     // ── Step 7: 记忆/Soul/Profile 更新（Mem0 两阶段） ──────────
     try {
-      const today = new Date().toISOString().split("T")[0];
+      const today = tzToday();
       const session = getSession(context.deviceId);
       const memoryManager = session.memoryManager;
 

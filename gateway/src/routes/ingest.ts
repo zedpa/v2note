@@ -206,7 +206,7 @@ export function registerIngestRoutes(router: Router) {
         await summaryRepo.create({
           record_id: fileRecord.id,
           title: safeFilename,
-          short_summary: parseResult.content.slice(0, 200),
+          short_summary: parseResult.content,
         });
 
         if (parseResult.success) {
@@ -254,7 +254,7 @@ export function registerIngestRoutes(router: Router) {
         await summaryRepo.create({
           record_id: urlRecord.id,
           title,
-          short_summary: extracted.slice(0, 200),
+          short_summary: extracted,
         });
 
         digestRecords([urlRecord.id], { deviceId, userId: userId ?? undefined }).catch(

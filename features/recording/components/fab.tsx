@@ -42,6 +42,8 @@ interface FABProps {
   commandContext?: Partial<CommandContext>;
   activeNotebook?: string | null;
   sourceContext?: "todo" | "timeline" | "chat" | "review";
+  /** 录音状态变化回调（recording/locked 时为 true） */
+  onRecordingChange?: (isRecording: boolean) => void;
 }
 
 export function FAB({
@@ -52,6 +54,7 @@ export function FAB({
   commandContext,
   activeNotebook,
   sourceContext = "timeline",
+  onRecordingChange,
 }: FABProps) {
   const [showTextSheet, setShowTextSheet] = useState(false);
   const [displayDuration, setDisplayDuration] = useState(0);
@@ -246,6 +249,18 @@ export function FAB({
           // 全局管道：终态
           if (pipelineIdRef.current) { endAiPipeline(pipelineIdRef.current); pipelineIdRef.current = null; }
           break;
+        case "tool.done": {
+          // 数据变更类工具执行完后，刷新前端列表
+          const dataTools = new Set([
+            "manage_folder", "move_record", "create_record", "update_record",
+            "delete_record", "create_todo", "update_todo", "delete_todo",
+            "create_goal", "update_goal", "update_user_info",
+          ]);
+          if (dataTools.has(msg.payload.toolName)) {
+            emit("recording:processed");
+          }
+          break;
+        }
         case "error":
           setProcessing((was) => {
             if (was) fabNotify.error("处理失败");
@@ -601,6 +616,11 @@ export function FAB({
       stopPreCapture();
     }
   }, [phase, recorder.isActive, stopPreCapture]);
+
+  // 向父组件报告录音状态
+  useEffect(() => {
+    onRecordingChange?.(phase === "recording" || phase === "locked");
+  }, [phase, onRecordingChange]);
 
   useEffect(() => {
     return () => {

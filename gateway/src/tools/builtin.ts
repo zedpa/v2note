@@ -547,7 +547,7 @@ async function handleIngest(
   await summaryRepo.create({
     record_id: record.id,
     title,
-    short_summary: finalText.slice(0, 200),
+    short_summary: finalText,
   });
 
   // Trigger digest in background

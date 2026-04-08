@@ -50,6 +50,8 @@ import { UpdateDialog } from "@/shared/components/update-dialog";
 import { NotificationCenter } from "@/features/notifications/components/notification-center";
 import type { AppNotification } from "@/features/notifications/hooks/use-notifications";
 import { AnimatePresence, motion } from "framer-motion";
+import { usePullToRefresh } from "@/shared/hooks/use-pull-to-refresh";
+import { PullRefreshIndicator } from "@/components/ui/pull-refresh-indicator";
 
 type OverlayName =
   | "search"
@@ -137,6 +139,23 @@ export default function Page() {
 
   /** null = voice notes timeline, string = diary notebook name */
   const [activeNotebook, setActiveNotebook] = useState<string | null>(null);
+
+  // ── 下拉刷新 ──
+  const mainScrollRef = useRef<HTMLElement>(null);
+  const diaryRefreshRef = useRef<() => Promise<boolean>>(undefined);
+  const todoRefreshRef = useRef<() => Promise<boolean>>(undefined);
+  const [fabRecording, setFabRecording] = useState(false);
+
+  const handlePullRefresh = useCallback(async (): Promise<boolean> => {
+    const fn = activeTab === "diary" ? diaryRefreshRef.current : todoRefreshRef.current;
+    if (!fn) return true;
+    return fn();
+  }, [activeTab]);
+  const pullToRefresh = usePullToRefresh({
+    onRefresh: handlePullRefresh,
+    scrollRef: mainScrollRef,
+    disabled: fabRecording,
+  });
 
   // ── Settings 按用户隔离 ──
   useEffect(() => {
@@ -581,9 +600,13 @@ export default function Page() {
   }, []);
   const handleTouchEnd = useCallback(
     (e: React.TouchEvent) => {
-      // 如果手势发生在可侧滑的待办项内，跳过全局手势，避免冲突
+      // 如果手势发生在可侧滑的待办项或日历区域内，跳过全局手势，避免冲突
       const target = e.target as HTMLElement;
-      if (target.closest?.("[data-testid='swipeable-task-item']")) return;
+      if (
+        target.closest?.("[data-testid='swipeable-task-item']") ||
+        target.closest?.("[data-testid='calendar-strip']") ||
+        target.closest?.("[data-testid='calendar-expand']")
+      ) return;
 
       const dx = e.changedTouches[0].clientX - touchStartX.current;
       const dy = e.changedTouches[0].clientY - touchStartY.current;
@@ -719,22 +742,30 @@ export default function Page() {
 
       {/* 工作区内容: 日记 or 待办 (swipeable) — 保持双 tab 挂载避免切换重载 */}
       <main
+        ref={mainScrollRef}
         className="flex-1 overflow-x-hidden overflow-y-auto"
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
       >
+        <PullRefreshIndicator
+          pullDistance={pullToRefresh.pullDistance}
+          isReady={pullToRefresh.isReady}
+          isRefreshing={pullToRefresh.isRefreshing}
+        />
         <div className={activeTab === "diary" ? "bg-surface-low" : "hidden"}>
           <NotesTimeline
             notebook={activeNotebook}
             domainFilter={domainFilter}
             onOpenChat={handleOpenCommandChat}
             onOpenOverlay={openOverlay}
+            onRegisterRefresh={(fn) => { diaryRefreshRef.current = fn; }}
           />
         </div>
         <div className={activeTab === "todo" ? undefined : "hidden"}>
           <TodoWorkspace
             onOpenChat={handleOpenCommandChat}
             viewMode={todoViewMode}
+            onRegisterRefresh={(fn) => { todoRefreshRef.current = fn; }}
           />
         </div>
       </main>
@@ -758,6 +789,7 @@ export default function Page() {
           showHelp,
           openOverlay,
         }}
+        onRecordingChange={setFabRecording}
       />
 
       {/* CommandSheet — 语音指令确认弹窗 */}

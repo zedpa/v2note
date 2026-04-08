@@ -8,6 +8,7 @@ import { getCommandDefs } from "@/features/commands/lib/registry";
 import { fetchChatHistory, clearChatHistory, type ChatHistoryMessage } from "@/shared/lib/api/chat";
 import * as chatCache from "@/features/chat/lib/chat-cache";
 import type { ChatCacheMessage } from "@/features/chat/lib/chat-cache";
+import { emit } from "@/features/recording/lib/events";
 
 /** 消息内嵌 part 类型 */
 export type MessagePart =
@@ -192,7 +193,7 @@ export function useChat(
         break;
       }
       case "tool.done" as string: {
-        const { callId, success, message: resultMsg, durationMs } = (msg as any).payload;
+        const { toolName, callId, success, message: resultMsg, durationMs } = (msg as any).payload;
         setMessages((prev) => {
           const last = prev[prev.length - 1];
           if (last?.role === "assistant" && last.parts) {
@@ -206,6 +207,15 @@ export function useChat(
           }
           return prev;
         });
+        // 数据变更类工具执行完后，触发前端列表 + 文件夹刷新
+        const dataTools = [
+          "manage_folder", "move_record", "create_record", "update_record",
+          "delete_record", "create_todo", "update_todo", "delete_todo",
+          "create_goal", "update_goal", "update_user_info",
+        ];
+        if (dataTools.includes(toolName)) {
+          emit("recording:processed");
+        }
         break;
       }
       case "chat.done": {

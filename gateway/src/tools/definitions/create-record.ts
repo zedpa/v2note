@@ -13,10 +13,29 @@ export const createRecordTool: ToolDefinition = {
   parameters: z.object({
     content: z.string().min(1).describe("日记正文内容"),
     title: z.string().max(50).optional().describe("标题（可选，不超过50字）"),
+    domain: z.string().optional().describe("分类文件夹路径（可选，如 '工作/v2note'）"),
   }),
   autonomy: "notify",
   handler: async (args, ctx) => {
     const { content, title } = args;
+
+    // 幂等性：60 秒内同用户同内容不重复创建（防 WebSocket 重连重放）
+    try {
+      const recent = await transcriptRepo.findRecentByContent(
+        ctx.userId ?? ctx.deviceId,
+        content,
+        60,
+      );
+      if (recent) {
+        return {
+          success: true,
+          message: `日记已存在（刚刚创建的）: "${(title ?? content).slice(0, 30)}"`,
+          data: { record_id: recent.record_id, title: title ?? content.slice(0, 50) },
+        };
+      }
+    } catch {
+      // 查询失败不阻塞创建
+    }
 
     const record = await recordRepo.create({
       device_id: ctx.deviceId,
@@ -34,8 +53,13 @@ export const createRecordTool: ToolDefinition = {
     await summaryRepo.create({
       record_id: record.id,
       title: title ?? content.slice(0, 50),
-      short_summary: content.slice(0, 200),
+      short_summary: content,
     });
+
+    // 设置分类（如果指定了 domain）
+    if (args.domain) {
+      await recordRepo.updateDomain(record.id, args.domain);
+    }
 
     // 标记为已消化，避免 digest 管道重新处理（工具创建的记录已有完整 summary）
     await recordRepo.markDigested(record.id);

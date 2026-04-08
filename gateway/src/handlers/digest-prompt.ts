@@ -36,7 +36,6 @@ ${dateAnchor}
   - intend: 用户想做的事/想达成的状态（"下季度降低成本"）
   - feel: 用户的情绪（"这事让我不安"）
 - confidence: 0-1
-- tags: string[] — 人名、主题、领域
 
 ## intend 类型的额外字段
 
@@ -75,8 +74,8 @@ ${dateAnchor}
 {
   "domain": "工作/采购",
   "strikes": [
-    {"nucleus": "铝价又涨了5%", "polarity": "perceive", "confidence": 0.9, "tags": ["铝", "成本"]},
-    {"nucleus": "明天下午3点找张总确认报价", "polarity": "intend", "confidence": 0.9, "tags": ["张总", "报价"], "field": {"granularity": "action", "scheduled_start": "（查表获取明天日期）T15:00:00", "person": "张总", "priority": "high"}}
+    {"nucleus": "铝价又涨了5%", "polarity": "perceive", "confidence": 0.9},
+    {"nucleus": "明天下午3点找张总确认报价", "polarity": "intend", "confidence": 0.9, "field": {"granularity": "action", "scheduled_start": "（查表获取明天日期）T15:00:00", "person": "张总", "priority": "high"}}
   ],
   "bonds": [{"source_idx": 0, "target_idx": 1, "type": "triggers", "strength": 0.8}]
 }

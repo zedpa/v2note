@@ -7,6 +7,7 @@ import {
   todoRepo,
   ideaRepo,
 } from "../db/repositories/index.js";
+import { today } from "../lib/tz.js";
 
 export function registerExportRoutes(router: Router) {
   router.get("/api/v1/export", async (req, res, _params, query) => {
@@ -41,7 +42,7 @@ export function registerExportRoutes(router: Router) {
       }));
       sendJson(res, {
         content: JSON.stringify({ records: data, todos, ideas }, null, 2),
-        filename: `v2note-export-${new Date().toISOString().split("T")[0]}.json`,
+        filename: `v2note-export-${today()}.json`,
       });
     } else if (format === "md") {
       const lines = records.map((r) => {
@@ -51,7 +52,7 @@ export function registerExportRoutes(router: Router) {
       });
       sendJson(res, {
         content: lines.join("\n---\n\n"),
-        filename: `v2note-export-${new Date().toISOString().split("T")[0]}.md`,
+        filename: `v2note-export-${today()}.md`,
       });
     } else {
       // CSV
@@ -64,7 +65,7 @@ export function registerExportRoutes(router: Router) {
       });
       sendJson(res, {
         content: header + rows.join("\n"),
-        filename: `v2note-export-${new Date().toISOString().split("T")[0]}.csv`,
+        filename: `v2note-export-${today()}.csv`,
       });
     }
   });

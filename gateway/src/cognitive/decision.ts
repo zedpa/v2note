@@ -13,6 +13,7 @@ import { hybridRetrieve } from "./retrieval.js";
 import { strikeRepo, bondRepo } from "../db/repositories/index.js";
 import { query } from "../db/pool.js";
 import type { StrikeEntry } from "../db/repositories/strike.js";
+import { formatDateWithRelative } from "../lib/date-anchor.js";
 
 export interface DecisionContext {
   /** Relevant strikes with attribution */
@@ -152,7 +153,7 @@ export function buildDecisionPrompt(ctx: DecisionContext): string {
   if (ctx.strikes.length > 0) {
     parts.push(`\n## 相关认知记录`);
     for (const s of ctx.strikes) {
-      const date = new Date(s.created_at).toLocaleDateString("zh-CN");
+      const date = formatDateWithRelative(new Date(s.created_at));
       parts.push(`[strike:${s.id.slice(0, 8)}] (${s.polarity}, ${date}) ${s.nucleus}`);
     }
   }

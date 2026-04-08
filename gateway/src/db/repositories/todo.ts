@@ -1,5 +1,6 @@
 import { query, queryOne, execute } from "../pool.js";
 import { getEmbedding, cosineSimilarity } from "../../memory/embeddings.js";
+import { daysAgo } from "../../lib/tz.js";
 
 export interface Todo {
   id: string;
@@ -339,10 +340,8 @@ export async function getStreak(
 
   // 从昨天开始数连续天
   let streak = 0;
-  const now = new Date();
   for (let i = 1; i <= 30; i++) {
-    const target = new Date(now.getTime() - i * 86400000)
-      .toISOString().split("T")[0];
+    const target = daysAgo(i);
     if (rows.some((r) => r.d.startsWith(target))) {
       streak++;
     } else {

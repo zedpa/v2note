@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useRef, useCallback, useEffect, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { MapPin, Clock, Trash2, X, CheckCircle2, Mic, Paperclip, MoreVertical, Pencil, Copy, RotateCcw, AlertTriangle, HardDrive, Bot, Globe, Quote } from "lucide-react";
+import { MapPin, Clock, Trash2, X, CheckCircle2, Mic, Paperclip, MoreVertical, Pencil, Copy, RotateCcw, AlertTriangle, HardDrive, Bot, Globe, Quote, ChevronUp, ChevronRight, FileText, Image as ImageIcon, Save } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useNotes } from "@/features/notes/hooks/use-notes";
 import { useNoteDetail } from "@/features/notes/hooks/use-note-detail";
@@ -23,6 +23,8 @@ interface NotesTimelineProps {
   domainFilter?: string | null;
   onOpenChat?: (initial?: string) => void;
   onOpenOverlay?: (name: string) => void;
+  /** 注册刷新函数，供父组件调用（下拉刷新） */
+  onRegisterRefresh?: (fn: () => Promise<boolean>) => void;
 }
 
 interface DayGroup {
@@ -42,8 +44,13 @@ function parseDayGroup(dateStr: string): { day: number; monthWeekday: string } {
   return { day, monthWeekday: `${month}月 周${weekday}` };
 }
 
-export function NotesTimeline({ filter, notebook, domainFilter, onOpenChat, onOpenOverlay }: NotesTimelineProps) {
-  const { notes, loading, deleteNotes, updateNote } = useNotes(notebook);
+export function NotesTimeline({ filter, notebook, domainFilter, onOpenChat, onOpenOverlay, onRegisterRefresh }: NotesTimelineProps) {
+  const { notes, loading, deleteNotes, updateNote, refetch } = useNotes(notebook);
+
+  // 注册刷新函数供父组件调用（下拉刷新）
+  useEffect(() => {
+    onRegisterRefresh?.(() => refetch(true));
+  }, [onRegisterRefresh, refetch]);
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [deleting, setDeleting] = useState(false);
@@ -299,6 +306,28 @@ function TimelineCard({
   }> | null>(null);
   const relatedFetched = useRef(false);
 
+  // 原文展开状态（录音/附件卡片内的原文面板）
+  const [transcriptOpen, setTranscriptOpen] = useState(false);
+  // 图片查看器 & 长按菜单
+  const [imageViewerOpen, setImageViewerOpen] = useState(false);
+  const [imageMenuOpen, setImageMenuOpen] = useState(false);
+  const imgTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // 检测正文是否被 line-clamp 截断
+  const contentRef = useRef<HTMLDivElement>(null);
+  const [isClamped, setIsClamped] = useState(false);
+  const canExpandRef = useRef(false);
+  useEffect(() => {
+    const el = contentRef.current;
+    if (!el || expanded) return;
+    setIsClamped(el.scrollHeight > el.clientHeight + 2);
+  }, [note.short_summary, note.title, expanded]);
+
+  // 清理图片长按 timer
+  useEffect(() => {
+    return () => { if (imgTimerRef.current) clearTimeout(imgTimerRef.current); };
+  }, []);
+
   useEffect(() => {
     if (!expanded || relatedFetched.current) return;
     relatedFetched.current = true;
@@ -325,7 +354,7 @@ function TimelineCard({
     if (!longPressTriggered.current) {
       if (selectionMode) {
         onToggleSelect();
-      } else {
+      } else if (canExpandRef.current) {
         setExpanded((prev) => !prev);
       }
     }
@@ -476,7 +505,7 @@ function TimelineCard({
 
   // Only show skeleton if still processing AND no content available yet
   const hasContent = !!(note.short_summary || note.title !== "处理中...");
-  const isProcessing = note.status !== "completed" && note.status !== "error" && note.status !== "failed" && note.status !== "pending_retry" && !hasContent;
+  const isProcessing = note.status !== "completed" && note.status !== "error" && note.status !== "failed" && !hasContent;
 
   if (isProcessing) {
     return (
@@ -501,16 +530,26 @@ function TimelineCard({
     );
   }
 
+  // 判断来源类型
+  const isVoice = !!(note.audio_path || (note.duration_seconds != null && note.duration_seconds > 0));
+  const isImage = note.source === "image" || (note.file_url && /\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i.test(note.file_url));
+  const isFile = !!(note.file_url && !isImage);
+
+  // 有附加内容（录音/附件/图片）或正文被截断时才可展开
+  const canExpand = isVoice || isFile || isImage || isClamped;
+  canExpandRef.current = canExpand;
+
   return (
     <div
+      data-testid="timeline-card"
       role="button"
       tabIndex={0}
-      onPointerDown={handlePointerDown}
-      onPointerUp={handlePointerUp}
-      onPointerLeave={handlePointerLeave}
+      onPointerDown={!expanded ? handlePointerDown : undefined}
+      onPointerUp={!expanded ? handlePointerUp : undefined}
+      onPointerLeave={!expanded ? handlePointerLeave : undefined}
       className={cn(
         "w-full rounded-2xl p-5 text-left transition-all duration-200 select-none",
-        "hover:shadow-md active:scale-[0.98]",
+        !expanded && "hover:shadow-md active:scale-[0.98]",
         "bg-card shadow-sm",
         "animate-card-enter",
         selected && "ring-2 ring-primary bg-primary/5",
@@ -534,18 +573,23 @@ function TimelineCard({
           {/* Meta row: time · duration/type · location · tags + menu button */}
           <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground/70 mb-2 flex-wrap">
             <span className="font-mono tabular-nums">{note.time}</span>
-            {/* 来源图标：AI聊天 / 附件 / 网页 / 摘录 */}
             {(note.source === "chat" || note.source === "chat_tool") ? (
               <>
                 <span>·</span>
                 <Bot className="w-3 h-3 text-primary/70" />
                 <span>AI</span>
               </>
-            ) : note.file_url ? (
+            ) : isFile ? (
               <>
                 <span>·</span>
                 <Paperclip className="w-3 h-3" />
                 <span className="truncate max-w-[80px]">{note.file_name || "附件"}</span>
+              </>
+            ) : isImage ? (
+              <>
+                <span>·</span>
+                <ImageIcon className="w-3 h-3 text-blue-500/70" />
+                <span>图片</span>
               </>
             ) : note.source === "url" ? (
               <>
@@ -559,11 +603,11 @@ function TimelineCard({
                 <Quote className="w-3 h-3 text-amber-500/70" />
                 <span>摘录</span>
               </>
-            ) : note.duration_seconds != null && note.duration_seconds > 0 ? (
+            ) : isVoice ? (
               <>
                 <span>·</span>
                 <Mic className="w-3 h-3" />
-                <span>{formatDuration(note.duration_seconds)}</span>
+                <span>{formatDuration(note.duration_seconds!)}</span>
               </>
             ) : null}
             {note.location && (
@@ -586,7 +630,6 @@ function TimelineCard({
                 ))}
               </>
             )}
-            {/* Spacer + three-dot menu button */}
             {!selectionMode && (
               <>
                 <span className="flex-1" />
@@ -608,48 +651,178 @@ function TimelineCard({
           </div>
 
           {/* Content — editing or display */}
-          {editing ? (
-            <div className="space-y-2" onClick={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()} onPointerUp={(e) => e.stopPropagation()}>
-              <textarea
-                autoFocus
-                value={editText}
-                onChange={(e) => setEditText(e.target.value)}
-                className="w-full text-[15px] leading-[1.7] bg-secondary/30 rounded-lg p-2 border outline-none focus:ring-1 focus:ring-primary/40 resize-none min-h-[80px]"
-              />
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={handleSaveEdit}
-                  className="bg-primary text-primary-foreground text-xs px-3 py-1.5 rounded-lg"
-                >
-                  保存
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setEditing(false)}
-                  className="text-xs px-3 py-1.5 rounded-lg text-muted-foreground hover:bg-secondary/60"
-                >
-                  取消
-                </button>
+          <div data-testid="card-content">
+            {editing ? (
+              <div className="space-y-2" onClick={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()} onPointerUp={(e) => e.stopPropagation()}>
+                <textarea
+                  autoFocus
+                  value={editText}
+                  onChange={(e) => setEditText(e.target.value)}
+                  className="w-full text-[15px] leading-[1.7] bg-secondary/30 rounded-lg p-2 border outline-none focus:ring-1 focus:ring-primary/40 resize-none min-h-[80px]"
+                />
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={handleSaveEdit}
+                    className="bg-primary text-primary-foreground text-xs px-3 py-1.5 rounded-lg"
+                  >
+                    保存
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditing(false)}
+                    className="text-xs px-3 py-1.5 rounded-lg text-muted-foreground hover:bg-secondary/60"
+                  >
+                    取消
+                  </button>
+                </div>
               </div>
-            </div>
-          ) : (
-            <div className={cn(
-              "text-[15px] leading-[1.7] text-foreground",
-              !expanded && "line-clamp-4",
-            )}>
-              <MarkdownContent className="text-[15px] leading-[1.7]">
-                {note.short_summary || note.title || ""}
-              </MarkdownContent>
-            </div>
-          )}
+            ) : (
+              <>
+                {/* 正文摘要 */}
+                {(note.short_summary || note.title) && (
+                  <div
+                    ref={contentRef}
+                    className={cn(
+                      "text-[15px] leading-[1.7] text-foreground",
+                      !expanded && "line-clamp-4",
+                    )}
+                  >
+                    <MarkdownContent className="text-[15px] leading-[1.7]">
+                      {note.short_summary || note.title || ""}
+                    </MarkdownContent>
+                  </div>
+                )}
 
-          {/* Audio player */}
-          {note.audio_path && !selectionMode && (
-            <div className="mt-3">
-              <MiniAudioPlayer recordId={note.id} />
-            </div>
-          )}
+                {/* 图片缩略图 */}
+                {isImage && note.file_url && (
+                  <div className="mt-3" onClick={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()} onPointerUp={(e) => e.stopPropagation()}>
+                    <img
+                      data-testid="image-thumbnail"
+                      src={note.file_url}
+                      alt=""
+                      className="rounded-lg max-h-40 object-cover cursor-pointer"
+                      onClick={() => setImageViewerOpen(true)}
+                      onPointerDown={(e) => {
+                        e.stopPropagation();
+                        imgTimerRef.current = setTimeout(() => {
+                          setImageMenuOpen(true);
+                        }, 500);
+                      }}
+                      onPointerUp={(e) => {
+                        e.stopPropagation();
+                        if (imgTimerRef.current) {
+                          clearTimeout(imgTimerRef.current);
+                          imgTimerRef.current = null;
+                        }
+                      }}
+                      onPointerLeave={() => {
+                        if (imgTimerRef.current) {
+                          clearTimeout(imgTimerRef.current);
+                          imgTimerRef.current = null;
+                        }
+                      }}
+                    />
+                  </div>
+                )}
+
+                {/* 录音卡片 — flomo 风格 */}
+                {isVoice && !selectionMode && (
+                  <div
+                    data-testid="recording-card"
+                    className="mt-3 rounded-xl bg-secondary/40 overflow-hidden"
+                    onClick={(e) => e.stopPropagation()}
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onPointerUp={(e) => e.stopPropagation()}
+                  >
+                    <div className="flex items-center gap-2 px-3 py-2.5">
+                      <div className="flex-1 min-w-0">
+                        <MiniAudioPlayer recordId={note.id} localPcmData={localCache?.pcmData} />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!expanded) setExpanded(true);
+                          setTranscriptOpen((prev) => !prev);
+                        }}
+                        className="flex items-center gap-0.5 shrink-0 text-xs text-primary font-medium px-2 py-1 rounded-lg hover:bg-primary/10 transition-colors"
+                      >
+                        原文
+                        <ChevronRight className={cn("w-3.5 h-3.5 transition-transform", transcriptOpen && "rotate-90")} />
+                      </button>
+                    </div>
+                    {/* 原文展开面板 */}
+                    {transcriptOpen && (
+                      <div data-testid="transcript-panel" className="px-3 pb-3 animate-in fade-in slide-in-from-top-1">
+                        <div className="border-t border-border/30 pt-2.5">
+                          {detailLoading ? (
+                            <div className="flex items-center gap-2 text-muted-foreground/60">
+                              <div className="w-3.5 h-3.5 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+                              <span className="text-xs">加载原文...</span>
+                            </div>
+                          ) : detail?.transcript?.text ? (
+                            <MarkdownContent className="text-sm text-foreground/70 leading-relaxed">
+                              {detail.transcript.text}
+                            </MarkdownContent>
+                          ) : (
+                            <span className="text-xs text-muted-foreground/50">暂无原文</span>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* 附件卡片 — 非图片文件 */}
+                {isFile && !selectionMode && (
+                  <div
+                    data-testid="attachment-card"
+                    className="mt-3 rounded-xl bg-secondary/40 overflow-hidden"
+                    onClick={(e) => e.stopPropagation()}
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onPointerUp={(e) => e.stopPropagation()}
+                  >
+                    <div className="flex items-center gap-2.5 px-3 py-2.5">
+                      <FileText className="w-5 h-5 text-muted-foreground/60 shrink-0" />
+                      <span data-testid="file-name" className="text-sm text-foreground/80 truncate flex-1">
+                        {note.file_name || "文件"}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!expanded) setExpanded(true);
+                          setTranscriptOpen((prev) => !prev);
+                        }}
+                        disabled={expanded && !detailLoading && detail != null && !detail.transcript?.text}
+                        className="flex items-center gap-0.5 shrink-0 text-xs text-primary font-medium px-2 py-1 rounded-lg hover:bg-primary/10 transition-colors disabled:text-muted-foreground/40 disabled:hover:bg-transparent"
+                      >
+                        原文
+                        <ChevronRight className={cn("w-3.5 h-3.5 transition-transform", transcriptOpen && "rotate-90")} />
+                      </button>
+                    </div>
+                    {transcriptOpen && (
+                      <div data-testid="transcript-panel" className="px-3 pb-3 animate-in fade-in slide-in-from-top-1">
+                        <div className="border-t border-border/30 pt-2.5">
+                          {detailLoading ? (
+                            <div className="flex items-center gap-2 text-muted-foreground/60">
+                              <div className="w-3.5 h-3.5 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+                              <span className="text-xs">加载原文...</span>
+                            </div>
+                          ) : detail?.transcript?.text ? (
+                            <MarkdownContent className="text-sm text-foreground/70 leading-relaxed">
+                              {detail.transcript.text}
+                            </MarkdownContent>
+                          ) : (
+                            <span className="text-xs text-muted-foreground/50">暂无原文</span>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
 
           {/* Expanded detail section */}
           {expanded && (
@@ -661,25 +834,6 @@ function TimelineCard({
                 </div>
               ) : detail && (
                 <>
-                  {/* Transcript / full content */}
-                  {detail.transcript?.text && (
-                    note.duration_seconds != null && note.duration_seconds > 0 ? (
-                      /* 语音记录：显示"原文"标题 */
-                      <div>
-                        <h4 className="text-xs font-medium text-muted-foreground mb-1">原文</h4>
-                        <MarkdownContent className="text-sm text-foreground/70 leading-relaxed">
-                          {detail.transcript.text}
-                        </MarkdownContent>
-                      </div>
-                    ) : detail.transcript.text !== (note.short_summary || note.title) ? (
-                      /* 文字记录：当 transcript 与摘要不同时显示完整内容 */
-                      <div>
-                        <MarkdownContent className="text-sm text-foreground/70 leading-relaxed">
-                          {detail.transcript.text}
-                        </MarkdownContent>
-                      </div>
-                    ) : null
-                  )}
                   {/* Todos */}
                   {detail.todos.length > 0 && (
                     <div>
@@ -720,10 +874,98 @@ function TimelineCard({
                   )}
                 </>
               )}
+              {/* 收起按钮 — 展开态底部 */}
+              <div className="flex justify-center pt-1">
+                <button
+                  data-testid="collapse-button"
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setExpanded(false);
+                    setTranscriptOpen(false);
+                  }}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onPointerUp={(e) => e.stopPropagation()}
+                  className="flex items-center gap-1 px-4 py-1.5 rounded-full text-xs text-muted-foreground hover:bg-secondary/60 transition-colors"
+                >
+                  <ChevronUp className="w-3.5 h-3.5" />
+                  收起
+                </button>
+              </div>
             </div>
           )}
         </div>
       </div>
+
+      {/* 图片全屏查看器 */}
+      {imageViewerOpen && note.file_url && createPortal(
+        <div
+          data-testid="image-viewer"
+          className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center"
+          onClick={() => setImageViewerOpen(false)}
+        >
+          <img
+            src={note.file_url}
+            alt=""
+            className="max-w-full max-h-full object-contain"
+          />
+          <button
+            type="button"
+            onClick={() => setImageViewerOpen(false)}
+            className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-white"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>,
+        document.body,
+      )}
+
+      {/* 图片管理菜单 */}
+      {imageMenuOpen && createPortal(
+        <>
+          <div className="fixed inset-0 z-50" onClick={() => setImageMenuOpen(false)} />
+          <div className="fixed bottom-0 left-0 right-0 z-60 bg-background rounded-t-2xl shadow-xl pb-safe animate-in slide-in-from-bottom">
+            <div className="py-2">
+              <button
+                type="button"
+                onClick={() => {
+                  if (note.file_url) {
+                    const a = document.createElement("a");
+                    a.href = note.file_url;
+                    a.download = note.file_name || "image";
+                    a.click();
+                  }
+                  setImageMenuOpen(false);
+                }}
+                className="w-full flex items-center gap-3 px-5 py-3 text-sm hover:bg-secondary/60 transition-colors"
+              >
+                <Save className="w-5 h-5 text-muted-foreground" />
+                保存到相册
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  setImageMenuOpen(false);
+                  const ok = await confirm({ description: "确定删除这张图片？", confirmText: "删除", destructive: true });
+                  if (ok) onDelete();
+                }}
+                className="w-full flex items-center gap-3 px-5 py-3 text-sm text-destructive hover:bg-destructive/10 transition-colors"
+              >
+                <Trash2 className="w-5 h-5" />
+                删除图片
+              </button>
+              <button
+                type="button"
+                onClick={() => setImageMenuOpen(false)}
+                className="w-full py-3 text-sm text-muted-foreground text-center border-t border-border/50 mt-1"
+              >
+                取消
+              </button>
+            </div>
+          </div>
+        </>,
+        document.body,
+      )}
 
       {/* Popover menu — portal to body to escape transform containing block */}
       {menuPos && createPortal(

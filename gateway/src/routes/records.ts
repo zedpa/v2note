@@ -281,11 +281,11 @@ export function registerRecordRoutes(router: Router) {
     await summaryRepo.create({
       record_id: record.id,
       title: content.slice(0, 50),
-      short_summary: content.slice(0, 200),
+      short_summary: content,
     });
 
     if (tags && tags.length > 0) {
-      for (const tagName of tags) {
+      for (const tagName of tags.slice(0, 5)) {
         const tag = await tagRepo.upsert(tagName);
         await tagRepo.addToRecord(record.id, tag.id);
       }

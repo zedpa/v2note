@@ -5,6 +5,7 @@ import { loadWarmContext } from "../context/loader.js";
 import { semanticSearch, findSimilarMemory } from "./embeddings.js";
 import * as memoryRepo from "../db/repositories/memory.js";
 import type { ContextMode } from "../context/tiers.js";
+import { formatDateWithRelative } from "../lib/date-anchor.js";
 
 /**
  * MemoryManager combines short-term (session) and long-term (Supabase) memory.
@@ -35,7 +36,10 @@ export class MemoryManager {
     }
 
     for (const entry of longTerm) {
-      memories.push(`[${entry.source_date ?? "未知日期"}] ${entry.content}`);
+      const label = entry.source_date
+        ? formatDateWithRelative(new Date(entry.source_date))
+        : "日期未知";
+      memories.push(`[${label}] ${entry.content}`);
     }
 
     return memories;

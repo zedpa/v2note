@@ -37,7 +37,7 @@ export function useNotes(notebook?: string | null, clusterId?: string | null) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const fetchNotes = useCallback(async (silent = false) => {
+  const fetchNotes = useCallback(async (silent = false): Promise<boolean> => {
     try {
       // 有缓存数据时静默刷新，不闪 loading
       if (!silent && notes.length === 0) setLoading(true);
@@ -94,8 +94,10 @@ export function useNotes(notebook?: string | null, clusterId?: string | null) {
 
       // Update local cache (only for main timeline)
       if (!notebook) setCachedNotes(items);
+      return true;
     } catch (e: any) {
       setError(e.message ?? "Failed to load notes");
+      return false;
     } finally {
       if (!initialLoadDone.current) setLoading(false);
       else setLoading(false);

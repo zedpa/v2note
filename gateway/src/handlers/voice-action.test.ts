@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { daysLater } from "../lib/tz.js";
 
 // ── Mocks ──────────────────────────────────────────────────────────────
 
@@ -307,9 +308,7 @@ describe("场景 7: executeVoiceAction — query_todo", () => {
   it("should_return_matching_todos_for_query", async () => {
     const { executeVoiceAction } = await import("./voice-action.js");
 
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    const tomorrowStr = tomorrow.toISOString().split("T")[0];
+    const tomorrowStr = daysLater(1);
 
     vi.mocked(todoRepo.findPendingByUser).mockResolvedValue([
       mockTodo("t1", "联系新供应商", { scheduled_start: `${tomorrowStr}T09:00` }),

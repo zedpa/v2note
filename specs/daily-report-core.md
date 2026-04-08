@@ -461,7 +461,9 @@ CREATE INDEX IF NOT EXISTS idx_daily_briefing_user_date
 
 ## 边界条件
 
-- [ ] 跨日（23:59 → 00:01）时日报内容切换
+- [x] 跨日（23:59 → 00:01）时日报内容切换 — `fix-morning-briefing`: 日期改用 `fmt()` 本地时间
+- [x] 日期计算使用本地时间而非 UTC — `fix-morning-briefing`: `toISOString().split("T")[0]` → `fmt()`
+- [x] 晨间问候基于 soul/profile 而非待办数据 — `fix-morning-briefing`: prompt 重写 + 字数 ≤30
 - [ ] 无待办、无目标的极端空状态
 - [ ] 快速连续打开/关闭 → 不重复 API 请求（加缓存 TTL）
 - [ ] 离线状态 → 显示上次缓存的日报 + "离线模式"标记

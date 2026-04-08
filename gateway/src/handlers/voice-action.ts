@@ -9,6 +9,7 @@ import { chatCompletion, type ChatMessage } from "../ai/provider.js";
 import { todoRepo, goalRepo } from "../db/repositories/index.js";
 import { safeParseJson } from "../lib/text-utils.js";
 import { buildDateAnchor } from "../lib/date-anchor.js";
+import { today as tzToday, daysLater as tzDaysLater, toLocalDate } from "../lib/tz.js";
 import { createTodoTool } from "../tools/definitions/create-todo.js";
 
 // ── Types ──────────────────────────────────────────────────────────────
@@ -329,7 +330,7 @@ async function executeQueryTodo(action: VoiceAction, ctx: ActionContext): Promis
         const startStr = typeof t.scheduled_start === "string"
           ? t.scheduled_start
           : new Date(t.scheduled_start).toISOString();
-        const todoDate = startStr.split("T")[0];
+        const todoDate = toLocalDate(startStr);
         return todoDate === targetDate;
       });
     }
@@ -448,20 +449,8 @@ function cleanActionPrefix(text: string): string {
 }
 
 function resolveDate(dateStr: string): string | null {
-  const now = new Date();
-
-  if (dateStr === "today") {
-    return now.toISOString().split("T")[0];
-  }
-  if (dateStr === "tomorrow") {
-    const d = new Date(now);
-    d.setDate(d.getDate() + 1);
-    return d.toISOString().split("T")[0];
-  }
-  // ISO 日期
-  if (/^\d{4}-\d{2}-\d{2}/.test(dateStr)) {
-    return dateStr.split("T")[0];
-  }
-
+  if (dateStr === "today") return tzToday();
+  if (dateStr === "tomorrow") return tzDaysLater(1);
+  if (/^\d{4}-\d{2}-\d{2}/.test(dateStr)) return dateStr.split("T")[0];
   return null;
 }

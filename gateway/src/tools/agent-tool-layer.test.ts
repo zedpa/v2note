@@ -1,6 +1,6 @@
 /**
  * agent-tool-layer spec 补全测试
- * Cluster搜索 + unmet_request + confirm自主度
+ * unmet_request + confirm自主度
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
@@ -21,60 +21,7 @@ vi.mock("../db/repositories/index.js", () => ({
   goalRepo: { findActiveByUser: vi.fn().mockResolvedValue([]), findActiveByDevice: vi.fn().mockResolvedValue([]) },
   todoRepo: { findPendingByUser: vi.fn().mockResolvedValue([]), findPendingByDevice: vi.fn().mockResolvedValue([]) },
   summaryRepo: { findByRecordIds: vi.fn().mockResolvedValue([]) },
-  strikeRepo: { findActive: vi.fn().mockResolvedValue([]) },
 }));
-
-// =====================================================================
-// Cluster 搜索
-// =====================================================================
-describe("Cluster 搜索补全", () => {
-  beforeEach(() => { vi.clearAllMocks(); });
-
-  it("should_search_clusters_when_scope_is_clusters", async () => {
-    const { unifiedSearch } = await import("./search.js");
-
-    mockQuery.mockImplementation((sql: string) => {
-      if (sql.includes("is_cluster") && sql.includes("ILIKE")) {
-        return Promise.resolve([{
-          id: "c1",
-          nucleus: "[供应链管理] 企业供应链优化",
-          status: "active",
-          created_at: new Date().toISOString(),
-        }]);
-      }
-      return Promise.resolve([]);
-    });
-
-    const results = await unifiedSearch(
-      { query: "供应链", scope: "clusters" },
-      { deviceId: "dev-1", userId: "user-1" },
-    );
-
-    expect(results.length).toBe(1);
-    expect(results[0].type).toBe("cluster");
-  });
-
-  it("should_include_clusters_in_scope_all", async () => {
-    const { unifiedSearch } = await import("./search.js");
-
-    mockQuery.mockImplementation((sql: string) => {
-      if (sql.includes("is_cluster")) {
-        return Promise.resolve([{
-          id: "c2", nucleus: "[产品] 产品", status: "active",
-          created_at: new Date().toISOString(),
-        }]);
-      }
-      return Promise.resolve([]);
-    });
-
-    const results = await unifiedSearch(
-      { query: "产品", scope: "all" },
-      { deviceId: "dev-1", userId: "user-1" },
-    );
-
-    expect(results.some((r) => r.type === "cluster")).toBe(true);
-  });
-});
 
 // =====================================================================
 // unmet_request 记录

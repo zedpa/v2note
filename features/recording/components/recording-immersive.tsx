@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Mic, X, Play, Check } from "lucide-react";
+import { Pause, X, Play, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface RecordingImmersiveProps {
@@ -10,10 +10,6 @@ interface RecordingImmersiveProps {
   onTogglePause: () => void;
   onCancel: () => void;
   onDone: () => void;
-  // 保留旧 props 签名兼容，不使用
-  waveHeights?: number[];
-  confirmedText?: string;
-  partialText?: string;
 }
 
 function formatDuration(s: number) {
@@ -101,7 +97,7 @@ export function RecordingImmersive({
               background: "rgba(196,92,92,0.75)",
             }}
           >
-            <Mic className="w-8 h-8" />
+            <Pause className="w-8 h-8" />
           </div>
           <span className="text-xs font-mono text-muted-accessible tabular-nums">
             {formatDuration(duration)}

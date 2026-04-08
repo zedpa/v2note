@@ -10,6 +10,7 @@
  */
 
 import { query } from "../db/pool.js";
+import { toLocalDate } from "../lib/tz.js";
 import { recordRepo, goalRepo, todoRepo, transcriptRepo } from "../db/repositories/index.js";
 import { digestRecords } from "../handlers/digest.js";
 
@@ -173,7 +174,7 @@ export async function buildGoalDiscussionContext(
       if (members.length > 0) {
         parts.push("\n### 相关认知记录");
         for (const m of members) {
-          const date = m.created_at.split("T")[0];
+          const date = toLocalDate(m.created_at);
           const ref = m.source_id ? ` [record:${m.source_id}]` : "";
           parts.push(`- (${m.polarity}, ${date}) ${m.nucleus}${ref}`);
         }
@@ -270,12 +271,12 @@ export async function buildInsightDiscussionContext(
 
   parts.push("## 思考变化");
   parts.push(
-    `\n### 观点 A（${row.a_created_at.split("T")[0]}）`,
+    `\n### 观点 A（${toLocalDate(row.a_created_at)}）`,
   );
   parts.push(`${row.a_nucleus} [record:${row.a_source_id}]`);
 
   parts.push(
-    `\n### 观点 B（${row.b_created_at.split("T")[0]}）`,
+    `\n### 观点 B（${toLocalDate(row.b_created_at)}）`,
   );
   parts.push(`${row.b_nucleus} [record:${row.b_source_id}]`);
 
@@ -306,7 +307,7 @@ export async function buildInsightDiscussionContext(
     if (relatedMembers.length > 0) {
       parts.push("\n### 相关思考");
       for (const m of relatedMembers) {
-        const date = m.created_at.split("T")[0];
+        const date = toLocalDate(m.created_at);
         parts.push(`- (${m.polarity}, ${date}) ${m.nucleus} [record:${m.source_id}]`);
       }
     }
@@ -326,7 +327,7 @@ export function formatCitation(record: {
   text: string;
   created_at: string;
 }): string {
-  const date = record.created_at.split("T")[0];
+  const date = toLocalDate(record.created_at);
   const snippet = record.text.slice(0, 60);
 
   if (record.source_type === "material") {

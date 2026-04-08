@@ -264,19 +264,16 @@ export async function* chatCompletionStreamDeepThink(
     },
   });
 
-  const streamResult = result as any;
-  if (streamResult.reasoningStream) {
-    try {
-      for await (const chunk of streamResult.reasoningStream) {
-        if (chunk) yield { type: "thinking", content: chunk };
-      }
-    } catch {
-      // reasoningStream not supported — fall through to textStream
+  // AI SDK fullStream 统一消费 reasoning + text chunk
+  for await (const part of result.fullStream) {
+    switch ((part as any).type) {
+      case "reasoning-delta":
+        if ((part as any).text) yield { type: "thinking", content: (part as any).text };
+        break;
+      case "text-delta":
+        if ((part as any).text) yield { type: "text", content: (part as any).text };
+        break;
     }
-  }
-
-  for await (const chunk of result.textStream) {
-    if (chunk) yield { type: "text", content: chunk };
   }
 }
 
@@ -357,11 +354,10 @@ const TOOL_LABELS: Record<string, string> = {
   delete_todo:     "🗑️ 正在取消待办…",
   create_link:     "🔗 正在建立关联…",
   confirm:         "✅ 正在处理确认…",
-  // ── 新增工具 ──
+  // ── 新增/合并工具 ──
   get_current_time: "🕐 正在获取时间…",
-  view_record:     "📖 正在读取日记…",
-  view_todo:       "📖 正在读取待办…",
-  view_goal:       "📖 正在读取目标…",
+  view:            "📖 正在查看详情…",
+  update_user_info:"👤 正在更新用户信息…",
   save_conversation: "📝 正在保存对话内容…",
   manage_folder:   "📂 正在管理分类…",
   move_record:     "📂 正在移动日记…",
@@ -375,28 +371,20 @@ const TOOL_LABELS: Record<string, string> = {
 export async function* streamWithTools(
   messages: ChatMessage[],
   tools: Record<string, any>,
-  opts?: { temperature?: number; maxSteps?: number; deepThink?: boolean; thinkingBudget?: number; tier?: ModelTier },
+  opts?: { temperature?: number; maxSteps?: number; tier?: ModelTier },
 ): AsyncGenerator<string, void, undefined> {
   const { provider, config } = getTier(opts?.tier ?? "chat");
   const maxSteps = opts?.maxSteps ?? 5;
 
-  const deepThinkOptions = opts?.deepThink
-    ? {
-        providerOptions: {
-          openai: {
-            enable_thinking: true,
-            thinking_budget: opts?.thinkingBudget ?? 4096,
-          },
-        },
-      }
-    : {
-        // chat 层级默认启用推理
-        ...(isReasoningModel(config.model) ? {
-          providerOptions: {
-            openai: { enable_thinking: config.reasoning },
-          },
-        } : {}),
-      };
+  // DashScope thinking + tools 已知 bug：
+  // 1. thinking 模式下 tool call 60% 失败率 (Qwen3 #1817)
+  // 2. reasoning_content 泄漏到 content (Qwen3.5 #26)
+  // 3. 流式 + thinking 时缓冲整个推理阶段，fullStream 无输出→用户看到"无响应"
+  // 深度推理需求走 streamDeepSkill（纯文本流，无工具，不受此限制）。
+  // TODO: DashScope 修复后或切换 Anthropic provider 后，可改为 enable_thinking: true
+  const reasoningOpts = isReasoningModel(config.model)
+    ? { providerOptions: { openai: { enable_thinking: false } } }
+    : {};
 
   let currentMessages = [...messages] as any[];
 
@@ -409,7 +397,7 @@ export async function* streamWithTools(
       maxRetries: 1,
       abortSignal: AbortSignal.timeout(config.timeout),
       maxSteps: 1,
-      ...deepThinkOptions,
+      ...reasoningOpts,
     } as any);
 
     const toolInputBuffers = new Map<string, { name: string; args: string }>();
@@ -454,6 +442,21 @@ export async function* streamWithTools(
             }
             break;
           }
+          // 推理 chunk：当前 DashScope 关闭了 thinking 不会产生，
+          // 但为将来切换 provider（Anthropic interleaved thinking）或 DashScope 修复后预留。
+          case "reasoning-delta": {
+            const r = part as any;
+            if (r.text) {
+              yield `\x00THINKING:${r.text}`;
+            }
+            break;
+          }
+          case "reasoning-start":
+          case "reasoning-end":
+          case "start-step":
+          case "finish-step":
+            // 已知的控制类 chunk，安全忽略
+            break;
         }
       }
     } catch (err: any) {
@@ -561,20 +564,17 @@ export async function* streamWithToolsDeepThink(
     },
   } as any);
 
-  const streamResult = result as any;
-
-  if (streamResult.reasoningStream) {
-    try {
-      for await (const chunk of streamResult.reasoningStream) {
-        if (chunk) yield { type: "thinking", content: chunk };
-      }
-    } catch {
-      // reasoningStream not supported
+  // ⚠️ 注意：DashScope thinking + tools 有已知 bug（见 streamWithTools 注释），
+  // 此函数目前未被调用。保留作为切换 Anthropic provider 后的入口。
+  for await (const part of result.fullStream) {
+    switch ((part as any).type) {
+      case "reasoning-delta":
+        if ((part as any).text) yield { type: "thinking", content: (part as any).text };
+        break;
+      case "text-delta":
+        if ((part as any).text) yield { type: "text", content: (part as any).text };
+        break;
     }
-  }
-
-  for await (const chunk of result.textStream) {
-    if (chunk) yield { type: "text", content: chunk };
   }
 }
 

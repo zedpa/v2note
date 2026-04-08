@@ -101,14 +101,14 @@ describe("save_conversation", () => {
     expect(result.message).toContain("无法访问对话历史");
   });
 
-  it("should_truncate_short_summary_to_200_chars", async () => {
+  it("should_preserve_full_short_summary", async () => {
     const longContent = "x".repeat(500);
     const ctx = makeCtx([{ role: "assistant", content: longContent }]);
 
     await saveConversationTool.handler({}, ctx);
 
     expect(summaryRepo.create).toHaveBeenCalledWith(expect.objectContaining({
-      short_summary: "x".repeat(200),
+      short_summary: "x".repeat(500),
     }));
   });
 

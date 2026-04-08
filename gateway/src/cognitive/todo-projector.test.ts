@@ -3,6 +3,7 @@
  * 覆盖场景 1-5: intend Strike 投影 todo、回补关联、goal 关联 Cluster、双向一致性、Strike 删除保护
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { daysLater } from "../lib/tz.js";
 import type { StrikeEntry } from "../db/repositories/strike.js";
 import type { Todo } from "../db/repositories/todo.js";
 import type { Goal } from "../db/repositories/goal.js";
@@ -204,9 +205,7 @@ describe("场景 1: intend Strike 自动投影为 todo", () => {
 
   it("should_extract_scheduled_start_from_intend_field", async () => {
     // "明天要去上山打老虎" — digest 会提取 scheduled_start
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    const tomorrowStr = tomorrow.toISOString().split("T")[0];
+    const tomorrowStr = daysLater(1);
 
     const strike = makeStrike({
       id: "strike-tiger",

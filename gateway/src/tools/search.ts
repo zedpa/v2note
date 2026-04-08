@@ -5,8 +5,10 @@
  * 支持 filters（status/date/date_from/date_to/goal_id/domain）结构化过滤。
  */
 
-import { recordRepo, summaryRepo } from "../db/repositories/index.js";
+import { recordRepo, summaryRepo, memoryRepo, aiDiaryRepo } from "../db/repositories/index.js";
 import { query as dbQuery } from "../db/pool.js";
+import { fmt } from "../lib/date-anchor.js";
+import { toLocalDate } from "../lib/tz.js";
 import type { SearchParams, SearchResultItem, SearchFilters } from "./types.js";
 
 interface SearchContext {
@@ -27,20 +29,40 @@ export async function unifiedSearch(
     filters.date_to = params.time_range.to;
   }
 
+  // 空 query + 无日期过滤 = 无意义搜索，提前返回错误提示
+  const hasDateFilter = !!(filters.date || filters.date_from || filters.date_to);
+  if (!query && !hasDateFilter && scope !== "memories") {
+    return []; // 调用方会处理空结果提示
+  }
+
   const results: SearchResultItem[] = [];
   const scopes = scope === "all"
-    ? ["records", "goals", "todos", "clusters"] as const
+    ? ["records", "goals", "todos"] as const
     : [scope] as const;
 
   const promises: Promise<void>[] = [];
-  if (scopes.includes("records")) promises.push(searchRecords(query, filters, ctx, results));
-  if (scopes.includes("goals"))   promises.push(searchGoals(query, filters, ctx, results));
-  if (scopes.includes("todos"))   promises.push(searchTodos(query, filters, ctx, results));
-  if (scopes.includes("clusters")) promises.push(searchClusters(query, ctx, results));
+  if (scopes.includes("records"))  promises.push(searchRecords(query, filters, ctx, results));
+  if (scopes.includes("goals"))    promises.push(searchGoals(query, filters, ctx, results));
+  if (scopes.includes("todos"))    promises.push(searchTodos(query, filters, ctx, results));
+  if ((scopes as readonly string[]).includes("memories")) promises.push(searchMemories(query, ctx, results));
+
+  // AI 日报：仅在 records scope + 有日期过滤 + include_ai_diary 时附加
+  if (filters.include_ai_diary && (scopes.includes("records") || scope === "all") && hasDateFilter) {
+    promises.push(searchAiDiary(filters, ctx, results));
+  }
 
   await Promise.all(promises);
 
-  results.sort((a, b) => b.score - a.score);
+  // 空 query 按时间排序（浏览模式），有 query 按相关性排序
+  if (!query) {
+    results.sort((a, b) => {
+      const ta = a.created_at ?? "";
+      const tb = b.created_at ?? "";
+      return tb.localeCompare(ta);
+    });
+  } else {
+    results.sort((a, b) => b.score - a.score);
+  }
   return results.slice(0, limit);
 }
 
@@ -48,16 +70,16 @@ export async function unifiedSearch(
 
 function resolveDate(dateStr: string): string | null {
   const now = new Date();
-  if (dateStr === "today") return now.toISOString().split("T")[0];
+  if (dateStr === "today") return fmt(now);
   if (dateStr === "tomorrow") {
     const d = new Date(now);
     d.setDate(d.getDate() + 1);
-    return d.toISOString().split("T")[0];
+    return fmt(d);
   }
   if (dateStr === "yesterday") {
     const d = new Date(now);
     d.setDate(d.getDate() - 1);
-    return d.toISOString().split("T")[0];
+    return fmt(d);
   }
   if (/^\d{4}-\d{2}-\d{2}/.test(dateStr)) return dateStr.split("T")[0];
   return null;
@@ -72,13 +94,33 @@ async function searchRecords(
   results: SearchResultItem[],
 ): Promise<void> {
   try {
-    // 解析时间范围
-    const dateFrom = filters.date_from ? resolveDate(filters.date_from) : null;
-    const dateTo = filters.date_to ? resolveDate(filters.date_to) : null;
+    // 解析日期过滤
+    let dateFrom: string | null = null;
+    let dateTo: string | null = null;
+    if (filters.date) {
+      const d = resolveDate(filters.date);
+      if (d) { dateFrom = d; dateTo = d; }
+    } else {
+      dateFrom = filters.date_from ? resolveDate(filters.date_from) : null;
+      dateTo = filters.date_to ? resolveDate(filters.date_to) : null;
+    }
 
-    const records = ctx.userId
-      ? await recordRepo.searchByUser(ctx.userId, query)
-      : await recordRepo.search(ctx.deviceId, query);
+    let records: Awaited<ReturnType<typeof recordRepo.searchByUser>>;
+
+    if (!query && ctx.userId && (dateFrom || dateTo)) {
+      // 空 query 快速路径：直接按日期查，跳过 ILIKE join
+      const start = dateFrom ? `${dateFrom}T00:00:00` : "1970-01-01T00:00:00";
+      const end = dateTo ? `${dateTo}T23:59:59` : "2099-12-31T23:59:59";
+      records = await recordRepo.findByUserAndDateRange(ctx.userId, start, end);
+      // findByUserAndDateRange 返回 ASC 排序，反转为 DESC（最新在前），再截断 100 条
+      records = records.reverse().slice(0, 100);
+    } else if (query) {
+      records = ctx.userId
+        ? await recordRepo.searchByUser(ctx.userId, query)
+        : await recordRepo.search(ctx.deviceId, query);
+    } else {
+      return; // 空 query 且无日期过滤，不搜索 records
+    }
 
     const recordIds = records.map((r) => r.id);
     const summaries = recordIds.length > 0
@@ -87,12 +129,15 @@ async function searchRecords(
     const summaryMap = new Map(summaries.map((s) => [s.record_id, s]));
 
     for (const r of records) {
-      // 时间范围过滤
-      if (dateFrom || dateTo) {
-        const createdDate = r.created_at?.split("T")[0];
+      // 有 query 时按日期二次过滤（快速路径已在 SQL 中过滤）
+      if (query && (dateFrom || dateTo)) {
+        const createdDate = toLocalDate(r.created_at);
         if (dateFrom && createdDate && createdDate < dateFrom) continue;
         if (dateTo && createdDate && createdDate > dateTo) continue;
       }
+
+      // domain 过滤
+      if (filters.domain && r.domain !== filters.domain) continue;
 
       const summary = summaryMap.get(r.id);
       results.push({
@@ -100,7 +145,7 @@ async function searchRecords(
         type: "record",
         title: summary?.title ?? `记录 ${r.id.slice(0, 8)}`,
         snippet: summary?.short_summary?.slice(0, 100),
-        score: 1.0,
+        score: query ? 1.0 : 0.5, // 浏览模式分数低，让有关键词匹配的排前面
         created_at: r.created_at,
       });
     }
@@ -260,42 +305,71 @@ async function searchTodos(
   }
 }
 
-// ── Cluster 搜索 ────────────────────────────────────────────────────────────
+// ── 记忆搜索 ────────────────────────────────────────────────────────────────
 
-async function searchClusters(
+async function searchMemories(
   query: string,
   ctx: SearchContext,
   results: SearchResultItem[],
 ): Promise<void> {
   try {
-    const userId = ctx.userId ?? ctx.deviceId;
-    const clusters = await dbQuery<{
-      id: string;
-      nucleus: string;
-      status: string;
-      created_at: string;
-    }>(
-      `SELECT id, nucleus, status, created_at FROM strike
-       WHERE user_id = $1 AND is_cluster = true AND status = 'active'
-         AND nucleus ILIKE $2
-       ORDER BY created_at DESC LIMIT 10`,
-      [userId, `%${query}%`],
-    );
+    if (!ctx.userId) return;
+    const memories = await memoryRepo.findByUser(ctx.userId, undefined, 100);
 
-    for (const c of clusters) {
-      const nameMatch = c.nucleus.match(/^\[(.+?)\]/);
-      const name = nameMatch ? nameMatch[1] : c.nucleus;
+    const queryLower = query.toLowerCase();
+    for (const m of memories) {
+      if (query && !m.content.toLowerCase().includes(queryLower)) continue;
       results.push({
-        id: c.id,
-        type: "cluster",
-        title: name,
-        snippet: c.nucleus,
-        score: 0.85,
-        status: c.status,
-        created_at: c.created_at,
+        id: m.id,
+        type: "memory",
+        title: m.content.slice(0, 60) + (m.content.length > 60 ? "…" : ""),
+        snippet: m.content.slice(0, 100),
+        score: query ? 0.7 : (m.importance / 10),
+        created_at: m.created_at,
       });
     }
   } catch (err) {
-    console.warn("[search] clusters search failed:", err);
+    console.warn("[search] memories search failed:", err);
+  }
+}
+
+// ── AI 日报搜索 ──────────────────────────────────────────────────────────────
+
+async function searchAiDiary(
+  filters: SearchFilters,
+  ctx: SearchContext,
+  results: SearchResultItem[],
+): Promise<void> {
+  try {
+    if (!ctx.userId) return;
+
+    // 解析日期范围
+    let dateFrom: string | null = null;
+    let dateTo: string | null = null;
+    if (filters.date) {
+      const d = resolveDate(filters.date);
+      if (d) { dateFrom = d; dateTo = d; }
+    } else {
+      dateFrom = filters.date_from ? resolveDate(filters.date_from) : null;
+      dateTo = filters.date_to ? resolveDate(filters.date_to) : null;
+    }
+    if (!dateFrom || !dateTo) return;
+
+    const diaries = await aiDiaryRepo.findSummariesByUser(
+      ctx.userId, "chat-daily", dateFrom, dateTo,
+    );
+
+    for (const d of diaries) {
+      results.push({
+        id: d.id,
+        type: "ai_diary",
+        title: `AI 日报 ${d.entry_date}`,
+        snippet: d.summary?.slice(0, 100),
+        score: 0.6,
+        created_at: d.entry_date,
+      });
+    }
+  } catch (err) {
+    console.warn("[search] ai_diary search failed:", err);
   }
 }

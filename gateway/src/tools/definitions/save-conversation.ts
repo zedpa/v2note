@@ -65,7 +65,7 @@ export const saveConversationTool: ToolDefinition = {
     await summaryRepo.create({
       record_id: record.id,
       title,
-      short_summary: content.slice(0, 200),
+      short_summary: content,
     });
 
     // 标记为已消化，避免 digest 管道重新处理
