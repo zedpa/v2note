@@ -25,6 +25,10 @@ export async function findByRecordIds(recordIds) {
      JOIN record_tag rt ON rt.tag_id = t.id
      WHERE rt.record_id = ANY($1)`, [recordIds]);
 }
+export async function countByRecordId(recordId) {
+    const row = await queryOne(`SELECT COUNT(*)::text AS count FROM record_tag WHERE record_id = $1`, [recordId]);
+    return parseInt(row?.count ?? "0", 10);
+}
 export async function addToRecord(recordId, tagId) {
     await execute(`INSERT INTO record_tag (record_id, tag_id) VALUES ($1, $2)
      ON CONFLICT (record_id, tag_id) DO NOTHING`, [recordId, tagId]);

@@ -10,5 +10,6 @@ export declare function findByRecordId(recordId: string): Promise<Tag[]>;
 export declare function findByRecordIds(recordIds: string[]): Promise<Array<{
     record_id: string;
 } & Tag>>;
+export declare function countByRecordId(recordId: string): Promise<number>;
 export declare function addToRecord(recordId: string, tagId: string): Promise<void>;
 export declare function removeFromRecord(recordId: string, tagId: string): Promise<void>;
