@@ -18,7 +18,7 @@ import { chatMessageRepo } from "../db/repositories/index.js";
 import { createDefaultRegistry } from "../tools/definitions/index.js";
 import type { ToolContext } from "../tools/types.js";
 import { mayProfileUpdate } from "../lib/text-utils.js";
-import { fmt, formatDateWithRelative } from "../lib/date-anchor.js";
+import { buildDateAnchor, fmt, formatDateWithRelative } from "../lib/date-anchor.js";
 import { today, daysAgo } from "../lib/tz.js";
 import { shouldUpdateSoulStrict } from "../cognitive/self-evolution.js";
 import { gatherDecisionContext, buildDecisionPrompt } from "../cognitive/decision.js";
@@ -481,6 +481,25 @@ async function* streamDeepSkill(
 /**
  * Send a message in an ongoing chat session.
  */
+/** 跨天检测：如果 system prompt 中的日期锚点过期，替换为最新的 */
+function refreshDateAnchorIfNeeded(session: ReturnType<typeof getSession>) {
+  const currentDate = today();
+  const messages = session.context.getMessages();
+  const sysMsg = messages.find(m => m.role === "system");
+  if (!sysMsg) return;
+  // 检测 system prompt 中嵌入的日期锚点是否还是今天
+  const match = sysMsg.content.match(/当前：(\d{4}-\d{2}-\d{2})/);
+  if (match && match[1] !== currentDate) {
+    console.log(`[chat] Date anchor stale (${match[1]} → ${currentDate}), refreshing`);
+    const newAnchor = buildDateAnchor();
+    const updated = sysMsg.content.replace(
+      /## 时间锚点（直接查表，禁止自行计算）[\s\S]*?(?=\n## |\n# |$)/,
+      newAnchor,
+    );
+    session.context.setSystemPrompt(updated);
+  }
+}
+
 export async function sendChatMessage(
   deviceId: string,
   text: string,
@@ -489,6 +508,9 @@ export async function sendChatMessage(
   if (session.mode !== "chat") {
     throw new Error("No active chat session");
   }
+
+  // 跨天检测：刷新日期锚点
+  refreshDateAnchorIfNeeded(session);
 
   // Skill 显式激活："/skill:xxx" 或 "/skill:xxx 用户文本" 格式
   const skillMatch = text.match(/^\/skill:(\S+)(?:\s+(.+))?$/s);
