@@ -163,8 +163,16 @@ export async function generateMorningBriefing(
   const dayOfWeek = ["日", "一", "二", "三", "四", "五", "六"][now.getDay()];
   const dateStr = `${now.getMonth() + 1}月${now.getDate()}日 周${dayOfWeek}`;
 
-  const todosText = pendingTodos.length > 0
-    ? pendingTodos.slice(0, 10).map((t) => `- ${t.text}`).join("\n")
+  // 优先展示：今日排期 > 逾期 > 最近创建的待办（避免古早待办占满列表）
+  const prioritizedTodos = [
+    ...todayScheduled,
+    ...overdue.filter((t) => !todayScheduled.includes(t)),
+    ...pendingTodos.filter((t) => !todayScheduled.includes(t) && !overdue.includes(t))
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()),
+  ].slice(0, 10);
+
+  const todosText = prioritizedTodos.length > 0
+    ? prioritizedTodos.map((t) => `- ${t.text}`).join("\n")
     : "暂无待办";
 
   const goalPulseText = goalPulseData.length > 0
@@ -231,7 +239,7 @@ ${goalPulseText}`,
 
     const fallback: BriefingResult = {
       greeting: `早上好！今天是${dateStr}`,
-      today_focus: todayScheduled.slice(0, 5).map((t) => t.text),
+      today_focus: prioritizedTodos.slice(0, 5).map((t) => t.text),
       carry_over: overdue.map((t) => t.text),
       goal_pulse: [],
       stats: { yesterday_done: yesterdayStats.done, yesterday_total: yesterdayStats.total },
@@ -380,8 +388,7 @@ export async function generateEveningSummary(
       role: "user",
       content: `今日完成(${todayDone.length}): ${todayDone.map((t) => t.text).join("、") || "无"}
 今日记录: ${newRecordCount} 条
-明日排期(${tomorrowScheduled.length}): ${tomorrowScheduled.slice(0, 5).map((t) => t.text).join("、") || "无"}
-待处理(${pending.length}): ${pending.slice(0, 5).map((t) => t.text).join("、") || "无"}${diaryBlock}`,
+明日排期(${tomorrowScheduled.length}): ${tomorrowScheduled.slice(0, 5).map((t) => t.text).join("、") || "无"}${diaryBlock}`,
     },
   ];
 

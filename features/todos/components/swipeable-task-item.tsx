@@ -197,14 +197,14 @@ export function SwipeableTaskItem({
       >
         <button
           onClick={handlePostpone}
-          className="flex flex-1 flex-col items-center justify-center bg-sky-500 dark:bg-sky-600 text-white text-xs gap-1"
+          className="flex flex-1 flex-col items-center justify-center bg-amber-500 dark:bg-amber-500 text-white text-xs gap-1"
         >
           <Clock className="h-4 w-4" />
           推迟
         </button>
         <button
           onClick={handleRemove}
-          className="flex flex-1 flex-col items-center justify-center bg-red-500 dark:bg-red-600 text-white text-xs gap-1 rounded-r-xl"
+          className="flex flex-1 flex-col items-center justify-center bg-red-500 dark:bg-red-500 text-white text-xs gap-1 rounded-r-xl"
         >
           <Trash2 className="h-4 w-4" />
           删除
