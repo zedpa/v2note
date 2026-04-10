@@ -20,8 +20,12 @@ import { searchTool } from "./search.js";
 import { confirmTool } from "./confirm.js";
 import { getCurrentTimeTool } from "./get-current-time.js";
 import { viewTool } from "./view.js";
-import { updateUserInfoTool } from "./update-user-info.js";
 import { saveConversationTool } from "./save-conversation.js";
+import { updateSoulTool } from "./update-soul.js";
+import { updateProfileTool } from "./update-profile-tool.js";
+import { updateUserAgentTool } from "./update-user-agent-tool.js";
+import { createMemoryTool } from "./create-memory-tool.js";
+import { sendNotificationTool } from "./send-notification-tool.js";
 import { manageFolderTool } from "./manage-folder.js";
 import { moveRecordTool } from "./move-record.js";
 import { listFoldersTool } from "./list-folders.js";
@@ -47,8 +51,12 @@ export const ALL_TOOL_DEFINITIONS = [
   searchTool,
   // 统一查看
   viewTool,
-  // 用户画像
-  updateUserInfoTool,
+  // 自我维护工具（AI 对话中自主调用）
+  updateSoulTool,
+  updateProfileTool,
+  updateUserAgentTool,
+  createMemoryTool,
+  sendNotificationTool,
   // 对话保存
   saveConversationTool,
   // 文件夹管理

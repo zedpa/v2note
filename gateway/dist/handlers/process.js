@@ -3,8 +3,16 @@ import { appendToDiary } from "../diary/manager.js";
 import { recordRepo, summaryRepo, todoRepo, tagRepo } from "../db/repositories/index.js";
 import { classifyVoiceIntent, executeVoiceAction, matchTodoByHint } from "./voice-action.js";
 import { safeParseJson } from "../lib/text-utils.js";
+import { toLocalDateTime } from "../lib/tz.js";
 import { buildTodoExtractPrompt, buildTodoRefinePrompt } from "./todo-extract-prompt.js";
 import { buildUnifiedProcessPrompt } from "./unified-process-prompt.js";
+/** 按页面上下文定义可用的 command 类型白名单，后续由 localConfig 覆盖 */
+const DEFAULT_COMMAND_WHITELIST = {
+    timeline: ["create_todo", "modify_todo"],
+    todo: ["create_todo", "complete_todo", "modify_todo", "query_todo"],
+    chat: ["create_todo", "complete_todo", "modify_todo", "query_todo"],
+    review: ["create_todo", "modify_todo"],
+};
 // v2: CLEANUP_SYSTEM_PROMPT 不再单独使用 — 文本清理已合并到统一 prompt 中
 /**
  * Process a single diary entry: clean transcript text, save summary, trigger digest.
@@ -183,13 +191,10 @@ export async function processEntry(payload) {
                 console.warn(`[process] Summary save failed: ${err.message}`);
             }
         }
-        // 5. 保存 domain
-        if (parsed.domain && payload.recordId) {
-            await recordRepo.updateDomain(payload.recordId, parsed.domain).catch((e) => console.warn(`[process] Domain save failed: ${e.message}`));
-        }
-        // 6. 保存 tags → record_tag
+        // 5. domain 分配已移除（Phase 11: Wiki Page 统一组织层）
+        // 6. 保存 tags → record_tag（最多5个）
         if (parsed.tags && parsed.tags.length > 0 && payload.recordId) {
-            for (const label of parsed.tags) {
+            for (const label of parsed.tags.slice(0, 5)) {
                 try {
                     const tag = await tagRepo.upsert(label);
                     await tagRepo.addToRecord(payload.recordId, tag.id);
@@ -218,10 +223,13 @@ export async function processEntry(payload) {
                 }
             }
         }
-        // 8. 处理指令（action/mixed 时）
-        if ((intentType === "action" || intentType === "mixed") && parsed.commands && parsed.commands.length > 0) {
+        // 8. 处理指令（仅 action 时，mixed 已废弃 → 归入 record）
+        // 按页面上下文过滤可用的 command 类型
+        const whitelist = DEFAULT_COMMAND_WHITELIST[payload.sourceContext ?? "timeline"] ?? ["create_todo", "modify_todo"];
+        const filteredCommands = (parsed.commands ?? []).filter(cmd => whitelist.includes(cmd.action_type));
+        if (intentType === "action" && filteredCommands.length > 0) {
             const actionResults = [];
-            for (const cmd of parsed.commands) {
+            for (const cmd of filteredCommands) {
                 try {
                     const actionResult = await executeVoiceAction({
                         type: cmd.action_type,
@@ -243,7 +251,7 @@ export async function processEntry(payload) {
             }
             result.action_results = actionResults;
             // 转为 todo_commands 格式，供 CommandSheet 显示
-            result.todo_commands = parsed.commands.map(cmd => ({
+            result.todo_commands = filteredCommands.map(cmd => ({
                 action_type: cmd.action_type,
                 confidence: cmd.confidence,
                 target_hint: cmd.target_hint,
@@ -256,9 +264,10 @@ export async function processEntry(payload) {
             await recordRepo.updateStatus(payload.recordId, "completed");
         }
         // 10. Append to daily diary
+        const timeTag = toLocalDateTime(new Date()).split(" ")[1] ?? "00:00";
         const diaryLine = result.summary
-            ? `[${new Date().toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })}] ${result.summary}`
-            : `[${new Date().toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })}] ${payload.text.slice(0, 200)}`;
+            ? `[${timeTag}] ${result.summary}`
+            : `[${timeTag}] ${payload.text.slice(0, 200)}`;
         const diaryNotebook = payload.notebook && payload.notebook !== "ai-self" ? payload.notebook : "default";
         appendToDiary(payload.deviceId, diaryNotebook, diaryLine, payload.userId).catch((e) => {
             console.warn("[process] Diary append failed:", e.message);

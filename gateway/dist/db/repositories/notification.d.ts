@@ -26,6 +26,8 @@ export declare function findByUser(userId: string, limit?: number): Promise<Noti
 export declare function countUnread(deviceId: string): Promise<number>;
 /** 查询未读数量（按用户，跨设备） */
 export declare function countUnreadByUser(userId: string): Promise<number>;
+/** 检查今天是否已发过指定类型的通知（按用户或设备去重） */
+export declare function hasTodayNotification(type: string, userId?: string | null, deviceId?: string): Promise<boolean>;
 /** 创建通知 */
 export declare function create(input: CreateNotificationInput): Promise<Notification>;
 /** 标记单条已读 */

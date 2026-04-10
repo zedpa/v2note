@@ -19,6 +19,7 @@ import { fabNotify, onFabNotify, type FabNotification } from "@/shared/lib/fab-n
 import { startAiPipeline, renewAiPipeline, endAiPipeline } from "@/shared/lib/ai-processing";
 import { saveAudio, mergeChunks, checkCacheSize, markCompleted, getAudioByRecordId, type PendingAudio } from "@/features/recording/lib/audio-cache";
 import { createRecord } from "@/shared/lib/api/records";
+import { AudioSession } from "@/shared/lib/audio-session";
 
 function formatDuration(s: number) {
   const m = Math.floor(s / 60);
@@ -88,6 +89,7 @@ export function FAB({
   const sourceContextRef = useRef(sourceContext);
   sourceContextRef.current = sourceContext;
   const gwClientRef = useRef<ReturnType<typeof getGatewayClient> | null>(null);
+  const audioActivatedRef = useRef(false);
 
   const startTimers = useCallback(() => {
     setDisplayDuration(0);
@@ -118,6 +120,23 @@ export function FAB({
     waveRef.current = null;
     volumeRef.current = 0;
     setWaveHeights(Array(32).fill(8));
+  }, []);
+
+  // ─── 音频会话管理: 录音时打断系统音频，结束后恢复 ───
+  const activateAudioSession = useCallback(async () => {
+    try {
+      await Promise.race([
+        AudioSession.activate(),
+        new Promise<void>((resolve) => setTimeout(resolve, 500)),
+      ]);
+      audioActivatedRef.current = true;
+    } catch { /* 静默 */ }
+  }, []);
+
+  const deactivateAudioSession = useCallback(async () => {
+    if (!audioActivatedRef.current) return;
+    audioActivatedRef.current = false;
+    try { await AudioSession.deactivate(); } catch { /* 静默 */ }
   }, []);
 
   // 监听全局 fabNotify 事件，显示胶囊通知
@@ -322,6 +341,7 @@ export function FAB({
         },
         onError: (err) => {
           fabNotify.error(`录音错误: ${err.message}`);
+          deactivateAudioSession();
           resetRef.current();
         },
       });
@@ -351,6 +371,9 @@ export function FAB({
 
   const startRecording = useCallback(async () => {
     try {
+      // 激活音频会话，打断系统音频（500ms 超时）
+      await activateAudioSession();
+
       pausedRef.current = false;
       setLockedPaused(false);
       commandReleaseRef.current = false;
@@ -366,6 +389,7 @@ export function FAB({
         if (!ready) {
           fabNotify.error("无法连接服务器，请检查网络");
           stopPreCapture();
+          deactivateAudioSession();
           return;
         }
       }
@@ -396,6 +420,7 @@ export function FAB({
           },
           onError: (err) => {
             fabNotify.error(`录音错误: ${err.message}`);
+            deactivateAudioSession();
             resetRef.current();
           },
         });
@@ -413,12 +438,16 @@ export function FAB({
       }
       stopTimers();
       stopPreCapture();
+      deactivateAudioSession();
       resetRef.current();
     }
-  }, [recorder, startTimers, stopTimers, stopPreCapture]);
+  }, [recorder, startTimers, stopTimers, stopPreCapture, activateAudioSession, deactivateAudioSession]);
 
   // 录音失败时的处理：保存本地缓存 + 创建占位 record
   const handleRecordingFailure = useCallback(async (reason: string) => {
+    // 恢复系统音频
+    deactivateAudioSession();
+
     const chunks = fullBufferRef.current;
     const id = cacheIdRef.current;
     if (!id || chunks.length === 0) return;
@@ -470,7 +499,7 @@ export function FAB({
     } catch (err) {
       console.error("[fab] Failed to save audio cache:", err);
     }
-  }, []);
+  }, [deactivateAudioSession]);
 
   const finishRecording = useCallback(
     async (asCommand: boolean) => {
@@ -508,6 +537,8 @@ export function FAB({
 
       try {
         recorder.stopRecording();
+        // 恢复系统音频（不等 IndexedDB 写入）
+        deactivateAudioSession();
         const deviceId = await getDeviceId();
         const client = getGatewayClient();
 
@@ -540,7 +571,7 @@ export function FAB({
         handleRecordingFailure(err.message);
       }
     },
-    [recorder, stopTimers, handleRecordingFailure],
+    [recorder, stopTimers, handleRecordingFailure, deactivateAudioSession],
   );
 
   const cancelRecording = useCallback(async () => {
@@ -555,6 +586,8 @@ export function FAB({
     gwClientRef.current = null;
 
     recorder.cancelRecording();
+    // 恢复系统音频
+    deactivateAudioSession();
 
     try {
       const deviceId = await getDeviceId();
@@ -567,7 +600,7 @@ export function FAB({
     setDisplayDuration(0);
     setConfirmedText("");
     setPartialText("");
-  }, [stopTimers, recorder]);
+  }, [stopTimers, recorder, deactivateAudioSession]);
 
   const fabRef = useRef<HTMLButtonElement>(null);
   const pointerIdRef = useRef<number | null>(null);
@@ -626,6 +659,7 @@ export function FAB({
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
       if (waveRef.current) clearInterval(waveRef.current);
+      deactivateAudioSession();
     };
   }, []);
 
@@ -741,29 +775,25 @@ export function FAB({
           <div
             className="absolute left-0 top-1/2 -translate-y-1/2 flex items-center transition-all duration-200"
             style={{
-              opacity: activeDirection === "left" ? 0.7 + progress * 0.3 : activeDirection === "none" ? 0.35 : 0.1,
+              opacity: activeDirection === "left" ? 0.7 + progress * 0.3 : activeDirection === "none" ? 0.65 : 0.15,
               transform: `translateY(-50%) translateX(${activeDirection === "left" ? 8 + progress * 12 : 8}px) scale(${activeDirection === "left" ? 1 + progress * 0.3 : 1})`,
             }}
           >
             <div className={cn(
-              "flex flex-col items-center gap-2 transition-all duration-200",
+              "flex items-center gap-1.5 px-3 py-1.5 rounded-full backdrop-blur-sm transition-all duration-200",
+              activeDirection === "left"
+                ? "bg-red-500/20 border border-red-500/30 shadow-[0_0_20px_rgba(239,68,68,0.2)]"
+                : "bg-white/10 border border-white/15",
             )}>
-              <div className={cn(
-                "w-14 h-14 rounded-2xl flex items-center justify-center transition-all duration-200",
-                activeDirection === "left"
-                  ? "bg-red-500/30 shadow-[0_0_30px_rgba(239,68,68,0.3)]"
-                  : "bg-white/8",
-              )}>
-                <X className={cn(
-                  "transition-all duration-200",
-                  activeDirection === "left" ? "w-7 h-7 text-red-400" : "w-5 h-5 text-white/40",
-                )} />
-              </div>
+              <X className={cn(
+                "transition-all duration-200",
+                activeDirection === "left" ? "w-5 h-5 text-red-400" : "w-4 h-4 text-white/60",
+              )} />
               <span className={cn(
-                "font-semibold tracking-wider transition-all duration-200",
+                "font-medium transition-all duration-200",
                 activeDirection === "left"
-                  ? "text-base text-red-400"
-                  : "text-xs text-white/30",
+                  ? "text-sm text-red-400"
+                  : "text-xs text-white/70",
               )}>
                 取消
               </span>
@@ -774,27 +804,25 @@ export function FAB({
           <div
             className="absolute right-0 top-1/2 -translate-y-1/2 flex items-center transition-all duration-200"
             style={{
-              opacity: activeDirection === "right" ? 0.7 + progress * 0.3 : activeDirection === "none" ? 0.35 : 0.1,
+              opacity: activeDirection === "right" ? 0.7 + progress * 0.3 : activeDirection === "none" ? 0.65 : 0.15,
               transform: `translateY(-50%) translateX(${activeDirection === "right" ? -8 - progress * 12 : -8}px) scale(${activeDirection === "right" ? 1 + progress * 0.3 : 1})`,
             }}
           >
-            <div className="flex flex-col items-center gap-2">
-              <div className={cn(
-                "w-14 h-14 rounded-2xl flex items-center justify-center transition-all duration-200",
-                activeDirection === "right"
-                  ? "bg-emerald-500/30 shadow-[0_0_30px_rgba(16,185,129,0.3)]"
-                  : "bg-white/8",
-              )}>
-                <Lock className={cn(
-                  "transition-all duration-200",
-                  activeDirection === "right" ? "w-7 h-7 text-emerald-400" : "w-5 h-5 text-white/40",
-                )} />
-              </div>
+            <div className={cn(
+              "flex items-center gap-1.5 px-3 py-1.5 rounded-full backdrop-blur-sm transition-all duration-200",
+              activeDirection === "right"
+                ? "bg-emerald-500/20 border border-emerald-500/30 shadow-[0_0_20px_rgba(16,185,129,0.2)]"
+                : "bg-white/10 border border-white/15",
+            )}>
+              <Lock className={cn(
+                "transition-all duration-200",
+                activeDirection === "right" ? "w-5 h-5 text-emerald-400" : "w-4 h-4 text-white/60",
+              )} />
               <span className={cn(
-                "font-semibold tracking-wider transition-all duration-200",
+                "font-medium transition-all duration-200",
                 activeDirection === "right"
-                  ? "text-base text-emerald-400"
-                  : "text-xs text-white/30",
+                  ? "text-sm text-emerald-400"
+                  : "text-xs text-white/70",
               )}>
                 常驻
               </span>
@@ -805,27 +833,25 @@ export function FAB({
           <div
             className="absolute top-[28%] left-1/2 -translate-x-1/2 flex items-center transition-all duration-200"
             style={{
-              opacity: activeDirection === "up" ? 0.7 + progress * 0.3 : activeDirection === "none" ? 0.35 : 0.1,
+              opacity: activeDirection === "up" ? 0.7 + progress * 0.3 : activeDirection === "none" ? 0.65 : 0.15,
               transform: `translateX(-50%) translateY(${activeDirection === "up" ? -progress * 16 : 0}px) scale(${activeDirection === "up" ? 1 + progress * 0.3 : 1})`,
             }}
           >
-            <div className="flex flex-col items-center gap-2">
-              <div className={cn(
-                "w-14 h-14 rounded-2xl flex items-center justify-center transition-all duration-200",
-                activeDirection === "up"
-                  ? "bg-amber-500/30 shadow-[0_0_30px_rgba(245,158,11,0.3)]"
-                  : "bg-white/8",
-              )}>
-                <Command className={cn(
-                  "transition-all duration-200",
-                  activeDirection === "up" ? "w-7 h-7 text-amber-400" : "w-5 h-5 text-white/40",
-                )} />
-              </div>
+            <div className={cn(
+              "flex items-center gap-1.5 px-3 py-1.5 rounded-full backdrop-blur-sm transition-all duration-200",
+              activeDirection === "up"
+                ? "bg-amber-500/20 border border-amber-500/30 shadow-[0_0_20px_rgba(245,158,11,0.2)]"
+                : "bg-white/10 border border-white/15",
+            )}>
+              <Command className={cn(
+                "transition-all duration-200",
+                activeDirection === "up" ? "w-5 h-5 text-amber-400" : "w-4 h-4 text-white/60",
+              )} />
               <span className={cn(
-                "font-semibold tracking-wider transition-all duration-200",
+                "font-medium transition-all duration-200",
                 activeDirection === "up"
-                  ? "text-base text-amber-400"
-                  : "text-xs text-white/30",
+                  ? "text-sm text-amber-400"
+                  : "text-xs text-white/70",
               )}>
                 指令
               </span>

@@ -11,6 +11,7 @@ import { FAB } from "@/features/recording/components/fab";
 import { CommandSheet, type TodoCommand } from "@/features/todos/components/command-sheet";
 import { emit } from "@/features/recording/lib/events";
 import { api } from "@/shared/lib/api";
+import { getLocalToday, toLocalDateStr } from "@/features/todos/lib/date-utils";
 import { SidebarDrawer } from "@/features/sidebar/components/sidebar-drawer";
 import { SearchView } from "@/features/search/components/search-view";
 import { ChatView } from "@/features/chat/components/chat-view";
@@ -34,8 +35,11 @@ import {
   scheduleDailyNotifications,
   cancelDailyNotifications,
   addNotificationClickListener,
+  addForegroundNotificationSuppressor,
   requestNotificationPermission,
 } from "@/shared/lib/notifications";
+import { dispatchIntents, type ReminderType } from "@/shared/lib/intent-dispatch";
+import SystemIntent from "@/shared/lib/system-intent";
 import { showUndoToast } from "@/features/todos/hooks/use-undo-toast";
 import { getCommandDefs } from "@/features/commands/lib/registry";
 import { on } from "@/features/recording/lib/events";
@@ -49,7 +53,8 @@ import { useUpdateCheck } from "@/shared/hooks/use-update-check";
 import { UpdateDialog } from "@/shared/components/update-dialog";
 import { NotificationCenter } from "@/features/notifications/components/notification-center";
 import type { AppNotification } from "@/features/notifications/hooks/use-notifications";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence } from "framer-motion";
+import { OverlayTransition } from "@/shared/components/overlay-transition";
 import { usePullToRefresh } from "@/shared/hooks/use-pull-to-refresh";
 import { PullRefreshIndicator } from "@/components/ui/pull-refresh-indicator";
 
@@ -86,37 +91,40 @@ export default function Page() {
   const [chatMode, setChatMode] = useState<"review" | "command" | "insight">("review");
   const [chatSkill, setChatSkill] = useState<string | undefined>();
   const [selectedGoalId, setSelectedGoalId] = useState<string | null>(null);
-  const [domainFilter, setDomainFilter] = useState<string | null>(null);
+  const [wikiPageFilter, setWikiPageFilter] = useState<string | null>(null);
 
-  // ── 文件夹列表：localStorage 缓存 + 事件刷新 ──
-  const [cachedDomains, setCachedDomains] = useState<Array<{ domain: string; count: number }>>(() => {
-    if (typeof window === "undefined") return [];
-    try {
-      return JSON.parse(localStorage.getItem("v2note:domains") || "[]");
-    } catch { return []; }
-  });
-  const fetchDomains = useCallback(() => {
-    api.get<{ domains: Array<{ domain: string; count: number }> }>("/api/v1/records/domains")
+  // ── Wiki 侧边栏数据：wiki page tree + inbox count ──
+  interface SidebarPage {
+    id: string;
+    title: string;
+    level: number;
+    parentId: string | null;
+    createdBy: string;
+    recordCount: number;
+    activeGoals: { id: string; title: string }[];
+    updatedAt: string;
+  }
+  const [sidebarPages, setSidebarPages] = useState<SidebarPage[]>([]);
+  const [inboxCount, setInboxCount] = useState(0);
+  const fetchSidebar = useCallback(() => {
+    api.get<{ pages: SidebarPage[]; inboxCount: number }>("/api/v1/wiki/sidebar")
       .then((res) => {
-        const domains = res.domains ?? [];
-        setCachedDomains(domains);
-        localStorage.setItem("v2note:domains", JSON.stringify(domains));
+        setSidebarPages(res.pages ?? []);
+        setInboxCount(res.inboxCount ?? 0);
       })
       .catch(() => {});
   }, []);
   useEffect(() => {
     if (!loggedIn) return;
-    fetchDomains();
-    // 手动文字输入时 processEntry 在后台运行，domain 可能延迟写入
-    // 额外延迟刷新确保 AI 处理完成后能拿到分类数据
+    fetchSidebar();
     let delayTimer: ReturnType<typeof setTimeout>;
     const unsub = on("recording:processed", () => {
-      fetchDomains();
+      fetchSidebar();
       clearTimeout(delayTimer);
-      delayTimer = setTimeout(fetchDomains, 8000);
+      delayTimer = setTimeout(fetchSidebar, 8000);
     });
     return () => { unsub(); clearTimeout(delayTimer); };
-  }, [loggedIn, fetchDomains]);
+  }, [loggedIn, fetchSidebar]);
   // CommandSheet 状态（语音指令确认弹窗）
   const [commandSheetOpen, setCommandSheetOpen] = useState(false);
   const [commandSheetTranscript, setCommandSheetTranscript] = useState<string>("");
@@ -184,7 +192,7 @@ export default function Page() {
       if (cancelled) return;
       const now = new Date();
       const hour = now.getHours();
-      const today = now.toISOString().split("T")[0];
+      const today = toLocalDateStr(now);
       const morningH = s.morningBriefingHour ?? 6;
       const eveningH = s.eveningSummaryHour ?? 22;
 
@@ -198,7 +206,7 @@ export default function Page() {
       } else if (hour >= eveningH || hour < 4) {
         // 晚报时段：eveningH ~ 次日4:00
         const eveningDate = hour < 4
-          ? new Date(now.getTime() - 86400000).toISOString().split("T")[0]
+          ? toLocalDateStr(new Date(now.getTime() - 86400000))
           : today;
         const key = `v2note:evening_shown:${eveningDate}`;
         if (!localStorage.getItem(key)) {
@@ -210,10 +218,11 @@ export default function Page() {
     return () => { cancelled = true; };
   }, [loggedIn]);
 
-  // ── 本地通知调度 + 点击跳转 ──
+  // ── 本地通知调度 + 点击跳转 + 前台抑制 ──
   useEffect(() => {
     if (!loggedIn) return;
     let removeListener: (() => void) | undefined;
+    let removeSuppressor: (() => void) | undefined;
 
     (async () => {
       const s = await getSettings();
@@ -231,17 +240,26 @@ export default function Page() {
         await cancelDailyNotifications();
       }
 
-      // 监听通知点击 → 打开日报
+      // 前台通知抑制：App 在前台时不弹出本地通知（避免与 WebSocket toast 双响）
+      removeSuppressor = await addForegroundNotificationSuppressor();
+
+      // 监听通知点击 → 打开日报 或 跳转待办
       removeListener = await addNotificationClickListener((action) => {
         if (action === "morning-briefing") {
           setActiveOverlay("morning-briefing");
         } else if (action === "evening-summary") {
           setActiveOverlay("evening-summary");
+        } else if (action === "todo-reminder") {
+          // 点击待办提醒通知 → 切换到待办 Tab
+          setActiveTab("todo");
         }
       });
     })();
 
-    return () => { removeListener?.(); };
+    return () => {
+      removeListener?.();
+      removeSuppressor?.();
+    };
   }, [loggedIn, user?.displayName]);
 
   // ── CommandSheet: 用 ref 避免闭包捕获过期值 ──
@@ -364,6 +382,32 @@ export default function Page() {
     return () => unsub();
   }, [loggedIn]);
 
+  // 触发日历/闹钟 Intent（如果 reminder_types 包含 calendar/alarm）
+  const triggerIntentDispatch = useCallback(async (cmd: TodoCommand) => {
+    const source = cmd.action_type === "modify"
+      ? { ...cmd.todo, ...cmd.changes }
+      : cmd.todo;
+    if (!source) return;
+    const types = source.reminder?.types as ReminderType[] | undefined;
+    if (!types || (!types.includes("calendar") && !types.includes("alarm"))) return;
+    if (!source.scheduled_start) return;
+    try {
+      await dispatchIntents(
+        {
+          text: source.text ?? "",
+          scheduled_start: source.scheduled_start,
+          scheduled_end: source.scheduled_end ?? null,
+          estimated_minutes: source.estimated_minutes ?? null,
+          reminder_before: source.reminder?.before_minutes ?? null,
+        },
+        types,
+        SystemIntent,
+      );
+    } catch (e) {
+      console.warn("[intent-dispatch] failed:", e);
+    }
+  }, []);
+
   // CommandSheet 确认执行：根据指令类型调用 REST API
   const handleCommandConfirm = useCallback(async (commands: TodoCommand[]) => {
     setCommandSheetOpen(false);
@@ -383,6 +427,7 @@ export default function Page() {
               recurrence_rule: cmd.todo.recurrence?.rule,
               recurrence_end: cmd.todo.recurrence?.end_date,
             });
+            await triggerIntentDispatch(cmd);
             break;
           }
           case "complete": {
@@ -402,6 +447,7 @@ export default function Page() {
               recurrence_rule: cmd.changes.recurrence?.rule,
               recurrence_end: cmd.changes.recurrence?.end_date,
             });
+            await triggerIntentDispatch(cmd);
             break;
           }
           case "query":
@@ -415,7 +461,7 @@ export default function Page() {
       console.error("[CommandSheet] confirm error:", err);
       fabNotify.error("执行失败: " + (err.message || "未知错误"));
     }
-  }, []);
+  }, [triggerIntentDispatch]);
 
   // 静默执行：跳过 CommandSheet 直接执行 + 撤销 toast
   const silentExecuteCommands = useCallback(async (commands: TodoCommand[]) => {
@@ -440,6 +486,7 @@ export default function Page() {
               recurrence_end: cmd.todo.recurrence?.end_date,
             });
             if (result?.id) createdIds.push(result.id);
+            await triggerIntentDispatch(cmd);
             break;
           }
           case "complete": {
@@ -462,6 +509,7 @@ export default function Page() {
               recurrence_rule: cmd.changes.recurrence?.rule,
               recurrence_end: cmd.changes.recurrence?.end_date,
             });
+            await triggerIntentDispatch(cmd);
             break;
           }
         }
@@ -505,7 +553,7 @@ export default function Page() {
     } catch (err: any) {
       fabNotify.error("执行失败: " + (err.message || "未知错误"));
     }
-  }, []);
+  }, [triggerIntentDispatch]);
 
   const backHandler = useMemo(() => {
     if (activeOverlay) return () => setActiveOverlay(null);
@@ -538,7 +586,7 @@ export default function Page() {
   }, []);
 
   const handleOpenCommandChat = useCallback((initialText?: string) => {
-    const today = new Date().toISOString().split("T")[0];
+    const today = getLocalToday();
     setChatDateRange({ start: today, end: today });
     setChatInitialMessage(initialText);
     setChatSkill(undefined);
@@ -547,7 +595,7 @@ export default function Page() {
   }, []);
 
   const handleOpenSkillChat = useCallback((skillName: string) => {
-    const today = new Date().toISOString().split("T")[0];
+    const today = getLocalToday();
     setChatDateRange({ start: today, end: today });
     setChatInitialMessage(undefined);
     setChatSkill(skillName);
@@ -714,9 +762,10 @@ export default function Page() {
         onViewBriefing={() => setActiveOverlay("daily-report")}
         onViewSettings={() => setActiveOverlay("settings")}
         onViewSearch={() => setActiveOverlay("search")}
-        domains={cachedDomains}
-        onSelectDomain={(domain) => {
-          setDomainFilter(domain);
+        wikiPages={sidebarPages}
+        inboxCount={inboxCount}
+        onSelectPage={(pageId) => {
+          setWikiPageFilter(pageId);
           setActiveTab("diary");
         }}
         onLogout={logout}
@@ -734,8 +783,9 @@ export default function Page() {
         onChatClick={() => handleOpenCommandChat()}
         onSearchClick={() => setActiveOverlay("search")}
         userName={user?.displayName}
-        domainFilter={domainFilter}
-        onClearDomainFilter={() => setDomainFilter(null)}
+        wikiPageFilter={wikiPageFilter}
+        wikiPageFilterLabel={wikiPageFilter === "__inbox__" ? "未整理" : sidebarPages.find(p => p.id === wikiPageFilter)?.title}
+        onClearWikiPageFilter={() => setWikiPageFilter(null)}
         todoViewMode={todoViewMode}
         onTodoViewModeChange={setTodoViewMode}
       />
@@ -752,16 +802,16 @@ export default function Page() {
           isReady={pullToRefresh.isReady}
           isRefreshing={pullToRefresh.isRefreshing}
         />
-        <div className={activeTab === "diary" ? "bg-surface-low" : "hidden"}>
+        <div className={activeTab === "diary" ? "bg-surface-low animate-tab-fade-in" : "hidden"}>
           <NotesTimeline
             notebook={activeNotebook}
-            domainFilter={domainFilter}
+            wikiPageFilter={wikiPageFilter}
             onOpenChat={handleOpenCommandChat}
             onOpenOverlay={openOverlay}
             onRegisterRefresh={(fn) => { diaryRefreshRef.current = fn; }}
           />
         </div>
-        <div className={activeTab === "todo" ? undefined : "hidden"}>
+        <div className={activeTab === "todo" ? "animate-tab-fade-in" : "hidden"}>
           <TodoWorkspace
             onOpenChat={handleOpenCommandChat}
             viewMode={todoViewMode}
@@ -828,94 +878,115 @@ export default function Page() {
         }}
       />
 
-      {/* Overlays — AnimatePresence 统一转场，key 由 activeOverlay 驱动 */}
+      {/* Overlays — AnimatePresence + OverlayTransition 统一 slide-in/out 转场 */}
       <AnimatePresence mode="wait">
       {activeOverlay === "search" ? (
-        <SearchView key="search" onClose={closeOverlay} />
+        <OverlayTransition motionKey="search">
+          <SearchView onClose={closeOverlay} />
+        </OverlayTransition>
       ) : activeOverlay === "chat" && chatDateRange ? (
-        <ChatView
-          key="chat"
-          dateRange={chatDateRange}
-          onClose={() => {
-            closeOverlay();
-            setChatInitialMessage(undefined);
-            setChatSkill(undefined);
-            setChatMode("review");
-          }}
-          initialMessage={chatInitialMessage}
-          mode={chatMode}
-          skill={chatSkill}
-          commandContext={{
-            setTheme,
-            exportData: handleExport,
-            startReview: handleStartReview,
-            showHelp,
-            openOverlay,
-          }}
-        />
+        <OverlayTransition motionKey="chat">
+          <ChatView
+            dateRange={chatDateRange}
+            onClose={() => {
+              closeOverlay();
+              setChatInitialMessage(undefined);
+              setChatSkill(undefined);
+              setChatMode("review");
+            }}
+            initialMessage={chatInitialMessage}
+            mode={chatMode}
+            skill={chatSkill}
+            commandContext={{
+              setTheme,
+              exportData: handleExport,
+              startReview: handleStartReview,
+              showHelp,
+              openOverlay,
+            }}
+          />
+        </OverlayTransition>
       ) : activeOverlay === "review" ? (
-        <ReviewOverlay key="review" onClose={closeOverlay} onStartInsight={handleStartInsight} />
+        <OverlayTransition motionKey="review">
+          <ReviewOverlay onClose={closeOverlay} onStartInsight={handleStartInsight} />
+        </OverlayTransition>
       ) : activeOverlay === "profile" ? (
-        <ProfileEditor key="profile" onClose={closeOverlay} />
+        <OverlayTransition motionKey="profile">
+          <ProfileEditor onClose={closeOverlay} />
+        </OverlayTransition>
       ) : activeOverlay === "user-settings" ? (
-        <UserSettings key="user-settings" onClose={closeOverlay} onLogout={logout} />
+        <OverlayTransition motionKey="user-settings">
+          <UserSettings onClose={closeOverlay} onLogout={logout} />
+        </OverlayTransition>
       ) : activeOverlay === "settings" ? (
-        <SettingsEditor
-          key="settings"
-          onClose={closeOverlay}
-          onThemeChange={setTheme}
-        />
+        <OverlayTransition motionKey="settings">
+          <SettingsEditor
+            onClose={closeOverlay}
+            onThemeChange={setTheme}
+          />
+        </OverlayTransition>
       ) : activeOverlay === "notebooks" ? (
-        <NotebookList
-          key="notebooks"
-          activeNotebook={activeNotebook}
-          onClose={closeOverlay}
-          onSelect={(name, _color) => {
-            setActiveNotebook(name);
-          }}
-        />
+        <OverlayTransition motionKey="notebooks">
+          <NotebookList
+            activeNotebook={activeNotebook}
+            onClose={closeOverlay}
+            onSelect={(name, _color) => {
+              setActiveNotebook(name);
+            }}
+          />
+        </OverlayTransition>
       ) : activeOverlay === "morning-briefing" ? (
-        <MorningBriefing key="morning-briefing" onClose={closeOverlay} />
+        <OverlayTransition motionKey="morning-briefing">
+          <MorningBriefing onClose={closeOverlay} />
+        </OverlayTransition>
       ) : activeOverlay === "evening-summary" ? (
-        <EveningSummary key="evening-summary" onClose={closeOverlay} />
+        <OverlayTransition motionKey="evening-summary">
+          <EveningSummary onClose={closeOverlay} />
+        </OverlayTransition>
       ) : activeOverlay === "daily-report" ? (
-        <SmartDailyReport key="daily-report" onClose={closeOverlay} />
+        <OverlayTransition motionKey="daily-report">
+          <SmartDailyReport onClose={closeOverlay} />
+        </OverlayTransition>
       ) : activeOverlay === "notifications" ? (
-        <NotificationCenter
-          key="notifications"
-          onClose={closeOverlay}
-          onNavigate={handleNotificationNavigate}
-        />
+        <OverlayTransition motionKey="notifications">
+          <NotificationCenter
+            onClose={closeOverlay}
+            onNavigate={handleNotificationNavigate}
+          />
+        </OverlayTransition>
       ) : activeOverlay === "goals" ? (
-        <GoalList
-          key="goals"
-          onClose={closeOverlay}
-          onViewGoal={(goalId) => {
-            setSelectedGoalId(goalId);
-            setActiveOverlay("goal-detail");
-          }}
-          onViewProject={(projectId) => {
-            setSelectedGoalId(projectId);
-            setActiveOverlay("project-detail");
-          }}
-        />
+        <OverlayTransition motionKey="goals">
+          <GoalList
+            onClose={closeOverlay}
+            onViewGoal={(goalId) => {
+              setSelectedGoalId(goalId);
+              setActiveOverlay("goal-detail");
+            }}
+            onViewProject={(projectId) => {
+              setSelectedGoalId(projectId);
+              setActiveOverlay("project-detail");
+            }}
+          />
+        </OverlayTransition>
       ) : activeOverlay === "goal-detail" && selectedGoalId ? (
-        <GoalDetailOverlay
-          key="goal-detail"
-          goalId={selectedGoalId}
-          onClose={closeOverlay}
-          onOpenChat={handleOpenCommandChat}
-        />
+        <OverlayTransition motionKey="goal-detail">
+          <GoalDetailOverlay
+            goalId={selectedGoalId}
+            onClose={closeOverlay}
+            onOpenChat={handleOpenCommandChat}
+          />
+        </OverlayTransition>
       ) : activeOverlay === "project-detail" && selectedGoalId ? (
-        <ProjectDetailOverlay
-          key="project-detail"
-          projectId={selectedGoalId}
-          onClose={closeOverlay}
-          onViewGoal={(goalId) => {
-            setSelectedGoalId(goalId);
-            setActiveOverlay("goal-detail");
-          }}
-        />
+        <OverlayTransition motionKey="project-detail">
+          <ProjectDetailOverlay
+            projectId={selectedGoalId}
+            onClose={closeOverlay}
+            onViewGoal={(goalId) => {
+              setSelectedGoalId(goalId);
+              setActiveOverlay("goal-detail");
+            }}
+          />
+        </OverlayTransition>
       ) : null}
       </AnimatePresence>
     </div>

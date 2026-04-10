@@ -31,6 +31,8 @@ export interface Todo {
     level?: number;
     /** 关联的 Cluster（level>=1 时使用，用于认知叙事） */
     cluster_id?: string | null;
+    /** 关联的 Wiki Page（level>=1 时使用，认知 Wiki 模式） */
+    wiki_page_id?: string | null;
     /** 状态（level>=1 时使用）：active/paused/completed/abandoned/progressing/blocked/suggested/dismissed（DB DEFAULT 'active'） */
     status?: string;
     /** 父目标名称（JOIN 得到，非 DB 列） */

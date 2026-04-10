@@ -10,12 +10,13 @@
 6. superseded 状态的 spec 已被合并，永远不要引用它们，使用 superseded_by 指向的文件
 -->
 
-> 最后更新：2026-04-08 | 共 94 个 spec（21 active / 5 draft / 38 completed / 29 superseded / 2 deprecated）
+> 最后更新：2026-04-11 | 共 103 个 spec（24 active / 6 draft / 43 completed / 29 superseded / 2 deprecated）
 
 ## 🔵 Active（当前有效，可直接引用和修改）
 
 | id | title | domain | file | 子域说明 |
 |----|-------|--------|------|---------|
+
 | 050a | Todo — Core & Logic | todo | todo-core.md | 数据流/AI提取/去重/时间/子任务/Strike关联 |
 | 050b | Todo — UI & Interactions | todo | todo-ui.md | 界面交互 + 实施阶段 |
 | 051 | Chat System | chat | chat-system.md | Header/Entry/Greeting/Skill |
@@ -35,11 +36,15 @@
 | 114 | 录音入口统一 | voice | voice-input-unify.md | 删InputBar死代码 + ChatView接gateway ASR + useVoiceToText hook |
 | 117 | 工具生态增强 | agent | tool-ecosystem-enhance.md | 读取工具+时间感知+认知层查询+描述优化 |
 | 119 | 认知 Wiki — 从原子拆解到知识编译 | cognitive | cognitive-wiki.md | Wiki编译替代Strike拆解+Cluster聚类，自顶向下拆分 |
+| 120 | 原生体验深度优化 — 路线A | ui | native-experience-deep.md | Phase 0-D 分阶段 |
+| 123 | 提示词架构 v2 — SharedAgent/UserAgent 分层 | agent | prompt-architecture-v2.md | 五层存储互斥+AI自主维护+wiki注入 |
+| 125 | 待办写入系统日历 & 闹钟 | todo | todo-calendar-alarm.md | Intent方案+SystemIntentPlugin |
 
 ## 🟡 Draft（规划中，尚未开始实施）
 
 | id | title | domain | file |
 |----|-------|--------|------|
+| 124 | Android App Shortcuts — 长按快捷指令 | ui | android-app-shortcuts.md |
 | 075 | 发现页 | ui | discovery-page.md |
 | 080 | 外部数据源集成 | infra | external-integration.md |
 | 087 | 鸿蒙适配 | infra | harmony-support.md |
@@ -49,6 +54,12 @@
 
 | id | title | domain | file |
 |----|-------|--------|------|
+| fix-recording-hint-style | Fix: 录音模式方向提示改为小按钮样式 | voice | fix-recording-hint-style.md |
+| fix-card-expand-collapse | Fix: 日记卡片展开逻辑优化+收起按钮高度 | ui | fix-card-expand-collapse.md |
+| 122 | 日程提醒 — 本地通知调度 | todo | todo-reminder-notify.md |
+| fix-record-delete-ghost | Fix: 日记删除后幽灵 Strike 残留 | cognitive | fix-record-delete-ghost.md |
+| 121 | 录音音频会话管理 | voice | audio-session-recording.md |
+| fix-note-card-menu | Fix: 日记卡片三点菜单位置 | ui | fix-note-card-menu-position.md |
 | fix-tag-limit | Fix: 标签系统清理 — 删除系统标签+限制5个 | cognitive | fix-tag-limit.md |
 | fix-tag-overflow | Fix: AI 标签超限+strike_tag弃用 | cognitive | fix-tag-overflow.md |
 | 118 | Chat Persistence — 对话持久化 | chat | chat-persistence.md |
@@ -102,6 +113,11 @@
 | fix-morning-briefing | Fix: 早报时区错位+问候语风格 | report | fix-morning-briefing.md |
 | fix-calendar-swipe | Fix: 日历滑动与Tab切换手势冲突 | ui | fix-calendar-swipe-conflict.md |
 | fix-tz | Fix: 系统性时区问题 | infra | fix-timezone-systematic.md |
+| fix-todo-time-shift | Fix: 待办时间编辑时区偏移 | todo | fix-todo-time-shift.md |
+| fix-note-card-edit-image | Fix: 卡片编辑自适应+图片缩略图 | ui | fix-note-card-edit-image.md |
+| fix-todo-project-vanish | Fix: 待办项目视图添加后消失 | todo | fix-todo-project-vanish.md |
+| fix-image-thumbnail | Fix: 图片插入后显示文字描述而非缩略图 | ui | fix-image-thumbnail.md |
+| fix-briefing-prompt-v2 | Fix: 早晚报接入 v2 提示词架构 | report | fix-briefing-prompt-v2.md |
 
 ## ⛔ Superseded（已被合并，不要引用）
 

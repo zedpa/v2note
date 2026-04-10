@@ -1,6 +1,6 @@
 import { strikeRepo, bondRepo, todoRepo } from "../db/repositories/index.js";
 import { query } from "../db/pool.js";
-import { todayRange } from "../lib/tz.js";
+import { todayRange, now as tzNow } from "../lib/tz.js";
 import type { StrikeEntry } from "../db/repositories/strike.js";
 import type { Todo } from "../db/repositories/todo.js";
 
@@ -154,7 +154,7 @@ export async function computeActionPanel(userId: string): Promise<ActionPanel> {
   }
 
   // ── Step 3: sort actions ──
-  const nowStr = new Date().toISOString();
+  const nowStr = tzNow().toISOString();
 
   allActions.sort((a, b) => {
     const aScheduledToday =

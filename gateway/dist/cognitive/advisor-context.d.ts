@@ -29,12 +29,14 @@ export interface ChatCognitiveContext {
     /** 可直接注入 system prompt 的文本 */
     contextString: string;
 }
-/** 加载普通 chat 的认知上下文：top-3 活跃 cluster + 近期矛盾 */
+/** 加载普通 chat 的认知上下文：最近更新的 wiki 主题 + 矛盾/变化段落 */
 export declare function loadChatCognitive(userId: string): Promise<ChatCognitiveContext>;
-/** 构建目标深入讨论的完整上下文 */
+/** 构建目标深入讨论的完整上下文（从 wiki_page 加载） */
 export declare function buildGoalDiscussionContext(goalId: string, userId: string): Promise<string>;
-/** 构建洞察"展开讨论"的上下文（基于矛盾 bond） */
-export declare function buildInsightDiscussionContext(bondId: string, userId: string): Promise<string>;
+/** 构建洞察"展开讨论"的上下文（从 wiki_page 加载） */
+export declare function buildInsightDiscussionContext(
+/** wiki_page_id 或旧的 bondId（兼容） */
+pageOrBondId: string, userId: string): Promise<string>;
 /** 格式化引用：📝 原声 vs 📄 素材 */
 export declare function formatCitation(record: {
     id: string;

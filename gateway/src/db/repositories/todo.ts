@@ -35,6 +35,8 @@ export interface Todo {
   level?: number;
   /** 关联的 Cluster（level>=1 时使用，用于认知叙事） */
   cluster_id?: string | null;
+  /** 关联的 Wiki Page（level>=1 时使用，认知 Wiki 模式） */
+  wiki_page_id?: string | null;
   /** 状态（level>=1 时使用）：active/paused/completed/abandoned/progressing/blocked/suggested/dismissed（DB DEFAULT 'active'） */
   status?: string;
   /** 父目标名称（JOIN 得到，非 DB 列） */
@@ -69,7 +71,7 @@ export async function findByDevice(deviceId: string): Promise<Todo[]> {
        SELECT COUNT(*)::int AS cnt, COUNT(*) FILTER (WHERE done)::int AS done_cnt
        FROM todo sub WHERE sub.parent_id = t.id
      ) sc ON true
-     WHERE (r.device_id = $1 OR t.device_id = $1) AND t.parent_id IS NULL
+     WHERE (r.device_id = $1 OR t.device_id = $1) AND (t.parent_id IS NULL OR p.id IS NOT NULL)
      ORDER BY t.created_at DESC`,
     [deviceId],
   );
@@ -88,7 +90,7 @@ export async function findByUser(userId: string): Promise<Todo[]> {
        SELECT COUNT(*)::int AS cnt, COUNT(*) FILTER (WHERE done)::int AS done_cnt
        FROM todo sub WHERE sub.parent_id = t.id
      ) sc ON true
-     WHERE (r.user_id = $1 OR t.user_id = $1) AND t.parent_id IS NULL
+     WHERE (r.user_id = $1 OR t.user_id = $1) AND (t.parent_id IS NULL OR p.id IS NOT NULL)
      ORDER BY t.created_at DESC`,
     [userId],
   );

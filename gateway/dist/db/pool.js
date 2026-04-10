@@ -24,7 +24,7 @@ export function getPool() {
             connectionTimeoutMillis: 5_000,
         });
         pool.on("connect", (client) => {
-            client.query("SET statement_timeout = 10000");
+            client.query("SET statement_timeout = 10000; SET timezone = 'Asia/Shanghai'");
         });
         pool.on("error", (err) => {
             console.error("[db] Unexpected pool error:", err);

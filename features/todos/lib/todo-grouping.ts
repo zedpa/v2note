@@ -6,7 +6,7 @@ export function filterByDate(todos: TodoDTO[], dateStr: string): TodoDTO[] {
   return todos.filter((t) => {
     if (t.level > 0) return false; // 项目/目标不在时间视图
 
-    // scheduled_start 是用户本地时间（去 Z 解析），created_at 是真实 UTC
+    // scheduled_start 是 UTC ISO 字符串，通过 parseScheduledTime 解析为本地 Date
     if (t.scheduled_start) return toLocalDateStr(parseScheduledTime(t.scheduled_start)) === dateStr;
     if (t.created_at) return toLocalDate(t.created_at) === dateStr;
     return false;

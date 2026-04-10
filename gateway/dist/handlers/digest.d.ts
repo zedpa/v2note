@@ -1,12 +1,16 @@
 /**
- * Digest Tier1 — 实时 Strike 分解
+ * Ingest Pipeline（Phase 2 — 认知 Wiki）
  *
- * 每条记录 1 次 AI 调用：分解为 Strike + 内部 Bond。
- * 跨 Strike 关系由 Tier2 批量分析统一处理。
+ * 简化后的 digest 流程：
+ * - 1 次 AI 调用提取 intend（待办/目标），不再拆解 Strike/Bond
+ * - 生成 record-level embedding（整条文本向量化）
+ * - 生成 content_hash（SHA256）
+ * - Record 标记为 pending_compile（等待每日 Wiki 编译）
+ * - 保留 Memory/Soul/Profile 更新
  */
 /**
  * Main digest entry point.
- * Tier1: 1 次 AI 调用分解 Strike + 内部 Bond。
+ * Phase 2: 只提取 intend + 标记 pending_compile，不再拆解 Strike/Bond。
  */
 export declare function digestRecords(recordIds: string[], context: {
     deviceId: string;

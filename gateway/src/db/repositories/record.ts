@@ -18,6 +18,8 @@ export interface Record {
   file_name: string | null;
   domain?: string | null;
   hierarchy_tags?: Array<{ label: string; level: number }>;
+  compile_status: string;
+  content_hash: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -183,6 +185,8 @@ export async function updateFields(
 export async function deleteByIds(ids: string[]): Promise<number> {
   if (ids.length === 0) return 0;
   const placeholders = ids.map((_, i) => `$${i + 1}`).join(", ");
+  // 先删除关联的 Strike（Bond/StrikeTag 有 ON DELETE CASCADE 自动清理）
+  await execute(`DELETE FROM strike WHERE source_id IN (${placeholders})`, ids);
   return execute(`DELETE FROM record WHERE id IN (${placeholders})`, ids);
 }
 
@@ -268,6 +272,17 @@ export async function findUndigested(userId: string): Promise<Record[]> {
      ORDER BY created_at ASC`,
     [userId],
   );
+}
+
+/** 统计正在消化中的 record 数量（digested=false, status=completed, 未超过重试上限） */
+export async function countUndigested(userId: string): Promise<number> {
+  const row = await queryOne<{ count: string }>(
+    `SELECT COUNT(*)::text AS count FROM record WHERE user_id = $1
+     AND digested = FALSE AND status = 'completed' AND archived = false
+     AND COALESCE(digest_attempts, 0) < 3`,
+    [userId],
+  );
+  return parseInt(row?.count ?? "0", 10);
 }
 
 export async function incrementDigestAttempts(id: string): Promise<void> {
@@ -415,4 +430,38 @@ export async function findByDeviceAndDateRange(
      ORDER BY created_at ASC`,
     [deviceId, start, end],
   );
+}
+
+/** 查找待编译的 record（compile_status = 'pending' 或 'needs_recompile'） */
+export async function findPendingCompile(userId: string, limit = 30): Promise<Record[]> {
+  return query<Record>(
+    `SELECT * FROM record WHERE user_id = $1
+     AND compile_status IN ('pending', 'needs_recompile')
+     AND status = 'completed'
+     AND archived = false
+     ORDER BY created_at ASC
+     LIMIT $2`,
+    [userId, limit],
+  );
+}
+
+/** 更新 record 的编译状态（附带可选的 content_hash） */
+export type CompileStatus = "pending" | "compiled" | "skipped" | "needs_recompile";
+
+export async function updateCompileStatus(
+  recordId: string,
+  status: CompileStatus,
+  contentHash?: string,
+): Promise<void> {
+  if (contentHash !== undefined) {
+    await execute(
+      `UPDATE record SET compile_status = $1, content_hash = $2, updated_at = now() WHERE id = $3`,
+      [status, contentHash, recordId],
+    );
+  } else {
+    await execute(
+      `UPDATE record SET compile_status = $1, updated_at = now() WHERE id = $2`,
+      [status, recordId],
+    );
+  }
 }

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { now as tzNow, APP_TZ } from "../../lib/tz.js";
 export const getCurrentTimeTool = {
     name: "get_current_time",
     description: `获取当前时间信息。
@@ -8,7 +9,7 @@ export const getCurrentTimeTool = {
     parameters: z.object({}),
     autonomy: "silent",
     handler: async () => {
-        const now = new Date();
+        const now = tzNow();
         const weekdays = ["日", "一", "二", "三", "四", "五", "六"];
         const weekday = `周${weekdays[now.getDay()]}`;
         const formatted = `${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}日 ${weekday} ${now.getHours()}:${String(now.getMinutes()).padStart(2, "0")}`;
@@ -19,7 +20,7 @@ export const getCurrentTimeTool = {
                 iso: now.toISOString(),
                 timestamp: now.getTime(),
                 weekday,
-                timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+                timezone: APP_TZ,
                 formatted,
             },
         };

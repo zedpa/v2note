@@ -54,7 +54,7 @@ export function TaskItem({ todo, onToggle, onPress }: TaskItemProps) {
 
       {/* Content */}
       <div
-        className="min-w-0 flex-1 cursor-pointer select-none"
+        className="min-w-0 flex-1 cursor-pointer select-none pressable"
         onClick={() => onPress?.(todo)}
       >
         <div

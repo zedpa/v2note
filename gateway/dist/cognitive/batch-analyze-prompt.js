@@ -6,6 +6,7 @@
  *
  * 本文件只负责 Step A 的 prompt。
  */
+import { toLocalDate } from "../lib/tz.js";
 // ── Step A: 结构分析 prompt ─────────────────────────────────────────
 const SYSTEM_PROMPT = `你是一个认知结构分析引擎。你的**唯一任务**是将用户的认知触动（Strike）组织成主题聚类。
 
@@ -104,7 +105,7 @@ export function buildBatchAnalyzeMessages(input) {
         }
         const materialTag = s.source_type === "material" ? "[素材] " : "";
         const tagStr = s.tags.length > 0 ? ` #${s.tags.join(" #")}` : "";
-        const dateStr = typeof s.created_at === "string" ? s.created_at.split("T")[0] : new Date(s.created_at).toISOString().split("T")[0];
+        const dateStr = toLocalDate(s.created_at);
         parts.push(`- [${s.id}] ${materialTag}[${s.polarity}] ${s.nucleus}${tagStr} (${dateStr})`);
     }
     parts.push(`\n共 ${totalCount} 条 Strike（其中 feel ${feelCount} 条已排除）。非 feel Strike ${totalCount - feelCount} 条，覆盖率目标 50%+。`);

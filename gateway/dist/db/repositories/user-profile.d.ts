@@ -9,6 +9,7 @@ export interface UserProfile {
     review_time: string | null;
     preferences: Record<string, any>;
     onboarding_done: boolean;
+    timezone: string;
     updated_at: string;
 }
 export declare function findByDevice(deviceId: string): Promise<UserProfile | null>;

@@ -152,6 +152,12 @@ export function ChatView({ dateRange, onClose, initialMessage, title, mode: mode
     if (!trimmed || streaming) return;
 
     if (trimmed.startsWith("/")) {
+      // /compact 直接发到后端处理，不在前端拦截
+      if (trimmed === "/compact") {
+        send("/compact");
+        setInput("");
+        return;
+      }
       const result = executeCommand(trimmed, mergedCommandContext);
       if (result?.handled) {
         setInput("");
@@ -318,6 +324,13 @@ export function ChatView({ dateRange, onClose, initialMessage, title, mode: mode
                 className="px-3 py-1.5 rounded-full bg-deer/10 text-deer text-xs font-medium hover:bg-deer/20 active:bg-deer/30 transition-colors select-none"
               >
                 /clear
+              </button>
+              <button
+                type="button"
+                onClick={() => { setInput(""); setSlashMenu(null); send("/compact"); }}
+                className="px-3 py-1.5 rounded-full bg-deer/10 text-deer text-xs font-medium hover:bg-deer/20 active:bg-deer/30 transition-colors select-none"
+              >
+                /compact
               </button>
             </div>
           )}

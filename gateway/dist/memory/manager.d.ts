@@ -32,8 +32,10 @@ export declare class MemoryManager {
     }): Promise<{
         soul?: string;
         userProfile?: string;
+        userAgent?: string;
         memories: string[];
         rawMemories: MemoryEntry[];
+        wikiContext?: string[];
     }>;
     /**
      * Semantic memory search.

@@ -15,6 +15,11 @@ export declare function writeStrikeEmbedding(strikeId: string, nucleus: string):
  */
 export declare function writeTodoEmbedding(todoId: string, text: string, level?: number): Promise<void>;
 /**
+ * 为 record 异步写入 embedding（整条文本向量化，替代逐 strike 向量化）。
+ * 调用方应 void 调用（不 await），不阻塞主流程。
+ */
+export declare function writeRecordEmbedding(recordId: string, text: string): Promise<void>;
+/**
  * 批量为已有 strike 补写 embedding（用于迁移/修复）。
  * 返回成功写入数量。
  */

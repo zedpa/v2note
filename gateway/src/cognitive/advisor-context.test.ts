@@ -91,46 +91,40 @@ describe("detectCognitiveQuery", () => {
 });
 
 describe("loadChatCognitive", () => {
-  it("should_return_top3_active_clusters_by_7day_strike_count", async () => {
-    // 模拟 top-3 clusters 查询
+  it("should_return_top3_wiki_pages_as_clusters", async () => {
+    // 模拟 wiki_page 查询（替代旧的 cluster 查询）
     mockQuery.mockResolvedValueOnce([
-      { id: "c1", nucleus: "供应链管理", member_count: "12" },
-      { id: "c2", nucleus: "团队建设", member_count: "8" },
-      { id: "c3", nucleus: "产品策略", member_count: "5" },
+      { id: "wp1", title: "供应链管理", summary: "供应链优化笔记", content: "供应链内容" },
+      { id: "wp2", title: "团队建设", summary: "团队管理", content: "团队内容" },
+      { id: "wp3", title: "产品策略", summary: "产品方向", content: "产品内容" },
     ]);
-    // 模拟 alerts 查询（空）
-    mockQuery.mockResolvedValueOnce([]);
 
     const result = await loadChatCognitive("user-1");
 
     expect(result.clusters).toHaveLength(3);
     expect(result.clusters[0].name).toBe("供应链管理");
-    expect(result.clusters[0].recentStrikeCount).toBe(12);
+    expect(result.clusters[0].recentStrikeCount).toBe(0); // wiki 模式不统计 strike
   });
 
-  it("should_include_recent_contradiction_alerts", async () => {
-    // clusters
-    mockQuery.mockResolvedValueOnce([]);
-    // contradictions
+  it("should_extract_contradictions_from_wiki_content", async () => {
+    // wiki 页面内容中包含矛盾/变化标记
     mockQuery.mockResolvedValueOnce([
       {
-        a_id: "s1", a_nucleus: "供应商A质量好", a_polarity: "judge",
-        b_id: "s2", b_nucleus: "供应商A交期不稳定", b_polarity: "judge",
-        bond_id: "b1",
+        id: "wp1", title: "供应商评估", summary: null,
+        content: "之前认为供应商A质量好，后来发现交期不稳定\n其他一般内容",
       },
     ]);
 
     const result = await loadChatCognitive("user-1");
 
     expect(result.contradictions).toHaveLength(1);
-    expect(result.contradictions[0].strikeA.nucleus).toBe("供应商A质量好");
+    expect(result.contradictions[0].strikeA.nucleus).toContain("供应商A质量好");
   });
 
   it("should_format_as_injectable_context_string", async () => {
     mockQuery.mockResolvedValueOnce([
-      { id: "c1", nucleus: "供应链管理", member_count: "12" },
+      { id: "wp1", title: "供应链管理", summary: "供应链优化", content: "普通内容" },
     ]);
-    mockQuery.mockResolvedValueOnce([]);
 
     const result = await loadChatCognitive("user-1");
 
@@ -142,7 +136,7 @@ describe("loadChatCognitive", () => {
 // ─── 场景 1: 目标详情"深入讨论" ───
 
 describe("buildGoalDiscussionContext", () => {
-  it("should_include_goal_strike_bond_chain", async () => {
+  it("should_include_goal_info_and_wiki_knowledge", async () => {
     mockGoalRepo.findById.mockResolvedValueOnce({
       id: "goal-1",
       title: "提升供应链效率",
@@ -150,13 +144,10 @@ describe("buildGoalDiscussionContext", () => {
       status: "active",
     });
 
-    // cluster members (strikes)
+    // wiki_page ILIKE 查询结果
     mockQuery.mockResolvedValueOnce([
-      { id: "s1", nucleus: "供应商评估标准需要统一", polarity: "realize", created_at: "2026-03-20", source_id: "rec-1" },
-      { id: "s2", nucleus: "物流成本过高", polarity: "judge", created_at: "2026-03-18", source_id: "rec-2" },
+      { id: "wp1", title: "供应链优化", content: "供应商评估标准需要统一\n物流成本过高", summary: "供应链相关知识" },
     ]);
-    // contradictions
-    mockQuery.mockResolvedValueOnce([]);
     // todo completion stats
     mockTodoRepo.findByGoalId.mockResolvedValueOnce([
       { id: "t1", done: true },
@@ -166,12 +157,11 @@ describe("buildGoalDiscussionContext", () => {
     const ctx = await buildGoalDiscussionContext("goal-1", "user-1");
 
     expect(ctx).toContain("提升供应链效率");
-    expect(ctx).toContain("[record:rec-1]");
-    expect(ctx).toContain("供应商评估标准需要统一");
+    expect(ctx).toContain("供应链优化");
     expect(ctx).toContain("完成率");
   });
 
-  it("should_include_contradiction_alerts_for_goal", async () => {
+  it("should_include_wiki_summaries_for_goal", async () => {
     mockGoalRepo.findById.mockResolvedValueOnce({
       id: "goal-1",
       title: "提升供应链效率",
@@ -179,24 +169,20 @@ describe("buildGoalDiscussionContext", () => {
       status: "active",
     });
 
-    // cluster members
+    // wiki pages with summaries
     mockQuery.mockResolvedValueOnce([
-      { id: "s1", nucleus: "降低成本", polarity: "intend", created_at: "2026-03-20", source_id: "rec-1" },
-    ]);
-    // contradictions for cluster strikes
-    mockQuery.mockResolvedValueOnce([
-      { a_nucleus: "降低成本优先", b_nucleus: "质量不能妥协" },
+      { id: "wp1", title: "成本控制", content: "降低成本优先\n质量不能妥协", summary: "成本与质量平衡" },
     ]);
     // todos
     mockTodoRepo.findByGoalId.mockResolvedValueOnce([]);
 
     const ctx = await buildGoalDiscussionContext("goal-1", "user-1");
 
-    expect(ctx).toContain("降低成本优先");
-    expect(ctx).toContain("质量不能妥协");
+    expect(ctx).toContain("成本控制");
+    expect(ctx).toContain("成本与质量平衡");
   });
 
-  it("should_return_minimal_context_when_goal_has_no_cluster", async () => {
+  it("should_return_minimal_context_when_no_wiki_pages", async () => {
     mockGoalRepo.findById.mockResolvedValueOnce({
       id: "goal-1",
       title: "学英语",
@@ -204,54 +190,45 @@ describe("buildGoalDiscussionContext", () => {
       status: "active",
     });
 
+    // wiki 查询返回空
+    mockQuery.mockResolvedValueOnce([]);
+    // todos
+    mockTodoRepo.findByGoalId.mockResolvedValueOnce([]);
+
     const ctx = await buildGoalDiscussionContext("goal-1", "user-1");
 
     expect(ctx).toContain("学英语");
-    // 没有 cluster 就不应有实际的 record 引用（[record:rec-xxx]）
-    expect(ctx).not.toMatch(/\[record:rec-/);
+    // 没有 wiki 就不应有"相关知识"段落
+    expect(ctx).not.toContain("相关知识");
   });
 });
 
 // ─── 场景 3: 展开讨论 ───
 
 describe("buildInsightDiscussionContext", () => {
-  it("should_include_both_sides_of_contradiction", async () => {
-    // 查询矛盾双方 + 相关 cluster 成员
-    mockQuery
-      // 矛盾 bond + strikes
-      .mockResolvedValueOnce([{
-        bond_id: "b1",
-        a_id: "s1", a_nucleus: "远程办公效率更高", a_polarity: "judge", a_created_at: "2026-03-10", a_source_id: "rec-1",
-        b_id: "s2", b_nucleus: "面对面协作不可替代", b_polarity: "judge", b_created_at: "2026-03-15", b_source_id: "rec-2",
-      }])
-      // 相关 cluster 成员
-      .mockResolvedValueOnce([
-        { id: "s3", nucleus: "混合办公可能是折中方案", polarity: "realize", created_at: "2026-03-18", source_id: "rec-3" },
-      ]);
+  it("should_return_wiki_page_content_when_found", async () => {
+    // wiki_page 查询返回匹配页面
+    mockQuery.mockResolvedValueOnce([{
+      id: "wp1",
+      title: "远程办公思考",
+      content: "远程办公效率更高\n但面对面协作不可替代\n混合办公是折中方案",
+      summary: "远程 vs 面对面",
+    }]);
 
-    const ctx = await buildInsightDiscussionContext("b1", "user-1");
+    const ctx = await buildInsightDiscussionContext("wp1", "user-1");
 
+    expect(ctx).toContain("远程办公思考");
     expect(ctx).toContain("远程办公效率更高");
     expect(ctx).toContain("面对面协作不可替代");
-    expect(ctx).toContain("2026-03-10");
-    expect(ctx).toContain("2026-03-15");
   });
 
-  it("should_include_related_cluster_members", async () => {
-    mockQuery
-      .mockResolvedValueOnce([{
-        bond_id: "b1",
-        a_id: "s1", a_nucleus: "A观点", a_polarity: "judge", a_created_at: "2026-03-10", a_source_id: "rec-1",
-        b_id: "s2", b_nucleus: "B观点", b_polarity: "judge", b_created_at: "2026-03-15", b_source_id: "rec-2",
-      }])
-      .mockResolvedValueOnce([
-        { id: "s3", nucleus: "C补充", polarity: "perceive", created_at: "2026-03-18", source_id: "rec-3" },
-      ]);
+  it("should_return_fallback_when_page_not_found", async () => {
+    // wiki_page 查询返回空
+    mockQuery.mockResolvedValueOnce([]);
 
-    const ctx = await buildInsightDiscussionContext("b1", "user-1");
+    const ctx = await buildInsightDiscussionContext("non-existent", "user-1");
 
-    expect(ctx).toContain("C补充");
-    expect(ctx).toContain("[record:rec-3]");
+    expect(ctx).toContain("未找到");
   });
 });
 

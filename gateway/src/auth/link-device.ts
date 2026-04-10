@@ -20,7 +20,6 @@ export async function linkDeviceToUser(
     "memory",
     "pending_intent",
     "notebook",
-    "ai_diary",
     "skill_config",
   ];
 
@@ -30,6 +29,39 @@ export async function linkDeviceToUser(
       [userId, deviceId],
     );
   }
+
+  // ai_diary has a unique constraint on (user_id, notebook, entry_date).
+  // If the user already has an entry for a given (notebook, entry_date) from
+  // another device, merge the device-only entry's content into it, then delete.
+  await execute(
+    `UPDATE ai_diary AS existing
+     SET full_content = existing.full_content || E'\\n\\n' || orphan.full_content,
+         summary = LEFT(existing.full_content || E'\\n\\n' || orphan.full_content, 200),
+         updated_at = now()
+     FROM ai_diary AS orphan
+     WHERE orphan.device_id = $2
+       AND orphan.user_id IS NULL
+       AND existing.user_id = $1
+       AND existing.notebook = orphan.notebook
+       AND existing.entry_date = orphan.entry_date`,
+    [userId, deviceId],
+  );
+  // 删除已合并的 device-only 条目
+  await execute(
+    `DELETE FROM ai_diary AS orphan
+     USING ai_diary AS existing
+     WHERE orphan.device_id = $2
+       AND orphan.user_id IS NULL
+       AND existing.user_id = $1
+       AND existing.notebook = orphan.notebook
+       AND existing.entry_date = orphan.entry_date`,
+    [userId, deviceId],
+  );
+  // 无冲突的 device-only 条目直接绑定 user_id
+  await execute(
+    `UPDATE ai_diary SET user_id = $1 WHERE device_id = $2 AND user_id IS NULL`,
+    [userId, deviceId],
+  );
 
   // soul and user_profile have a unique constraint on user_id.
   // If the user already has a record (from another device), skip backfill

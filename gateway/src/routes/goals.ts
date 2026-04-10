@@ -1,7 +1,7 @@
 import type { Router } from "../router.js";
 import { readBody, sendJson, getDeviceId, getUserId } from "../lib/http-helpers.js";
 import { todoRepo, pendingIntentRepo } from "../db/repositories/index.js";
-import { queryOne } from "../db/pool.js";
+import { queryOne, query as dbQuery } from "../db/pool.js";
 import { computeGoalHealth, createActionEvent, updateGoalStatus, getGoalTimeline } from "../cognitive/goal-linker.js";
 import { goalAutoLink, getProjectProgress } from "../cognitive/goal-auto-link.js";
 
@@ -27,10 +27,22 @@ export function registerGoalRoutes(router: Router) {
     const goals = userId
       ? await todoRepo.findActiveGoalsByUser(userId)
       : await todoRepo.findActiveGoalsByDevice(deviceId);
-    // 兼容前端：text → title 映射
+    // 批量查询 wiki page titles
+    const wikiPageIds = [...new Set(goals.map((g) => g.wiki_page_id).filter(Boolean))] as string[];
+    const wikiTitleMap = new Map<string, string>();
+    if (wikiPageIds.length > 0) {
+      const rows = await dbQuery<{ id: string; title: string }>(
+        `SELECT id, title FROM wiki_page WHERE id = ANY($1) AND status = 'active'`,
+        [wikiPageIds],
+      );
+      for (const r of rows) wikiTitleMap.set(r.id, r.title);
+    }
+
+    // 兼容前端：text → title 映射 + wiki page title
     const mapped = goals.map((g) => ({
       ...g,
       title: g.text,
+      wiki_page_title: g.wiki_page_id ? wikiTitleMap.get(g.wiki_page_id) ?? null : null,
     }));
     sendJson(res, mapped);
   });
@@ -154,72 +166,7 @@ export function registerGoalRoutes(router: Router) {
     sendJson(res, summary);
   });
 
-  // 诊断：检查 L1 集群 embedding 和两两相似度
-  router.get("/api/v1/sidebar/debug-emergence", async (req, res) => {
-    const userId = await resolveUserId(req);
-    if (!userId) { sendJson(res, { error: "user_id required" }, 401); return; }
-    // 自由 L1（不在任何 active L2 下）
-    const freeL1 = await queryOne<{ cnt: number }>(
-      `SELECT COUNT(*)::int AS cnt FROM strike s
-       WHERE s.user_id = $1 AND s.is_cluster = true AND s.level = 1
-         AND s.status = 'active' AND s.embedding IS NOT NULL
-         AND NOT EXISTS (
-           SELECT 1 FROM bond b WHERE b.target_strike_id = s.id AND b.type = 'cluster_member'
-             AND EXISTS (SELECT 1 FROM strike p WHERE p.id = b.source_strike_id AND p.level = 2 AND p.status = 'active')
-         )`, [userId]);
-    const totalL1 = await queryOne<{ cnt: number }>(
-      `SELECT COUNT(*)::int AS cnt FROM strike WHERE user_id = $1 AND is_cluster = true AND level = 1 AND status = 'active'`, [userId]);
-    const withEmb = await queryOne<{ cnt: number }>(
-      `SELECT COUNT(*)::int AS cnt FROM strike WHERE user_id = $1 AND is_cluster = true AND level = 1 AND status = 'active' AND embedding IS NOT NULL`, [userId]);
-    const l2Count = await queryOne<{ cnt: number }>(
-      `SELECT COUNT(*)::int AS cnt FROM strike WHERE user_id = $1 AND is_cluster = true AND level = 2`, [userId]);
-    // top 5 相似度对
-    const { query: dbQuery } = await import("../db/pool.js");
-    let topPairs: any[] = [];
-    try {
-      topPairs = await dbQuery(
-        `SELECT a.nucleus AS name_a, b.nucleus AS name_b,
-                (1 - (a.embedding <=> b.embedding))::float AS similarity
-         FROM strike a, strike b
-         WHERE a.user_id = $1 AND b.user_id = $1
-           AND a.is_cluster = true AND b.is_cluster = true
-           AND a.level = 1 AND b.level = 1
-           AND a.status = 'active' AND b.status = 'active'
-           AND a.embedding IS NOT NULL AND b.embedding IS NOT NULL
-           AND a.id < b.id
-         ORDER BY similarity DESC LIMIT 66`, [userId]);
-    } catch (e: any) { topPairs = [{ error: e.message }]; }
-    sendJson(res, {
-      totalL1: totalL1?.cnt,
-      withEmbedding: withEmb?.cnt,
-      freeL1: freeL1?.cnt,
-      l2Count: l2Count?.cnt,
-      topPairs: topPairs.map(p => ({
-        a: p.name_a?.match(/^\[(.+?)\]/)?.[1] ?? p.name_a?.slice(0, 15),
-        b: p.name_b?.match(/^\[(.+?)\]/)?.[1] ?? p.name_b?.slice(0, 15),
-        sim: p.similarity?.toFixed(3) ?? p.error,
-      })),
-      threshold: 0.75,
-    });
-  });
-
-  // 手动触发 L2 涌现
-  router.post("/api/v1/sidebar/emergence", async (req, res) => {
-    const userId = await resolveUserId(req);
-    if (!userId) { sendJson(res, { error: "user_id required" }, 401); return; }
-    const { runEmergence } = await import("../cognitive/emergence.js");
-    const result = await runEmergence(userId);
-    sendJson(res, result);
-  });
-
-  // 手动触发目标↔集群回填
-  router.post("/api/v1/sidebar/backfill", async (req, res) => {
-    const userId = await resolveUserId(req);
-    if (!userId) { sendJson(res, { error: "user_id required" }, 401); return; }
-    const { linkGoalsToClusters } = await import("../cognitive/todo-projector.js");
-    const result = await linkGoalsToClusters(userId);
-    sendJson(res, result);
-  });
+  // @deprecated debug-emergence / emergence / backfill 路由已移除（Phase 12）
 
   // 侧边栏"我的世界"树结构
   router.get("/api/v1/sidebar/my-world", async (req, res) => {

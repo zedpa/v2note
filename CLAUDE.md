@@ -148,6 +148,11 @@ v2note/
 - [流程] Phase 1b spec 审查必须前台等待结果，禁止后台化与实现并行。审查的价值是拦截 spec 偏差，后台化等于跳过审查 (来源: 2026-04-08 fix-tag-overflow)
 - [日期] gateway 中日期计算禁止使用 `toISOString().split("T")[0]`（返回 UTC）和 `created_at.split("T")[0]`（DB 可能返回 UTC ISO）。必须使用 `lib/tz.ts` 导出函数：`today()`, `daysAgo(n)`, `toLocalDate(d)`, `todayRange()`, `dayRange()`, `weekRange()`, `monthRange()`。tz.ts 硬编码 Asia/Shanghai 不依赖 process.env.TZ。DB 连接池已设 `SET timezone = 'Asia/Shanghai'` (来源: fix-timezone-systematic)
 - [模板] 共享 prompt 模板（如 `templates.ts`）有多个消费者时，更新占位符必须同步更新所有消费者的 `.replace()` 逻辑，否则 AI 会收到未替换的 `{变量名}` 字面量 (来源: fix-morning-briefing)
+- [前端时区] 前端解析后端 `timestamptz` 值时，禁止 `.replace(/Z$/i, "")` 剥离 Z 后缀。直接 `new Date(isoString)` 会正确解析 UTC，`getHours()`/`getDate()` 自动返回本地时间。剥离 Z 会导致 UTC 时间被当作本地时间，产生 -8h 偏移 (来源: fix-todo-time-shift)
+- [前端时区] 前端获取"今天日期"禁止 `new Date().toISOString().split("T")[0]`（返回 UTC 日期）。必须用 `getLocalToday()` 或 `toLocalDateStr(new Date())`。同理，从时间戳提取日期用 `toLocalDate(ts)` 而非 `ts.split("T")[0]` (来源: fix-todo-time-shift)
+- [数据库锁] 禁止在 Supabase transaction pooler（端口 6543）上使用 session-level advisory lock（`pg_advisory_lock/unlock`）。lock 和 unlock 会被路由到不同后端连接，导致锁永远无法释放。必须使用 `pg_try_advisory_xact_lock`（事务级，包裹在 BEGIN/ROLLBACK 中，事务结束自动释放）(来源: 2026-04-10 wiki-compiler lock 泄漏)
+- [数据库锁] Supabase Transaction Pooler 会杀死持有超过约 60 秒的事务连接。禁止在事务中执行 AI 调用或其他长时间操作。如果需要并发控制，单实例服务使用进程内 `Set/Map` 内存锁替代 DB advisory lock (来源: 2026-04-11 wiki-compiler 连接被杀)
+- [AI 幻觉] LLM 输出的任何 ID（UUID / FK 引用）都不可信。在执行 DB 写入前必须：(1) 正则校验格式（`/^[0-9a-f]{8}-...-[0-9a-f]{12}$/i`）；(2) `SELECT 1 FROM target_table WHERE id = $1` 存在性检查。AI 会编造格式正确但不存在的 UUID，也会编造格式非法的伪 UUID。INSERT 语句使用 `WHERE EXISTS` 子查询防护 (来源: 2026-04-11 wiki-compiler 6 层 FK violation)
 
 ## 🎯 风险分级
 
@@ -182,6 +187,50 @@ Spec frontmatter 中的 `risk` 字段决定流程自动化程度：
 - 中文注释优先，关键术语保留英文
 - 错误处理：所有 async 函数必须有 try/catch 或 .catch()
 - 路径别名：`@/*` → 项目根目录
+
+## 🕐 时区契约（全局强制）
+
+> UTC 进，UTC 存，最后一刻转。时区只在两个边界处理：用户输入 → UTC，UTC → 用户显示。
+
+### 存储层
+- PostgreSQL `timestamptz` 内部一律 UTC
+- 用户表存 `timezone` 字段（IANA 格式，如 `Asia/Shanghai`），后续国际化时按用户设置转换
+- DB 连接池已设 `SET timezone = 'Asia/Shanghai'`
+
+### API 层（Gateway）
+- 返回时间一律 ISO 8601 带 `Z` 后缀：`"2026-04-09T01:00:00.000Z"`
+- 接收时间接受带偏移的 ISO 8601：`"2026-04-09T09:00:00+08:00"`
+- **禁止传输"裸时间"**（无时区信息的字符串如 `"2026-04-09T09:00:00"`）
+- 获取当前时间/日期：必须用 `gateway/src/lib/tz.ts` 导出函数（`tzNow()`, `today()`, `daysAgo()`, `dayRange()` 等）
+- **禁止** `new Date()` / `new Date().toISOString()` 做日期计算（服务器可能在 UTC 时区）
+
+### 前端（浏览器）
+- 解析后端时间：**直接 `new Date(isoString)`**，浏览器自动按本地时区处理
+- **禁止** `.replace(/Z$/i, "")` 剥离 Z 后缀
+- 获取本地日期字符串：`getLocalToday()` 或 `toLocalDateStr(new Date())`（来自 `features/todos/lib/date-utils.ts`）
+- 从时间戳提取日期：`toLocalDate(ts)` 或 `toLocalDateStr(new Date(ts))`
+- **禁止** `new Date().toISOString().split("T")[0]`（返回 UTC 日期，北京 0:00-8:00 会错一天）
+- **禁止** `ts.split("T")[0]` 提取日期（对 UTC ISO 字符串返回 UTC 日期）
+- 构造带时区的时间字符串：`${date}T${time}:00${localTzOffset()}`
+- `toLocaleString` 系列用于纯展示时可以使用，但必须传明确的 locale 参数
+
+### 禁止模式速查
+```typescript
+// ❌ 全部禁止
+new Date().toISOString().split("T")[0]     // UTC 日期
+ts.replace(/Z$/i, "")                      // 剥离时区
+someDate.split("T")[0]                     // UTC 日期提取
+new Date()  // 仅在 gateway 中禁止，用 tzNow()
+
+// ✅ 正确做法
+getLocalToday()                            // 前端：本地今天
+toLocalDateStr(new Date(ts))               // 前端：时间戳→本地日期
+toLocalDate(ts)                            // 前端：时间戳→本地日期字符串
+parseScheduledTime(ts)                     // 前端：解析为本地 Date
+tzNow()                                    // 后端：当前时间
+today()                                    // 后端：今天日期字符串
+toLocalDateTime(ts)                        // 后端：给 AI/用户看的本地时间
+```
 
 ## 🦌 产品核心原则
 

@@ -1,5 +1,6 @@
 import { strikeRepo, bondRepo } from "../db/repositories/index.js";
 import { query } from "../db/pool.js";
+import { todayRange, now as tzNow } from "../lib/tz.js";
 // ── Step 5: keyword-based duration classification ──
 const QUICK_RE = /打电话|发消息|确认|回复|发送|转发|通知|提醒|call|reply|send|confirm/i;
 const DEEP_RE = /写|做|分析|学习|研究|设计|开发|整理|规划|write|analyze|study|design|develop|plan/i;
@@ -42,10 +43,7 @@ export async function computeActionPanel(userId) {
     const goalStrikeIds = new Set(goalStrikes.map((s) => s.id));
     const allActions = [];
     const goalActionCounts = new Map();
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
-    const todayEnd = new Date();
-    todayEnd.setHours(23, 59, 59, 999);
+    const { start: todayStartISO, end: todayEndISO } = todayRange();
     for (const goal of goalStrikes) {
         let count = 0;
         // 2a: find action strikes via bonds
@@ -91,22 +89,22 @@ export async function computeActionPanel(userId) {
         goalActionCounts.set(goal.id, count);
     }
     // ── Step 3: sort actions ──
-    const nowStr = new Date().toISOString();
+    const nowStr = tzNow().toISOString();
     allActions.sort((a, b) => {
         const aScheduledToday = a.scheduledStart &&
-            a.scheduledStart >= todayStart.toISOString() &&
-            a.scheduledStart <= todayEnd.toISOString();
+            a.scheduledStart >= todayStartISO &&
+            a.scheduledStart <= todayEndISO;
         const bScheduledToday = b.scheduledStart &&
-            b.scheduledStart >= todayStart.toISOString() &&
-            b.scheduledStart <= todayEnd.toISOString();
+            b.scheduledStart >= todayStartISO &&
+            b.scheduledStart <= todayEndISO;
         // Scheduled today → highest
         if (aScheduledToday && !bScheduledToday)
             return -1;
         if (!aScheduledToday && bScheduledToday)
             return 1;
         // Has approaching deadline → next
-        const aDeadlineSoon = a.deadline && a.deadline <= todayEnd.toISOString();
-        const bDeadlineSoon = b.deadline && b.deadline <= todayEnd.toISOString();
+        const aDeadlineSoon = a.deadline && a.deadline <= todayEndISO;
+        const bDeadlineSoon = b.deadline && b.deadline <= todayEndISO;
         if (aDeadlineSoon && !bDeadlineSoon)
             return -1;
         if (!aDeadlineSoon && bDeadlineSoon)
@@ -132,11 +130,11 @@ export async function computeActionPanel(userId) {
     const today = allActions.slice(1, 5).map((a) => {
         let symbol = "flexible";
         if (a.scheduledStart &&
-            a.scheduledStart >= todayStart.toISOString() &&
-            a.scheduledStart <= todayEnd.toISOString()) {
+            a.scheduledStart >= todayStartISO &&
+            a.scheduledStart <= todayEndISO) {
             symbol = "scheduled";
         }
-        else if (a.deadline && a.deadline <= todayEnd.toISOString()) {
+        else if (a.deadline && a.deadline <= todayEndISO) {
             symbol = "next";
         }
         return {

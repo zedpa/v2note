@@ -1,9 +1,8 @@
 /**
- * Context tier definitions for structured prompt assembly.
+ * Context tier definitions.
  *
- * Inspired by OpenClaw's approach:
- * - Hot: always in system prompt (core rules, anti-hallucination, output format)
- * - Warm: task-specific (soul, relevant memories, active skill prompts)
+ * v2: SharedAgent (static) + Soul/UserAgent/Profile/Memory/Wiki (dynamic per-user)
+ * buildSystemPrompt 在 prompt-builder.ts 中直接组装，不再使用 ContextBuildOptions。
  */
 export {};
 //# sourceMappingURL=tiers.js.map

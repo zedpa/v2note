@@ -1,18 +1,23 @@
 /**
  * 共享时间锚点 — 预计算常用相对日期，嵌入 LLM prompt。
  * LLM 直接查表，禁止自行做日期算术。
+ *
+ * 所有日期计算使用 Asia/Shanghai 时区（via tz.ts），不依赖 process.env.TZ。
  */
+import { TZDate } from "@date-fns/tz";
+import { addDays as dfAddDays } from "date-fns";
+import { now as tzNow, APP_TZ } from "./tz.js";
+/** 格式化日期为 "YYYY-MM-DD"，始终使用 Asia/Shanghai 时区解释 */
 export function fmt(d) {
-    // 使用本地日期，避免 UTC 时区偏移（如 UTC+8 下 4月30日00:00 → UTC 4月29日）
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, "0");
-    const day = String(d.getDate()).padStart(2, "0");
+    const tzd = d instanceof TZDate ? d : new TZDate(d.getTime(), APP_TZ);
+    const y = tzd.getFullYear();
+    const m = String(tzd.getMonth() + 1).padStart(2, "0");
+    const day = String(tzd.getDate()).padStart(2, "0");
     return `${y}-${m}-${day}`;
 }
 function addDays(base, n) {
-    const d = new Date(base);
-    d.setDate(d.getDate() + n);
-    return d;
+    const tzd = base instanceof TZDate ? base : new TZDate(base.getTime(), APP_TZ);
+    return dfAddDays(tzd, n);
 }
 /**
  * 生成预计算时间锚点查找表（Markdown 格式），嵌入 LLM prompt。
@@ -22,8 +27,25 @@ function addDays(base, n) {
  * - "这周六" → 本周六；若今天已过周六 → 下周六
  * - "下周X" → 下一个自然周的周X
  */
+/**
+ * 格式化日期并附带相对标记（今天/昨天）。
+ * 用于 AI 上下文注入，让 AI 直观判断时间关系。
+ */
+export function formatDateWithRelative(date, today) {
+    const ref = today ?? tzNow();
+    const dateStr = fmt(date);
+    const todayStr = fmt(ref);
+    const yesterday = new Date(ref);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = fmt(yesterday);
+    if (dateStr === todayStr)
+        return `${dateStr} 今天`;
+    if (dateStr === yesterdayStr)
+        return `${dateStr} 昨天`;
+    return dateStr;
+}
 export function buildDateAnchor(referenceDate) {
-    const now = referenceDate ?? new Date();
+    const now = referenceDate ?? tzNow();
     const today = fmt(now);
     const wd = now.getDay(); // 0=周日, 1=周一, ..., 6=周六
     const wdName = ["日", "一", "二", "三", "四", "五", "六"][wd];

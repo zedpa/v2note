@@ -1,20 +1,25 @@
 /**
- * Tag Projector — 从涌现结构（L1/L2/L3）反向标注 record 的层级标签
+ * Tag Projector — 从 Wiki Page 关联反向标注 record 的层级标签
  *
- * 链路：record → strike(source_id) → L1(cluster_member) → L2(cluster_member) → domain(L3)
- * 每条 record 最多 5 个标签，按 L2 > L1 > L3 排序。
+ * Phase 11 改造：数据源从 strike/cluster 切换到 wiki_page。
+ * 链路：record → wiki_page_record → wiki_page.title
+ * 每条 record 最多 5 个标签，按 level ASC 排序（L1 最具体 → L3 最宽泛）。
  */
 /**
- * 刷新单条 record 的层级标签
+ * 刷新单条 record 的层级标签（从 wiki page 关联获取）
  */
 export declare function refreshHierarchyTags(recordId: string): Promise<void>;
 /**
- * 批量刷新：给定一组 strike id，反查其 source record 并刷新标签。
- * 用于 batch-analyze / emergence 完成后的回刷。
+ * 批量刷新：给定一组 record id，刷新其 wiki page 标签。
+ * 用于 wiki compile 完成后的回刷。
  */
-export declare function batchRefreshByStrikeIds(strikeIds: string[]): Promise<number>;
+export declare function batchRefreshByRecordIds(recordIds: string[]): Promise<number>;
 /**
- * 批量刷新：给定一组 L1 cluster id，反查其成员 strike 的 source record 并刷新。
- * 用于 emergence 阶段（吸纳/释放/合并）后的回刷。
+ * 批量刷新：给定一组 wiki page id，反查关联 record 并刷新标签。
+ * 用于 wiki page 创建/更新/合并/拆分后的回刷。
  */
+export declare function batchRefreshByPageIds(pageIds: string[]): Promise<number>;
+/** @deprecated 使用 batchRefreshByRecordIds 替代 */
+export declare function batchRefreshByStrikeIds(strikeIds: string[]): Promise<number>;
+/** @deprecated 使用 batchRefreshByPageIds 替代 */
 export declare function batchRefreshByClusterIds(clusterIds: string[]): Promise<number>;

@@ -9,6 +9,7 @@
  */
 import { hybridRetrieve } from "./retrieval.js";
 import { query } from "../db/pool.js";
+import { formatDateWithRelative } from "../lib/date-anchor.js";
 /**
  * Gather all relevant cognitive context for a decision question.
  */
@@ -106,7 +107,7 @@ export function buildDecisionPrompt(ctx) {
     if (ctx.strikes.length > 0) {
         parts.push(`\n## 相关认知记录`);
         for (const s of ctx.strikes) {
-            const date = new Date(s.created_at).toLocaleDateString("zh-CN");
+            const date = formatDateWithRelative(new Date(s.created_at));
             parts.push(`[strike:${s.id.slice(0, 8)}] (${s.polarity}, ${date}) ${s.nucleus}`);
         }
     }

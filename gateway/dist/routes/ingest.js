@@ -92,7 +92,7 @@ export function registerIngestRoutes(router) {
                     device_id: deviceId,
                     user_id: userId ?? undefined,
                     status: "completed",
-                    source: "manual",
+                    source: "image",
                     source_type: "material",
                     file_url: imageUrl,
                     file_name: imgFileName,
@@ -103,8 +103,8 @@ export function registerIngestRoutes(router) {
                 });
                 await summaryRepo.create({
                     record_id: imgRecord.id,
-                    title: visionResult.success ? visionResult.text.slice(0, 50) : "[图片分析失败]",
-                    short_summary: visionResult.text,
+                    title: visionResult.success ? visionResult.text.slice(0, 50) : "图片",
+                    short_summary: visionResult.success ? visionResult.text : "",
                 });
                 digestRecords([imgRecord.id], { deviceId, userId: userId ?? undefined }).catch((err) => console.error("[ingest] digest failed for record", imgRecord.id, ":", err));
                 sendJson(res, {
@@ -159,7 +159,7 @@ export function registerIngestRoutes(router) {
                 await summaryRepo.create({
                     record_id: fileRecord.id,
                     title: safeFilename,
-                    short_summary: parseResult.content.slice(0, 200),
+                    short_summary: parseResult.content,
                 });
                 if (parseResult.success) {
                     digestRecords([fileRecord.id], { deviceId, userId: userId ?? undefined }).catch((err) => console.error("[ingest] digest failed for record", fileRecord.id, ":", err));
@@ -197,7 +197,7 @@ export function registerIngestRoutes(router) {
                 await summaryRepo.create({
                     record_id: urlRecord.id,
                     title,
-                    short_summary: extracted.slice(0, 200),
+                    short_summary: extracted,
                 });
                 digestRecords([urlRecord.id], { deviceId, userId: userId ?? undefined }).catch((err) => console.error("[ingest] digest failed for record", urlRecord.id, ":", err));
                 sendJson(res, {

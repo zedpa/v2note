@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { getDeviceId } from "@/shared/lib/device";
 import { on } from "@/features/recording/lib/events";
 import {
@@ -10,9 +10,14 @@ import {
   updateTodo as apiUpdateTodo,
   deleteTodo as apiDeleteTodo,
 } from "@/shared/lib/api/todos";
+import {
+  cancelTodoReminder,
+  syncTodoReminders,
+} from "@/shared/lib/notifications";
 import type { TodoDTO, ProjectGroup, TimeSlotGroup } from "../lib/todo-types";
 import { filterByDate, groupByTimeSlot, buildProjectGroups } from "../lib/todo-grouping";
-import { getLocalToday } from "../lib/date-utils";
+import { getLocalToday, parseScheduledTime, toLocalDateStr } from "../lib/date-utils";
+import { localTzOffset } from "../lib/time-slots";
 
 /**
  * 统一待办数据源，替代 useTodos + useTodayTodos
@@ -42,6 +47,10 @@ export function useTodoStore() {
 
       setAllTodos(todosData);
       setProjects(projectsData);
+
+      // 首次加载 或 App resume 后同步所有待办提醒通知
+      syncTodoReminders(todosData).catch(() => {});
+
       return true;
     } catch (e: any) {
       setError(e.message ?? "加载待办失败");
@@ -51,11 +60,39 @@ export function useTodoStore() {
     }
   }, []);
 
+  const resumeListenerRef = useRef<(() => void) | null>(null);
+  const cleanedUpRef = useRef(false);
+
   useEffect(() => {
+    cleanedUpRef.current = false;
     refresh();
     // digest 处理完成后自动刷新待办（冷启动/新输入都会触发）
     const unsub = on("recording:processed", () => refresh());
-    return unsub;
+
+    // 监听 App 从后台恢复，触发 refresh + sync
+    (async () => {
+      try {
+        const { App } = await import("@capacitor/app");
+        const listener = await App.addListener("resume", () => {
+          refresh();
+        });
+        // 如果在 await 期间组件已卸载，立即清理
+        if (cleanedUpRef.current) {
+          listener.remove();
+        } else {
+          resumeListenerRef.current = () => listener.remove();
+        }
+      } catch {
+        // Web 环境，静默跳过
+      }
+    })();
+
+    return () => {
+      cleanedUpRef.current = true;
+      unsub();
+      resumeListenerRef.current?.();
+      resumeListenerRef.current = null;
+    };
   }, [refresh]);
 
   // ===== 派生数据 =====
@@ -91,6 +128,10 @@ export function useTodoStore() {
 
       try {
         await apiUpdateTodo(id, { done: newDone });
+        // 完成时取消提醒通知
+        if (newDone) {
+          cancelTodoReminder(id).catch(() => {});
+        }
       } catch {
         // 回滚
         setAllTodos((prev) =>
@@ -112,8 +153,9 @@ export function useTodoStore() {
       level?: number;
     }) => {
       const result = await apiCreateTodo(params);
-      // 刷新以获取完整数据
+      // 刷新以获取完整数据（含后端计算的 reminder_at）
       await refresh();
+      // refresh 中已调用 syncTodoReminders，新 todo 的通知会被自动调度
       return result;
     },
     [refresh],
@@ -138,15 +180,17 @@ export function useTodoStore() {
       tomorrow.setDate(tomorrow.getDate() + 1);
 
       let newStart: string;
+      const pad = (n: number) => String(n).padStart(2, "0");
+      const tz = localTzOffset();
       if (todo.scheduled_start) {
         // 保留原时间，日期推到明天
-        const orig = new Date(todo.scheduled_start.replace(/Z$/i, ""));
-        tomorrow.setHours(orig.getHours(), orig.getMinutes(), 0, 0);
-        newStart = tomorrow.toISOString();
+        const orig = parseScheduledTime(todo.scheduled_start);
+        const tomorrowDate = toLocalDateStr(tomorrow);
+        newStart = `${tomorrowDate}T${pad(orig.getHours())}:${pad(orig.getMinutes())}:00${tz}`;
       } else {
         // 无时间则设为明天 09:00
-        tomorrow.setHours(9, 0, 0, 0);
-        newStart = tomorrow.toISOString();
+        const tomorrowDate = toLocalDateStr(tomorrow);
+        newStart = `${tomorrowDate}T09:00:00${tz}`;
       }
 
       // 乐观更新
@@ -165,7 +209,7 @@ export function useTodoStore() {
     [allTodos, refresh],
   );
 
-  /** 撤销完成（恢复为未完成） */
+  /** 撤销完成（恢复为未完成，重新调度提醒通知） */
   const undoToggle = useCallback(
     async (id: string) => {
       setAllTodos((prev) =>
@@ -173,6 +217,8 @@ export function useTodoStore() {
       );
       try {
         await apiUpdateTodo(id, { done: false });
+        // refresh 内的 syncTodoReminders 会重新调度被取消的通知
+        await refresh();
       } catch {
         await refresh();
       }
@@ -192,6 +238,8 @@ export function useTodoStore() {
     async (id: string) => {
       // 乐观删除
       setAllTodos((prev) => prev.filter((t) => t.id !== id));
+      // 取消该待办的提醒通知
+      cancelTodoReminder(id).catch(() => {});
       try {
         await apiDeleteTodo(id);
       } catch {

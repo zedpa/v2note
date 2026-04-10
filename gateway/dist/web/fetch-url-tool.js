@@ -4,6 +4,7 @@
 import { z } from "zod";
 import { isUrlSafe } from "./url-safety.js";
 import { extractUrl } from "../ingest/url-extractor.js";
+import { toLocalDateTime } from "../lib/tz.js";
 const MAX_CONTENT = 50000;
 export const fetchUrlToolDef = {
     name: "fetch_url",
@@ -39,7 +40,7 @@ export const fetchUrlToolDef = {
                     content,
                     word_count: content.length,
                     url: args.url,
-                    fetched_at: new Date().toISOString(),
+                    fetched_at: toLocalDateTime(new Date()),
                 },
                 next_hint: "内容已获取。如需将此内容录入系统，后台会自动作为 material 保存。",
             };

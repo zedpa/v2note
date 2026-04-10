@@ -23,7 +23,7 @@ export function loadSkills(dir) {
             name: data.name ?? entry.name,
             description: data.description ?? "",
             prompt: content.trim(),
-            enabled: true,
+            enabled: false, // 所有技能默认关闭，需在 UserAgent 技能配置中显式开启
             metadata: {
                 extract_fields: data.metadata?.openclaw?.extract_fields,
                 always: data.metadata?.openclaw?.always ?? data.always ?? false,

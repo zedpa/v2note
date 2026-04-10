@@ -1,5 +1,6 @@
 import { query, queryOne, execute } from "../pool.js";
 import { getEmbedding, cosineSimilarity } from "../../memory/embeddings.js";
+import { daysAgo } from "../../lib/tz.js";
 export async function findByDevice(deviceId) {
     return query(`SELECT t.*,
             COALESCE(sc.cnt, 0)::int AS subtask_count,
@@ -12,7 +13,7 @@ export async function findByDevice(deviceId) {
        SELECT COUNT(*)::int AS cnt, COUNT(*) FILTER (WHERE done)::int AS done_cnt
        FROM todo sub WHERE sub.parent_id = t.id
      ) sc ON true
-     WHERE (r.device_id = $1 OR t.device_id = $1) AND t.parent_id IS NULL
+     WHERE (r.device_id = $1 OR t.device_id = $1) AND (t.parent_id IS NULL OR p.id IS NOT NULL)
      ORDER BY t.created_at DESC`, [deviceId]);
 }
 export async function findByUser(userId) {
@@ -27,7 +28,7 @@ export async function findByUser(userId) {
        SELECT COUNT(*)::int AS cnt, COUNT(*) FILTER (WHERE done)::int AS done_cnt
        FROM todo sub WHERE sub.parent_id = t.id
      ) sc ON true
-     WHERE (r.user_id = $1 OR t.user_id = $1) AND t.parent_id IS NULL
+     WHERE (r.user_id = $1 OR t.user_id = $1) AND (t.parent_id IS NULL OR p.id IS NOT NULL)
      ORDER BY t.created_at DESC`, [userId]);
 }
 export async function findPendingByUser(userId) {
@@ -170,10 +171,8 @@ export async function getStreak(opts) {
      ORDER BY d DESC`, params);
     // 从昨天开始数连续天
     let streak = 0;
-    const now = new Date();
     for (let i = 1; i <= 30; i++) {
-        const target = new Date(now.getTime() - i * 86400000)
-            .toISOString().split("T")[0];
+        const target = daysAgo(i);
         if (rows.some((r) => r.d.startsWith(target))) {
             streak++;
         }

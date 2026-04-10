@@ -19,6 +19,8 @@ export interface Record {
         label: string;
         level: number;
     }>;
+    compile_status: string;
+    content_hash: string | null;
     created_at: string;
     updated_at: string;
 }
@@ -67,6 +69,8 @@ export declare function countByUser(userId: string): Promise<number>;
 export declare function countByDateRange(deviceId: string, start: string, end: string): Promise<number>;
 export declare function countByUserDateRange(userId: string, start: string, end: string): Promise<number>;
 export declare function findUndigested(userId: string): Promise<Record[]>;
+/** 统计正在消化中的 record 数量（digested=false, status=completed, 未超过重试上限） */
+export declare function countUndigested(userId: string): Promise<number>;
 export declare function incrementDigestAttempts(id: string): Promise<void>;
 export declare function markDigested(id: string): Promise<void>;
 /**
@@ -101,3 +105,8 @@ export declare function updateHierarchyTags(id: string, tags: Array<{
     level: number;
 }>): Promise<void>;
 export declare function findByDeviceAndDateRange(deviceId: string, start: string, end: string): Promise<Record[]>;
+/** 查找待编译的 record（compile_status = 'pending' 或 'needs_recompile'） */
+export declare function findPendingCompile(userId: string, limit?: number): Promise<Record[]>;
+/** 更新 record 的编译状态（附带可选的 content_hash） */
+export type CompileStatus = "pending" | "compiled" | "skipped" | "needs_recompile";
+export declare function updateCompileStatus(recordId: string, status: CompileStatus, contentHash?: string): Promise<void>;

@@ -9,6 +9,7 @@
  * 5. 对话保存为日记：record(source_type='think', type='conversation')
  */
 import { query } from "../db/pool.js";
+import { toLocalDate } from "../lib/tz.js";
 import { recordRepo, goalRepo, todoRepo, transcriptRepo } from "../db/repositories/index.js";
 import { digestRecords } from "../handlers/digest.js";
 // ─── 场景 2: 关键词检测 ───
@@ -25,68 +26,61 @@ export function detectCognitiveQuery(message) {
         return false;
     return COGNITIVE_KEYWORDS.some((kw) => kw.test(message));
 }
-/** 加载普通 chat 的认知上下文：top-3 活跃 cluster + 近期矛盾 */
+/** 加载普通 chat 的认知上下文：最近更新的 wiki 主题 + 矛盾/变化段落 */
 export async function loadChatCognitive(userId) {
     const ctx = {
         clusters: [],
         contradictions: [],
         contextString: "",
     };
-    // Top-3 clusters by 7-day strike count
+    // Top-3 最近更新的 wiki 页面（替代 cluster）
     try {
-        const rows = await query(`SELECT s.id, s.nucleus, COUNT(cm.target_strike_id) as member_count
-       FROM strike s
-       JOIN bond cm ON cm.source_strike_id = s.id AND cm.type = 'cluster_member'
-       JOIN strike ms ON ms.id = cm.target_strike_id
-         AND ms.created_at >= NOW() - INTERVAL '7 days'
-       WHERE s.user_id = $1 AND s.is_cluster = true AND s.status = 'active'
-       GROUP BY s.id
-       ORDER BY member_count DESC
+        const rows = await query(`SELECT id, title, summary, content
+       FROM wiki_page
+       WHERE user_id = $1 AND status = 'active'
+       ORDER BY COALESCE(compiled_at, updated_at) DESC
        LIMIT 3`, [userId]);
         ctx.clusters = rows.map((r) => ({
             id: r.id,
-            name: r.nucleus,
-            recentStrikeCount: parseInt(r.member_count, 10),
+            name: r.title,
+            recentStrikeCount: 0, // wiki 模式不再统计 strike 数
         }));
+        // 从 wiki 内容中提取矛盾/变化段落（编译时已标注）
+        for (const row of rows) {
+            // 搜索包含"之前""后来""变化""矛盾""不同""转变"的段落
+            const lines = row.content.split("\n");
+            for (const line of lines) {
+                if (/之前.*后来|变化|转变|不同.*看法|矛盾/.test(line) && line.trim().length > 10) {
+                    ctx.contradictions.push({
+                        strikeA: { id: row.id, nucleus: line.trim().slice(0, 60) },
+                        strikeB: { id: row.id, nucleus: "" },
+                        bondId: row.id,
+                    });
+                    if (ctx.contradictions.length >= 5)
+                        break;
+                }
+            }
+            if (ctx.contradictions.length >= 5)
+                break;
+        }
     }
     catch (err) {
-        console.warn("[advisor-context] Cluster loading failed:", err.message);
-    }
-    // Recent contradictions (7 days)
-    try {
-        const rows = await query(`SELECT sa.id as a_id, sa.nucleus as a_nucleus,
-              sb.id as b_id, sb.nucleus as b_nucleus,
-              b.id as bond_id
-       FROM bond b
-       JOIN strike sa ON sa.id = b.source_strike_id
-       JOIN strike sb ON sb.id = b.target_strike_id
-       WHERE sa.user_id = $1
-         AND b.type = 'contradiction'
-         AND b.created_at >= NOW() - INTERVAL '7 days'
-         AND COALESCE(sa.source_type, 'think') != 'material'
-       ORDER BY b.created_at DESC
-       LIMIT 5`, [userId]);
-        ctx.contradictions = rows.map((r) => ({
-            strikeA: { id: r.a_id, nucleus: r.a_nucleus },
-            strikeB: { id: r.b_id, nucleus: r.b_nucleus },
-            bondId: r.bond_id,
-        }));
-    }
-    catch (err) {
-        console.warn("[advisor-context] Contradiction loading failed:", err.message);
+        console.warn("[advisor-context] Wiki cognitive loading failed:", err.message);
     }
     // 构建可注入字符串
     const parts = [];
     if (ctx.clusters.length > 0) {
         parts.push("## 用户近期关注主题");
         for (const c of ctx.clusters) {
-            parts.push(`- ${c.name}（近7天 ${c.recentStrikeCount} 条相关记录）`);
+            parts.push(`- ${c.name}`);
         }
     }
     if (ctx.contradictions.length > 0) {
         parts.push("\n## 近期思考变化");
         for (const c of ctx.contradictions) {
-            parts.push(`- 用户之前说「${c.strikeA.nucleus.slice(0, 40)}」，后来又说「${c.strikeB.nucleus.slice(0, 40)}」`);
+            if (c.strikeA.nucleus) {
+                parts.push(`- ${c.strikeA.nucleus}`);
+            }
         }
     }
     if (parts.length > 0) {
@@ -96,7 +90,7 @@ export async function loadChatCognitive(userId) {
     return ctx;
 }
 // ─── 场景 1: 目标详情"深入讨论" ───
-/** 构建目标深入讨论的完整上下文 */
+/** 构建目标深入讨论的完整上下文（从 wiki_page 加载） */
 export async function buildGoalDiscussionContext(goalId, userId) {
     const goal = await goalRepo.findById(goalId);
     if (!goal)
@@ -104,44 +98,23 @@ export async function buildGoalDiscussionContext(goalId, userId) {
     const parts = [];
     parts.push(`## 目标：${goal.title}`);
     parts.push(`状态：${goal.status}`);
-    // 如果有关联 cluster，加载 Strike 链路
-    if (goal.cluster_id) {
-        try {
-            const members = await query(`SELECT ms.id, ms.nucleus, ms.polarity, ms.created_at, ms.source_id
-         FROM bond cm
-         JOIN strike ms ON ms.id = cm.target_strike_id
-         WHERE cm.source_strike_id = $1 AND cm.type = 'cluster_member'
-         ORDER BY ms.created_at DESC
-         LIMIT 20`, [goal.cluster_id]);
-            if (members.length > 0) {
-                parts.push("\n### 相关认知记录");
-                for (const m of members) {
-                    const date = m.created_at.split("T")[0];
-                    const ref = m.source_id ? ` [record:${m.source_id}]` : "";
-                    parts.push(`- (${m.polarity}, ${date}) ${m.nucleus}${ref}`);
-                }
-            }
-            // 矛盾
-            const strikeIds = members.map((m) => m.id);
-            if (strikeIds.length > 0) {
-                const contradictions = await query(`SELECT sa.nucleus as a_nucleus, sb.nucleus as b_nucleus
-           FROM bond b
-           JOIN strike sa ON sa.id = b.source_strike_id
-           JOIN strike sb ON sb.id = b.target_strike_id
-           WHERE b.type = 'contradiction'
-             AND (b.source_strike_id = ANY($1) OR b.target_strike_id = ANY($1))
-           LIMIT 5`, [strikeIds]);
-                if (contradictions.length > 0) {
-                    parts.push("\n### ⚠️ 存在不同看法");
-                    for (const c of contradictions) {
-                        parts.push(`- 「${c.a_nucleus}」 vs 「${c.b_nucleus}」`);
-                    }
-                }
+    // 从 wiki_page 中搜索与目标相关的知识
+    try {
+        const wikiPages = await query(`SELECT id, title, content, summary
+       FROM wiki_page
+       WHERE user_id = $1 AND status = 'active'
+         AND content ILIKE '%' || $2 || '%'
+       LIMIT 5`, [userId, goal.title.slice(0, 50)]);
+        if (wikiPages.length > 0) {
+            parts.push("\n### 相关知识");
+            for (const page of wikiPages) {
+                const summary = page.summary ?? page.content.split("\n").slice(0, 3).join(" ").slice(0, 100);
+                parts.push(`- **${page.title}**: ${summary}`);
             }
         }
-        catch (err) {
-            console.warn("[advisor-context] Goal cluster loading failed:", err.message);
-        }
+    }
+    catch (err) {
+        console.warn("[advisor-context] Wiki goal context failed:", err.message);
     }
     // Todo 完成率
     try {
@@ -155,63 +128,35 @@ export async function buildGoalDiscussionContext(goalId, userId) {
     catch (err) {
         console.warn("[advisor-context] Todo stats failed:", err.message);
     }
-    parts.push("\n路路人格：温暖、不催促、不评判。引用用户记录时标注 [record:ID]，引导用户自己思考。");
     return parts.join("\n");
 }
 // ─── 场景 3: 展开讨论 ───
-/** 构建洞察"展开讨论"的上下文（基于矛盾 bond） */
-export async function buildInsightDiscussionContext(bondId, userId) {
+/** 构建洞察"展开讨论"的上下文（从 wiki_page 加载） */
+export async function buildInsightDiscussionContext(
+/** wiki_page_id 或旧的 bondId（兼容） */
+pageOrBondId, userId) {
     const parts = [];
-    // 加载矛盾双方 Strike
-    const contradictionRows = await query(`SELECT b.id as bond_id,
-            sa.id as a_id, sa.nucleus as a_nucleus, sa.polarity as a_polarity,
-            sa.created_at as a_created_at, sa.source_id as a_source_id,
-            sb.id as b_id, sb.nucleus as b_nucleus, sb.polarity as b_polarity,
-            sb.created_at as b_created_at, sb.source_id as b_source_id
-     FROM bond b
-     JOIN strike sa ON sa.id = b.source_strike_id
-     JOIN strike sb ON sb.id = b.target_strike_id
-     WHERE b.id = $1`, [bondId]);
-    if (contradictionRows.length === 0) {
-        return "未找到相关讨论上下文。";
-    }
-    const row = contradictionRows[0];
-    parts.push("## 思考变化");
-    parts.push(`\n### 观点 A（${row.a_created_at.split("T")[0]}）`);
-    parts.push(`${row.a_nucleus} [record:${row.a_source_id}]`);
-    parts.push(`\n### 观点 B（${row.b_created_at.split("T")[0]}）`);
-    parts.push(`${row.b_nucleus} [record:${row.b_source_id}]`);
-    // 加载相关 cluster 成员（通过矛盾双方所在 cluster）
+    // 尝试从 wiki_page 加载
     try {
-        const relatedMembers = await query(`SELECT DISTINCT ms.id, ms.nucleus, ms.polarity, ms.created_at, ms.source_id
-       FROM bond cm
-       JOIN strike ms ON ms.id = cm.target_strike_id
-       WHERE cm.type = 'cluster_member'
-         AND cm.source_strike_id IN (
-           SELECT cm2.source_strike_id FROM bond cm2
-           WHERE cm2.type = 'cluster_member'
-             AND cm2.target_strike_id IN ($1, $2)
-         )
-         AND ms.id NOT IN ($1, $2)
-       ORDER BY ms.created_at DESC
-       LIMIT 10`, [row.a_id, row.b_id]);
-        if (relatedMembers.length > 0) {
-            parts.push("\n### 相关思考");
-            for (const m of relatedMembers) {
-                const date = m.created_at.split("T")[0];
-                parts.push(`- (${m.polarity}, ${date}) ${m.nucleus} [record:${m.source_id}]`);
-            }
+        const page = await query(`SELECT id, title, content, summary
+       FROM wiki_page
+       WHERE id = $1 AND user_id = $2 AND status = 'active'`, [pageOrBondId, userId]);
+        if (page.length > 0) {
+            const p = page[0];
+            parts.push(`## ${p.title}`);
+            parts.push(p.content);
+            return parts.join("\n");
         }
     }
-    catch (err) {
-        console.warn("[advisor-context] Related members failed:", err.message);
+    catch {
+        // 非 UUID 或表不存在，跳过
     }
-    return parts.join("\n");
+    return "未找到相关讨论上下文。";
 }
 // ─── 场景 4: 引用格式区分 ───
 /** 格式化引用：📝 原声 vs 📄 素材 */
 export function formatCitation(record) {
-    const date = record.created_at.split("T")[0];
+    const date = toLocalDate(record.created_at);
     const snippet = record.text.slice(0, 60);
     if (record.source_type === "material") {
         return `📄 报告中提到「${snippet}」— ${date} [record:${record.id}]`;

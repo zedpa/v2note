@@ -14,8 +14,10 @@ import { loadProfile } from "../profile/manager.js";
 import { goalRepo } from "../db/repositories/index.js";
 import { extractKeywords } from "../lib/text-utils.js";
 import { semanticSearch } from "../memory/embeddings.js";
+import { loadWikiContext as loadWikiContextFromSearch } from "../tools/wiki-search.js";
 import type { ContextMode } from "./tiers.js";
 import { formatDateWithRelative } from "../lib/date-anchor.js";
+import { DEFAULT_SOUL } from "../soul/default-soul.js";
 
 /** Memory limits per mode */
 const MEMORY_LIMITS: Record<ContextMode, number> = {
@@ -27,11 +29,15 @@ export interface LoadedContext {
   soul?: string;
   /** User profile (factual info, separated from soul) */
   userProfile?: string;
+  /** UserAgent 内容（用户的规则/配置） */
+  userAgent?: string;
   memories: string[];
   /** Raw memory entries (for downstream use like goal extraction) */
   rawMemories: MemoryEntry[];
   /** Active goals from goal table */
   goals: Array<{ id: string; title: string }>;
+  /** Wiki page 上下文（title: summary 格式） */
+  wikiContext?: string[];
 }
 
 /**
@@ -52,17 +58,20 @@ export async function loadWarmContext(opts: {
   const id = opts.userId ?? opts.deviceId;
   const useUser = !!opts.userId;
 
-  // Parallel loading (soul + profile + memories + goals)
-  const [soul, profile, rawMemories, activeGoals] = await Promise.all([
+  // Parallel loading (soul + profile + userAgent + memories + goals + wiki context)
+  const [soul, profile, userAgent, rawMemories, activeGoals, wikiContext] = await Promise.all([
     !opts.localSoul
       ? (useUser ? loadSoulByUserSafe(id) : loadSoulSafe(opts.deviceId))
       : Promise.resolve(undefined),
     useUser ? loadProfileByUserSafe(id) : loadProfileSafe(opts.deviceId),
+    useUser ? loadUserAgentSafe(id) : Promise.resolve(undefined),
     useUser ? loadMemoryByUserSafe(id, opts.dateRange) : loadMemorySafe(opts.deviceId, opts.dateRange),
     useUser ? loadGoalsByUserSafe(id) : loadGoalsSafe(opts.deviceId),
+    useUser ? loadWikiContextSafe(id, opts.inputText) : Promise.resolve([]),
   ]);
 
-  const soulContent = opts.localSoul ?? soul?.content;
+  // Soul: 有本地配置用本地，有 DB 用 DB，都没有用默认模板
+  const soulContent = opts.localSoul ?? soul?.content ?? (useUser ? DEFAULT_SOUL : undefined);
   const profileContent = profile?.content;
 
   // Relevance-filter memories (embedding-first, keyword fallback)
@@ -80,9 +89,11 @@ export async function loadWarmContext(opts: {
   return {
     soul: soulContent,
     userProfile: profileContent,
+    userAgent: userAgent?.content,
     memories,
     rawMemories: ranked,
     goals,
+    wikiContext: wikiContext.length > 0 ? wikiContext : undefined,
   };
 }
 
@@ -260,6 +271,32 @@ async function loadGoalsByUserSafe(
     return await goalRepo.findActiveByUser(userId);
   } catch (err: any) {
     console.warn(`[context-loader] Failed to load goals by user: ${err.message}`);
+    return [];
+  }
+}
+
+/** Safe UserAgent loading (never throws) */
+async function loadUserAgentSafe(
+  userId: string,
+): Promise<{ content: string } | undefined> {
+  try {
+    const { userAgentRepo } = await import("../db/repositories/index.js");
+    return await userAgentRepo.findOrCreate(userId);
+  } catch (err: any) {
+    console.warn(`[context-loader] Failed to load user agent: ${err.message}`);
+    return undefined;
+  }
+}
+
+/** Safe wiki context loading (never throws) */
+async function loadWikiContextSafe(
+  userId: string,
+  inputText?: string,
+): Promise<string[]> {
+  try {
+    return await loadWikiContextFromSearch(userId, inputText);
+  } catch (err: any) {
+    console.warn(`[context-loader] Failed to load wiki context: ${err.message}`);
     return [];
   }
 }

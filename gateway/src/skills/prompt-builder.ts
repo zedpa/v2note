@@ -2,23 +2,29 @@ import { readFileSync, existsSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Skill } from "./types.js";
-import type { ContextTier, ContextBuildOptions, AgentRole } from "../context/tiers.js";
+import type { AgentRole } from "../context/tiers.js";
 import { buildDateAnchor } from "../lib/date-anchor.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const AGENTS_DIR = join(__dirname, "../../agents");
 
-// Load base constitution once at startup — AI 行为宪法（共享基座）
-let baseMd: string;
+// SharedAgent: 全局共享基座，启动时加载常驻内存
+let sharedAgentMd: string;
 try {
-  baseMd = readFileSync(join(__dirname, "../../AGENTS.md"), "utf-8");
+  sharedAgentMd = readFileSync(join(__dirname, "../../SHARED_AGENT.md"), "utf-8");
+  console.log("[prompt-builder] SHARED_AGENT.md loaded");
 } catch {
-  baseMd = "你是一个智能笔记助手，帮助用户整理和回顾语音/文字记录。";
+  // 回退到旧 AGENTS.md（过渡期）
+  try {
+    sharedAgentMd = readFileSync(join(__dirname, "../../AGENTS.md"), "utf-8");
+    console.log("[prompt-builder] Fallback to AGENTS.md");
+  } catch {
+    sharedAgentMd = "你是一个智能笔记助手，帮助用户整理和回顾语音/文字记录。";
+  }
 }
 
-// Load agent-specific prompts at startup（角色化 Agent）
-const agentFileMap: Record<AgentRole, string> = {
-  chat: "chat.md",
+// 角色化 Agent — briefing/onboarding 保留，chat 已由 Soul 替代
+const agentFileMap: Partial<Record<AgentRole, string>> = {
   briefing: "briefing.md",
   onboarding: "onboarding.md",
 };
@@ -37,101 +43,99 @@ for (const [role, filename] of Object.entries(agentFileMap)) {
 }
 
 /**
- * Build tiered context for chat/briefing prompt assembly.
+ * Build the system prompt.
  *
- * Hot tier (~1500 chars): core rules, anti-hallucination
- * Warm tier (variable): soul, profile, memories, skill prompts, tools
- */
-export function buildTieredContext(opts: ContextBuildOptions): ContextTier {
-  const hot: string[] = [];
-  const warm: string[] = [];
-
-  // ── HOT TIER: base constitution (AGENTS.md 共享基座) ──
-
-  hot.push(baseMd);
-
-  // ── HOT TIER: agent-specific prompt (角色化 Agent) ──
-  if (opts.agent && agentPrompts[opts.agent]) {
-    hot.push(agentPrompts[opts.agent]!);
-  }
-
-  // ── HOT TIER: 时间锚点（让 AI 调用 create_todo 时知道今天日期）──
-  hot.push(buildDateAnchor());
-
-  // ── WARM TIER: task-specific ──
-
-  // Soul
-  if (opts.soul) {
-    warm.push(`## AI 身份\n${opts.soul}`);
-  }
-
-  // User profile
-  if (opts.userProfile) {
-    warm.push(`## 用户画像\n${opts.userProfile}`);
-  }
-
-  // Memories
-  if (opts.memories && opts.memories.length > 0) {
-    warm.push(`## 相关记忆\n${opts.memories.join("\n")}`);
-  }
-
-  // Active skill full prompts
-  if (opts.skills.length > 0) {
-    warm.push(`## 激活的技能`);
-    for (const skill of opts.skills) {
-      warm.push(`\n### ${skill.name}\n${skill.prompt}`);
-    }
-  }
-
-  // Tools — 工具通过 Vercel AI SDK 原生 function calling 注入，
-  // 不再在 system prompt 中注入工具列表和调用规则。
-  // MCP 外部工具仍通过描述注入（兼容性保留）
-  if (opts.mcpTools && opts.mcpTools.length > 0) {
-    warm.push(`## 外部工具（MCP）`);
-    for (const tool of opts.mcpTools) {
-      warm.push(`\n### ${tool.name}\n${tool.description}`);
-    }
-  }
-
-  return {
-    hot: hot.join("\n"),
-    warm: warm.join("\n"),
-  };
-}
-
-/**
- * Build the system prompt by combining hot + warm tiers.
- * Serves chat and briefing modes only (process uses hardcoded prompt).
+ * 组装顺序（按意义优先级）：
+ * 1. SharedAgent — 系统基座（安全规则 + 工具规则 + 自我维护说明）
+ * 2. Agent prompt — briefing/onboarding 角色化（chat 已由 Soul 替代）
+ * 3. 时间锚点
+ * 4. Soul — AI 的灵魂人格
+ * 5. UserAgent — 用户的规则/配置
+ * 6. Profile — 用户画像
+ * 7. Memory — 相关记忆
+ * 8. Wiki — 相关知识
+ * 9. 认知上下文 — 用户思考动态
+ * 10. 待确认意图
+ * 11. 技能
+ * 12. MCP 工具
  */
 export function buildSystemPrompt(opts: {
   skills: Skill[];
   soul?: string;
+  userAgent?: string;
   userProfile?: string;
   memory?: string[];
+  wikiContext?: string[];
   mode?: "chat" | "briefing";
+  /** briefing/onboarding 保留，chat 不再传 */
   agent?: AgentRole;
   mcpTools?: Array<{ name: string; description: string; parameters?: Record<string, unknown> }>;
-  /** Pre-built pending intent context to inject into warm tier */
   pendingIntentContext?: string;
-  /** Cognitive engine context (contradictions, evolution) in natural language */
   cognitiveContext?: string;
 }): string {
-  const tiered = buildTieredContext({
-    mode: opts.mode ?? "chat",
-    skills: opts.skills,
-    soul: opts.soul,
-    userProfile: opts.userProfile,
-    memories: opts.memory,
-    mcpTools: opts.mcpTools,
-    agent: opts.agent,
-  });
+  const parts: string[] = [];
 
-  const parts = [tiered.hot, tiered.warm];
+  // 1. SharedAgent 基座
+  parts.push(sharedAgentMd);
+
+  // 2. Agent prompt（briefing/onboarding）
+  if (opts.agent && agentPrompts[opts.agent]) {
+    parts.push(agentPrompts[opts.agent]!);
+  }
+
+  // 3. 时间锚点
+  parts.push(buildDateAnchor());
+
+  // 4. Soul — AI 灵魂人格
+  if (opts.soul) {
+    parts.push(`## 灵魂\n${opts.soul}`);
+  }
+
+  // 5. UserAgent — 用户规则/配置
+  if (opts.userAgent) {
+    parts.push(`## 用户规则\n${opts.userAgent}`);
+  }
+
+  // 6. Profile — 用户画像
+  if (opts.userProfile) {
+    parts.push(`## 用户画像\n${opts.userProfile}`);
+  }
+
+  // 7. Memory — 相关记忆
+  if (opts.memory && opts.memory.length > 0) {
+    parts.push(`## 相关记忆\n${opts.memory.join("\n")}`);
+  }
+
+  // 8. Wiki — 相关知识
+  if (opts.wikiContext && opts.wikiContext.length > 0) {
+    parts.push(`## 相关知识\n${opts.wikiContext.map(w => `- ${w}`).join("\n")}`);
+  }
+
+  // 9. 认知上下文
   if (opts.cognitiveContext) {
     parts.push(`## 用户思考动态\n${opts.cognitiveContext}\n在对话中自然提及这些变化和演进，用"变化""演进""不同角度"等温和措辞。不要使用"矛盾""聚类""Strike"等技术术语。`);
   }
+
+  // 10. 待确认意图
   if (opts.pendingIntentContext) {
     parts.push(opts.pendingIntentContext);
   }
+
+  // 11. 技能
+  if (opts.skills.length > 0) {
+    parts.push(`## 激活的技能`);
+    for (const skill of opts.skills) {
+      parts.push(`\n### ${skill.name}\n${skill.prompt}`);
+    }
+  }
+
+  // 12. MCP 外部工具
+  if (opts.mcpTools && opts.mcpTools.length > 0) {
+    parts.push(`## 外部工具（MCP）`);
+    for (const tool of opts.mcpTools) {
+      parts.push(`\n### ${tool.name}\n${tool.description}`);
+    }
+  }
+
   return parts.filter(Boolean).join("\n");
 }

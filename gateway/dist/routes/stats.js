@@ -1,27 +1,25 @@
 import { sendJson, getDeviceId, getUserId } from "../lib/http-helpers.js";
 import { recordRepo, todoRepo, subscriptionRepo } from "../db/repositories/index.js";
 import { query } from "../db/pool.js";
+import { weekRange, dayRange } from "../lib/tz.js";
 export function registerStatsRoutes(router) {
     // Week stats
     router.get("/api/v1/stats/week", async (req, res) => {
         const deviceId = getDeviceId(req);
         const userId = getUserId(req);
-        const now = new Date();
-        const dayOfWeek = now.getDay();
-        const monday = new Date(now);
-        monday.setDate(now.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
-        monday.setHours(0, 0, 0, 0);
-        const sunday = new Date(monday);
-        sunday.setDate(monday.getDate() + 6);
-        sunday.setHours(23, 59, 59, 999);
+        const week = weekRange();
+        const mondayRange = dayRange(week.start);
+        const sundayRange = dayRange(week.end);
+        const weekStart = mondayRange.start; // UTC ISO: Monday 00:00 Asia/Shanghai
+        const weekEnd = sundayRange.end; // UTC ISO: Sunday 23:59 Asia/Shanghai
         const [recordCount, todoStats] = userId
             ? await Promise.all([
-                recordRepo.countByUserDateRange(userId, monday.toISOString(), sunday.toISOString()),
-                todoRepo.countByUserDateRange(userId, monday.toISOString(), sunday.toISOString()),
+                recordRepo.countByUserDateRange(userId, weekStart, weekEnd),
+                todoRepo.countByUserDateRange(userId, weekStart, weekEnd),
             ])
             : await Promise.all([
-                recordRepo.countByDateRange(deviceId, monday.toISOString(), sunday.toISOString()),
-                todoRepo.countByDateRange(deviceId, monday.toISOString(), sunday.toISOString()),
+                recordRepo.countByDateRange(deviceId, weekStart, weekEnd),
+                todoRepo.countByDateRange(deviceId, weekStart, weekEnd),
             ]);
         sendJson(res, {
             recordCount,

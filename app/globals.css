@@ -1,11 +1,8 @@
-/* Google Fonts 通过 CDN 加载（构建时不依赖网络） */
-@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700;900&family=Noto+Sans+SC:wght@300;400;500;600;700&family=Inter:wght@400;500;600&family=Newsreader:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400;1,500;1,600&display=swap');
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* 字体 CSS 变量（替代 next/font/google 的构建时下载） */
+/* 字体 CSS 变量 — 字体文件由 @fontsource 本地加载（见 app/fonts.ts） */
 :root {
   --font-serif: "Newsreader", "Noto Serif SC", Georgia, serif;
   --font-body: "Inter", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
@@ -254,6 +251,15 @@
 
 .animate-waveform {
   animation: waveform 0.8s ease-in-out infinite;
+}
+
+/* Tab crossfade — 轻量入场动画（spec 120 场景 1.1） */
+@keyframes tab-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.animate-tab-fade-in {
+  animation: tab-fade-in 150ms ease-out both;
 }
 
 /* Card entrance animation */
@@ -652,4 +658,32 @@ body::before {
 
 .tool-detail-inner {
   overflow: hidden;
+}
+
+/* ============================================
+   按压缩放反馈 — spec 120 场景 4.5
+   来源：UI/UX Pro Max scale-feedback
+   应用于可交互卡片和按钮，不应用于输入框/文本区域
+   ============================================ */
+.pressable {
+  -webkit-tap-highlight-color: transparent;
+}
+.pressable:active {
+  transform: scale(0.97);
+  transition: transform 80ms ease-out;
+}
+
+/* ============================================
+   全局 prefers-reduced-motion — spec 120 场景 4.4
+   来源：UI/UX Pro Max reduced-motion / Apple HIG
+   ============================================ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

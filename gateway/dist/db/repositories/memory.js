@@ -27,6 +27,9 @@ export async function findByUser(userId, dateRange, limit) {
     return query(`SELECT * FROM memory WHERE user_id = $1
      ORDER BY importance DESC LIMIT $2`, [userId, limit ?? 50]);
 }
+export async function findById(id) {
+    return queryOne(`SELECT * FROM memory WHERE id = $1`, [id]);
+}
 export async function deleteById(id, deviceId) {
     await execute(`DELETE FROM memory WHERE id = $1 AND device_id = $2`, [id, deviceId]);
 }

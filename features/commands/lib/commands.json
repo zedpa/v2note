@@ -12,5 +12,6 @@
   {"name": "profile", "aliases": ["画像"], "description": "编辑AI画像", "category": "view"},
   {"name": "ideas", "aliases": ["灵感"], "description": "查看灵感列表", "category": "view"},
   {"name": "memory", "aliases": ["记忆"], "description": "查看AI记忆", "category": "view"},
-  {"name": "clear", "aliases": ["清空","清除历史"], "description": "清空聊天历史", "category": "action"}
+  {"name": "clear", "aliases": ["清空","清除历史"], "description": "清空聊天历史", "category": "action"},
+  {"name": "compact", "aliases": ["压缩","压缩上下文"], "description": "压缩对话上下文（AI摘要）", "category": "action"}
 ]

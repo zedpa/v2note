@@ -1,12 +1,13 @@
 import { chatCompletion } from "../ai/provider.js";
 import { aiDiaryRepo, notebookRepo } from "../db/repositories/index.js";
 import { MemoryManager } from "../memory/manager.js";
+import { today as tzToday } from "../lib/tz.js";
 /**
  * Append content to today's diary for a specific notebook.
  * Fast operation — no AI call, just DB append.
  */
 export async function appendToDiary(deviceId, notebook, content, userId) {
-    const today = new Date().toISOString().split("T")[0];
+    const today = tzToday();
     if (userId) {
         await notebookRepo.ensureSystemNotebooksByUser(userId, deviceId);
     }

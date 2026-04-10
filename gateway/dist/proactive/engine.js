@@ -17,6 +17,10 @@ import * as dailyBriefingRepo from "../db/repositories/daily-briefing.js";
 import { regenerateSummary, extractToMemory } from "../diary/manager.js";
 import { digestRecords } from "../handlers/digest.js";
 import { runDailyCognitiveCycle } from "../cognitive/daily-cycle.js";
+import { generateMorningBriefing, generateEveningSummary } from "../handlers/daily-loop.js";
+import { fmt } from "../lib/date-anchor.js";
+import { now as tzNow } from "../lib/tz.js";
+import { addDays as dfAddDays } from "date-fns";
 export class ProactiveEngine {
     devices = new Map();
     intervalMs = 30 * 60 * 1000; // 30 minutes
@@ -194,6 +198,13 @@ export class ProactiveEngine {
                 continue;
             switch (type) {
                 case "morning": {
+                    // 先预生成简报内容，用户打开 app 时无需等待
+                    try {
+                        await generateMorningBriefing(device.deviceId, device.userId);
+                    }
+                    catch (e) {
+                        console.warn(`[proactive] Morning briefing pre-generate failed: ${e.message}`);
+                    }
                     const mText = "新的一天开始了，查看今日简报";
                     this.sendMessage(device, {
                         type: "proactive.morning_briefing",
@@ -220,6 +231,13 @@ export class ProactiveEngine {
                     break;
                 }
                 case "evening": {
+                    // 先预生成晚报内容
+                    try {
+                        await generateEveningSummary(device.deviceId, device.userId);
+                    }
+                    catch (e) {
+                        console.warn(`[proactive] Evening summary pre-generate failed: ${e.message}`);
+                    }
                     const eText = "今天辛苦了，看看日终总结";
                     this.sendMessage(device, {
                         type: "proactive.evening_summary",
@@ -227,13 +245,13 @@ export class ProactiveEngine {
                     });
                     this.persistNotification(device, "proactive.evening_summary", "日终总结", eText);
                     // Regenerate diary summaries for today
-                    const today = new Date().toISOString().split("T")[0];
-                    regenerateSummary(device.deviceId, "default", today).catch(() => { });
-                    regenerateSummary(device.deviceId, "ai-self", today).catch(() => { });
+                    const todayStr = fmt(tzNow());
+                    regenerateSummary(device.deviceId, "default", todayStr).catch(() => { });
+                    regenerateSummary(device.deviceId, "ai-self", todayStr).catch(() => { });
                     // Weekly deep memory extraction (every Sunday)
-                    if (new Date().getDay() === 0) {
-                        const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString().split("T")[0];
-                        extractToMemory(device.deviceId, { start: weekAgo, end: today }).catch(() => { });
+                    if (tzNow().getDay() === 0) {
+                        const weekAgo = fmt(dfAddDays(tzNow(), -7));
+                        extractToMemory(device.deviceId, { start: weekAgo, end: todayStr }).catch(() => { });
                     }
                     break;
                 }
@@ -402,13 +420,13 @@ export class ProactiveEngine {
         }
     }
     async checkDevice(device) {
-        const now = new Date();
+        const now = tzNow();
         const hour = now.getHours();
-        const today = now.toISOString().split("T")[0];
+        const today = fmt(now);
         const nudgeKey = `${device.deviceId}:${today}`;
         // Time-aware pushes (only used in fallback mode — BullMQ uses cron)
         if (!this.redisAvailable) {
-            if (hour >= 7 && hour < 9) {
+            if (hour >= 7 && hour < 8) {
                 const briefingKey = `morning:${nudgeKey}`;
                 if (!this.dailyPushSent.has(briefingKey)) {
                     try {
@@ -428,7 +446,7 @@ export class ProactiveEngine {
                     catch { /* table may not exist */ }
                 }
             }
-            if (hour >= 14 && hour < 17) {
+            if (hour >= 14 && hour < 15) {
                 const relayKey = `relay:${nudgeKey}`;
                 if (!this.dailyPushSent.has(relayKey)) {
                     try {
@@ -450,7 +468,7 @@ export class ProactiveEngine {
                     catch { /* table may not exist */ }
                 }
             }
-            if (hour >= 20 && hour < 22) {
+            if (hour >= 20 && hour < 21) {
                 const eveningKey = `evening:${nudgeKey}`;
                 if (!this.dailyPushSent.has(eveningKey)) {
                     const eveningText = "今天辛苦了，看看日终总结";
@@ -493,8 +511,8 @@ export class ProactiveEngine {
         }
         // ── 提醒检查：reminder_at 在 30 分钟窗口内 ──
         try {
-            const windowStart = new Date().toISOString();
-            const windowEnd = new Date(Date.now() + 30 * 60000).toISOString();
+            const windowStart = tzNow().toISOString();
+            const windowEnd = new Date(tzNow().getTime() + 30 * 60000).toISOString();
             const reminders = await todoRepo.findPendingReminders(windowStart, windowEnd);
             for (const todo of reminders) {
                 // 只推送给相关设备
@@ -560,8 +578,18 @@ export class ProactiveEngine {
         }
     }
     /** 持久化通知到数据库 */
+    /**
+     * 持久化通知 + 数据库去重（防重启/多进程重复发送）。
+     * 返回 true 表示成功写入（新通知），false 表示今天已发过（跳过）。
+     */
     async persistNotification(device, type, title, body) {
         try {
+            // DB 去重：今天是否已发过同类通知
+            const exists = await notificationRepo.hasTodayNotification(type, device.userId, device.deviceId);
+            if (exists) {
+                console.log(`[proactive] Notification ${type} already sent today for ${device.userId ?? device.deviceId}, skip`);
+                return false;
+            }
             await notificationRepo.create({
                 deviceId: device.deviceId,
                 userId: device.userId ?? null,
@@ -569,9 +597,11 @@ export class ProactiveEngine {
                 title,
                 body,
             });
+            return true;
         }
         catch (err) {
             console.warn(`[proactive] Failed to persist notification: ${err.message}`);
+            return false;
         }
     }
     sendNudge(device, msg) {

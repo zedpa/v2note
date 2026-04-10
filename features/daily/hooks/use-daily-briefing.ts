@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { api } from "@/shared/lib/api";
+import { getLocalToday } from "@/features/todos/lib/date-utils";
 
 interface BriefingResult {
   greeting: string;
@@ -30,7 +31,7 @@ function loadCached<T>(key: string): T | null {
     const raw = localStorage.getItem(key);
     if (!raw) return null;
     const cached: CachedReport<T> = JSON.parse(raw);
-    const today = new Date().toISOString().split("T")[0];
+    const today = getLocalToday();
     if (cached.date === today) return cached.data;
     return null;
   } catch {
@@ -40,7 +41,7 @@ function loadCached<T>(key: string): T | null {
 
 function saveCache<T>(key: string, data: T): void {
   try {
-    const today = new Date().toISOString().split("T")[0];
+    const today = getLocalToday();
     localStorage.setItem(key, JSON.stringify({ date: today, data }));
   } catch { /* ignore */ }
 }

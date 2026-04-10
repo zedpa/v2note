@@ -6,6 +6,14 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
+/** 本地日期提取（Asia/Shanghai UTC+8） */
+function toShanghaiDateStr(d: Date): string {
+  const utc = d.getTime() + d.getTimezoneOffset() * 60000;
+  const shanghai = new Date(utc + 8 * 3600000);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${shanghai.getFullYear()}-${pad(shanghai.getMonth() + 1)}-${pad(shanghai.getDate())}`;
+}
+
 interface GenerateSummaryPayload {
   device_id: string;
   period: "daily" | "weekly" | "monthly" | "yearly";
@@ -45,9 +53,9 @@ serve(async (req) => {
     let periodLabel: string;
 
     if (body.period === "daily") {
-      const dateStr = now.toISOString().split("T")[0];
-      rangeStart = `${dateStr}T00:00:00Z`;
-      rangeEnd = `${dateStr}T23:59:59Z`;
+      const dateStr = toShanghaiDateStr(now);
+      rangeStart = `${dateStr}T00:00:00+08:00`;
+      rangeEnd = `${dateStr}T23:59:59+08:00`;
       periodLabel = `${now.getMonth() + 1}月${now.getDate()}日日报`;
     } else if (body.period === "weekly") {
       const dayOfWeek = now.getDay();
@@ -56,14 +64,14 @@ serve(async (req) => {
       monday.setDate(now.getDate() - mondayOffset);
       const sunday = new Date(monday);
       sunday.setDate(monday.getDate() + 6);
-      rangeStart = `${monday.toISOString().split("T")[0]}T00:00:00Z`;
-      rangeEnd = `${sunday.toISOString().split("T")[0]}T23:59:59Z`;
+      rangeStart = `${toShanghaiDateStr(monday)}T00:00:00+08:00`;
+      rangeEnd = `${toShanghaiDateStr(sunday)}T23:59:59+08:00`;
       periodLabel = `${monday.getMonth() + 1}.${monday.getDate()} - ${sunday.getMonth() + 1}.${sunday.getDate()} 周报`;
     } else if (body.period === "monthly") {
       const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
       const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-      rangeStart = `${firstDay.toISOString().split("T")[0]}T00:00:00Z`;
-      rangeEnd = `${lastDay.toISOString().split("T")[0]}T23:59:59Z`;
+      rangeStart = `${toShanghaiDateStr(firstDay)}T00:00:00+08:00`;
+      rangeEnd = `${toShanghaiDateStr(lastDay)}T23:59:59+08:00`;
       periodLabel = `${now.getFullYear()}年${now.getMonth() + 1}月月报`;
     } else {
       // yearly

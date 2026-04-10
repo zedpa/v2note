@@ -37,6 +37,7 @@ function makeGoal(overrides = {}) {
         status: "active",
         source: "speech",
         cluster_id: null,
+        wiki_page_id: null,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
         ...overrides,

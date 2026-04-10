@@ -115,6 +115,8 @@ export async function deleteByIds(ids) {
     if (ids.length === 0)
         return 0;
     const placeholders = ids.map((_, i) => `$${i + 1}`).join(", ");
+    // 先删除关联的 Strike（Bond/StrikeTag 有 ON DELETE CASCADE 自动清理）
+    await execute(`DELETE FROM strike WHERE source_id IN (${placeholders})`, ids);
     return execute(`DELETE FROM record WHERE id IN (${placeholders})`, ids);
 }
 export async function archive(id) {
@@ -158,6 +160,13 @@ export async function findUndigested(userId) {
     return query(`SELECT * FROM record WHERE user_id = $1 AND digested = FALSE AND status = 'completed'
        AND COALESCE(digest_attempts, 0) < 3
      ORDER BY created_at ASC`, [userId]);
+}
+/** 统计正在消化中的 record 数量（digested=false, status=completed, 未超过重试上限） */
+export async function countUndigested(userId) {
+    const row = await queryOne(`SELECT COUNT(*)::text AS count FROM record WHERE user_id = $1
+     AND digested = FALSE AND status = 'completed' AND archived = false
+     AND COALESCE(digest_attempts, 0) < 3`, [userId]);
+    return parseInt(row?.count ?? "0", 10);
 }
 export async function incrementDigestAttempts(id) {
     await execute(`UPDATE record SET digest_attempts = COALESCE(digest_attempts, 0) + 1, updated_at = now() WHERE id = $1`, [id]);
@@ -236,5 +245,22 @@ export async function findByDeviceAndDateRange(deviceId, start, end) {
      AND created_at >= $2 AND created_at <= $3
      ${HIDDEN_SOURCES_CLAUSE}
      ORDER BY created_at ASC`, [deviceId, start, end]);
+}
+/** 查找待编译的 record（compile_status = 'pending' 或 'needs_recompile'） */
+export async function findPendingCompile(userId, limit = 30) {
+    return query(`SELECT * FROM record WHERE user_id = $1
+     AND compile_status IN ('pending', 'needs_recompile')
+     AND status = 'completed'
+     AND archived = false
+     ORDER BY created_at ASC
+     LIMIT $2`, [userId, limit]);
+}
+export async function updateCompileStatus(recordId, status, contentHash) {
+    if (contentHash !== undefined) {
+        await execute(`UPDATE record SET compile_status = $1, content_hash = $2, updated_at = now() WHERE id = $3`, [status, contentHash, recordId]);
+    }
+    else {
+        await execute(`UPDATE record SET compile_status = $1, updated_at = now() WHERE id = $2`, [status, recordId]);
+    }
 }
 //# sourceMappingURL=record.js.map

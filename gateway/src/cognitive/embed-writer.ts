@@ -61,6 +61,23 @@ export async function writeTodoEmbedding(
 }
 
 /**
+ * 为 record 异步写入 embedding（整条文本向量化，替代逐 strike 向量化）。
+ * 调用方应 void 调用（不 await），不阻塞主流程。
+ */
+export async function writeRecordEmbedding(recordId: string, text: string): Promise<void> {
+  try {
+    const embedding = await getEmbedding(text);
+    const pgVector = `[${embedding.join(",")}]`;
+    await execute(
+      `UPDATE record SET embedding = $1::vector WHERE id = $2`,
+      [pgVector, recordId],
+    );
+  } catch (err: any) {
+    console.warn(`[embed-writer] record ${recordId} embedding 写入失败: ${err.message}`);
+  }
+}
+
+/**
  * 批量为已有 strike 补写 embedding（用于迁移/修复）。
  * 返回成功写入数量。
  */

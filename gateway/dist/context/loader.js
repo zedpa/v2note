@@ -13,6 +13,9 @@ import { loadProfile } from "../profile/manager.js";
 import { goalRepo } from "../db/repositories/index.js";
 import { extractKeywords } from "../lib/text-utils.js";
 import { semanticSearch } from "../memory/embeddings.js";
+import { loadWikiContext as loadWikiContextFromSearch } from "../tools/wiki-search.js";
+import { formatDateWithRelative } from "../lib/date-anchor.js";
+import { DEFAULT_SOUL } from "../soul/default-soul.js";
 /** Memory limits per mode */
 const MEMORY_LIMITS = {
     chat: 15,
@@ -26,28 +29,38 @@ export async function loadWarmContext(opts) {
     // Use userId for cross-device data when available, fall back to deviceId
     const id = opts.userId ?? opts.deviceId;
     const useUser = !!opts.userId;
-    // Parallel loading (soul + profile + memories + goals)
-    const [soul, profile, rawMemories, activeGoals] = await Promise.all([
+    // Parallel loading (soul + profile + userAgent + memories + goals + wiki context)
+    const [soul, profile, userAgent, rawMemories, activeGoals, wikiContext] = await Promise.all([
         !opts.localSoul
             ? (useUser ? loadSoulByUserSafe(id) : loadSoulSafe(opts.deviceId))
             : Promise.resolve(undefined),
         useUser ? loadProfileByUserSafe(id) : loadProfileSafe(opts.deviceId),
+        useUser ? loadUserAgentSafe(id) : Promise.resolve(undefined),
         useUser ? loadMemoryByUserSafe(id, opts.dateRange) : loadMemorySafe(opts.deviceId, opts.dateRange),
         useUser ? loadGoalsByUserSafe(id) : loadGoalsSafe(opts.deviceId),
+        useUser ? loadWikiContextSafe(id, opts.inputText) : Promise.resolve([]),
     ]);
-    const soulContent = opts.localSoul ?? soul?.content;
+    // Soul: 有本地配置用本地，有 DB 用 DB，都没有用默认模板
+    const soulContent = opts.localSoul ?? soul?.content ?? (useUser ? DEFAULT_SOUL : undefined);
     const profileContent = profile?.content;
     // Relevance-filter memories (embedding-first, keyword fallback)
     const ranked = await rankMemories(rawMemories, opts.inputText, memoryLimit);
     // Format as context strings
-    const memories = ranked.map((m) => `[${m.source_date ?? "未知日期"}] ${m.content}`);
+    const memories = ranked.map((m) => {
+        if (!m.source_date)
+            return `[日期未知] ${m.content}`;
+        const label = formatDateWithRelative(new Date(m.source_date));
+        return `[${label}] ${m.content}`;
+    });
     const goals = activeGoals.map((g) => ({ id: g.id, title: g.title }));
     return {
         soul: soulContent,
         userProfile: profileContent,
+        userAgent: userAgent?.content,
         memories,
         rawMemories: ranked,
         goals,
+        wikiContext: wikiContext.length > 0 ? wikiContext : undefined,
     };
 }
 /**
@@ -191,6 +204,27 @@ async function loadGoalsByUserSafe(userId) {
     }
     catch (err) {
         console.warn(`[context-loader] Failed to load goals by user: ${err.message}`);
+        return [];
+    }
+}
+/** Safe UserAgent loading (never throws) */
+async function loadUserAgentSafe(userId) {
+    try {
+        const { userAgentRepo } = await import("../db/repositories/index.js");
+        return await userAgentRepo.findOrCreate(userId);
+    }
+    catch (err) {
+        console.warn(`[context-loader] Failed to load user agent: ${err.message}`);
+        return undefined;
+    }
+}
+/** Safe wiki context loading (never throws) */
+async function loadWikiContextSafe(userId, inputText) {
+    try {
+        return await loadWikiContextFromSearch(userId, inputText);
+    }
+    catch (err) {
+        console.warn(`[context-loader] Failed to load wiki context: ${err.message}`);
         return [];
     }
 }

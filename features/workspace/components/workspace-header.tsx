@@ -14,8 +14,9 @@ interface WorkspaceHeaderProps {
   onChatClick?: () => void;
   onSearchClick: () => void;
   userName?: string | null;
-  domainFilter?: string | null;
-  onClearDomainFilter?: () => void;
+  wikiPageFilter?: string | null;
+  wikiPageFilterLabel?: string;
+  onClearWikiPageFilter?: () => void;
   todoViewMode?: TodoViewMode;
   onTodoViewModeChange?: (mode: TodoViewMode) => void;
 }
@@ -27,8 +28,9 @@ export function WorkspaceHeader({
   onChatClick,
   onSearchClick,
   userName,
-  domainFilter,
-  onClearDomainFilter,
+  wikiPageFilter,
+  wikiPageFilterLabel,
+  onClearWikiPageFilter,
   todoViewMode = "time",
   onTodoViewModeChange,
 }: WorkspaceHeaderProps) {
@@ -147,14 +149,14 @@ export function WorkspaceHeader({
         </div>
       </div>
 
-      {/* 文件夹筛选药丸 */}
-      {domainFilter && (
+      {/* 主题筛选药丸 */}
+      {wikiPageFilter && (
         <div className="flex items-center px-4 pb-2">
           <button
-            onClick={onClearDomainFilter}
+            onClick={onClearWikiPageFilter}
             className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-deer/10 text-deer text-xs font-medium transition-colors hover:bg-deer/15"
           >
-            <span>{domainFilter}</span>
+            <span>{wikiPageFilterLabel || "筛选中"}</span>
             <X size={12} />
           </button>
         </div>

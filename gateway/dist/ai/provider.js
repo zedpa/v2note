@@ -187,21 +187,18 @@ export async function* chatCompletionStreamDeepThink(messages, opts) {
             },
         },
     });
-    const streamResult = result;
-    if (streamResult.reasoningStream) {
-        try {
-            for await (const chunk of streamResult.reasoningStream) {
-                if (chunk)
-                    yield { type: "thinking", content: chunk };
-            }
+    // AI SDK fullStream 统一消费 reasoning + text chunk
+    for await (const part of result.fullStream) {
+        switch (part.type) {
+            case "reasoning-delta":
+                if (part.text)
+                    yield { type: "thinking", content: part.text };
+                break;
+            case "text-delta":
+                if (part.text)
+                    yield { type: "text", content: part.text };
+                break;
         }
-        catch {
-            // reasoningStream not supported — fall through to textStream
-        }
-    }
-    for await (const chunk of result.textStream) {
-        if (chunk)
-            yield { type: "text", content: chunk };
     }
 }
 /**
@@ -265,15 +262,19 @@ const TOOL_LABELS = {
     delete_todo: "🗑️ 正在取消待办…",
     create_link: "🔗 正在建立关联…",
     confirm: "✅ 正在处理确认…",
-    // ── 新增工具 ──
+    // ── 新增/合并工具 ──
     get_current_time: "🕐 正在获取时间…",
-    view_record: "📖 正在读取日记…",
-    view_todo: "📖 正在读取待办…",
-    view_goal: "📖 正在读取目标…",
+    view: "📖 正在查看详情…",
     save_conversation: "📝 正在保存对话内容…",
     manage_folder: "📂 正在管理分类…",
     move_record: "📂 正在移动日记…",
     list_folders: "📂 正在查看分类…",
+    // ── 自我维护工具（silent 级别，标签仅供日志） ──
+    update_soul: "✨ 正在调整人格…",
+    update_profile: "👤 正在更新画像…",
+    update_user_agent: "⚙️ 正在更新规则…",
+    create_memory: "💾 正在记录…",
+    send_notification: "🔔 正在发送通知…",
 };
 /**
  * 手动 tool call 循环（绕过 AI SDK maxSteps 的 DashScope 兼容性 bug）
@@ -282,34 +283,40 @@ const TOOL_LABELS = {
 export async function* streamWithTools(messages, tools, opts) {
     const { provider, config } = getTier(opts?.tier ?? "chat");
     const maxSteps = opts?.maxSteps ?? 5;
-    const deepThinkOptions = opts?.deepThink
-        ? {
-            providerOptions: {
-                openai: {
-                    enable_thinking: true,
-                    thinking_budget: opts?.thinkingBudget ?? 4096,
-                },
-            },
-        }
-        : {
-            // chat 层级默认启用推理
-            ...(isReasoningModel(config.model) ? {
-                providerOptions: {
-                    openai: { enable_thinking: config.reasoning },
-                },
-            } : {}),
-        };
+    // DashScope qwen3.5 系列 + tools 的 thinking 策略：
+    // 不注入 enable_thinking 参数，让模型使用默认行为。
+    // （显式 true/false 都有已知 bug，详见 vllm #20611）
+    // 剥离 execute 函数：只传 schema 给模型，执行由我们的手动循环负责。
+    // AI SDK v6 的 tool() 是 identity 函数，剥离 execute 后模型仍能识别工具。
+    const schemaOnlyTools = {};
+    for (const [name, def] of Object.entries(tools)) {
+        const { execute, ...schema } = def;
+        schemaOnlyTools[name] = schema;
+    }
     let currentMessages = [...messages];
+    console.log(`[ai] streamWithTools: tier=${opts?.tier ?? "chat"}, tools=[${Object.keys(tools).join(",")}], msgs=${currentMessages.length}`);
     for (let step = 0; step < maxSteps; step++) {
+        if (step > 0) {
+            console.log(`[ai] Step ${step}: sending tool results to model (${currentMessages.length} msgs)`);
+            // 调试：打印每条消息的 role 和类型
+            for (let i = 0; i < currentMessages.length; i++) {
+                const m = currentMessages[i];
+                const contentType = typeof m.content === "string"
+                    ? `str(${m.content.length})`
+                    : Array.isArray(m.content)
+                        ? `arr[${m.content.map((c) => c.type).join(",")}]`
+                        : typeof m.content;
+                console.log(`[ai]   [${i}] role=${m.role} content=${contentType}`);
+            }
+        }
+        // AI SDK v6: maxSteps 已替换为 stopWhen，默认 stepCountIs(1) = 单步
         const result = streamText({
             model: provider.chat(config.model),
             messages: currentMessages,
-            tools,
+            tools: schemaOnlyTools,
             temperature: opts?.temperature ?? 0.7,
             maxRetries: 1,
             abortSignal: AbortSignal.timeout(config.timeout),
-            maxSteps: 1,
-            ...deepThinkOptions,
         });
         const toolInputBuffers = new Map();
         let hasToolCalls = false;
@@ -339,32 +346,66 @@ export async function* streamWithTools(messages, tools, opts) {
                     }
                     case "tool-call": {
                         hasToolCalls = true;
-                        // Fallback: 如果模型不支持流式 tool args（MiniMax 等），
-                        // 直接从 tool-call 事件提取完整参数
                         const tc = part;
                         const tcId = tc.toolCallId ?? tc.id;
-                        if (tcId && tc.toolName && !toolInputBuffers.has(tcId)) {
-                            // AI SDK tool-call 事件用 input 字段（可能是 string 或 object）
-                            const rawInput = tc.input ?? tc.args ?? {};
-                            toolInputBuffers.set(tcId, {
-                                name: tc.toolName,
-                                args: typeof rawInput === "string" ? rawInput : JSON.stringify(rawInput),
-                            });
+                        const rawInput = tc.input ?? tc.args ?? {};
+                        const rawArgs = typeof rawInput === "string" ? rawInput : JSON.stringify(rawInput);
+                        const existing = tcId ? toolInputBuffers.get(tcId) : undefined;
+                        if (existing && !existing.args) {
+                            existing.args = rawArgs;
+                        }
+                        else if (tcId && tc.toolName && !existing) {
+                            toolInputBuffers.set(tcId, { name: tc.toolName, args: rawArgs });
                         }
                         break;
                     }
+                    case "reasoning-delta": {
+                        const r = part;
+                        if (r.text)
+                            yield `\x00THINKING:${r.text}`;
+                        break;
+                    }
+                    case "reasoning-start":
+                    case "reasoning-end":
+                    case "start-step":
+                    case "finish-step":
+                        break;
                 }
             }
         }
         catch (err) {
+            // Step 1+ 的验证错误：打印完整错误以便调试
+            if (step > 0 && err.name === "AI_InvalidPromptError") {
+                console.error(`[ai] Step ${step} message validation failed. Falling back to text summary.`);
+                // 回退策略：直接把工具结果当文本发给模型，绕过严格的消息格式
+                const fallbackMessages = [
+                    ...messages,
+                    { role: "user", content: `[工具执行结果]\n${currentMessages.slice(-1).map((m) => Array.isArray(m.content) ? m.content.map((c) => JSON.stringify(c.output ?? c)).join("\n") : m.content).join("\n")}\n\n请基于以上工具返回的真实数据回答用户的问题。` },
+                ];
+                const fallbackResult = streamText({
+                    model: provider.chat(config.model),
+                    messages: fallbackMessages,
+                    temperature: opts?.temperature ?? 0.7,
+                    maxRetries: 1,
+                    abortSignal: AbortSignal.timeout(config.timeout),
+                });
+                for await (const part of fallbackResult.fullStream) {
+                    if (part.type === "text-delta" && part.text) {
+                        yield part.text;
+                    }
+                }
+                return;
+            }
             console.error(`[ai] Stream error at step ${step}:`, err.message);
             yield `\n\n⚠️ AI 响应中断: ${err.message}\n\n`;
             return;
         }
         if (!hasToolCalls || toolInputBuffers.size === 0) {
+            console.log(`[ai] Step ${step}: no tool calls, text=${textGenerated}`);
             return;
         }
-        const toolResultMessages = [];
+        // ── 执行工具 ──
+        const toolResults = [];
         for (const [callId, { name, args: rawArgs }] of toolInputBuffers) {
             const label = TOOL_LABELS[name] ?? `正在执行 ${name}…`;
             yield `\x00TOOL_STATUS:${name}:${label}:${callId}`;
@@ -376,7 +417,7 @@ export async function* streamWithTools(messages, tools, opts) {
             catch {
                 console.warn(`[ai] Failed to parse tool args for ${name}: ${rawArgs.slice(0, 100)}`);
             }
-            const toolStartTime = Date.now();
+            const t0 = Date.now();
             let toolResult = { success: false, message: "工具执行失败" };
             try {
                 const toolDef = tools[name];
@@ -385,47 +426,37 @@ export async function* streamWithTools(messages, tools, opts) {
                 }
             }
             catch (err) {
-                console.error(`[ai] Tool "${name}" execution error:`, err.message);
+                console.error(`[ai] Tool "${name}" error:`, err.message);
                 toolResult = { success: false, message: `工具执行失败: ${err.message}` };
             }
-            const durationMs = Date.now() - toolStartTime;
-            console.log(`[ai] Tool result: ${name} →`, JSON.stringify(toolResult).slice(0, 150));
-            // 发送 TOOL_DONE 标记（success:message:durationMs）
+            const ms = Date.now() - t0;
+            const resultJson = JSON.stringify(toolResult);
+            console.log(`[ai] Tool result: ${name} (${ms}ms) →`, resultJson.slice(0, 200));
             const toolSuccess = toolResult?.success !== false;
             const toolMessage = (toolResult?.message ?? "").replace(/:/g, "：");
-            yield `\x00TOOL_DONE:${name}:${callId}:${toolSuccess}:${toolMessage}:${durationMs}`;
-            toolResultMessages.push({
-                tool_call_id: callId,
-                toolName: name,
-                content: JSON.stringify(toolResult),
-            });
+            yield `\x00TOOL_DONE:${name}:${callId}:${toolSuccess}:${toolMessage}:${ms}`;
+            toolResults.push({ callId, name, input: parsedArgs, resultJson });
         }
-        const assistantContent = [];
-        for (const [callId, { name, args: rawArgs }] of toolInputBuffers) {
-            assistantContent.push({
-                type: "tool-call",
-                toolCallId: callId,
-                toolName: name,
-                input: (() => { try {
-                    return JSON.parse(rawArgs || "{}");
-                }
-                catch {
-                    return {};
-                } })(),
-            });
-        }
+        // ── 构造 AI SDK v6 消息格式 ──
+        // assistant message: content = [{ type: "tool-call", toolCallId, toolName, input }]
+        // tool message: content = [{ type: "tool-result", toolCallId, toolName, output: { type, value } }]
+        const assistantParts = toolResults.map(tr => ({
+            type: "tool-call",
+            toolCallId: tr.callId,
+            toolName: tr.name,
+            input: tr.input,
+        }));
+        const toolResultParts = toolResults.map(tr => ({
+            type: "tool-result",
+            toolCallId: tr.callId,
+            toolName: tr.name,
+            output: { type: "text", value: tr.resultJson },
+        }));
+        console.log(`[ai] Step ${step} → ${toolResults.length} tool results, continuing to step ${step + 1}`);
         currentMessages = [
             ...currentMessages,
-            { role: "assistant", content: assistantContent },
-            ...toolResultMessages.map((tr) => ({
-                role: "tool",
-                content: [{
-                        type: "tool-result",
-                        toolCallId: tr.tool_call_id,
-                        toolName: tr.toolName,
-                        output: { type: "text", value: tr.content },
-                    }],
-            })),
+            { role: "assistant", content: assistantParts },
+            { role: "tool", content: toolResultParts },
         ];
     }
     console.warn(`[ai] maxSteps (${maxSteps}) exhausted`);
@@ -451,21 +482,19 @@ export async function* streamWithToolsDeepThink(messages, tools, opts) {
             },
         },
     });
-    const streamResult = result;
-    if (streamResult.reasoningStream) {
-        try {
-            for await (const chunk of streamResult.reasoningStream) {
-                if (chunk)
-                    yield { type: "thinking", content: chunk };
-            }
+    // ⚠️ 注意：DashScope thinking + tools 有已知 bug（见 streamWithTools 注释），
+    // 此函数目前未被调用。保留作为切换 Anthropic provider 后的入口。
+    for await (const part of result.fullStream) {
+        switch (part.type) {
+            case "reasoning-delta":
+                if (part.text)
+                    yield { type: "thinking", content: part.text };
+                break;
+            case "text-delta":
+                if (part.text)
+                    yield { type: "text", content: part.text };
+                break;
         }
-        catch {
-            // reasoningStream not supported
-        }
-    }
-    for await (const chunk of result.textStream) {
-        if (chunk)
-            yield { type: "text", content: chunk };
     }
 }
 // Re-export for convenience

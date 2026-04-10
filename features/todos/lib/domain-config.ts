@@ -1,3 +1,8 @@
+/**
+ * @deprecated Domain 配色系统已停用（Phase 13）。
+ * todo.domain 字段不再由 AI 赋值，保留代码仅为已有数据的 UI 兼容。
+ * 后续将迁移到 wiki page 关联的样式系统。
+ */
 import { Briefcase, Home, Users, BookOpen, Heart, type LucideIcon } from "lucide-react";
 
 export interface DomainStyle {

@@ -15,7 +15,7 @@ interface DateGroup {
 
 const POLL_INTERVAL = 5000;
 
-export function useNotes(notebook?: string | null, clusterId?: string | null) {
+export function useNotes(notebook?: string | null, wikiPageId?: string | null) {
   const [notes, setNotes] = useState<NoteItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -45,7 +45,7 @@ export function useNotes(notebook?: string | null, clusterId?: string | null) {
 
       const fetchOpts: Parameters<typeof listRecords>[0] = {};
       if (notebook !== undefined && notebook !== null) fetchOpts.notebook = notebook;
-      if (clusterId) fetchOpts.cluster_id = clusterId;
+      if (wikiPageId) fetchOpts.wiki_page_id = wikiPageId;
       const hasOpts = Object.keys(fetchOpts).length > 0;
 
       const records = await listRecords(hasOpts ? fetchOpts : undefined);
@@ -102,7 +102,7 @@ export function useNotes(notebook?: string | null, clusterId?: string | null) {
       if (!initialLoadDone.current) setLoading(false);
       else setLoading(false);
     }
-  }, [notebook, clusterId]);
+  }, [notebook, wikiPageId]);
 
   // Start/stop polling based on whether any notes are still processing
   useEffect(() => {
@@ -128,11 +128,11 @@ export function useNotes(notebook?: string | null, clusterId?: string | null) {
     };
   }, [notes, fetchNotes]);
 
-  // Reset on notebook/clusterId change
+  // Reset on notebook/wikiPageId change
   useEffect(() => {
     setNotes([]);
     initialLoadDone.current = false;
-  }, [notebook, clusterId]);
+  }, [notebook, wikiPageId]);
 
   // Initial fetch + event listeners
   useEffect(() => {

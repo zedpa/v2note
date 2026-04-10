@@ -64,6 +64,18 @@ export function toLocalDate(d: Date | string | number | null | undefined): strin
   return format(new TZDate(d.getTime(), APP_TZ), "yyyy-MM-dd");
 }
 
+/**
+ * 任意 Date/ISO string 转本地日期时间 "YYYY-MM-DD HH:mm"。
+ * 用于返回给 AI 的人类可读时间（避免 AI 误读 UTC 日期）。
+ */
+export function toLocalDateTime(d: Date | string | number | null | undefined): string {
+  if (d == null) return `${today()} 00:00`;
+  const ms = typeof d === "string" ? new Date(d).getTime()
+    : typeof d === "number" ? d
+    : d.getTime();
+  return format(new TZDate(ms, APP_TZ), "yyyy-MM-dd HH:mm");
+}
+
 // ── UTC ISO 时间范围（用于 DB WHERE 子句）──
 
 /**

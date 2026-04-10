@@ -1,31 +1,29 @@
 /**
  * 认知报告生成 — 纯数据聚合，0 AI 调用。
  *
+ * v3: 数据源从 strike/bond/cluster 切换到 wiki page + record。
  * 在 daily-cycle 末尾调用，产出结构化报告供晨间/晚间简报使用。
  */
 
 import { query } from "../db/pool.js";
-import { today } from "../lib/tz.js";
+import { today, toLocalDate } from "../lib/tz.js";
 
 export interface CognitiveReport {
-  today_strikes: {
-    perceive: number;
-    judge: number;
-    realize: number;
-    intend: number;
-    feel: number;
-  };
+  /** 今日新增 record 数量 */
+  today_records: number;
+  /** wiki page 中「矛盾/未决」段落（从 content 中提取） */
   contradictions: Array<{
-    strikeA_nucleus: string;
-    strikeB_nucleus: string;
-    strength: number;
+    page_title: string;
+    snippet: string;
   }>;
-  cluster_changes: Array<{
-    name: string;
-    type: "created" | "merged" | "archived";
+  /** 今日新建/更新的 wiki page */
+  wiki_changes: Array<{
+    title: string;
+    type: "created" | "updated";
   }>;
+  /** 行为偏差：今日待办完成率 */
   behavior_drift: {
-    intend_count: number;
+    today_records: number;
     todo_completed: number;
     completion_rate: number;
   };
@@ -36,71 +34,54 @@ export async function generateCognitiveReport(
   opts: { userId?: string; deviceId?: string },
 ): Promise<CognitiveReport> {
   const todayStr = today();
-  // 支持 userId 或 deviceId 查询（无登录用户时走 device 路径）
-  const [strikeWhere, todoWhere, params] = opts.userId
+  const [recordWhere, todoWhere, params] = opts.userId
     ? ["user_id = $1", "user_id = $1", [opts.userId]]
-    : ["source_id IN (SELECT id FROM record WHERE device_id = $1)", "device_id = $1", [opts.deviceId!]];
+    : ["device_id = $1", "device_id = $1", [opts.deviceId!]];
 
-  // 1. 今日极性分布（只统计 think）
-  const polarityRows = await query<{ polarity: string; count: string }>(
-    `SELECT polarity, COUNT(*) as count FROM strike
-     WHERE ${strikeWhere} AND status = 'active'
-       AND COALESCE(source_type, 'think') != 'material'
-       AND created_at::date = $2::date
-     GROUP BY polarity`,
+  // 1. 今日新增 record 数
+  const recCountRows = await query<{ count: string }>(
+    `SELECT COUNT(*) as count FROM record
+     WHERE ${recordWhere} AND created_at::date = $2::date`,
     [...params, todayStr],
   );
+  const today_records = parseInt(recCountRows[0]?.count ?? "0", 10);
 
-  const polarityMap: Record<string, number> = {};
-  for (const row of polarityRows) {
-    polarityMap[row.polarity] = parseInt(row.count, 10);
+  // 2. Wiki page 中的矛盾/未决（从 content 中 ## 矛盾 段落提取）
+  const wikiWhere = opts.userId ? "user_id = $1" : "user_id IN (SELECT user_id FROM record WHERE device_id = $1 LIMIT 1)";
+  const contradictionRows = await query<{ title: string; content: string }>(
+    `SELECT title, content FROM wiki_page
+     WHERE ${wikiWhere} AND status = 'active'
+       AND content ILIKE '%矛盾%'
+     LIMIT 10`,
+    params,
+  );
+
+  const contradictions: CognitiveReport["contradictions"] = [];
+  for (const row of contradictionRows) {
+    // 简单提取矛盾段落的第一行
+    const match = row.content.match(/##\s*矛盾[^\n]*\n([^\n#]+)/);
+    if (match) {
+      contradictions.push({
+        page_title: row.title,
+        snippet: match[1].trim().slice(0, 100),
+      });
+    }
   }
 
-  const today_strikes = {
-    perceive: polarityMap["perceive"] ?? 0,
-    judge: polarityMap["judge"] ?? 0,
-    realize: polarityMap["realize"] ?? 0,
-    intend: polarityMap["intend"] ?? 0,
-    feel: polarityMap["feel"] ?? 0,
-  };
-
-  // 2. 今日矛盾（最多 5 条）
-  const contradictionRows = await query<{
-    a_nucleus: string;
-    b_nucleus: string;
-    strength: number;
-  }>(
-    `SELECT sa.nucleus as a_nucleus, sb.nucleus as b_nucleus, b.strength
-     FROM bond b
-     JOIN strike sa ON sa.id = b.source_strike_id
-     JOIN strike sb ON sb.id = b.target_strike_id
-     WHERE sa.${strikeWhere} AND b.type = 'contradiction'
-       AND b.created_at::date = $2::date
-     ORDER BY b.strength DESC
-     LIMIT 5`,
+  // 3. 今日新建/更新的 wiki page
+  const wikiChanges = await query<{ title: string; created_at: string; updated_at: string }>(
+    `SELECT title, created_at, updated_at FROM wiki_page
+     WHERE ${wikiWhere} AND status = 'active'
+       AND (created_at::date = $2::date OR updated_at::date = $2::date)`,
     [...params, todayStr],
   );
 
-  const contradictions = contradictionRows.slice(0, 5).map((r) => ({
-    strikeA_nucleus: r.a_nucleus,
-    strikeB_nucleus: r.b_nucleus,
-    strength: r.strength,
+  const wiki_changes = wikiChanges.map((w) => ({
+    title: w.title,
+    type: (toLocalDate(w.created_at) === todayStr ? "created" : "updated") as "created" | "updated",
   }));
 
-  // 3. Cluster 变化（今日新建的）
-  const newClusters = await query<{ nucleus: string }>(
-    `SELECT nucleus FROM strike
-     WHERE ${strikeWhere} AND is_cluster = true AND status = 'active'
-       AND created_at::date = $2::date`,
-    [...params, todayStr],
-  );
-
-  const cluster_changes = newClusters.map((c) => ({
-    name: c.nucleus,
-    type: "created" as const,
-  }));
-
-  // 4. 行为偏差
+  // 4. 行为偏差（待办完成率）
   const todoStats = await query<{ total: string; done: string }>(
     `SELECT
        COUNT(*)::text as total,
@@ -114,18 +95,17 @@ export async function generateCognitiveReport(
   const doneTodos = parseInt(todoStats[0]?.done ?? "0", 10);
 
   const behavior_drift = {
-    intend_count: today_strikes.intend,
+    today_records,
     todo_completed: doneTodos,
     completion_rate: totalTodos > 0 ? doneTodos / totalTodos : 0,
   };
 
-  const totalStrikes = Object.values(today_strikes).reduce((a, b) => a + b, 0);
-  const is_empty = totalStrikes === 0 && contradictions.length === 0 && cluster_changes.length === 0;
+  const is_empty = today_records === 0 && contradictions.length === 0 && wiki_changes.length === 0;
 
   return {
-    today_strikes,
+    today_records,
     contradictions,
-    cluster_changes,
+    wiki_changes,
     behavior_drift,
     is_empty,
   };

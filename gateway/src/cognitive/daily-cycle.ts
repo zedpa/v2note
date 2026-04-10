@@ -1,20 +1,18 @@
 /**
- * Daily cognitive cycle — 3 步：批量分析 + 维护 + 报告
+ * Daily cognitive cycle — Wiki 编译 + 认知报告
  *
- * v2: 从 8 步简化为 3 步，clustering/emergence/contradiction/promote/tag-sync
- *     全部由 batch-analyze 单次 AI 调用替代。
+ * v3: Strike/Bond/Cluster 引擎已移除。
+ *     每日流程：周期任务 → Wiki 编译 → 认知报告 → AI 日记
  */
 
-import { runBatchAnalyze, type BatchAnalyzeResult } from "./batch-analyze.js";
-import { normalizeBondTypes, decayBondStrength, decaySalience } from "./maintenance.js";
+import { compileWikiForUser, type CompileResult } from "./wiki-compiler.js";
 import { generateCognitiveReport, type CognitiveReport } from "./report.js";
 import { appendToDiary } from "../diary/manager.js";
 import * as todoRepo from "../db/repositories/todo.js";
-import { today as tzToday } from "../lib/tz.js";
+import { today as tzToday, now as tzNow } from "../lib/tz.js";
 
 export interface CognitiveCycleResult {
-  batchAnalyze: BatchAnalyzeResult | null;
-  maintenance: { normalized: number; decayed: number; salience: number } | null;
+  wikiCompile: CompileResult | null;
   report: CognitiveReport | null;
   recurringInstances: number;
 }
@@ -25,8 +23,7 @@ export async function runDailyCognitiveCycle(
 ): Promise<CognitiveCycleResult> {
   console.log("[cognitive] Starting daily cycle for user", userId);
 
-  let batchResult: BatchAnalyzeResult | null = null;
-  let maintenance: CognitiveCycleResult["maintenance"] = null;
+  let wikiCompile: CompileResult | null = null;
   let report: CognitiveReport | null = null;
 
   // Step 0: 生成今日的周期任务实例
@@ -40,37 +37,15 @@ export async function runDailyCognitiveCycle(
     console.error("[cognitive] Recurring instance generation failed:", err);
   }
 
-  // Step 1: 批量分析（替代 clustering + emergence + contradiction + promote + tag-sync）
+  // Step 1: Wiki 编译（替代原 batch-analyze + emergence + maintenance）
   try {
-    batchResult = await runBatchAnalyze(userId);
-    console.log("[cognitive] Batch analyze:", batchResult);
+    wikiCompile = await compileWikiForUser(userId);
+    console.log("[cognitive] Wiki compile:", wikiCompile);
   } catch (err) {
-    console.error("[cognitive] Batch analyze failed:", err);
+    console.error("[cognitive] Wiki compile failed:", err);
   }
 
-  // Step 2: 维护（Bond 衰减 + salience 衰减）
-  try {
-    const normalized = await normalizeBondTypes(userId);
-    const decayed = await decayBondStrength(userId);
-    const salienceDecayed = await decaySalience(userId);
-    maintenance = { normalized, decayed, salience: salienceDecayed };
-    console.log(
-      `[cognitive] Maintenance: normalized=${normalized} decayed=${decayed} salience=${salienceDecayed}`,
-    );
-  } catch (err) {
-    console.error("[cognitive] Maintenance failed:", err);
-  }
-
-  // Step 2.5: L2 涌现（每日运行，检查是否有可合并的 L1 聚类）
-  try {
-    const { runEmergence } = await import("./emergence.js");
-    const emergence = await runEmergence(userId);
-    console.log(`[cognitive] Emergence: ${emergence.higherOrderClusters} L2 created`);
-  } catch (err) {
-    console.error("[cognitive] L2 emergence failed:", err);
-  }
-
-  // Step 3: 认知报告
+  // Step 2: 认知报告
   try {
     report = await generateCognitiveReport({ userId, deviceId: opts?.deviceId });
     console.log(`[cognitive] Report: empty=${report.is_empty}`);
@@ -78,22 +53,19 @@ export async function runDailyCognitiveCycle(
     console.error("[cognitive] Report generation failed:", err);
   }
 
-  // 写入 AI 日记（deviceId 仅作设备标记，不可用 userId 替代）
+  // 写入 AI 日记摘要
   const deviceId = opts?.deviceId;
   try {
     const digestLines: string[] = [];
-    if (batchResult && batchResult.success) {
-      if (batchResult.newClusters > 0) {
-        digestLines.push(`发现${batchResult.newClusters}个新主题`);
+    if (wikiCompile) {
+      if (wikiCompile.pages_created > 0) {
+        digestLines.push(`新建${wikiCompile.pages_created}个知识页`);
       }
-      if (batchResult.contradictions > 0) {
-        digestLines.push(`${batchResult.contradictions}处观点变化`);
+      if (wikiCompile.pages_updated > 0) {
+        digestLines.push(`更新${wikiCompile.pages_updated}个知识页`);
       }
-      if (batchResult.patterns > 0) {
-        digestLines.push(`${batchResult.patterns}个思维模式`);
-      }
-      if (batchResult.goals > 0) {
-        digestLines.push(`${batchResult.goals}个涌现目标建议`);
+      if (wikiCompile.records_compiled > 0) {
+        digestLines.push(`编译${wikiCompile.records_compiled}条记录`);
       }
     }
 
@@ -105,7 +77,7 @@ export async function runDailyCognitiveCycle(
     console.error("[cognitive] Failed to save cognitive digest:", err);
   }
 
-  return { batchAnalyze: batchResult, maintenance, report, recurringInstances };
+  return { wikiCompile, report, recurringInstances };
 }
 
 // ── 周期任务实例生成 ──────────────────────────────────────────────
@@ -143,7 +115,7 @@ async function generateRecurringInstances(
 
   if (templates.length === 0) return 0;
 
-  const today = new Date();
+  const today = tzNow();
   const todayStr = tzToday();
   let created = 0;
 

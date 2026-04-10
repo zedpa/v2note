@@ -8,6 +8,7 @@ import { useTodos } from "@/features/todos/hooks/use-todos";
 import { TodoDetailSheet } from "@/features/todos/components/todo-detail-sheet";
 import { getDomainStyle } from "@/features/todos/lib/domain-config";
 import type { TodoItem } from "@/shared/lib/types";
+import { getLocalToday, toLocalDateStr, toLocalDate } from "@/features/todos/lib/date-utils";
 import { listGoals, listPendingIntents } from "@/shared/lib/api/goals";
 import { useActionPanel } from "@/features/action-panel/hooks/use-action-panel";
 import { NowCard } from "@/features/action-panel/components/now-card";
@@ -17,14 +18,15 @@ import { reportSwipe } from "@/shared/lib/api/action-panel";
 interface TodoWorkspaceViewProps {
   onOpenChat?: (initial?: string) => void;
   onReflect?: (strikeId: string) => void;
-  domainFilter?: string | null;
+  wikiPageFilter?: string | null;
 }
 
-/** 按目标/domain 分组 */
+/** 按目标/wiki page 分组 */
 interface GoalGroup {
   type: "goal" | "domain" | "ungrouped";
   id: string;
   title: string;
+  subtitle?: string;
   icon: "tree-pine" | "target" | "package" | "circle";
   clusterId?: string;
   todos: TodoItem[];
@@ -33,7 +35,7 @@ interface GoalGroup {
 }
 
 /** 将 todo 列表按 parent_id（目标）分组，无 parent 的按 domain 兜底 */
-function groupTodosByGoal(todos: TodoItem[], goals: Array<{ id: string; text?: string; title?: string; cluster_id?: string }>): GoalGroup[] {
+function groupTodosByGoal(todos: TodoItem[], goals: Array<{ id: string; text?: string; title?: string; wiki_page_id?: string; wiki_page_title?: string }>): GoalGroup[] {
   const goalMap = new Map(goals.map((g) => [g.id, g]));
   const groups = new Map<string, GoalGroup>();
 
@@ -48,8 +50,9 @@ function groupTodosByGoal(todos: TodoItem[], goals: Array<{ id: string; text?: s
           type: "goal",
           id: goal.id,
           title: goal.text || goal.title || "未命名目标",
-          icon: goal.cluster_id ? "tree-pine" : "target",
-          clusterId: goal.cluster_id ?? undefined,
+          subtitle: goal.wiki_page_title ?? undefined,
+          icon: goal.wiki_page_id ? "tree-pine" : "target",
+          clusterId: goal.wiki_page_id ?? undefined,
           todos: [],
           doneCount: 0,
           totalCount: 0,
@@ -88,20 +91,20 @@ function groupTodosByGoal(todos: TodoItem[], goals: Array<{ id: string; text?: s
   );
 }
 
-export function TodoWorkspaceView({ onOpenChat, onReflect, domainFilter }: TodoWorkspaceViewProps) {
+export function TodoWorkspaceView({ onOpenChat, onReflect, wikiPageFilter }: TodoWorkspaceViewProps) {
   const { todos: rawTodayTodos, loading: todayLoading, toggleTodo } = useTodayTodos();
   const { todos: rawAllTodos, loading: allLoading } = useTodos();
 
-  // 维度筛选：按 domain 或 parent 目标的 domain 过滤
+  // wiki page 筛选：通过 goal 的 wiki_page_id 间接过滤
   const todayTodos = useMemo(() => {
-    if (!domainFilter) return rawTodayTodos;
-    return rawTodayTodos.filter((t) => t.domain === domainFilter);
-  }, [rawTodayTodos, domainFilter]);
+    if (!wikiPageFilter) return rawTodayTodos;
+    return rawTodayTodos.filter((t) => (t as any).wiki_page_id === wikiPageFilter);
+  }, [rawTodayTodos, wikiPageFilter]);
 
   const allTodos = useMemo(() => {
-    if (!domainFilter) return rawAllTodos;
-    return rawAllTodos.filter((t) => t.domain === domainFilter);
-  }, [rawAllTodos, domainFilter]);
+    if (!wikiPageFilter) return rawAllTodos;
+    return rawAllTodos.filter((t) => (t as any).wiki_page_id === wikiPageFilter);
+  }, [rawAllTodos, wikiPageFilter]);
   const {
     now: nowCard,
     goals: actionGoals,
@@ -114,7 +117,7 @@ export function TodoWorkspaceView({ onOpenChat, onReflect, domainFilter }: TodoW
   const [refreshKey, setRefreshKey] = useState(0);
   const [pendingIntents, setPendingIntents] = useState<any[]>([]);
   const [confirmCollapsed, setConfirmCollapsed] = useState(false);
-  const [goals, setGoals] = useState<Array<{ id: string; text?: string; title?: string; cluster_id?: string }>>([]);
+  const [goals, setGoals] = useState<Array<{ id: string; text?: string; title?: string; wiki_page_id?: string; wiki_page_title?: string }>>([]);
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
 
   // NowCard 完成/跳过后刷新
@@ -141,17 +144,17 @@ export function TodoWorkspaceView({ onOpenChat, onReflect, domainFilter }: TodoW
       .then((intents) => setPendingIntents(intents || []))
       .catch(() => {});
     listGoals()
-      .then((g) => setGoals((g || []).map((x: any) => ({ id: x.id, text: x.text, title: x.title, cluster_id: x.cluster_id }))))
+      .then((g) => setGoals((g || []).map((x: any) => ({ id: x.id, text: x.text, title: x.title, wiki_page_id: x.wiki_page_id, wiki_page_title: x.wiki_page_title }))))
       .catch(() => {});
   }, [refreshKey]);
 
   const loading = todayLoading || allLoading;
 
   // 分组逻辑
-  const todayDate = new Date().toISOString().split("T")[0];
+  const todayDate = getLocalToday();
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
-  const tomorrowDate = tomorrow.toISOString().split("T")[0];
+  const tomorrowDate = toLocalDateStr(tomorrow);
 
   const todayPending = todayTodos.filter((t) => !t.done);
   const todayDone = todayTodos.filter((t) => t.done);
@@ -162,18 +165,19 @@ export function TodoWorkspaceView({ onOpenChat, onReflect, domainFilter }: TodoW
   // 未来待办（非今日）
   const futureTodos = allTodos.filter((t) => {
     if (t.done) return false;
-    const sched = t.scheduled_start?.split("T")[0];
-    if (!sched) return false;
+    if (!t.scheduled_start) return false;
+    const sched = toLocalDate(t.scheduled_start);
     return sched > todayDate;
   });
 
   const tomorrowTodos = futureTodos.filter(
-    (t) => t.scheduled_start?.split("T")[0] === tomorrowDate,
+    (t) => t.scheduled_start && toLocalDate(t.scheduled_start) === tomorrowDate,
   );
 
   const laterTodos = futureTodos.filter((t) => {
-    const d = t.scheduled_start?.split("T")[0];
-    return d && d > tomorrowDate;
+    if (!t.scheduled_start) return false;
+    const d = toLocalDate(t.scheduled_start);
+    return d > tomorrowDate;
   });
 
   // 无排期（排除已在 todayTodos 中的）
@@ -415,7 +419,7 @@ function TodayGrouped({
   onSelectTodo,
 }: {
   todos: TodoItem[];
-  goals: Array<{ id: string; text?: string; title?: string; cluster_id?: string }>;
+  goals: Array<{ id: string; text?: string; title?: string; wiki_page_id?: string }>;
   collapsedGroups: Set<string>;
   onToggleCollapse: (key: string) => void;
   onToggleTodo: (id: string) => void;
@@ -449,9 +453,16 @@ function TodayGrouped({
               className="flex items-center gap-2 w-full py-2 px-1"
             >
               {groupIcon(group.icon)}
-              <span className="text-sm font-medium text-on-surface flex-1 text-left truncate">
-                {group.title}
-              </span>
+              <div className="flex-1 min-w-0 text-left">
+                <span className="text-sm font-medium text-on-surface truncate block">
+                  {group.title}
+                </span>
+                {group.subtitle && (
+                  <span className="text-[10px] text-muted-accessible truncate block">
+                    {group.subtitle}
+                  </span>
+                )}
+              </div>
               <span className="text-xs font-mono text-muted-accessible">
                 {group.doneCount}/{group.totalCount}
               </span>
@@ -510,7 +521,7 @@ function TodoRow({
 }) {
   const isDone = done || todo.done;
   const timeStr = todo.scheduled_start
-    ? new Date(todo.scheduled_start.replace(/Z$/i, "")).toLocaleTimeString("zh-CN", {
+    ? new Date(todo.scheduled_start).toLocaleTimeString("zh-CN", {
         hour: "2-digit",
         minute: "2-digit",
       })

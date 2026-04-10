@@ -5,10 +5,11 @@
 
 import { chatCompletion, type ChatMessage } from "../ai/provider.js";
 import { todoRepo, recordRepo } from "../db/repositories/index.js";
-import { toDateString } from "./daily-loop.js";
+import { toLocalDateStr } from "./daily-loop.js";
 import { MORNING_PROMPT, EVENING_PROMPT } from "../prompts/templates.js";
 import { fmt } from "../lib/date-anchor.js";
-import { dayRange } from "../lib/tz.js";
+import { dayRange, now as tzNow, toLocalDateTime } from "../lib/tz.js";
+import { addDays as dfAddDays } from "date-fns";
 import { loadSoul } from "../soul/manager.js";
 import { loadProfile } from "../profile/manager.js";
 
@@ -37,11 +38,9 @@ export async function generateMorningReport(
   deviceId: string,
   userId?: string,
 ): Promise<any> {
-  const now = new Date();
+  const now = tzNow();
   const today = fmt(now);
-  const yesterdayDate = new Date(now);
-  yesterdayDate.setDate(yesterdayDate.getDate() - 1);
-  const yesterday = fmt(yesterdayDate);
+  const yesterday = fmt(dfAddDays(now, -1));
 
   const [pendingTodos, yesterdayStats, soul, profile] = await Promise.all([
     (userId ? todoRepo.findPendingByUser(userId) : todoRepo.findPendingByDevice(deviceId)).catch(() => []),
@@ -57,7 +56,7 @@ export async function generateMorningReport(
   ]);
 
   const todayScheduled = pendingTodos.filter((t) =>
-    toDateString(t.scheduled_start)?.startsWith(today),
+    toLocalDateStr(t.scheduled_start) === today,
   );
   const overdue = pendingTodos.filter((t) =>
     t.scheduled_end ? new Date(t.scheduled_end) < now : false,
@@ -88,7 +87,7 @@ export async function generateMorningReport(
     if (!parsed) throw new Error("AI 返回格式异常");
 
     parsed.mode = "morning";
-    parsed.generated_at = new Date().toISOString();
+    parsed.generated_at = toLocalDateTime(tzNow());
     if (!parsed.stats) {
       parsed.stats = { yesterday_done: yesterdayStats.done, yesterday_total: yesterdayStats.total };
     }
@@ -97,7 +96,7 @@ export async function generateMorningReport(
     console.error(`[report] Morning generation failed: ${err.message}`);
     return {
       mode: "morning",
-      generated_at: new Date().toISOString(),
+      generated_at: toLocalDateTime(tzNow()),
       headline: `今天有${todayScheduled.length}件事排着`,
       today_focus: todayScheduled.slice(0, 5).map((t) => t.text),
       carry_over: overdue.map((t) => t.text),
@@ -112,11 +111,9 @@ export async function generateEveningReport(
   deviceId: string,
   userId?: string,
 ): Promise<any> {
-  const now = new Date();
+  const now = tzNow();
   const today = fmt(now);
-  const tomorrowDate = new Date(now);
-  tomorrowDate.setDate(tomorrowDate.getDate() + 1);
-  const tomorrow = fmt(tomorrowDate);
+  const tomorrow = fmt(dfAddDays(now, 1));
 
   const [allTodos, pendingTodos, soul, profile] = await Promise.all([
     (userId ? todoRepo.findByUser(userId) : todoRepo.findByDevice(deviceId)).catch(() => []),
@@ -126,7 +123,7 @@ export async function generateEveningReport(
   ]);
 
   const todayDone = allTodos.filter(
-    (t) => t.done && t.completed_at && toDateString(t.completed_at)?.startsWith(today),
+    (t) => t.done && t.completed_at && toLocalDateStr(t.completed_at) === today,
   );
 
   let newRecordCount = 0;
@@ -135,12 +132,12 @@ export async function generateEveningReport(
       ? await recordRepo.findByUser(userId, { limit: 100 })
       : await recordRepo.findByDevice(deviceId, { limit: 100 });
     newRecordCount = records.filter(
-      (r: any) => r.created_at && toDateString(r.created_at)?.startsWith(today),
+      (r: any) => r.created_at && toLocalDateStr(r.created_at) === today,
     ).length;
   } catch { /* non-critical */ }
 
   const tomorrowScheduled = pendingTodos.filter((t) =>
-    toDateString(t.scheduled_start)?.startsWith(tomorrow),
+    toLocalDateStr(t.scheduled_start) === tomorrow,
   );
 
   const doneText = todayDone.length > 0
@@ -170,7 +167,7 @@ export async function generateEveningReport(
     if (!parsed) throw new Error("AI 返回格式异常");
 
     parsed.mode = "evening";
-    parsed.generated_at = new Date().toISOString();
+    parsed.generated_at = toLocalDateTime(tzNow());
     if (!parsed.stats) {
       parsed.stats = { done: todayDone.length, new_records: newRecordCount };
     }
@@ -179,7 +176,7 @@ export async function generateEveningReport(
     console.error(`[report] Evening generation failed: ${err.message}`);
     return {
       mode: "evening",
-      generated_at: new Date().toISOString(),
+      generated_at: toLocalDateTime(tzNow()),
       headline: todayDone.length > 0 ? `今天完成了${todayDone.length}件事` : "安静的一天",
       accomplishments: todayDone.slice(0, 5).map((t) => t.text),
       tomorrow_preview: tomorrowScheduled.slice(0, 3).map((t) => t.text),
@@ -195,7 +192,7 @@ export async function generateReport(
   deviceId: string,
   userId?: string,
 ): Promise<any> {
-  const resolvedMode = mode === "auto" ? resolveMode(new Date().getHours()) : mode;
+  const resolvedMode = mode === "auto" ? resolveMode(tzNow().getHours()) : mode;
 
   switch (resolvedMode) {
     case "morning":

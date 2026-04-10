@@ -1,6 +1,7 @@
 export interface MemoryEntry {
     id: string;
     device_id: string;
+    user_id: string | null;
     content: string;
     source_date: string | null;
     importance: number;
@@ -21,6 +22,7 @@ export declare function findByUser(userId: string, dateRange?: {
     start: string;
     end: string;
 }, limit?: number): Promise<MemoryEntry[]>;
+export declare function findById(id: string): Promise<MemoryEntry | null>;
 export declare function deleteById(id: string, deviceId: string): Promise<void>;
 export declare function deleteByIdAndUser(id: string, userId: string): Promise<void>;
 export declare function update(id: string, deviceId: string, fields: {

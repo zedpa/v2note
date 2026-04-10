@@ -52,6 +52,10 @@ export declare class ProactiveEngine {
     private runWeeklyEmergence;
     private checkDevice;
     /** 持久化通知到数据库 */
+    /**
+     * 持久化通知 + 数据库去重（防重启/多进程重复发送）。
+     * 返回 true 表示成功写入（新通知），false 表示今天已发过（跳过）。
+     */
     private persistNotification;
     private sendNudge;
     private sendMessage;

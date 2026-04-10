@@ -28,6 +28,8 @@ function makeTodo(overrides: Partial<TodoDTO> = {}): TodoDTO {
     subtask_count: 0,
     subtask_done_count: 0,
     goal_title: null,
+    reminder_at: null,
+    reminder_before: null,
     ...overrides,
   };
 }

@@ -4,13 +4,16 @@ export async function listRecords(opts?: {
   limit?: number;
   offset?: number;
   notebook?: string;
+  /** @deprecated 使用 wiki_page_id 替代 */
   cluster_id?: string;
+  wiki_page_id?: string;
 }): Promise<any[]> {
   const params = new URLSearchParams();
   if (opts?.limit) params.set("limit", String(opts.limit));
   if (opts?.offset) params.set("offset", String(opts.offset));
   if (opts?.notebook !== undefined) params.set("notebook", opts.notebook);
-  if (opts?.cluster_id) params.set("cluster_id", opts.cluster_id);
+  if (opts?.wiki_page_id) params.set("wiki_page_id", opts.wiki_page_id);
+  else if (opts?.cluster_id) params.set("cluster_id", opts.cluster_id);
   const qs = params.toString();
   return api.get(`/api/v1/records${qs ? `?${qs}` : ""}`);
 }

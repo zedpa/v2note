@@ -12,6 +12,7 @@ import { shouldTriggerMemory } from "./handlers/chat-memory-trigger.js";
 import { aggregateTodos } from "./handlers/todo.js";
 import { startASR, sendAudioChunk, stopASR, cancelASR } from "./handlers/asr.js";
 import { getSession } from "./session/manager.js";
+import { today as tzToday, now as tzNow } from "./lib/tz.js";
 import { Router } from "./router.js";
 import { sendJson, sendError } from "./lib/http-helpers.js";
 import { iterateStreamWithTimeout } from "./lib/stream-utils.js";
@@ -47,6 +48,7 @@ import { registerTopicRoutes } from "./routes/topics.js";
 import { registerVocabularyRoutes } from "./routes/vocabulary.js";
 import { registerNotificationRoutes } from "./routes/notifications.js";
 import { registerChatRoutes } from "./routes/chat.js";
+import { registerWikiRoutes } from "./routes/wiki.js";
 import { getProactiveEngine } from "./proactive/engine.js";
 import { verifyAccessToken } from "./auth/jwt.js";
 import { generateAiStatus } from "./handlers/reflect.js";
@@ -109,6 +111,7 @@ function startWorker() {
     registerVocabularyRoutes(router);
     registerNotificationRoutes(router);
     registerChatRoutes(router);
+    registerWikiRoutes(router);
     // ── HTTP Server ──
     const server = createServer(async (req, res) => {
         // CORS for all requests (including /health and non-router paths)
@@ -129,7 +132,7 @@ function startWorker() {
         }
         // Health check (before router for speed)
         if (req.url === "/health") {
-            sendJson(res, { status: "ok", timestamp: new Date().toISOString() });
+            sendJson(res, { status: "ok", timestamp: tzNow().toISOString() });
             return;
         }
         // Try router (CORS already handled above)
@@ -156,12 +159,25 @@ function startWorker() {
         res.end("Not Found");
     });
     // ── WebSocket Server ──
+    // wiki compile 等长时间任务需要更长超时
+    server.requestTimeout = 10 * 60 * 1000; // 10 min
+    server.headersTimeout = 10 * 60 * 1000 + 1000;
+    server.keepAliveTimeout = 10 * 60 * 1000;
     const wss = new WebSocketServer({ server });
     // Map WebSocket connections to device IDs and user IDs
     const connectionDeviceMap = new Map();
     const connectionUserMap = new Map();
+    // 反向映射：deviceId → 当前活跃 ws（断连重连后自动更新）
+    const deviceToWsMap = new Map();
     function send(ws, msg) {
         if (ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify(msg));
+        }
+    }
+    /** 向设备当前活跃的 WebSocket 发送消息（断连重连后自动切换到新连接） */
+    function sendToDevice(deviceId, msg) {
+        const ws = deviceToWsMap.get(deviceId);
+        if (ws && ws.readyState === WebSocket.OPEN) {
             ws.send(JSON.stringify(msg));
         }
     }
@@ -215,6 +231,7 @@ function startWorker() {
                         const payload = verifyAccessToken(msg.payload.token);
                         connectionUserMap.set(ws, payload.userId);
                         connectionDeviceMap.set(ws, payload.deviceId);
+                        deviceToWsMap.set(payload.deviceId, ws);
                         console.log(`[gateway] WebSocket authenticated: user=${payload.userId}, device=${payload.deviceId}`);
                         send(ws, { type: "auth.ok", payload: { userId: payload.userId } });
                         proactiveEngine.registerDevice(payload.deviceId, ws, payload.userId);
@@ -266,28 +283,51 @@ function startWorker() {
                         break;
                     }
                     case "chat.message": {
+                        // 自动恢复：如果 session 不在 chat mode（断连重连后未 chat.start），自动初始化
+                        {
+                            const session = getSession(msg.payload.deviceId);
+                            if (session.mode !== "chat") {
+                                console.log(`[chat] Auto-recovering chat session for device ${msg.payload.deviceId}`);
+                                try {
+                                    const todayStr = tzToday();
+                                    await initChat({
+                                        deviceId: msg.payload.deviceId,
+                                        userId: authedUserId,
+                                        mode: "command",
+                                        dateRange: { start: todayStr, end: todayStr },
+                                    });
+                                }
+                                catch (err) {
+                                    console.error(`[gateway] chat auto-recovery failed:`, err.message);
+                                    send(ws, { type: "error", payload: { message: "会话恢复失败，请重新打开对话" } });
+                                    break;
+                                }
+                            }
+                        }
                         // 持久化用户消息（先于 AI 处理）
                         if (authedUserId && msg.payload.text) {
                             chatMessageRepo.saveMessage(authedUserId, "user", msg.payload.text).catch(e => console.warn(`[chat] Failed to persist user msg: ${e.message}`));
                             // 即时记忆触发：关键词快筛 + 异步 maybeCreateMemory
                             if (shouldTriggerMemory(msg.payload.text)) {
                                 const session = getSession(msg.payload.deviceId);
-                                const today = new Date().toISOString().split("T")[0];
-                                session.memoryManager.maybeCreateMemory(msg.payload.deviceId, msg.payload.text, today, authedUserId).catch(e => console.warn(`[chat] Memory trigger failed: ${e.message}`));
+                                const todayStr = tzToday();
+                                session.memoryManager.maybeCreateMemory(msg.payload.deviceId, msg.payload.text, todayStr, authedUserId).catch(e => console.warn(`[chat] Memory trigger failed: ${e.message}`));
                             }
                         }
+                        const chatDeviceId = msg.payload.deviceId;
                         let fullText = "";
                         try {
-                            const stream = await sendChatMessage(msg.payload.deviceId, msg.payload.text);
+                            const stream = await sendChatMessage(chatDeviceId, msg.payload.text);
+                            // 使用 sendToDevice 替代 send(ws)：断连重连后自动切换到新连接
                             await iterateStreamWithTimeout(stream, (chunk) => {
                                 if (chunk.startsWith("\x00TOOL_STATUS:")) {
                                     const parts = chunk.slice(13).split(":", 3);
-                                    send(ws, { type: "tool.status", payload: { toolName: parts[0], label: parts[1], callId: parts[2] ?? "" } });
+                                    sendToDevice(chatDeviceId, { type: "tool.status", payload: { toolName: parts[0], label: parts[1], callId: parts[2] ?? "" } });
                                     return;
                                 }
                                 if (chunk.startsWith("\x00TOOL_DONE:")) {
                                     const parts = chunk.slice(11).split(":", 5);
-                                    send(ws, { type: "tool.done", payload: {
+                                    sendToDevice(chatDeviceId, { type: "tool.done", payload: {
                                             toolName: parts[0], callId: parts[1] ?? "",
                                             success: parts[2] === "true", message: parts[3] ?? "",
                                             durationMs: parseInt(parts[4] ?? "0", 10),
@@ -295,7 +335,7 @@ function startWorker() {
                                     return;
                                 }
                                 fullText += chunk;
-                                send(ws, { type: "chat.chunk", payload: { text: chunk } });
+                                sendToDevice(chatDeviceId, { type: "chat.chunk", payload: { text: chunk } });
                             });
                         }
                         catch (streamErr) {
@@ -303,9 +343,9 @@ function startWorker() {
                             if (!fullText)
                                 fullText = "抱歉，出了点问题，请稍后再试。";
                         }
-                        const session = getSession(msg.payload.deviceId);
+                        const session = getSession(chatDeviceId);
                         session.context.addMessage({ role: "assistant", content: fullText });
-                        send(ws, { type: "chat.done", payload: { full_text: fullText } });
+                        sendToDevice(chatDeviceId, { type: "chat.done", payload: { full_text: fullText } });
                         // 持久化 AI 回复（异步）
                         if (fullText && authedUserId) {
                             chatMessageRepo.saveMessage(authedUserId, "assistant", fullText).catch(e => console.warn(`[chat] Failed to persist assistant msg: ${e.message}`));
@@ -410,6 +450,10 @@ function startWorker() {
             if (deviceId) {
                 cancelASR(deviceId, ws);
                 connectionDeviceMap.delete(ws);
+                // 仅当 deviceToWsMap 指向本连接时才清除（新连接可能已覆盖）
+                if (deviceToWsMap.get(deviceId) === ws) {
+                    deviceToWsMap.delete(deviceId);
+                }
             }
             connectionUserMap.delete(ws);
             proactiveEngine.unregisterByWs(ws);

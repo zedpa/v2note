@@ -37,6 +37,8 @@ function mockRecord(id, overrides) {
         user_id: null,
         file_url: null,
         file_name: null,
+        compile_status: "pending",
+        content_hash: null,
         ...overrides,
     };
 }

@@ -1,6 +1,6 @@
 import { readBody, sendJson, getDeviceId, getUserId } from "../lib/http-helpers.js";
 import { todoRepo, pendingIntentRepo } from "../db/repositories/index.js";
-import { queryOne } from "../db/pool.js";
+import { queryOne, query as dbQuery } from "../db/pool.js";
 import { computeGoalHealth, createActionEvent, getGoalTimeline } from "../cognitive/goal-linker.js";
 import { goalAutoLink, getProjectProgress } from "../cognitive/goal-auto-link.js";
 /** 获取 user_id（JWT 优先，device 表兜底） */
@@ -23,10 +23,19 @@ export function registerGoalRoutes(router) {
         const goals = userId
             ? await todoRepo.findActiveGoalsByUser(userId)
             : await todoRepo.findActiveGoalsByDevice(deviceId);
-        // 兼容前端：text → title 映射
+        // 批量查询 wiki page titles
+        const wikiPageIds = [...new Set(goals.map((g) => g.wiki_page_id).filter(Boolean))];
+        const wikiTitleMap = new Map();
+        if (wikiPageIds.length > 0) {
+            const rows = await dbQuery(`SELECT id, title FROM wiki_page WHERE id = ANY($1) AND status = 'active'`, [wikiPageIds]);
+            for (const r of rows)
+                wikiTitleMap.set(r.id, r.title);
+        }
+        // 兼容前端：text → title 映射 + wiki page title
         const mapped = goals.map((g) => ({
             ...g,
             title: g.text,
+            wiki_page_title: g.wiki_page_id ? wikiTitleMap.get(g.wiki_page_id) ?? null : null,
         }));
         sendJson(res, mapped);
     });

@@ -167,6 +167,148 @@ export async function addNotificationClickListener(
   }
 }
 
+// ── 待办提醒通知 ──
+
+/**
+ * todo.id (UUID) → 通知 ID (number) 的确定性映射。
+ * 范围 [10000, 2147483647]，避免与日报通知 ID（9001/9002）冲突。
+ * 使用简单 hash：取 UUID 中的 hex 字符做数值运算。
+ */
+export function todoNotificationId(todoId: string): number {
+  const hex = todoId.replace(/-/g, "");
+  let hash = 0;
+  for (let i = 0; i < hex.length; i++) {
+    hash = ((hash << 5) - hash + hex.charCodeAt(i)) | 0;
+  }
+  // 映射到 [10000, 2147483647]
+  const range = 2147483647 - 10000;
+  return 10000 + ((Math.abs(hash) % range) | 0);
+}
+
+/**
+ * 为一条待办调度本地通知。
+ * 幂等：相同 todoId 重复调用会先取消再重新调度。
+ * Web 平台 no-op。
+ */
+export async function scheduleTodoReminder(todo: {
+  id: string;
+  text: string;
+  reminder_at: string; // ISO 8601 UTC
+}): Promise<void> {
+  if (!(await isNative())) return;
+
+  try {
+    const { LocalNotifications } = await import("@capacitor/local-notifications");
+
+    // 请求权限
+    const perm = await LocalNotifications.requestPermissions();
+    if (perm.display !== "granted") return;
+
+    const notifId = todoNotificationId(todo.id);
+
+    // 先取消（幂等）
+    await LocalNotifications.cancel({
+      notifications: [{ id: notifId }],
+    });
+
+    // 解析提醒时间（遵循时区契约：直接 new Date(isoString)）
+    const at = new Date(todo.reminder_at);
+
+    await LocalNotifications.schedule({
+      notifications: [
+        {
+          id: notifId,
+          title: "待办提醒",
+          body: todo.text,
+          schedule: { at },
+          extra: { action: "todo-reminder", todoId: todo.id },
+        },
+      ],
+    });
+  } catch (e) {
+    console.warn("[notifications] scheduleTodoReminder failed:", e);
+  }
+}
+
+/**
+ * 取消一条待办的本地通知。
+ * 幂等：不存在时静默成功。
+ * Web 平台 no-op。
+ */
+export async function cancelTodoReminder(todoId: string): Promise<void> {
+  if (!(await isNative())) return;
+
+  try {
+    const { LocalNotifications } = await import("@capacitor/local-notifications");
+    const notifId = todoNotificationId(todoId);
+    await LocalNotifications.cancel({
+      notifications: [{ id: notifId }],
+    });
+  } catch (e) {
+    console.warn("[notifications] cancelTodoReminder failed:", e);
+  }
+}
+
+/**
+ * 同步所有待办的本地通知。
+ * 为 pending（done=false 且 reminder_at > now）的调度，其余取消。
+ * Web 平台 no-op。
+ */
+export async function syncTodoReminders(
+  todos: Array<{
+    id: string;
+    text: string;
+    done: boolean;
+    reminder_at: string | null;
+  }>,
+): Promise<void> {
+  if (!(await isNative())) return;
+
+  const now = Date.now();
+
+  for (const todo of todos) {
+    // 已完成 或 无提醒 → 取消可能残留的通知
+    if (todo.done || !todo.reminder_at) {
+      await cancelTodoReminder(todo.id);
+      continue;
+    }
+
+    // 未过期 → 调度
+    const reminderTime = new Date(todo.reminder_at).getTime();
+    if (reminderTime > now) {
+      await scheduleTodoReminder({
+        id: todo.id,
+        text: todo.text,
+        reminder_at: todo.reminder_at,
+      });
+    }
+    // 已过期 → 不调度也不取消（OS 已触发或丢弃）
+  }
+}
+
+/**
+ * 注册前台通知拦截：App 在前台时抑制本地通知弹出。
+ * 返回清理函数。
+ * Web 平台 no-op。
+ */
+export async function addForegroundNotificationSuppressor(): Promise<() => void> {
+  if (!(await isNative())) return () => {};
+
+  try {
+    const { LocalNotifications } = await import("@capacitor/local-notifications");
+    const listener = await LocalNotifications.addListener(
+      "localNotificationReceived",
+      () => {
+        // 前台收到通知时，什么都不做（抑制弹出）
+        // 前台提醒由 WebSocket toast 负责
+      },
+    );
+    return () => listener.remove();
+  } catch {
+    return () => {};
+  }
+}
+
 // ── Helpers ──
 
 /** 计算下一次某个小时整点的 Date */

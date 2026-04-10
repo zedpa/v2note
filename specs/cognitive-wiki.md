@@ -1,7 +1,7 @@
 ---
 id: "119"
 title: "认知 Wiki — 从原子拆解到知识编译"
-status: draft
+status: active
 domain: cognitive
 risk: high
 dependencies: ["todo-core.md", "topic-lifecycle.md"]
@@ -430,6 +430,121 @@ updated: 2026-04-08
 
 ---
 
+## 4b. 知识热力与生命周期
+
+### 设计思路
+
+每个 wiki page 有一个 `heat_score`（热力分数），反映它近期被"触碰"的频率和强度。
+采用**指数时间衰减**模型：每次触碰贡献一个加权分值，但贡献随时间指数衰减。
+
+```
+heat_score = Σ (weight[event_type] × e^(-λ × days_since_event))
+
+λ = ln(2) / half_life     半衰期默认 14 天（两周前的活动只值今天的一半）
+```
+
+事件权重：
+| 事件类型 | 权重 | 触发时机 |
+|---------|------|---------|
+| compile_hit | 3.0 | 每日编译时有新内容写入该 page |
+| search_hit | 1.0 | 搜索结果命中该 page |
+| view_hit | 0.5 | 用户在 lifecycle 视图中浏览该 page |
+| chat_context_hit | 2.0 | 参谋对话检索到该 page 作为上下文 |
+| goal_active_bonus | 5.0 | 每日计算时该 page 有 active goal（持续贡献） |
+
+生命周期阶段：
+| 阶段 | heat_score | UI 表现 | 自动行为 |
+|------|-----------|---------|---------|
+| 🔥 热门 | > 8.0 | 醒目、热点地图高亮 | 无 |
+| 🌿 活跃 | 3.0 - 8.0 | 正常显示 | 无 |
+| 🌙 沉默 | 1.0 - 3.0 | 灰色弱化 | 无 |
+| 🧊 冰封 | < 1.0 且持续 30+ 天 | 折叠到"冰封区" | 候选归档 |
+| 📦 归档 | 人工确认后 | 不在列表显示 | content 精简为摘要 |
+
+### 场景 4b.1: 活动事件记录
+```
+假设 (Given)  wiki page 被各种方式"触碰"
+当   (When)   以下事件发生：
+  - 每日编译写入了该 page（compile_hit）
+  - 搜索结果命中该 page（search_hit）
+  - 用户浏览了该 page 的 lifecycle 视图（view_hit）
+  - 参谋对话检索该 page 作为上下文（chat_context_hit）
+那么 (Then)   向 wiki_page_event 表插入一条事件记录：
+  { wiki_page_id, event_type, created_at }
+并且 (And)    写入是 fire-and-forget，不阻塞主流程
+并且 (And)    同一 page 同一类型事件同一天内最多记录 10 条（防刷）
+```
+
+### 场景 4b.2: 每日热力分数计算
+```
+假设 (Given)  每日编译完成后（或定时任务 3:30AM）
+当   (When)   触发热力分数计算
+那么 (Then)   对每个 active wiki page：
+  1. 查询该 page 最近 90 天的 wiki_page_event 记录
+  2. 按公式计算 heat_score：Σ (weight × e^(-λ × days_ago))
+  3. 如果该 page 有 active goal，额外加 goal_active_bonus（不衰减）
+  4. 更新 wiki_page.heat_score 和 wiki_page.heat_phase：
+     - heat_phase = 'hot' | 'active' | 'silent' | 'frozen'
+  5. 子 page 的热力不向上聚合（parent page 有自己的活动）
+并且 (And)    90 天前的 event 记录可安全清理（不影响计算）
+并且 (And)    计算为纯 SQL 操作，无 AI 成本
+```
+
+### 场景 4b.3: 冰封与候选归档
+```
+假设 (Given)  某 wiki page heat_score < 1.0 持续 30 天以上
+当   (When)   每日热力计算后判定为 frozen
+那么 (Then)   该 page heat_phase 标记为 'frozen'
+并且 (And)    侧边栏中该 page 折叠到"冰封区"（灰色 + 雪花图标）
+并且 (And)    不自动归档——需要用户确认
+当   (When)   AI 每日编译时发现有 frozen page
+那么 (Then)   在编译变更摘要中提示："以下知识已沉寂 30+ 天，是否需要归档？"
+  - 列出 frozen page 的 title + 最后活跃时间 + 一句话摘要
+并且 (And)    用户可以：
+  - 忽略（保持 frozen）
+  - 确认归档 → status='archived'，content 精简为一句话摘要，原文存入 metadata.archived_content
+  - 唤醒 → 手动浏览或在对话中提及，产生 view_hit/chat_context_hit，heat_score 回升
+```
+
+### 场景 4b.4: 热力回升（自然唤醒）
+```
+假设 (Given)  一个 frozen 或 silent 的 wiki page "旅行规划"
+当   (When)   用户在参谋对话中提到"旅行"，检索命中该 page
+那么 (Then)   产生 chat_context_hit 事件（权重 2.0）
+并且 (And)    下次热力计算后 heat_score 上升
+并且 (And)    如果从 frozen 回升到 silent 以上 → 自动从冰封区移回正常列表
+当   (When)   用户在新日记中提到旅行相关内容
+那么 (Then)   每日编译将新内容写入该 page → compile_hit 事件（权重 3.0）
+并且 (And)    page 可能在一次编译内从 frozen 跳到 active
+```
+
+### 场景 4b.5: 归档 page 的恢复
+```
+假设 (Given)  一个已归档的 wiki page
+当   (When)   搜索/编译命中了它（通过 summary 或 embedding）
+那么 (Then)   提示用户："这个方向之前被归档了，要恢复吗？"
+当   (When)   用户确认恢复
+那么 (Then)   从 metadata.archived_content 恢复完整 content
+并且 (And)    status 改回 'active'，heat_phase 设为 'active'
+并且 (And)    产生一个 compile_hit 事件，确保下次计算时有基础分
+```
+
+### 场景 4b.6: 个人热点地图
+```
+假设 (Given)  用户想看自己的知识全貌
+当   (When)   打开热点地图视图（未来功能）
+那么 (Then)   展示所有 wiki page 的热力可视化：
+  - 每个 page 是一个节点，面积 ∝ heat_score
+  - 颜色：🔥红（hot）→ 🌿绿（active）→ 🌙灰（silent）→ 🧊蓝（frozen）
+  - 布局按 domain 分区
+  - parent-children 关系用连线表示
+  - 点击节点 → 跳转到该 page 的 lifecycle 视图
+并且 (And)    热点地图的数据来源：GET /api/v1/wiki/heatmap
+并且 (And)    具体 UI 设计不在本 spec 范围（本 spec 只定义数据层）
+```
+
+---
+
 ## 5. 前端适配 + topic-lifecycle.md 场景对照
 
 > topic-lifecycle.md（099）的 12 个场景中，6 个需要重写数据源，6 个需要改变行为逻辑。
@@ -693,8 +808,14 @@ CREATE TABLE wiki_page (
   updated_at TIMESTAMPTZ DEFAULT now()
 );
 
+-- 热力分数（每日计算更新）
+ALTER TABLE wiki_page ADD COLUMN heat_score REAL DEFAULT 0;
+ALTER TABLE wiki_page ADD COLUMN heat_phase TEXT DEFAULT 'active'
+  CHECK (heat_phase IN ('hot','active','silent','frozen'));
+
 CREATE INDEX idx_wiki_page_user ON wiki_page(user_id) WHERE status = 'active';
 CREATE INDEX idx_wiki_page_parent ON wiki_page(parent_id);
+CREATE INDEX idx_wiki_page_heat ON wiki_page(user_id, heat_phase) WHERE status = 'active';
 
 -- Record ↔ Wiki Page 关联表（替代 UUID[] 避免无界增长）
 CREATE TABLE wiki_page_record (
@@ -704,6 +825,17 @@ CREATE TABLE wiki_page_record (
   PRIMARY KEY (wiki_page_id, record_id)
 );
 CREATE INDEX idx_wpr_record ON wiki_page_record(record_id);
+
+-- 知识活动事件表（轻量级 append-only，90 天后可清理）
+CREATE TABLE wiki_page_event (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  wiki_page_id UUID NOT NULL REFERENCES wiki_page(id) ON DELETE CASCADE,
+  event_type TEXT NOT NULL
+    CHECK (event_type IN ('compile_hit','search_hit','view_hit','chat_context_hit')),
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX idx_wpe_page_time ON wiki_page_event(wiki_page_id, created_at DESC);
+CREATE INDEX idx_wpe_cleanup ON wiki_page_event(created_at); -- 用于定期清理 90 天前数据
 ```
 
 ### 现有表修改
@@ -719,6 +851,7 @@ ALTER TABLE goal ADD COLUMN wiki_page_id UUID REFERENCES wiki_page(id);
 ALTER TABLE record ADD COLUMN compile_status TEXT DEFAULT 'pending'
   CHECK (compile_status IN ('pending', 'compiled', 'skipped', 'needs_recompile'));
 ALTER TABLE record ADD COLUMN content_hash TEXT; -- SHA256，用于增量去重
+ALTER TABLE record ADD COLUMN embedding vector(1024); -- record 级别向量，用于编译路由和搜索
 CREATE INDEX idx_record_compile_pending ON record(user_id)
   WHERE compile_status IN ('pending', 'needs_recompile');
 
@@ -748,11 +881,25 @@ POST /api/v1/wiki/compile
 
 GET /api/v1/wiki/pages
   → 获取用户的 wiki page 列表（用于侧边栏 / 搜索）
-  响应: [{ id, title, summary, level, parent_id, domain, has_active_goal, updated_at }]
+  响应: [{ id, title, summary, level, parent_id, domain, has_active_goal, heat_score, heat_phase, updated_at }]
 
 GET /api/v1/wiki/pages/:id
   → 获取单个 wiki page 完整内容
   响应: { id, title, content, summary, level, children: [...], goals: [...], source_records: [...] }
+
+GET /api/v1/wiki/heatmap
+  → 获取用户的知识热点地图数据
+  响应: [{
+    id: string,
+    title: string,
+    heat_score: number,
+    heat_phase: 'hot' | 'active' | 'silent' | 'frozen',
+    domain: string,
+    level: number,
+    parent_id: string | null,
+    has_active_goal: boolean,
+    last_activity: string
+  }]
 
 GET /api/v1/search
   → 统一搜索（wiki + record 双层）
@@ -776,7 +923,9 @@ GET /api/v1/topics
     lastActivity: string,      // wiki_page.updated_at
     hasActiveGoal: boolean,
     level: number,             // wiki page level
-    parentId: string | null    // 父页 ID
+    parentId: string | null,   // 父页 ID
+    heatScore: number,         // 热力分数
+    heatPhase: 'hot' | 'active' | 'silent' | 'frozen'
   }]
 
 GET /api/v1/topics/:id/lifecycle
@@ -822,24 +971,104 @@ GET /api/v1/records?cluster_id=xxx
 - [ ] Record 内容被用户编辑：content_hash 变化 → needs_recompile → 下次编译更新 wiki
 - [ ] 同一 Record 在编辑后重复编译：content_hash 去重，相同 hash 跳过
 - [ ] 确定性预抽取正则匹配错误（如"3点"误提取）：AI 调用时可修正预抽取结果
+- [ ] 新建 page 初始 heat_score：首次编译赋予 compile_hit 基础分（3.0），避免新 page 出生即沉默
+- [ ] 归档 page 被编译/搜索意外命中：只匹配 summary（content 已精简），提示用户恢复
+- [ ] 热力计算期间大量 event 记录：纯 SQL 聚合，加 wiki_page_id 索引，单用户 < 100ms
+- [ ] goal_active_bonus 不衰减：有 active goal 的 page 每天持续获得 5.0 分，保证项目型知识不被误冰封
+- [ ] parent page 热力独立于 children：parent 只有被直接触碰时才加分，不自动聚合子页热力
 
 ---
 
 ## Implementation Phases (实施阶段)
 
-- [ ] Phase 1: 数据模型 — 建表 + goal/record 新字段 + repository 层
-- [ ] Phase 2: 编译引擎 — wiki compile prompt + 每日批处理 + 后处理
-- [ ] Phase 3: Ingest 改造 — 去掉 strike 拆解，保留 intend 抽取 + pending_compile 标记
-- [ ] Phase 4: 搜索改造 — 双层搜索（wiki + record）
-- [ ] Phase 5: 前端适配 — topics API 数据源切换 + lifecycle 视图适配
-- [ ] Phase 6: 数据迁移 — Strike/Cluster → wiki page 一次性迁移脚本
-- [ ] Phase 7: 清理 — 废弃 strike 相关代码路径 + 旧表归档
+### Batch 1: 核心管线（必做，让 Wiki 编译跑通取代 Strike）
+
+> 目标：用户录入 → 待办实时抽取 → 每日编译到 wiki page → 前端能看到
+> 涉及场景：1.1-1.3, 2.1(基础版)-2.3, 3.1-3.8, 4.1-4.2, 5.1-5.10, 6.1-6.2
+
+- [x] **Phase 1: 数据模型**
+  - wiki_page 表（不含 heat_score/heat_phase，Batch 2 加）
+  - wiki_page_record 关联表
+  - goal.wiki_page_id 字段
+  - record.compile_status 字段 + 索引
+  - wiki_page repository CRUD
+  - wiki_page_record repository
+
+- [x] **Phase 2: Ingest 改造**
+  - digest.ts 简化：去掉 Strike 拆解，只保留 intend 抽取
+  - Record 入库后标记 pending_compile
+  - 生成 record embedding（整条向量化，替代逐 strike 向量化）
+  - 外部素材标记 material
+
+- [x] **Phase 3: 编译引擎**
+  - wiki compile prompt 设计（content 格式规范、AI 指令）
+  - 两阶段检索：embedding 路由 → 加载命中 page 全文
+  - AI 调用 + JSON 解析
+  - 编译指令执行（update/create/split/merge/goal_sync）
+  - DB 事务保证 + 失败回滚（场景 3.8）
+  - 编译后处理（embedding 更新、compiled_at、record 状态）
+  - 冷启动逻辑（场景 3.7）
+  - 定时任务接入（3AM cron）
+  - 手动触发 API（POST /api/v1/wiki/compile）
+
+- [x] **Phase 4: 搜索改造**
+  - wiki page 全文搜索（content 关键字匹配）
+  - wiki page 向量搜索（embedding 相似度）
+  - Record 全文搜索（保持现有）
+  - 统一搜索 API（GET /api/v1/search，双层返回）
+  - Chat 参谋上下文加载从 strike → wiki page
+
+- [x] **Phase 5: 前端适配**
+  - GET /api/v1/topics 数据源切换（Cluster → wiki_page）
+  - GET /api/v1/topics/:id/lifecycle 数据源切换
+  - Seeds 渲染改造（Strike 卡片 → wiki 段落条目）
+  - Harvest 渲染改造（回顾 Strike → wiki 收获段落）
+  - 筛选参数 cluster_id → wiki_page_id
+  - 类型定义更新（shared/lib/types.ts）
+
+- [x] **Phase 6: 数据迁移 + 清理**
+  - Strike/Cluster → wiki page 一次性迁移脚本
+  - goal.cluster_id → goal.wiki_page_id 映射
+  - 兼容期 feature flag
+  - 观察 2 周后废弃 strike 相关代码路径
+  - 旧表归档（只读保留）
+
+### Batch 2: 增强能力（后续迭代，基础设施上叠加智能）
+
+> 前提：Batch 1 完成，Wiki 编译管线已稳定运行
+> 涉及场景：1.4, 2.1(确定性预抽取), 1.2(置信度标签), 3.6(变更摘要), 3.9-3.10, 4b.1-4b.6
+
+- [ ] **Phase 7: 知识热力系统**
+  - wiki_page 加 heat_score / heat_phase 字段
+  - wiki_page_event 事件表
+  - 各触碰点埋点（compile/search/view/chat_context）
+  - 每日热力计算（纯 SQL，编译后执行）
+  - 冰封判定 + 候选归档提示
+  - 归档/恢复流程
+  - heatmap API
+
+- [ ] **Phase 8: 编译增强**
+  - 确定性预抽取（正则提取日期/人名/金额，减少 AI token）
+  - 置信度标签（[直述]/[推断]/[关联] 三级标注）
+  - 编译变更摘要（wiki_compile_log 表 + 早报引用）
+  - content_hash 增量去重
+
+- [ ] **Phase 9: 知识维护**
+  - Record 删除 → wiki 清理（场景 3.9，needs_recompile）
+  - 聊天反馈循环（场景 3.10，有价值对话回流 wiki）
+  - Domain 自动分类规则（场景 1.4）
+
+- [ ] **Phase 10: 可视化**
+  - 个人热点地图 UI（场景 4b.6）
+  - 知识生命周期仪表盘
+  - 编译历史查看
 
 ---
 
 ## 备注
 
-- 本 spec 是 `risk: high` 变更，涉及核心数据模型重构，每个 Phase 需用户确认
+- **Batch 划分原则**：Batch 1 是"让新管线替代旧管线"的最小可行集；Batch 2 是"让新管线变得更聪明"的增强层。Batch 1 完成后系统已可用，Batch 2 的每个 Phase 可独立上线，不互相依赖
+- 本 spec 是 `risk: high` 变更，涉及核心数据模型重构，Batch 1 每个 Phase 需用户确认
 - topic-lifecycle.md（099）需要按本 spec 第 5 节逐场景适配，场景 5/6/7/9 需要行为重写，不是简单换数据源
 - strike-extraction.md（098）将被本 spec 取代（status → superseded）
 - cognitive-engine-v2.md（067）、emergence-lifecycle.md（078）、cluster-tag-sync.md（066）将被本 spec 取代
@@ -848,3 +1077,83 @@ GET /api/v1/records?cluster_id=xxx
 - 编译整体在单个 DB 事务中执行，保证原子性（详见场景 3.8）
 - 参考项目：[Graphify](https://github.com/safishamsi/graphify) — 借鉴了内容寻址缓存、确定性优先抽取、置信度标签、递归拆分、查询反馈循环、变更审计等模式
 - 参考文档：[LLM Wiki Pattern](https://gist.github.com/442a6bf555914893e9891c11519de94f) — 整体架构灵感来源
+
+降低人的手动录入
+
+---
+
+## Batch 3: Wiki Page 统一组织层（Strike 全面退役 + Domain 退场）
+
+> 目标：Wiki Page 成为唯一组织单元（文件夹 + 主题 + 知识 + 未来 Obsidian vault 映射）
+> 设计原则：简单系统 > 功能系统。一棵树，一个概念，一个入口。
+> 所有权规则：用户创建/改名的 page → created_by='user'，AI 不可修改其标题和层级；AI 创建的 page → AI 可修改，用户改名后变为 'user'
+
+### Phase 11: Wiki Page 接管组织层（P0 — 用户直接感知）
+
+- [ ] **11.1 数据模型增强**
+  - wiki_page 新增 `created_by TEXT NOT NULL DEFAULT 'ai'`（'user' | 'ai'）
+  - 用户手动创建/改名 page 时 created_by 设为 'user'
+
+- [ ] **11.2 Digest 移除 domain 分配**
+  - digest-prompt.ts 移除 domain 相关 prompt 段落
+  - digest.ts 不再调用 recordRepo.updateDomain
+  - record.domain 字段保留但不再写入（向后兼容）
+
+- [ ] **11.3 hierarchy_tags 数据源切换**
+  - tag-projector.ts 重写：从 wiki_page_record → wiki_page.title 获取标签
+  - 不再查询 strike/bond/cluster 表
+  - 标签内容 = record 所属 wiki page 的 title，level = page.level
+
+- [ ] **11.4 侧边栏改造**
+  - 后端：新增 API 返回 wiki page 树（含 record count + active goal count）
+  - 前端：sidebar-drawer 渲染 wiki page 树 + 收件箱（未编译 record）
+  - 收件箱：纯时间排列，不做自动分类
+  - 用户可手动在日记中写 `#wiki-page-name` 归入特定 page
+
+- [ ] **11.5 Goal 子标题**
+  - Goal 卡片下方显示关联 wiki page title
+  - 后端：goal 查询时 JOIN wiki_page 获取 title
+  - 前端：todo-workspace-view / goal-list 渲染子标题
+
+- [ ] **11.6 note-card 标签切换**
+  - note-card 的 hierarchy_tags 改为从 wiki page 获取
+  - 移除 strike-preview 组件的渲染（保留代码，Phase 13 清理）
+
+### Phase 12: 停用 Strike 引擎（P1 — 后台简化） ✅ 2026-04-11
+
+- [x] **12.1 Daily Cycle 简化**
+  - 移除 runBatchAnalyze() 调用
+  - 移除 runEmergence() 调用
+  - 移除 maintenance（normalizeBondTypes / decayBondStrength / decaySalience）调用
+  - 新增：每日触发 wiki compile（替代 batch-analyze 的编译职责）
+
+- [x] **12.2 认知报告重写**
+  - report.ts 数据源从 strike/bond/cluster 切换到 wiki page + record
+  - today_strikes → today_records（今日新增 record 数）
+  - contradictions → wiki page 中「矛盾/未决」段落
+  - cluster_changes → wiki_changes（今日新建/更新的 wiki page）
+  - behavior_drift → 保持不变（todo 完成率）
+
+### Phase 13: 前端展示迁移 + 代码清理（P2） ✅ 2026-04-11
+
+- [x] **13.1 Strike 相关前端组件**
+  - strike-preview.tsx → 已删除（note-card 不再渲染 strikes）
+  - use-strikes.ts → 已删除
+  - life-map.tsx → 已删除（无引用的死代码）
+  - cluster-detail.tsx → 已删除（无引用的死代码）
+  - use-cognitive-map.ts → 已删除
+  - stats-dashboard.tsx → 已删除（无引用的死代码）
+  - domain-config.ts → 标记 @deprecated，保留 UI 兼容
+
+- [x] **13.2 后端代码清理**
+  - daily-cycle.ts 不再 import batch-analyze / emergence / maintenance
+  - cognitive-stats.ts 路由改为查 wiki page 数据，/cognitive/compile 替代 /cognitive/batch-analyze
+  - strike 路由返回空数据/410，标记 @deprecated
+  - cluster 路由返回空数据/410，标记 @deprecated
+  - goals.ts 移除 debug-emergence / emergence / backfill 路由
+
+- [x] **13.3 Domain 退场**
+  - domain-config.ts 标记 @deprecated
+  - 侧边栏已不读取 domain 数据
+  - digest prompt 已不含 domain 概念（Phase 11 完成）
+  - listUserDomains / batchUpdateDomain 保留（folder-tools 仍活跃使用 record.domain）

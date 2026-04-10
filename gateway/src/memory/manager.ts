@@ -60,8 +60,10 @@ export class MemoryManager {
   ): Promise<{
     soul?: string;
     userProfile?: string;
+    userAgent?: string;
     memories: string[];
     rawMemories: MemoryEntry[];
+    wikiContext?: string[];
   }> {
     const shortTermEntries = this.shortTerm.getAll();
 

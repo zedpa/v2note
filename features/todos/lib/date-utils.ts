@@ -19,10 +19,9 @@ export function toLocalDate(ts: string): string {
 
 /**
  * 将 scheduled_start 解析为本地 Date。
- * AI 输出的时间是用户本地时间（如 "2026-04-04T20:30:00"），
- * 但经过 PostgreSQL timestamptz 存储后变成 "2026-04-04T20:30:00.000Z"。
- * 去掉 Z 后缀避免被浏览器当作 UTC 解析。
+ * DB 存储 UTC（如 "2026-04-09T01:00:00.000Z" = 北京时间 9:00），
+ * 直接用 new Date() 解析，浏览器会自动转为本地时区。
  */
 export function parseScheduledTime(ts: string): Date {
-  return new Date(ts.replace(/Z$/i, ""));
+  return new Date(ts);
 }

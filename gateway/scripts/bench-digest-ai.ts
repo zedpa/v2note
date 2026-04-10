@@ -13,8 +13,10 @@ const MODEL = process.env.AI_MODEL_FAST ?? "qwen-plus";
 const provider = createOpenAI({ apiKey: API_KEY, baseURL: BASE_URL, name: "dashscope" });
 
 // ── digest prompt（与生产环境一致）──────────────────────────────
-const today = new Date().toISOString().split("T")[0];
-const weekday = ["日", "一", "二", "三", "四", "五", "六"][new Date().getDay()];
+const pad = (n: number) => String(n).padStart(2, "0");
+const _now = new Date();
+const today = `${_now.getFullYear()}-${pad(_now.getMonth() + 1)}-${pad(_now.getDate())}`;
+const weekday = ["日", "一", "二", "三", "四", "五", "六"][_now.getDay()];
 
 const SYSTEM_PROMPT = `你是一个认知分析引擎。将以下内容拆解为 Strike（认知触动）。每个 Strike 是一个能被独立理解的最小语义单元。
 

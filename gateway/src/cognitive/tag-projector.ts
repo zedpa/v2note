@@ -1,35 +1,33 @@
 /**
- * Tag Projector — 从涌现结构（L1/L2/L3）反向标注 record 的层级标签
+ * Tag Projector — 从 Wiki Page 关联反向标注 record 的层级标签
  *
- * 链路：record → strike(source_id) → L1(cluster_member) → L2(cluster_member) → domain(L3)
- * 每条 record 最多 5 个标签，按 L2 > L1 > L3 排序。
+ * Phase 11 改造：数据源从 strike/cluster 切换到 wiki_page。
+ * 链路：record → wiki_page_record → wiki_page.title
+ * 每条 record 最多 5 个标签，按 level ASC 排序（L1 最具体 → L3 最宽泛）。
  */
 
 import { query, execute } from "../db/pool.js";
 
 interface HierarchyTag {
   label: string;
-  level: number; // 1=L1, 2=L2, 3=L3(domain)
-}
-
-/** 从 "[名称] 描述" 格式提取名称 */
-function extractClusterName(nucleus: string): string {
-  const match = nucleus.match(/^\[(.+?)\]/);
-  return match ? match[1] : nucleus.slice(0, 10);
+  level: number; // 1=L1(leaf), 2=L2(split), 3=L3(top)
 }
 
 /**
- * 刷新单条 record 的层级标签
+ * 刷新单条 record 的层级标签（从 wiki page 关联获取）
  */
 export async function refreshHierarchyTags(recordId: string): Promise<void> {
-  // 1. 查该 record 的所有 active strike
-  const strikes = await query<{ id: string; domain: string | null }>(
-    `SELECT id, domain FROM strike
-     WHERE source_id = $1 AND status = 'active'`,
+  // 查该 record 关联的所有 active wiki page
+  const pages = await query<{ title: string; level: number; parent_id: string | null }>(
+    `SELECT wp.title, wp.level, wp.parent_id
+     FROM wiki_page_record wpr
+     JOIN wiki_page wp ON wp.id = wpr.wiki_page_id
+     WHERE wpr.record_id = $1 AND wp.status = 'active'
+     ORDER BY wp.level ASC`,
     [recordId],
   );
 
-  if (strikes.length === 0) {
+  if (pages.length === 0) {
     await execute(
       `UPDATE record SET hierarchy_tags = '[]'::jsonb, updated_at = now() WHERE id = $1`,
       [recordId],
@@ -37,68 +35,17 @@ export async function refreshHierarchyTags(recordId: string): Promise<void> {
     return;
   }
 
-  const strikeIds = strikes.map((s) => s.id);
   const tags: HierarchyTag[] = [];
   const seen = new Set<string>();
 
-  // 2. 查这些 strike 所属的 L1 cluster
-  const l1Clusters = await query<{ id: string; nucleus: string; domain: string | null }>(
-    `SELECT DISTINCT s.id, s.nucleus, s.domain
-     FROM bond b JOIN strike s ON s.id = b.source_strike_id
-     WHERE b.target_strike_id = ANY($1)
-       AND b.type = 'cluster_member'
-       AND s.is_cluster = true AND s.level = 1 AND s.status = 'active'`,
-    [strikeIds],
-  );
-
-  const l1Ids = l1Clusters.map((c) => c.id);
-
-  // 3. 查这些 L1 所属的 L2 cluster
-  let l2Clusters: Array<{ id: string; nucleus: string; domain: string | null }> = [];
-  if (l1Ids.length > 0) {
-    l2Clusters = await query(
-      `SELECT DISTINCT s.id, s.nucleus, s.domain
-       FROM bond b JOIN strike s ON s.id = b.source_strike_id
-       WHERE b.target_strike_id = ANY($1)
-         AND b.type = 'cluster_member'
-         AND s.is_cluster = true AND s.level = 2 AND s.status = 'active'`,
-      [l1Ids],
-    );
-  }
-
-  // 4. 按 L2 > L1 > L3 收集标签
-  for (const l2 of l2Clusters) {
-    const name = extractClusterName(l2.nucleus);
-    if (!seen.has(name)) {
-      tags.push({ label: name, level: 2 });
-      seen.add(name);
+  for (const page of pages) {
+    if (!seen.has(page.title)) {
+      tags.push({ label: page.title, level: page.level });
+      seen.add(page.title);
     }
   }
 
-  for (const l1 of l1Clusters) {
-    const name = extractClusterName(l1.nucleus);
-    if (!seen.has(name)) {
-      tags.push({ label: name, level: 1 });
-      seen.add(name);
-    }
-  }
-
-  // 收集 domain（L3）：从 L2、L1、strike 自身
-  const domains = new Set<string>();
-  for (const c of [...l2Clusters, ...l1Clusters]) {
-    if (c.domain && c.domain !== "其他") domains.add(c.domain);
-  }
-  for (const s of strikes) {
-    if (s.domain && s.domain !== "其他") domains.add(s.domain);
-  }
-  for (const d of domains) {
-    if (!seen.has(d)) {
-      tags.push({ label: d, level: 3 });
-      seen.add(d);
-    }
-  }
-
-  // 5. 截取前 5 个，写入
+  // 截取前 5 个，写入
   const finalTags = tags.slice(0, 5);
   await execute(
     `UPDATE record SET hierarchy_tags = $1::jsonb, updated_at = now() WHERE id = $2`,
@@ -107,62 +54,56 @@ export async function refreshHierarchyTags(recordId: string): Promise<void> {
 }
 
 /**
- * 批量刷新：给定一组 strike id，反查其 source record 并刷新标签。
- * 用于 batch-analyze / emergence 完成后的回刷。
+ * 批量刷新：给定一组 record id，刷新其 wiki page 标签。
+ * 用于 wiki compile 完成后的回刷。
  */
-export async function batchRefreshByStrikeIds(strikeIds: string[]): Promise<number> {
-  if (strikeIds.length === 0) return 0;
-
-  // 反查去重的 record_id
-  const rows = await query<{ source_id: string }>(
-    `SELECT DISTINCT source_id FROM strike
-     WHERE id = ANY($1) AND source_id IS NOT NULL`,
-    [strikeIds],
-  );
-
-  const recordIds = rows.map((r) => r.source_id);
+export async function batchRefreshByRecordIds(recordIds: string[]): Promise<number> {
   if (recordIds.length === 0) return 0;
 
+  let refreshed = 0;
   for (const rid of recordIds) {
     try {
       await refreshHierarchyTags(rid);
+      refreshed++;
     } catch (e) {
       console.warn(`[tag-projector] Failed to refresh record ${rid}:`, e);
     }
   }
 
-  console.log(`[tag-projector] Refreshed ${recordIds.length} records from ${strikeIds.length} strikes`);
-  return recordIds.length;
+  console.log(`[tag-projector] Refreshed ${refreshed}/${recordIds.length} records from wiki pages`);
+  return refreshed;
 }
 
 /**
- * 批量刷新：给定一组 L1 cluster id，反查其成员 strike 的 source record 并刷新。
- * 用于 emergence 阶段（吸纳/释放/合并）后的回刷。
+ * 批量刷新：给定一组 wiki page id，反查关联 record 并刷新标签。
+ * 用于 wiki page 创建/更新/合并/拆分后的回刷。
  */
-export async function batchRefreshByClusterIds(clusterIds: string[]): Promise<number> {
-  if (clusterIds.length === 0) return 0;
+export async function batchRefreshByPageIds(pageIds: string[]): Promise<number> {
+  if (pageIds.length === 0) return 0;
 
-  // L1 cluster → 成员 strike → source record
-  const rows = await query<{ source_id: string }>(
-    `SELECT DISTINCT s.source_id
-     FROM bond b JOIN strike s ON s.id = b.target_strike_id
-     WHERE b.source_strike_id = ANY($1)
-       AND b.type = 'cluster_member'
-       AND s.source_id IS NOT NULL`,
-    [clusterIds],
+  // 反查去重的 record_id
+  const rows = await query<{ record_id: string }>(
+    `SELECT DISTINCT record_id FROM wiki_page_record
+     WHERE wiki_page_id = ANY($1)`,
+    [pageIds],
   );
 
-  const recordIds = rows.map((r) => r.source_id);
-  if (recordIds.length === 0) return 0;
+  const recordIds = rows.map((r) => r.record_id);
+  return batchRefreshByRecordIds(recordIds);
+}
 
-  for (const rid of recordIds) {
-    try {
-      await refreshHierarchyTags(rid);
-    } catch (e) {
-      console.warn(`[tag-projector] Failed to refresh record ${rid}:`, e);
-    }
-  }
+// ── 以下函数保留签名以兼容旧调用方，内部转发到新实现 ──
 
-  console.log(`[tag-projector] Refreshed ${recordIds.length} records from ${clusterIds.length} clusters`);
-  return recordIds.length;
+/** @deprecated 使用 batchRefreshByRecordIds 替代 */
+export async function batchRefreshByStrikeIds(strikeIds: string[]): Promise<number> {
+  // strike 系统已废弃，此函数不再有实际作用
+  console.warn("[tag-projector] batchRefreshByStrikeIds is deprecated, no-op");
+  return 0;
+}
+
+/** @deprecated 使用 batchRefreshByPageIds 替代 */
+export async function batchRefreshByClusterIds(clusterIds: string[]): Promise<number> {
+  // cluster 系统已废弃，此函数不再有实际作用
+  console.warn("[tag-projector] batchRefreshByClusterIds is deprecated, no-op");
+  return 0;
 }

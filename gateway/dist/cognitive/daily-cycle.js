@@ -9,6 +9,7 @@ import { normalizeBondTypes, decayBondStrength, decaySalience } from "./maintena
 import { generateCognitiveReport } from "./report.js";
 import { appendToDiary } from "../diary/manager.js";
 import * as todoRepo from "../db/repositories/todo.js";
+import { today as tzToday, now as tzNow } from "../lib/tz.js";
 export async function runDailyCognitiveCycle(userId, opts) {
     console.log("[cognitive] Starting daily cycle for user", userId);
     let batchResult = null;
@@ -116,8 +117,8 @@ async function generateRecurringInstances(userId, deviceId) {
     });
     if (templates.length === 0)
         return 0;
-    const today = new Date();
-    const todayStr = today.toISOString().split("T")[0];
+    const today = tzNow();
+    const todayStr = tzToday();
     let created = 0;
     for (const template of templates) {
         if (!template.recurrence_rule)

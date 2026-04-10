@@ -1,6 +1,7 @@
 import { getDeviceId } from "@/shared/lib/device";
 import { getEntries, setEntries, getSyncCursor, setSyncCursor } from "./workspace";
 import { pushSync, pullSync } from "@/shared/lib/api/sync";
+import { getLocalToday } from "@/features/todos/lib/date-utils";
 
 /**
  * Sync local workspace entries to Gateway.
@@ -15,7 +16,7 @@ export async function syncWorkspace(): Promise<{
   let downloaded = 0;
 
   // 1. Upload unsynced local entries
-  const today = new Date().toISOString().split("T")[0];
+  const today = getLocalToday();
   const entries = await getEntries(today);
   const unsynced = entries.filter((e) => !e.synced);
 

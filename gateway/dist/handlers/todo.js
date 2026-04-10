@@ -2,6 +2,7 @@ import { chatCompletion } from "../ai/provider.js";
 import { todoRepo } from "../db/repositories/index.js";
 import { recordRepo } from "../db/repositories/index.js";
 import { transcriptRepo } from "../db/repositories/index.js";
+import { fmt } from "../lib/date-anchor.js";
 /**
  * Aggregate all pending todos for a device into a formatted diary entry.
  */
@@ -16,7 +17,7 @@ export async function aggregateTodos(deviceId, userId) {
     // Group by date
     const grouped = {};
     for (const todo of deviceTodos) {
-        const date = new Date(todo.created_at).toLocaleDateString("zh-CN");
+        const date = fmt(new Date(todo.created_at));
         if (!grouped[date])
             grouped[date] = [];
         grouped[date].push(todo.text);

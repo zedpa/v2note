@@ -2,9 +2,9 @@
  * Cognitive alerts — generates user-facing alerts for recent contradictions.
  */
 import { query } from "../db/pool.js";
+import { toLocalDate } from "../lib/tz.js";
 function formatDate(dateStr) {
-    const d = new Date(dateStr);
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    return toLocalDate(dateStr);
 }
 export async function generateAlerts(opts) {
     // 支持 userId 或 deviceId（无登录用户走 device 路径）

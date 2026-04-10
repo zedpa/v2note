@@ -179,7 +179,7 @@ export async function projectIntendStrike(
   const createFields: Parameters<typeof todoRepo.create>[0] = {
     record_id: strike.source_id,
     text: strike.nucleus,
-    strike_id: strike.id,
+    strike_id: strike.id || undefined,
     user_id: uid,
     device_id: deviceId,
     parent_id: matchedGoalId,

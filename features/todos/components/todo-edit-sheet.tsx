@@ -7,6 +7,7 @@ import {
 import { updateTodo, deleteTodo } from "@/shared/lib/api/todos";
 import type { TodoDTO } from "../lib/todo-types";
 import { localTzOffset } from "../lib/time-slots";
+import { parseScheduledTime } from "../lib/date-utils";
 import { PrioritySelector } from "./priority-selector";
 
 interface TodoEditSheetProps {
@@ -37,7 +38,7 @@ export function TodoEditSheet({ todo, open, onClose, onUpdated, onAskAI }: TodoE
   const syncFromTodo = useCallback((t: TodoDTO) => {
     setText(t.text);
     if (t.scheduled_start) {
-      const d = new Date(t.scheduled_start.replace(/Z$/i, ""));
+      const d = parseScheduledTime(t.scheduled_start);
       const pad = (n: number) => String(n).padStart(2, "0");
       setDate(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`);
       setTime(`${pad(d.getHours())}:${pad(d.getMinutes())}`);

@@ -131,8 +131,6 @@ export declare function generateWithTools(messages: ChatMessage[], tools: Record
 export declare function streamWithTools(messages: ChatMessage[], tools: Record<string, any>, opts?: {
     temperature?: number;
     maxSteps?: number;
-    deepThink?: boolean;
-    thinkingBudget?: number;
     tier?: ModelTier;
 }): AsyncGenerator<string, void, undefined>;
 /**

@@ -3,9 +3,7 @@
 import { useRef, useCallback, useState } from "react";
 import { MapPin, Clock, Sparkles, Check, AlertCircle, ChevronDown, ChevronUp, Link } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useStrikes } from "@/features/notes/hooks/use-strikes";
 import { useRelated } from "@/features/notes/hooks/use-related";
-import { StrikePreview, strikeSummaryText } from "./strike-preview";
 import type { HierarchyTag } from "@/shared/lib/types";
 
 export interface Note {
@@ -173,8 +171,8 @@ export function NoteCard({
         onPointerLeave={handlePointerUp}
         onClick={handleClick}
         className={cn(
-          "flex-1 rounded-2xl p-4 mb-3 text-left transition-all duration-200",
-          "hover:shadow-md active:scale-[0.98]",
+          "flex-1 rounded-2xl p-4 mb-3 text-left transition-all duration-200 pressable",
+          "hover:shadow-md",
           "border border-border/60",
           isSummary ? "bg-accent/5" : "bg-card",
           selectionMode && selected && "ring-2 ring-primary border-primary/40",
@@ -289,12 +287,9 @@ export function NoteCard({
           </div>
         )}
 
-        {/* Strikes + Related — only for completed notes */}
+        {/* Related — only for completed notes */}
         {note.status === "completed" && (
           <div className="flex items-center gap-3 mt-2 border-t border-border/40 pt-2">
-            <div className="flex-1">
-              <StrikesSection noteId={note.id} />
-            </div>
             <RelatedBadge noteId={note.id} />
           </div>
         )}
@@ -323,45 +318,3 @@ function RelatedBadge({ noteId }: { noteId: string }) {
   );
 }
 
-function StrikesSection({ noteId }: { noteId: string }) {
-  const { strikes, loading, loaded, fetch, updateStrike } = useStrikes(noteId);
-  const [expanded, setExpanded] = useState(false);
-
-  const handleToggle = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (!loaded) fetch();
-    setExpanded((prev) => !prev);
-  };
-
-  if (loaded && strikes.length === 0) return null;
-
-  return (
-    <div>
-      <button
-        type="button"
-        onClick={handleToggle}
-        className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors w-full"
-      >
-        <ChevronDown
-          className={cn(
-            "w-3 h-3 transition-transform",
-            expanded && "rotate-180",
-          )}
-        />
-        <span>
-          {loaded
-            ? strikeSummaryText(strikes)
-            : "查看认知记录"}
-        </span>
-      </button>
-      {expanded && loaded && !loading && (
-        <div className="mt-1.5" onClick={(e) => e.stopPropagation()}>
-          <StrikePreview strikes={strikes} onUpdate={updateStrike} />
-        </div>
-      )}
-      {expanded && loading && (
-        <div className="text-[11px] text-muted-foreground py-2">加载中...</div>
-      )}
-    </div>
-  );
-}

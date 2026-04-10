@@ -21,6 +21,15 @@ export async function countUnreadByUser(userId) {
     const row = await queryOne(`SELECT COUNT(*) as cnt FROM notification WHERE user_id = $1 AND read = false`, [userId]);
     return parseInt(row?.cnt ?? "0", 10);
 }
+/** 检查今天是否已发过指定类型的通知（按用户或设备去重） */
+export async function hasTodayNotification(type, userId, deviceId) {
+    const row = userId
+        ? await queryOne(`SELECT COUNT(*) as cnt FROM notification
+         WHERE user_id = $1 AND type = $2 AND created_at::date = CURRENT_DATE`, [userId, type])
+        : await queryOne(`SELECT COUNT(*) as cnt FROM notification
+         WHERE device_id = $1 AND type = $2 AND created_at::date = CURRENT_DATE`, [deviceId, type]);
+    return parseInt(row?.cnt ?? "0", 10) > 0;
+}
 // ── Write ──
 /** 创建通知 */
 export async function create(input) {

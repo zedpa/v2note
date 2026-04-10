@@ -81,7 +81,7 @@ export function GoalList({ onClose, onViewGoal, onViewProject }: GoalListProps) 
                     <button
                       type="button"
                       onClick={() => isProject ? onViewProject(goal.id) : onViewGoal(goal.id)}
-                      className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl bg-surface-lowest hover:bg-surface-low transition-colors text-left"
+                      className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl bg-surface-lowest hover:bg-surface-low transition-colors text-left pressable"
                     >
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-on-surface truncate">
@@ -90,6 +90,9 @@ export function GoalList({ onClose, onViewGoal, onViewProject }: GoalListProps) 
                         <p className="text-[11px] text-muted-accessible mt-0.5">
                           {statusLabel(goal.status)}
                           {isProject && ` · ${children.length} 个子目标`}
+                          {goal.wiki_page_title && (
+                            <span className="text-deer/70"> · {goal.wiki_page_title}</span>
+                          )}
                         </p>
                       </div>
                       <ChevronRight size={16} className="text-muted-accessible/40 shrink-0" />

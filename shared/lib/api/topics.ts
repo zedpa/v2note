@@ -1,13 +1,14 @@
 import { api } from "../api";
 
 export interface TopicItem {
-  clusterId: string;
+  wikiPageId: string;
   title: string;
-  memberCount: number;
+  recordCount: number;
   activeGoals: Array<{ id: string; title: string }>;
   lastActivity: string;
-  intendDensity: number;
   hasActiveGoal: boolean;
+  level: number;
+  parentId: string | null;
 }
 
 export interface TopicLifecycle {
@@ -24,13 +25,12 @@ export interface TopicLifecycle {
   }>;
   seeds: Array<{
     id: string;
-    nucleus: string;
-    polarity: string;
-    created_at: string;
+    content: string;
+    type: "section";
   }>;
   harvest: Array<{
     goal: { id: string; title: string; status: string };
-    reviewStrike: { id: string; nucleus: string; polarity: string } | null;
+    content: string;
     completedAt: string;
   }>;
 }
@@ -39,10 +39,10 @@ export async function fetchTopics(): Promise<TopicItem[]> {
   return api.get("/api/v1/topics");
 }
 
-export async function fetchTopicLifecycle(clusterId: string): Promise<TopicLifecycle> {
-  return api.get(`/api/v1/topics/${clusterId}/lifecycle`);
+export async function fetchTopicLifecycle(wikiPageId: string): Promise<TopicLifecycle> {
+  return api.get(`/api/v1/topics/${wikiPageId}/lifecycle`);
 }
 
-export async function harvestGoal(goalId: string): Promise<{ strikeId: string; nucleus: string }> {
+export async function harvestGoal(goalId: string): Promise<{ goalId: string; title: string; wikiPageId: string | null }> {
   return api.post(`/api/v1/goals/${goalId}/harvest`, {});
 }

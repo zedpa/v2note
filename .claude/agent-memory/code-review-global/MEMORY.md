@@ -1,0 +1,1 @@
+- [Wiki Migration](project_wiki_migration.md) — Strike→Wiki compile migration: digest simplification, fake StrikeEntry tech debt, missing record.embedding column

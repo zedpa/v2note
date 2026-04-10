@@ -13,6 +13,8 @@ export interface LoadedContext {
     soul?: string;
     /** User profile (factual info, separated from soul) */
     userProfile?: string;
+    /** UserAgent 内容（用户的规则/配置） */
+    userAgent?: string;
     memories: string[];
     /** Raw memory entries (for downstream use like goal extraction) */
     rawMemories: MemoryEntry[];
@@ -21,6 +23,8 @@ export interface LoadedContext {
         id: string;
         title: string;
     }>;
+    /** Wiki page 上下文（title: summary 格式） */
+    wikiContext?: string[];
 }
 /**
  * Load warm-tier context in parallel, with relevance filtering.

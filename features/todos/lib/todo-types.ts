@@ -17,6 +17,11 @@ export interface TodoDTO {
   estimated_minutes: number | null;
   priority: number | null;
 
+  // 提醒
+  reminder_at: string | null;       // 后端计算的绝对提醒时间（ISO 8601 UTC）
+  reminder_before: number | null;   // 用户设定的提前分钟数
+  reminder_types: string[] | null;  // ['notification','alarm','calendar'] 可多选
+
   // 领域 & 影响
   domain: string | null;
   impact: number | null;
@@ -29,6 +34,8 @@ export interface TodoDTO {
   level: number;          // 0=行动, 1=目标, 2=项目
   parent_id: string | null;
   cluster_id: string | null;
+  /** wiki page 关联 ID（认知 Wiki 模式） */
+  wiki_page_id?: string | null;
   status: string;         // active|progressing|blocked|paused|completed|...
   strike_id: string | null;
   goal_id: string | null; // deprecated

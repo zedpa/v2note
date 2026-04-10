@@ -11,6 +11,7 @@ export interface UserProfile {
   review_time: string | null;
   preferences: Record<string, any>;
   onboarding_done: boolean;
+  timezone: string;
   updated_at: string;
 }
 

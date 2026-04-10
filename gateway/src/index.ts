@@ -12,7 +12,7 @@ import { shouldTriggerMemory } from "./handlers/chat-memory-trigger.js";
 import { aggregateTodos } from "./handlers/todo.js";
 import { startASR, sendAudioChunk, stopASR, cancelASR, type ASRMode } from "./handlers/asr.js";
 import { getSession } from "./session/manager.js";
-import { today as tzToday } from "./lib/tz.js";
+import { today as tzToday, now as tzNow } from "./lib/tz.js";
 import { Router } from "./router.js";
 import { sendJson, sendError } from "./lib/http-helpers.js";
 import { iterateStreamWithTimeout, StreamTimeoutError } from "./lib/stream-utils.js";
@@ -48,6 +48,7 @@ import { registerTopicRoutes } from "./routes/topics.js";
 import { registerVocabularyRoutes } from "./routes/vocabulary.js";
 import { registerNotificationRoutes } from "./routes/notifications.js";
 import { registerChatRoutes } from "./routes/chat.js";
+import { registerWikiRoutes } from "./routes/wiki.js";
 import { getProactiveEngine } from "./proactive/engine.js";
 import { verifyAccessToken } from "./auth/jwt.js";
 import { generateAiStatus } from "./handlers/reflect.js";
@@ -158,6 +159,7 @@ registerTopicRoutes(router);
 registerVocabularyRoutes(router);
 registerNotificationRoutes(router);
 registerChatRoutes(router);
+registerWikiRoutes(router);
 
 // ── HTTP Server ──
 
@@ -181,7 +183,7 @@ const server = createServer(async (req, res) => {
 
   // Health check (before router for speed)
   if (req.url === "/health") {
-    sendJson(res, { status: "ok", timestamp: new Date().toISOString() });
+    sendJson(res, { status: "ok", timestamp: tzNow().toISOString() });
     return;
   }
 
@@ -210,6 +212,11 @@ const server = createServer(async (req, res) => {
 });
 
 // ── WebSocket Server ──
+
+// wiki compile 等长时间任务需要更长超时
+server.requestTimeout = 10 * 60 * 1000; // 10 min
+server.headersTimeout = 10 * 60 * 1000 + 1000;
+server.keepAliveTimeout = 10 * 60 * 1000;
 
 const wss = new WebSocketServer({ server });
 

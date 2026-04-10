@@ -3,6 +3,7 @@ import { appendToDiary } from "../diary/manager.js";
 import { recordRepo, summaryRepo, todoRepo, tagRepo } from "../db/repositories/index.js";
 import { classifyVoiceIntent, executeVoiceAction, matchTodoByHint, type VoiceAction, type ActionExecResult } from "./voice-action.js";
 import { safeParseJson } from "../lib/text-utils.js";
+import { toLocalDateTime } from "../lib/tz.js";
 import { buildTodoExtractPrompt, buildTodoRefinePrompt, type TodoModeContext } from "./todo-extract-prompt.js";
 import { buildUnifiedProcessPrompt, type UnifiedProcessContext } from "./unified-process-prompt.js";
 
@@ -314,12 +315,7 @@ export async function processEntry(payload: ProcessPayload): Promise<ProcessResu
       }
     }
 
-    // 5. 保存 domain
-    if (parsed.domain && payload.recordId) {
-      await recordRepo.updateDomain(payload.recordId, parsed.domain).catch((e) =>
-        console.warn(`[process] Domain save failed: ${e.message}`),
-      );
-    }
+    // 5. domain 分配已移除（Phase 11: Wiki Page 统一组织层）
 
     // 6. 保存 tags → record_tag（最多5个）
     if (parsed.tags && parsed.tags.length > 0 && payload.recordId) {
@@ -399,9 +395,10 @@ export async function processEntry(payload: ProcessPayload): Promise<ProcessResu
     }
 
     // 10. Append to daily diary
+    const timeTag = toLocalDateTime(new Date()).split(" ")[1] ?? "00:00";
     const diaryLine = result.summary
-      ? `[${new Date().toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })}] ${result.summary}`
-      : `[${new Date().toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })}] ${payload.text.slice(0, 200)}`;
+      ? `[${timeTag}] ${result.summary}`
+      : `[${timeTag}] ${payload.text.slice(0, 200)}`;
     const diaryNotebook = payload.notebook && payload.notebook !== "ai-self" ? payload.notebook : "default";
     appendToDiary(payload.deviceId, diaryNotebook, diaryLine, payload.userId).catch((e) => {
       console.warn("[process] Diary append failed:", e.message);

@@ -20,7 +20,7 @@ import { fetchCognitiveStats, type CognitiveStats } from "@/shared/lib/api/cogni
 interface NotesTimelineProps {
   filter?: string;
   notebook?: string | null;
-  domainFilter?: string | null;
+  wikiPageFilter?: string | null;
   onOpenChat?: (initial?: string) => void;
   onOpenOverlay?: (name: string) => void;
   /** 注册刷新函数，供父组件调用（下拉刷新） */
@@ -44,8 +44,8 @@ function parseDayGroup(dateStr: string): { day: number; monthWeekday: string } {
   return { day, monthWeekday: `${month}月 周${weekday}` };
 }
 
-export function NotesTimeline({ filter, notebook, domainFilter, onOpenChat, onOpenOverlay, onRegisterRefresh }: NotesTimelineProps) {
-  const { notes, loading, deleteNotes, updateNote, refetch } = useNotes(notebook);
+export function NotesTimeline({ filter, notebook, wikiPageFilter, onOpenChat, onOpenOverlay, onRegisterRefresh }: NotesTimelineProps) {
+  const { notes, loading, deleteNotes, updateNote, refetch } = useNotes(notebook, wikiPageFilter);
 
   // 注册刷新函数供父组件调用（下拉刷新）
   useEffect(() => {
@@ -102,12 +102,7 @@ export function NotesTimeline({ filter, notebook, domainFilter, onOpenChat, onOp
     if (filter && filter !== "全部") {
       filtered = filtered.filter((n) => n.tags.includes(filter));
     }
-    // 维度筛选（前缀匹配：选"工作"会匹配"工作"和"工作/v2note"）
-    if (domainFilter) {
-      filtered = filtered.filter((n) =>
-        n.domain === domainFilter || n.domain?.startsWith(domainFilter + "/"),
-      );
-    }
+    // wikiPageFilter 已在 useNotes 中通过后端过滤，前端不再额外过滤
 
     const map = new Map<string, NoteItem[]>();
     for (const note of filtered) {
@@ -130,7 +125,7 @@ export function NotesTimeline({ filter, notebook, domainFilter, onOpenChat, onOp
       });
     }
     return groups.sort((a, b) => b.date.localeCompare(a.date));
-  }, [notes, filter, domainFilter]);
+  }, [notes, filter]);
 
   if (loading) {
     return (
@@ -290,7 +285,10 @@ function TimelineCard({
   onUpdate: (fields: { short_summary: string }) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
-  const { detail, loading: detailLoading } = useNoteDetail(expanded ? note.id : null);
+  // 原文展开状态（录音/附件卡片内的原文面板）
+  const [transcriptOpen, setTranscriptOpen] = useState(false);
+  // expanded 或 transcriptOpen 时都需要加载 detail
+  const { detail, loading: detailLoading } = useNoteDetail((expanded || transcriptOpen) ? note.id : null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const longPressTriggered = useRef(false);
   const { confirm, ConfirmDialog } = useConfirmDialog();
@@ -306,12 +304,27 @@ function TimelineCard({
   }> | null>(null);
   const relatedFetched = useRef(false);
 
-  // 原文展开状态（录音/附件卡片内的原文面板）
-  const [transcriptOpen, setTranscriptOpen] = useState(false);
-  // 图片查看器 & 长按菜单
+  // 图片查看器 & 长按菜单 & 加载失败
   const [imageViewerOpen, setImageViewerOpen] = useState(false);
   const [imageMenuOpen, setImageMenuOpen] = useState(false);
+  const [imgLoadFailed, setImgLoadFailed] = useState(false);
   const imgTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // 编辑 textarea 自适应高度，CSS max-h-[50vh] 控制上限（键盘弹起时自动缩小）
+  const editTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const resizeTextarea = useCallback(() => {
+    const el = editTextareaRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, []);
+
+  // editing 变为 true 后，等 DOM 渲染完成再自适应高度
+  useEffect(() => {
+    if (editing) {
+      requestAnimationFrame(resizeTextarea);
+    }
+  }, [editing, resizeTextarea]);
 
   // 检测正文是否被 line-clamp 截断
   const contentRef = useRef<HTMLDivElement>(null);
@@ -532,11 +545,15 @@ function TimelineCard({
 
   // 判断来源类型
   const isVoice = !!(note.audio_path || (note.duration_seconds != null && note.duration_seconds > 0));
-  const isImage = note.source === "image" || (note.file_url && /\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i.test(note.file_url));
+  const isImage = note.source === "image" || (note.file_url != null && (
+    note.file_url.startsWith("data:image/") ||
+    /\.(jpg|jpeg|png|gif|webp|bmp|svg)(\?|$)/i.test(note.file_url)
+  ));
   const isFile = !!(note.file_url && !isImage);
 
-  // 有附加内容（录音/附件/图片）或正文被截断时才可展开
-  const canExpand = isVoice || isFile || isImage || isClamped;
+  // 只有正文被截断时才支持卡片body点击展开
+  // 录音/附件/图片的展开由"原文"按钮独立处理（setExpanded(true)）
+  const canExpand = isClamped;
   canExpandRef.current = canExpand;
 
   return (
@@ -571,82 +588,81 @@ function TimelineCard({
 
         <div className="flex-1 min-w-0">
           {/* Meta row: time · duration/type · location · tags + menu button */}
-          <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground/70 mb-2 flex-wrap">
-            <span className="font-mono tabular-nums">{note.time}</span>
-            {(note.source === "chat" || note.source === "chat_tool") ? (
-              <>
-                <span>·</span>
-                <Bot className="w-3 h-3 text-primary/70" />
-                <span>AI</span>
-              </>
-            ) : isFile ? (
-              <>
-                <span>·</span>
-                <Paperclip className="w-3 h-3" />
-                <span className="truncate max-w-[80px]">{note.file_name || "附件"}</span>
-              </>
-            ) : isImage ? (
-              <>
-                <span>·</span>
-                <ImageIcon className="w-3 h-3 text-blue-500/70" />
-                <span>图片</span>
-              </>
-            ) : note.source === "url" ? (
-              <>
-                <span>·</span>
-                <Globe className="w-3 h-3 text-blue-500/70" />
-                <span>网页</span>
-              </>
-            ) : note.source_type === "material" ? (
-              <>
-                <span>·</span>
-                <Quote className="w-3 h-3 text-amber-500/70" />
-                <span>摘录</span>
-              </>
-            ) : isVoice ? (
-              <>
-                <span>·</span>
-                <Mic className="w-3 h-3" />
-                <span>{formatDuration(note.duration_seconds!)}</span>
-              </>
-            ) : null}
-            {note.location && (
-              <>
-                <span>·</span>
-                <MapPin className="w-3 h-3" />
-                <span className="truncate max-w-[80px]">{note.location}</span>
-              </>
-            )}
-            {note.tags.length > 0 && (
-              <>
-                <span>·</span>
-                {note.tags.map((tag) => (
-                  <span
-                    key={tag}
-                    className="px-1.5 py-0.5 rounded-full bg-primary/8 text-primary/80 text-[10px]"
-                  >
-                    {tag}
-                  </span>
-                ))}
-              </>
-            )}
+          <div className="flex items-start gap-1.5 mb-2">
+            <div className="flex-1 min-w-0 flex items-center gap-1.5 text-[11px] text-muted-foreground/70 flex-wrap">
+              <span className="font-mono tabular-nums">{note.time}</span>
+              {(note.source === "chat" || note.source === "chat_tool") ? (
+                <>
+                  <span>·</span>
+                  <Bot className="w-3 h-3 text-primary/70" />
+                  <span>AI</span>
+                </>
+              ) : isFile ? (
+                <>
+                  <span>·</span>
+                  <Paperclip className="w-3 h-3" />
+                  <span className="truncate max-w-[80px]">{note.file_name || "附件"}</span>
+                </>
+              ) : isImage ? (
+                <>
+                  <span>·</span>
+                  <ImageIcon className="w-3 h-3 text-blue-500/70" />
+                  <span>图片</span>
+                </>
+              ) : note.source === "url" ? (
+                <>
+                  <span>·</span>
+                  <Globe className="w-3 h-3 text-blue-500/70" />
+                  <span>网页</span>
+                </>
+              ) : note.source_type === "material" ? (
+                <>
+                  <span>·</span>
+                  <Quote className="w-3 h-3 text-amber-500/70" />
+                  <span>摘录</span>
+                </>
+              ) : isVoice ? (
+                <>
+                  <span>·</span>
+                  <Mic className="w-3 h-3" />
+                  <span>{formatDuration(note.duration_seconds!)}</span>
+                </>
+              ) : null}
+              {note.location && (
+                <>
+                  <span>·</span>
+                  <MapPin className="w-3 h-3" />
+                  <span className="truncate max-w-[80px]">{note.location}</span>
+                </>
+              )}
+              {note.tags.length > 0 && (
+                <>
+                  <span>·</span>
+                  {note.tags.map((tag) => (
+                    <span
+                      key={tag}
+                      className="px-1.5 py-0.5 rounded-full bg-primary/8 text-primary/80 text-[10px]"
+                    >
+                      {tag}
+                    </span>
+                  ))}
+                </>
+              )}
+            </div>
             {!selectionMode && (
-              <>
-                <span className="flex-1" />
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    const rect = e.currentTarget.getBoundingClientRect();
-                    setMenuPos({ x: rect.right - 160, y: rect.bottom + 4 });
-                  }}
-                  onPointerDown={(e) => e.stopPropagation()}
-                  onPointerUp={(e) => e.stopPropagation()}
-                  className="shrink-0 p-1 -mr-1 rounded-md hover:bg-secondary/60 transition-colors"
-                >
-                  <MoreVertical className="w-4 h-4 text-muted-foreground/60" />
-                </button>
-              </>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  setMenuPos({ x: rect.right - 160, y: rect.bottom + 4 });
+                }}
+                onPointerDown={(e) => e.stopPropagation()}
+                onPointerUp={(e) => e.stopPropagation()}
+                className="shrink-0 p-1 -mr-1 rounded-md hover:bg-secondary/60 transition-colors text-muted-foreground/60"
+              >
+                <MoreVertical className="w-4 h-4" />
+              </button>
             )}
           </div>
 
@@ -655,10 +671,15 @@ function TimelineCard({
             {editing ? (
               <div className="space-y-2" onClick={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()} onPointerUp={(e) => e.stopPropagation()}>
                 <textarea
+                  ref={editTextareaRef}
                   autoFocus
                   value={editText}
-                  onChange={(e) => setEditText(e.target.value)}
-                  className="w-full text-[15px] leading-[1.7] bg-secondary/30 rounded-lg p-2 border outline-none focus:ring-1 focus:ring-primary/40 resize-none min-h-[80px]"
+                  onChange={(e) => {
+                    setEditText(e.target.value);
+                    resizeTextarea();
+                  }}
+                  onFocus={resizeTextarea}
+                  className="w-full text-[15px] leading-[1.7] bg-secondary/30 rounded-lg p-2 border outline-none focus:ring-1 focus:ring-primary/40 resize-none min-h-[80px] max-h-[50vh] overflow-y-auto"
                 />
                 <div className="flex gap-2">
                   <button
@@ -679,23 +700,41 @@ function TimelineCard({
               </div>
             ) : (
               <>
-                {/* 正文摘要 */}
-                {(note.short_summary || note.title) && (
+                {/* 正文摘要 — 图片无 short_summary 时不显示文字 */}
+                {(note.short_summary || note.title) && (!isImage || note.short_summary || imgLoadFailed) && (
                   <div
                     ref={contentRef}
                     className={cn(
-                      "text-[15px] leading-[1.7] text-foreground",
+                      "text-[15px] leading-[1.7] text-foreground relative",
                       !expanded && "line-clamp-4",
                     )}
                   >
                     <MarkdownContent className="text-[15px] leading-[1.7]">
                       {note.short_summary || note.title || ""}
                     </MarkdownContent>
+                    {/* 内联收起按钮 — 仅正文被截断时显示 */}
+                    {expanded && isClamped && (
+                      <button
+                        data-testid="collapse-button"
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setExpanded(false);
+                          setTranscriptOpen(false);
+                        }}
+                        onPointerDown={(e) => e.stopPropagation()}
+                        onPointerUp={(e) => e.stopPropagation()}
+                        className="inline-flex items-center gap-0.5 ml-2 align-baseline text-xs text-primary/70 hover:text-primary transition-colors"
+                      >
+                        <ChevronUp className="w-3 h-3" />
+                        收起
+                      </button>
+                    )}
                   </div>
                 )}
 
-                {/* 图片缩略图 */}
-                {isImage && note.file_url && (
+                {/* 图片缩略图 — 置于文字摘要之后 */}
+                {isImage && note.file_url && !imgLoadFailed && (
                   <div className="mt-3" onClick={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()} onPointerUp={(e) => e.stopPropagation()}>
                     <img
                       data-testid="image-thumbnail"
@@ -703,6 +742,7 @@ function TimelineCard({
                       alt=""
                       className="rounded-lg max-h-40 object-cover cursor-pointer"
                       onClick={() => setImageViewerOpen(true)}
+                      onError={() => setImgLoadFailed(true)}
                       onPointerDown={(e) => {
                         e.stopPropagation();
                         imgTimerRef.current = setTimeout(() => {
@@ -741,10 +781,7 @@ function TimelineCard({
                       </div>
                       <button
                         type="button"
-                        onClick={() => {
-                          if (!expanded) setExpanded(true);
-                          setTranscriptOpen((prev) => !prev);
-                        }}
+                        onClick={() => setTranscriptOpen((prev) => !prev)}
                         className="flex items-center gap-0.5 shrink-0 text-xs text-primary font-medium px-2 py-1 rounded-lg hover:bg-primary/10 transition-colors"
                       >
                         原文
@@ -789,11 +826,8 @@ function TimelineCard({
                       </span>
                       <button
                         type="button"
-                        onClick={() => {
-                          if (!expanded) setExpanded(true);
-                          setTranscriptOpen((prev) => !prev);
-                        }}
-                        disabled={expanded && !detailLoading && detail != null && !detail.transcript?.text}
+                        onClick={() => setTranscriptOpen((prev) => !prev)}
+                        disabled={!transcriptOpen && !detailLoading && detail != null && !detail.transcript?.text}
                         className="flex items-center gap-0.5 shrink-0 text-xs text-primary font-medium px-2 py-1 rounded-lg hover:bg-primary/10 transition-colors disabled:text-muted-foreground/40 disabled:hover:bg-transparent"
                       >
                         原文
@@ -824,9 +858,9 @@ function TimelineCard({
             )}
           </div>
 
-          {/* Expanded detail section */}
-          {expanded && (
-            <div className="mt-3 pt-3 border-t border-border/50 space-y-3 animate-in fade-in slide-in-from-top-2">
+          {/* Expanded detail section — 仅在有实际内容（todos/related）时渲染 */}
+          {expanded && (detailLoading || (detail && (detail.todos.length > 0 || (relatedRecords && relatedRecords.length > 0)))) && (
+            <div className="mt-2 pt-2 border-t border-border/50 space-y-2 animate-in fade-in slide-in-from-top-2">
               {detailLoading ? (
                 <div className="flex items-center gap-2 text-muted-foreground/60">
                   <div className="w-4 h-4 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
@@ -874,24 +908,6 @@ function TimelineCard({
                   )}
                 </>
               )}
-              {/* 收起按钮 — 展开态底部 */}
-              <div className="flex justify-center pt-1">
-                <button
-                  data-testid="collapse-button"
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setExpanded(false);
-                    setTranscriptOpen(false);
-                  }}
-                  onPointerDown={(e) => e.stopPropagation()}
-                  onPointerUp={(e) => e.stopPropagation()}
-                  className="flex items-center gap-1 px-4 py-1.5 rounded-full text-xs text-muted-foreground hover:bg-secondary/60 transition-colors"
-                >
-                  <ChevronUp className="w-3.5 h-3.5" />
-                  收起
-                </button>
-              </div>
             </div>
           )}
         </div>

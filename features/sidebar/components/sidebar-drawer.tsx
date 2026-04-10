@@ -2,11 +2,21 @@
 
 import { useState, useEffect, useMemo } from "react";
 import {
-  Zap, Settings, LogOut, Search, FolderOpen, ChevronDown, ChevronRight,
+  Zap, Settings, LogOut, Search, BookOpen, ChevronDown, ChevronRight,
+  Inbox, Plus, Target,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-interface DomainEntry { domain: string; count: number }
+interface WikiPageEntry {
+  id: string;
+  title: string;
+  level: number;
+  parentId: string | null;
+  createdBy: string;
+  recordCount: number;
+  activeGoals: { id: string; title: string }[];
+  updatedAt: string;
+}
 
 interface SidebarDrawerProps {
   open: boolean;
@@ -19,8 +29,9 @@ interface SidebarDrawerProps {
   userName?: string | null;
   userPhone?: string | null;
   onViewProfile?: () => void;
-  onSelectDomain?: (domain: string | null) => void;
-  domains?: DomainEntry[];
+  onSelectPage?: (pageId: string | null) => void;
+  wikiPages?: WikiPageEntry[];
+  inboxCount?: number;
 }
 
 export function SidebarDrawer({
@@ -33,30 +44,29 @@ export function SidebarDrawer({
   userName,
   userPhone,
   onViewProfile,
-  onSelectDomain,
-  domains: domainsProp = [],
+  onSelectPage,
+  wikiPages = [],
+  inboxCount = 0,
 }: SidebarDrawerProps) {
-  const [expandedL1, setExpandedL1] = useState<Set<string>>(new Set());
+  const [expandedPages, setExpandedPages] = useState<Set<string>>(new Set());
 
-  // 总 record 数决定展示深度
-  const totalCount = useMemo(() => domainsProp.reduce((sum, d) => sum + d.count, 0), [domainsProp]);
+  // 构建树结构：顶层 page (parentId=null) + 子 page
+  const { roots, childrenMap } = useMemo(() => {
+    const cMap = new Map<string, WikiPageEntry[]>();
+    const rootPages: WikiPageEntry[] = [];
 
-  // 按一级分类聚合
-  const folderTree = useMemo(() => {
-    const map = new Map<string, { count: number; children: Map<string, number> }>();
-    for (const { domain, count } of domainsProp) {
-      const parts = domain.split("/");
-      const l1 = parts[0];
-      if (!map.has(l1)) map.set(l1, { count: 0, children: new Map() });
-      const entry = map.get(l1)!;
-      entry.count += count;
-      if (parts.length > 1) {
-        const l2 = parts.slice(1).join("/");
-        entry.children.set(l2, (entry.children.get(l2) ?? 0) + count);
+    for (const page of wikiPages) {
+      if (page.parentId) {
+        const list = cMap.get(page.parentId) ?? [];
+        list.push(page);
+        cMap.set(page.parentId, list);
+      } else {
+        rootPages.push(page);
       }
     }
-    return map;
-  }, [domainsProp]);
+
+    return { roots: rootPages, childrenMap: cMap };
+  }, [wikiPages]);
 
   // 锁定背景滚动
   useEffect(() => {
@@ -156,54 +166,110 @@ export function SidebarDrawer({
             />
           </nav>
 
-          {/* ── 自动归类文件夹 ── */}
-          {folderTree.size > 0 && (
+          {/* ── 收件箱 ── */}
+          {inboxCount > 0 && (
             <>
               <div className="my-5 flex items-center gap-3">
                 <div className="flex-1 h-px bg-border/40" />
-                <span className="text-xs text-muted-accessible tracking-widest">自动归类</span>
+                <span className="text-xs text-muted-accessible tracking-widest">收件箱</span>
                 <div className="flex-1 h-px bg-border/40" />
               </div>
               <nav className="space-y-0.5">
-                {Array.from(folderTree.entries()).map(([l1, { count, children }]) => {
-                  const showChildren = totalCount > 20 && children.size > 0;
-                  const isExpanded = expandedL1.has(l1);
+                <SidebarItem
+                  icon={<Inbox size={18} />}
+                  label="未整理"
+                  badge={String(inboxCount)}
+                  onClick={() => {
+                    onClose();
+                    onSelectPage?.("__inbox__");
+                  }}
+                />
+              </nav>
+            </>
+          )}
+
+          {/* ── Wiki Page 主题树 ── */}
+          {roots.length > 0 && (
+            <>
+              <div className="my-5 flex items-center gap-3">
+                <div className="flex-1 h-px bg-border/40" />
+                <span className="text-xs text-muted-accessible tracking-widest">主题</span>
+                <div className="flex-1 h-px bg-border/40" />
+              </div>
+              <nav className="space-y-0.5">
+                {roots.map((page) => {
+                  const children = childrenMap.get(page.id) ?? [];
+                  const hasChildren = children.length > 0;
+                  const isExpanded = expandedPages.has(page.id);
+                  const totalRecords = page.recordCount + children.reduce((s, c) => s + c.recordCount, 0);
+
                   return (
-                    <div key={l1}>
+                    <div key={page.id}>
                       <button
                         type="button"
                         onClick={() => {
-                          if (showChildren) {
-                            setExpandedL1(prev => {
+                          if (hasChildren) {
+                            setExpandedPages(prev => {
                               const next = new Set(prev);
-                              next.has(l1) ? next.delete(l1) : next.add(l1);
+                              next.has(page.id) ? next.delete(page.id) : next.add(page.id);
                               return next;
                             });
                           } else {
                             onClose();
-                            onSelectDomain?.(l1);
+                            onSelectPage?.(page.id);
                           }
                         }}
                         className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-left hover:bg-surface/60 active:bg-surface/80 transition-colors select-none"
                       >
                         <span className="text-muted-accessible shrink-0">
-                          {showChildren ? (isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />) : <FolderOpen size={16} />}
+                          {hasChildren
+                            ? (isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />)
+                            : <BookOpen size={16} />}
                         </span>
-                        <span className="flex-1 min-w-0 text-sm text-on-surface truncate">{l1}</span>
-                        <span className="text-xs font-mono text-muted-accessible">{count}</span>
+                        <div className="flex-1 min-w-0">
+                          <span className="text-sm text-on-surface truncate block">{page.title}</span>
+                          {page.activeGoals.length > 0 && (
+                            <span className="text-[10px] text-muted-accessible truncate block flex items-center gap-1">
+                              <Target size={10} className="shrink-0" />
+                              {page.activeGoals[0].title}
+                              {page.activeGoals.length > 1 && ` +${page.activeGoals.length - 1}`}
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-xs font-mono text-muted-accessible">{totalRecords || ""}</span>
                       </button>
-                      {showChildren && isExpanded && (
+                      {hasChildren && isExpanded && (
                         <div className="ml-4">
-                          {Array.from(children.entries()).map(([l2, c]) => (
+                          {/* 点击父节点本身也能过滤 */}
+                          {page.recordCount > 0 && (
                             <button
-                              key={l2}
                               type="button"
-                              onClick={() => { onClose(); onSelectDomain?.(`${l1}/${l2}`); }}
+                              onClick={() => { onClose(); onSelectPage?.(page.id); }}
                               className="flex items-center gap-3 w-full px-3 py-2 rounded-xl text-left hover:bg-surface/60 transition-colors select-none"
                             >
-                              <span className="text-muted-accessible shrink-0"><FolderOpen size={14} /></span>
-                              <span className="flex-1 min-w-0 text-sm text-on-surface truncate">{l2}</span>
-                              <span className="text-xs font-mono text-muted-accessible">{c}</span>
+                              <span className="text-muted-accessible shrink-0"><BookOpen size={14} /></span>
+                              <span className="flex-1 min-w-0 text-sm text-on-surface truncate">概览</span>
+                              <span className="text-xs font-mono text-muted-accessible">{page.recordCount}</span>
+                            </button>
+                          )}
+                          {children.map((child) => (
+                            <button
+                              key={child.id}
+                              type="button"
+                              onClick={() => { onClose(); onSelectPage?.(child.id); }}
+                              className="flex items-center gap-3 w-full px-3 py-2 rounded-xl text-left hover:bg-surface/60 transition-colors select-none"
+                            >
+                              <span className="text-muted-accessible shrink-0"><BookOpen size={14} /></span>
+                              <div className="flex-1 min-w-0">
+                                <span className="text-sm text-on-surface truncate block">{child.title}</span>
+                                {child.activeGoals.length > 0 && (
+                                  <span className="text-[10px] text-muted-accessible truncate block flex items-center gap-1">
+                                    <Target size={10} className="shrink-0" />
+                                    {child.activeGoals[0].title}
+                                  </span>
+                                )}
+                              </div>
+                              <span className="text-xs font-mono text-muted-accessible">{child.recordCount || ""}</span>
                             </button>
                           ))}
                         </div>

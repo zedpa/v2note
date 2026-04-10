@@ -6,6 +6,7 @@
  */
 import { query, queryOne, execute } from "../db/pool.js";
 import { chatCompletion } from "../ai/provider.js";
+import { toLocalDate } from "../lib/tz.js";
 const MIN_MENTION_COUNT = 5;
 /**
  * 从 Strike tags 中扫描高频人名（出现 5+ 次），创建 person 记录。
@@ -125,7 +126,7 @@ export async function getPersonContext(userId, personNames) {
             recentStrikes: recentStrikes.map((s) => ({
                 nucleus: s.nucleus,
                 polarity: s.polarity,
-                date: s.created_at.split("T")[0],
+                date: toLocalDate(s.created_at),
             })),
         });
     }

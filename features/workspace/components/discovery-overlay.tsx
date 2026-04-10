@@ -10,7 +10,7 @@ type FilterType = "all" | "active" | "silent" | "seed";
 
 interface DiscoveryOverlayProps {
   onClose: () => void;
-  onOpenTopic: (clusterId: string) => void;
+  onOpenTopic: (wikiPageId: string) => void;
 }
 
 const FILTERS: { key: FilterType; label: string }[] = [
@@ -90,9 +90,9 @@ export function DiscoveryOverlay({ onClose, onOpenTopic }: DiscoveryOverlayProps
           <div className="space-y-3">
             {filtered.map(topic => (
               <TopicCard
-                key={topic.clusterId}
+                key={topic.wikiPageId}
                 topic={topic}
-                onClick={() => onOpenTopic(topic.clusterId)}
+                onClick={() => onOpenTopic(topic.wikiPageId)}
               />
             ))}
           </div>
@@ -130,12 +130,12 @@ function TopicCard({ topic, onClick }: { topic: TopicItem; onClick: () => void }
           "text-[10px] px-1.5 py-0.5 rounded-full",
           topic.hasActiveGoal ? "bg-deer/10 text-deer" : "bg-surface-high text-muted-accessible",
         )}>
-          {topic.hasActiveGoal ? "活跃" : topic.memberCount >= 3 ? "静默" : "种子"}
+          {topic.hasActiveGoal ? "活跃" : topic.recordCount >= 3 ? "静默" : "种子"}
         </span>
       </div>
 
       <div className="flex items-center gap-3 text-xs text-muted-accessible">
-        <span>{topic.memberCount} 条记录</span>
+        <span>{topic.recordCount} 条记录</span>
         <span>·</span>
         <span>{activityLabel}活动</span>
       </div>

@@ -11,6 +11,7 @@ import {
   skillConfigRepo,
 } from "../../db/repositories/index.js";
 import type { ToolDefinition } from "../types.js";
+import { toLocalDateTime } from "../../lib/tz.js";
 
 const MAX_CONTENT_LENGTH = 5000;
 const MAX_TODOS_PER_GOAL = 20;
@@ -94,7 +95,7 @@ async function viewRecord(id: string, userId: string) {
       content,
       domain: record.domain ?? null,
       source: record.source,
-      created_at: record.created_at,
+      created_at: toLocalDateTime(record.created_at),
       word_count: fullContent.length,
       truncated,
     },
@@ -120,13 +121,13 @@ async function viewTodo(id: string, userId: string) {
       text: todo.text,
       done: todo.done,
       priority: todo.priority,
-      scheduled_start: todo.scheduled_start,
-      scheduled_end: todo.scheduled_end,
+      scheduled_start: todo.scheduled_start ? toLocalDateTime(todo.scheduled_start) : null,
+      scheduled_end: todo.scheduled_end ? toLocalDateTime(todo.scheduled_end) : null,
       estimated_minutes: todo.estimated_minutes,
       parent_id: todo.parent_id,
       record_id: todo.record_id,
       subtasks: subtasks.map((s) => ({ id: s.id, text: s.text, done: s.done })),
-      created_at: todo.created_at,
+      created_at: toLocalDateTime(todo.created_at),
     },
   };
 }
@@ -156,7 +157,7 @@ async function viewGoal(id: string, userId: string) {
       todos: todos.slice(0, MAX_TODOS_PER_GOAL).map((t) => ({
         id: t.id, text: t.text, done: t.done,
       })),
-      created_at: goal.created_at,
+      created_at: toLocalDateTime(goal.created_at),
     },
   };
 }
@@ -186,7 +187,7 @@ async function viewMemory(id: string, userId: string) {
       content: memory.content,
       importance: memory.importance,
       source_date: memory.source_date,
-      created_at: memory.created_at,
+      created_at: toLocalDateTime(memory.created_at),
     },
   };
 }
@@ -224,6 +225,7 @@ async function viewProfile(userId: string) {
       review_time: profile.review_time,
       preferences: profile.preferences ?? {},
       onboarding_done: profile.onboarding_done,
+      timezone: profile.timezone ?? "Asia/Shanghai",
       updated_at: profile.updated_at,
     },
   };

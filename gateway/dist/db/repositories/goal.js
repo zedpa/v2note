@@ -9,7 +9,7 @@ import { query, queryOne, execute } from "../pool.js";
 /** SQL: todo → Goal 字段映射 */
 const SELECT_AS_GOAL = `
   SELECT id, device_id, user_id, text AS title, parent_id, status,
-         COALESCE(category, 'speech') AS source, cluster_id,
+         COALESCE(category, 'speech') AS source, cluster_id, wiki_page_id,
          created_at, COALESCE(updated_at, created_at) AS updated_at
   FROM todo
   WHERE level >= 1
@@ -29,16 +29,13 @@ export async function findByDevice(deviceId) {
     return query(`${SELECT_AS_GOAL} AND device_id = $1 ORDER BY created_at DESC`, [deviceId]);
 }
 export async function findById(id) {
-    return queryOne(`SELECT id, device_id, text AS title, parent_id, status,
-            COALESCE(category, 'speech') AS source, cluster_id,
-            created_at, COALESCE(updated_at, created_at) AS updated_at
-     FROM todo WHERE id = $1 AND level >= 1`, [id]);
+    return queryOne(`${SELECT_AS_GOAL} AND id = $1`, [id]);
 }
 export async function create(fields) {
     const row = await queryOne(`INSERT INTO todo (device_id, user_id, text, parent_id, category, status, level, done)
      VALUES ($1, $2, $3, $4, $5, $6, 1, false)
-     RETURNING id, device_id, text AS title, parent_id, status,
-               COALESCE(category, 'speech') AS source, cluster_id,
+     RETURNING id, device_id, user_id, text AS title, parent_id, status,
+               COALESCE(category, 'speech') AS source, cluster_id, wiki_page_id,
                created_at, COALESCE(updated_at, created_at) AS updated_at`, [
         fields.device_id,
         fields.user_id ?? null,
@@ -72,11 +69,19 @@ export async function update(id, fields) {
         sets.push(`cluster_id = $${i++}`);
         params.push(fields.cluster_id);
     }
+    if (fields.wiki_page_id !== undefined) {
+        sets.push(`wiki_page_id = $${i++}`);
+        params.push(fields.wiki_page_id);
+    }
     if (sets.length === 0)
         return;
     sets.push(`updated_at = now()`);
     params.push(id);
     await execute(`UPDATE todo SET ${sets.join(", ")} WHERE id = $${i}`, params);
+}
+/** 更新 goal 的 wiki_page_id 引用（编译时关联用） */
+export async function updateWikiPageRef(goalId, wikiPageId) {
+    await execute(`UPDATE todo SET wiki_page_id = $1, updated_at = now() WHERE id = $2 AND level >= 1`, [wikiPageId, goalId]);
 }
 /** 批量更新 cluster_id 引用（聚类合并时用） */
 export async function updateClusterRef(oldClusterId, newClusterId) {

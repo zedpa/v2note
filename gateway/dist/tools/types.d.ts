@@ -49,11 +49,12 @@ export interface SearchFilters {
     date_to?: string;
     goal_id?: string;
     domain?: string;
+    include_ai_diary?: boolean;
 }
 /** 统一搜索参数 */
 export interface SearchParams {
     query: string;
-    scope: "all" | "records" | "goals" | "todos" | "clusters";
+    scope: "all" | "records" | "goals" | "todos" | "memories";
     filters?: SearchFilters;
     time_range?: {
         from: string;
@@ -64,7 +65,7 @@ export interface SearchParams {
 /** 搜索结果项 */
 export interface SearchResultItem {
     id: string;
-    type: "record" | "goal" | "todo" | "cluster";
+    type: "record" | "goal" | "todo" | "memory" | "ai_diary";
     title: string;
     snippet?: string;
     score: number;

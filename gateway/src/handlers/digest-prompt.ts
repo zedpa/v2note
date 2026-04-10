@@ -1,103 +1,68 @@
 /**
- * Prompts for the Digest pipeline (cognitive layer).
- * - buildDigestPrompt: guides AI to decompose text into Strikes + internal Bonds
- * - buildCrossLinkPrompt: guides AI to link new Strikes with historical ones
+ * Prompts for the Ingest pipeline (Phase 2 — 认知 Wiki).
+ *
+ * - buildIngestPrompt: 只提取 intend 类型的待办/目标，不拆解 Strike/Bond
+ * - domain 分配已移除（Phase 11: Wiki Page 统一组织层）
  */
 
 import { buildDateAnchor } from "../lib/date-anchor.js";
 
-export function buildDigestPrompt(existingDomains?: string[]): string {
+/**
+ * 构建 Ingest prompt — 指导 AI 从用户输入中提取 intend（待办/目标）。
+ *
+ * 不再生成 Strike/Bond 列表，不再分配 domain。
+ * 输出 JSON 结构只含 intends[]。
+ */
+export function buildIngestPrompt(): string {
   const dateAnchor = buildDateAnchor();
 
-  const domainHint = existingDomains && existingDomains.length > 0
-    ? `\n\n## 已有分类（优先使用这些名称）\n${existingDomains.map(d => `- ${d}`).join("\n")}`
-    : "";
-
-  return `你是一个认知记录提取器。将用户的原始输入拆解为 Strike（认知触动）列表。
+  return `你是一个待办/目标提取器。从用户输入中提取 intend 类型的内容（可执行的待办、目标、项目）。
 
 ## 核心原则
-你是**提取器**，不是分析师。只提取用户说了什么，不加入你的分析和推理。
+你只提取用户明确表达的行动意图，不提取感想、感受、判断或事实陈述。
+如果没有任何待办/目标内容，返回空 intends 数组。
 
 ${dateAnchor}
 
-## Strike 结构
+## intend 结构
 
-每个 Strike 包含：
-- nucleus: string — 用户表达的最小语义单元
-  - 必须包含足够上下文（谁、什么、何时），一年后独立可读
-  - 保留用户的不确定语气（"可能""觉得"）和归属（"张总说"）
-  - ❌ 禁止包含："用户认为…""这表明…""分析可得…""我推断…""需要…""应该…"
-  - ❌ 禁止包含分类说明："这是一个行动/目标/感受"
-  - ❌ 禁止包含你的思考过程或推理链
-- polarity: "perceive" | "judge" | "realize" | "intend" | "feel"
-  - perceive: 用户感知到的事实（"铝价涨了5%"）
-  - judge: 用户的主观评价（"这个供应商不靠谱"）
-  - realize: 用户新的领悟（"原来根源在工艺"）
-  - intend: 用户想做的事/想达成的状态（"下季度降低成本"）
-  - feel: 用户的情绪（"这事让我不安"）
-- confidence: 0-1
-
-## intend 类型的额外字段
-
-当 polarity="intend" 时，必须提取 field 对象：
-- granularity: "action" | "goal" | "project"
-  - action: 单步可执行，有明确动作（"明天给张总打电话"）
-  - goal: 多步、长期、可衡量（"今年把身体搞好"）
-  - project: 复合方向（"做一个供应链管理系统"）
-- scheduled_start?: ISO 时间 — 优先用户原话精确到分钟，参照锚点表解析优先级
-- deadline?: ISO 日期 — "这周之内""月底前"
-- person?: string
-- priority?: "high" | "medium" | "low" — 仅从用户语气推断（"挺急的"→high, "不着急"→low, 无明确信号→不填）
-
-**intend 的 nucleus 格式：动词开头，写成可直接执行/追踪的短句。**
+每个 intend 包含：
+- text: string — 动词开头的可执行短句
   ✅ "明天下午3点找张总确认报价"
   ✅ "本周内完成供应商比价"
   ❌ "用户打算找张总确认报价"
   ❌ "需要进行供应商比价工作"
-
-## Bond（Strike 间关系）
-- source_idx / target_idx: 0-based 索引
-- type: causal | contradiction | resonance | evolution | supports | context_of | elaborates | triggers | resolves | depends_on | perspective_of
-- strength: 0-1
-
-## domain（自动归类）
-
-根据内容语义判断这段输入属于哪个分类，输出为 domain 字段（顶层字段，非 strike 内部）。
-- 一级分类：简短中文，如 "工作"、"生活"、"学习"、"健康"
-- 可带二级路径：如 "工作/项目A"、"生活/旅行"
-- 若无法判断，返回 null
-- 仅当内容明确属于某个已有分类时才复用，不确定时创建新分类
+- granularity: "action" | "goal" | "project"
+  - action: 单步可执行，有明确动作（"明天给张总打电话"）
+  - goal: 多步、长期、可衡量（"今年把身体搞好"）
+  - project: 复合方向（"做一个供应链管理系统"）
+- scheduled_start?: ISO 时间 — 优先用户原话精确到分钟，参照锚点表解析
+- deadline?: ISO 日期 — "这周之内""月底前"
+- person?: string — 提及的相关人名
+- priority?: "high" | "medium" | "low" — 仅从用户语气推断（"挺急的"→high, "不着急"→low, 无明确信号→不填）
 
 ## 输出
 
 返回纯 JSON。不要包含 markdown 代码块、思考过程、解释或任何非 JSON 文字。
 {
-  "domain": "工作/采购",
-  "strikes": [
-    {"nucleus": "铝价又涨了5%", "polarity": "perceive", "confidence": 0.9},
-    {"nucleus": "明天下午3点找张总确认报价", "polarity": "intend", "confidence": 0.9, "field": {"granularity": "action", "scheduled_start": "（查表获取明天日期）T15:00:00", "person": "张总", "priority": "high"}}
-  ],
-  "bonds": [{"source_idx": 0, "target_idx": 1, "type": "triggers", "strength": 0.8}]
+  "intends": [
+    {
+      "text": "明天下午3点找张总确认报价",
+      "granularity": "action",
+      "scheduled_start": "2026-04-10T15:00:00",
+      "person": "张总",
+      "priority": "high"
+    }
+  ]
 }
 
-只有 polarity="intend" 需要 field 对象，其他 polarity 不需要。${domainHint}`;
+如果没有待办/目标内容，返回 {"intends": []}`;
 }
 
-export function buildCrossLinkPrompt(): string {
-  return `你是一个认知关联引擎。以下是新提取的 Strike 和语义相关的历史 Strike。判断它们之间是否有关系。
-
-对于每对有关系的 Strike，输出：
-- new_idx: 新 Strike 索引（0-based）
-- history_id: 历史 Strike 的 ID
-- type: bond 类型（causal, contradiction, resonance, evolution, supports, context_of, elaborates, triggers, resolves, depends_on, perspective_of）
-- strength: 0-1
-- supersedes: boolean — 新 Strike 是否取代了这个历史 Strike（例如更新了同一个判断或意图）
-
-返回纯 JSON，不要包含任何其他文字：
-{
-  "cross_bonds": [{"new_idx": 0, "history_id": "uuid", "type": "evolution", "strength": 0.8}],
-  "supersedes": [{"new_idx": 0, "history_id": "uuid"}]
-}
-
-如果没有有意义的关系，返回空数组：{"cross_bonds": [], "supersedes": []}`;
+/**
+ * 兼容旧调用方——内部转发到 buildIngestPrompt。
+ * @deprecated 使用 buildIngestPrompt 替代
+ */
+export function buildDigestPrompt(): string {
+  return buildIngestPrompt();
 }

@@ -9,6 +9,7 @@ import {
   ideaRepo,
 } from "../db/repositories/index.js";
 import { processEntry } from "../handlers/process.js";
+import { getSignedUrl, isOssConfigured } from "../storage/oss.js";
 
 export function registerRecordRoutes(router: Router) {
   // Get signed audio URL for a record
@@ -38,19 +39,46 @@ export function registerRecordRoutes(router: Router) {
     const limit = parseInt(query.limit ?? "100", 10);
     const offset = parseInt(query.offset ?? "0", 10);
     const notebook = query.notebook;
-    const records = userId
-      ? await recordRepo.findByUser(userId, {
-          archived: false,
-          limit,
-          offset,
-          notebook: notebook !== undefined ? notebook : undefined,
-        })
-      : await recordRepo.findByDevice(deviceId, {
-          archived: false,
-          limit,
-          offset,
-          notebook: notebook !== undefined ? notebook : undefined,
-        });
+    const wikiPageId = query.wiki_page_id;
+
+    let records;
+
+    if (wikiPageId === "__inbox__" && userId) {
+      // 收件箱：未关联任何 wiki page 的 records
+      const { query: dbQuery } = await import("../db/pool.js");
+      records = await dbQuery<any>(
+        `SELECT r.* FROM record r
+         WHERE r.user_id = $1 AND r.status = 'completed' AND r.archived = false
+           AND NOT EXISTS (SELECT 1 FROM wiki_page_record wpr WHERE wpr.record_id = r.id)
+         ORDER BY r.created_at DESC LIMIT $2 OFFSET $3`,
+        [userId, limit, offset],
+      );
+    } else if (wikiPageId && userId) {
+      // 按 wiki page 过滤：通过 wiki_page_record 关联
+      const { query: dbQuery } = await import("../db/pool.js");
+      records = await dbQuery<any>(
+        `SELECT r.* FROM record r
+         JOIN wiki_page_record wpr ON wpr.record_id = r.id
+         WHERE r.user_id = $1 AND wpr.wiki_page_id = $2
+           AND r.status = 'completed' AND r.archived = false
+         ORDER BY r.created_at DESC LIMIT $3 OFFSET $4`,
+        [userId, wikiPageId, limit, offset],
+      );
+    } else {
+      records = userId
+        ? await recordRepo.findByUser(userId, {
+            archived: false,
+            limit,
+            offset,
+            notebook: notebook !== undefined ? notebook : undefined,
+          })
+        : await recordRepo.findByDevice(deviceId, {
+            archived: false,
+            limit,
+            offset,
+            notebook: notebook !== undefined ? notebook : undefined,
+          });
+    }
 
     // 批量加载关联数据（3 次查询，替代 N+1）
     const ids = records.map((r) => r.id);
@@ -73,12 +101,25 @@ export function registerRecordRoutes(router: Router) {
       transcripts.map((t) => [t.record_id, t]),
     );
 
-    const items = records.map((r) => ({
-      ...r,
-      summary: summaryMap[r.id] ?? null,
-      transcript: transcriptMap[r.id] ?? null,
-      tags: tagMap[r.id] ?? [],
-    }));
+    // 为 OSS 图片 URL 生成签名（私有 bucket 需要签名才能访问）
+    const needSign = isOssConfigured();
+    const items = await Promise.all(
+      records.map(async (r) => {
+        let fileUrl = r.file_url;
+        if (needSign && fileUrl && fileUrl.startsWith("http") && !fileUrl.startsWith("data:")) {
+          try {
+            fileUrl = await getSignedUrl(fileUrl);
+          } catch { /* 签名失败保留原 URL */ }
+        }
+        return {
+          ...r,
+          file_url: fileUrl,
+          summary: summaryMap[r.id] ?? null,
+          transcript: transcriptMap[r.id] ?? null,
+          tags: tagMap[r.id] ?? [],
+        };
+      }),
+    );
 
     sendJson(res, items);
   });
@@ -154,7 +195,12 @@ export function registerRecordRoutes(router: Router) {
       ideaRepo.findByRecordId(params.id),
     ]);
 
-    sendJson(res, { ...record, transcript, summary, tags, todos, ideas });
+    let fileUrl = record.file_url;
+    if (isOssConfigured() && fileUrl && fileUrl.startsWith("http") && !fileUrl.startsWith("data:")) {
+      try { fileUrl = await getSignedUrl(fileUrl); } catch { /* keep original */ }
+    }
+
+    sendJson(res, { ...record, file_url: fileUrl, transcript, summary, tags, todos, ideas });
   });
 
   // Create record

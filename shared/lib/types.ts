@@ -210,6 +210,8 @@ export interface TodoItem {
   parent_id?: string | null
   level?: number
   cluster_id?: string | null
+  /** wiki page 关联 ID（认知 Wiki 模式） */
+  wiki_page_id?: string | null
   status?: string
   subtask_count?: number
   subtask_done_count?: number
@@ -222,6 +224,10 @@ export interface Goal {
   title: string
   parent_id: string | null
   cluster_id?: string | null
+  /** wiki page 关联 ID（认知 Wiki 模式） */
+  wiki_page_id?: string | null
+  /** wiki page 标题（由后端 JOIN 返回） */
+  wiki_page_title?: string | null
   domain?: string | null
   status: 'active' | 'paused' | 'completed' | 'abandoned' | 'progressing' | 'blocked' | 'suggested' | 'dismissed'
   source: 'speech' | 'chat' | 'manual' | 'explicit' | 'emerged'

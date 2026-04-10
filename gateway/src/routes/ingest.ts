@@ -125,7 +125,7 @@ export function registerIngestRoutes(router: Router) {
           device_id: deviceId,
           user_id: userId ?? undefined,
           status: "completed",
-          source: "manual",
+          source: "image",
           source_type: "material",
           file_url: imageUrl,
           file_name: imgFileName,
@@ -138,8 +138,8 @@ export function registerIngestRoutes(router: Router) {
 
         await summaryRepo.create({
           record_id: imgRecord.id,
-          title: visionResult.success ? visionResult.text.slice(0, 50) : "[图片分析失败]",
-          short_summary: visionResult.text,
+          title: visionResult.success ? visionResult.text.slice(0, 50) : "图片",
+          short_summary: visionResult.success ? visionResult.text : "",
         });
 
         digestRecords([imgRecord.id], { deviceId, userId: userId ?? undefined }).catch(

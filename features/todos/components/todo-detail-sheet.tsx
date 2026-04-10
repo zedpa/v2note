@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 import { getDomainStyle } from "@/features/todos/lib/domain-config";
 import { updateTodo } from "@/shared/lib/api/todos";
 import { localTzOffset } from "../lib/time-slots";
+import { parseScheduledTime } from "../lib/date-utils";
 import { PrioritySelector } from "./priority-selector";
 import type { TodoItem } from "@/shared/lib/types";
 
@@ -70,7 +71,7 @@ export function TodoDetailSheet({ todo, open, onClose, onUpdated, onAskAI }: Tod
   const syncFromTodo = useCallback((t: TodoItem | null) => {
     if (!t) return;
     if (t.scheduled_start) {
-      const d = new Date(t.scheduled_start.replace(/Z$/i, ""));
+      const d = parseScheduledTime(t.scheduled_start);
       const pad = (n: number) => String(n).padStart(2, "0");
       setDate(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`);
       setTime(`${pad(d.getHours())}:${pad(d.getMinutes())}`);
@@ -132,7 +133,7 @@ export function TodoDetailSheet({ todo, open, onClose, onUpdated, onAskAI }: Tod
     } finally {
       setSaving(false);
     }
-  }, [todo, date, time, duration, customDuration, onUpdated, onClose]);
+  }, [todo, date, time, duration, customDuration, priority, onUpdated, onClose]);
 
   if (!todo) return null;
 

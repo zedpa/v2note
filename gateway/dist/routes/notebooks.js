@@ -1,5 +1,6 @@
 import { sendJson, sendError, getDeviceId, getUserId, readBody } from "../lib/http-helpers.js";
 import { notebookRepo, aiDiaryRepo } from "../db/repositories/index.js";
+import { today, daysAgo } from "../lib/tz.js";
 export function registerNotebookRoutes(router) {
     // List notebooks
     router.get("/api/v1/notebooks", async (req, res) => {
@@ -63,8 +64,8 @@ export function registerNotebookRoutes(router) {
         const deviceId = getDeviceId(req);
         const userId = getUserId(req);
         const url = new URL(req.url ?? "", `http://${req.headers.host}`);
-        const start = url.searchParams.get("start") ?? new Date(Date.now() - 30 * 86400000).toISOString().split("T")[0];
-        const end = url.searchParams.get("end") ?? new Date().toISOString().split("T")[0];
+        const start = url.searchParams.get("start") ?? daysAgo(30);
+        const end = url.searchParams.get("end") ?? today();
         const summaries = userId
             ? await aiDiaryRepo.findSummariesByUser(userId, params.notebook, start, end)
             : await aiDiaryRepo.findSummaries(deviceId, params.notebook, start, end);

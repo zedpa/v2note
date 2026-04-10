@@ -27,3 +27,6 @@ export * as snapshotRepo from "./snapshot.js";
 export * as vocabularyRepo from "./vocabulary.js";
 export * as notificationRepo from "./notification.js";
 export * as chatMessageRepo from "./chat-message.js";
+export * as wikiPageRepo from "./wiki-page.js";
+export * as wikiPageRecordRepo from "./wiki-page-record.js";
+export * as userAgentRepo from "./user-agent.js";

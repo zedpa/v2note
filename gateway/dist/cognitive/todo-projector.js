@@ -139,7 +139,7 @@ export async function projectIntendStrike(strike, userId) {
     const createFields = {
         record_id: strike.source_id,
         text: strike.nucleus,
-        strike_id: strike.id,
+        strike_id: strike.id || undefined,
         user_id: uid,
         device_id: deviceId,
         parent_id: matchedGoalId,

@@ -4,10 +4,8 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
 
 import { ViewportHeightManager } from "@/components/layout/viewport-height-manager";
+import "./fonts"; // @fontsource 本地字体（离线可用，无 CDN 依赖）
 import "./globals.css";
-
-// Editorial Serenity 字体系统 — 系统字体 fallback（避免构建时依赖 Google Fonts）
-// CSS 变量在 globals.css 中通过 :root 定义
 
 export const metadata: Metadata = {
   title: "念念有路 — AI 认知伙伴",

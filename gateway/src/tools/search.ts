@@ -7,8 +7,7 @@
 
 import { recordRepo, summaryRepo, memoryRepo, aiDiaryRepo } from "../db/repositories/index.js";
 import { query as dbQuery } from "../db/pool.js";
-import { fmt } from "../lib/date-anchor.js";
-import { toLocalDate } from "../lib/tz.js";
+import { today as tzToday, daysAgo, daysLater, toLocalDate, toLocalDateTime, dayRange } from "../lib/tz.js";
 import type { SearchParams, SearchResultItem, SearchFilters } from "./types.js";
 
 interface SearchContext {
@@ -56,33 +55,29 @@ export async function unifiedSearch(
   // 空 query 按时间排序（浏览模式），有 query 按相关性排序
   if (!query) {
     results.sort((a, b) => {
-      const ta = a.created_at ?? "";
-      const tb = b.created_at ?? "";
+      const ta = String(a.created_at ?? "");
+      const tb = String(b.created_at ?? "");
       return tb.localeCompare(ta);
     });
   } else {
     results.sort((a, b) => b.score - a.score);
   }
-  return results.slice(0, limit);
+  const final = results.slice(0, limit);
+  console.log(`[search] unifiedSearch: query="${query}", scope="${scope}", filters=${JSON.stringify(filters)}, total=${final.length} results`);
+  if (final.length > 0) console.log(`[search]   first result: ${JSON.stringify(final[0]).slice(0, 200)}`);
+  return final;
 }
 
 // ── 日期解析 ────────────────────────────────────────────────────────────────
 
 function resolveDate(dateStr: string): string | null {
-  const now = new Date();
-  if (dateStr === "today") return fmt(now);
-  if (dateStr === "tomorrow") {
-    const d = new Date(now);
-    d.setDate(d.getDate() + 1);
-    return fmt(d);
-  }
-  if (dateStr === "yesterday") {
-    const d = new Date(now);
-    d.setDate(d.getDate() - 1);
-    return fmt(d);
-  }
-  if (/^\d{4}-\d{2}-\d{2}/.test(dateStr)) return dateStr.split("T")[0];
-  return null;
+  let result: string | null = null;
+  if (dateStr === "today") result = tzToday();
+  else if (dateStr === "tomorrow") result = daysLater(1);
+  else if (dateStr === "yesterday") result = daysAgo(1);
+  else if (/^\d{4}-\d{2}-\d{2}/.test(dateStr)) result = dateStr.split("T")[0];
+  console.log(`[search] resolveDate("${dateStr}") → ${result}`);
+  return result;
 }
 
 // ── 日记搜索 ────────────────────────────────────────────────────────────────
@@ -109,9 +104,12 @@ async function searchRecords(
 
     if (!query && ctx.userId && (dateFrom || dateTo)) {
       // 空 query 快速路径：直接按日期查，跳过 ILIKE join
-      const start = dateFrom ? `${dateFrom}T00:00:00` : "1970-01-01T00:00:00";
-      const end = dateTo ? `${dateTo}T23:59:59` : "2099-12-31T23:59:59";
+      const range = dayRange(dateFrom ?? dateTo!);
+      const start = dateFrom ? range.start : "1970-01-01T00:00:00Z";
+      const end = dateTo ? (dateFrom === dateTo ? range.end : dayRange(dateTo).end) : "2099-12-31T23:59:59Z";
+      console.log(`[search] searchRecords: dateFrom=${dateFrom}, dateTo=${dateTo}, range=${start} ~ ${end}`);
       records = await recordRepo.findByUserAndDateRange(ctx.userId, start, end);
+      console.log(`[search] searchRecords: found ${records.length} records`);
       // findByUserAndDateRange 返回 ASC 排序，反转为 DESC（最新在前），再截断 100 条
       records = records.reverse().slice(0, 100);
     } else if (query) {
@@ -145,8 +143,8 @@ async function searchRecords(
         type: "record",
         title: summary?.title ?? `记录 ${r.id.slice(0, 8)}`,
         snippet: summary?.short_summary?.slice(0, 100),
-        score: query ? 1.0 : 0.5, // 浏览模式分数低，让有关键词匹配的排前面
-        created_at: r.created_at,
+        score: query ? 1.0 : 0.5,
+        created_at: toLocalDateTime(r.created_at),
       });
     }
   } catch (err) {
@@ -202,7 +200,7 @@ async function searchGoals(
           title: g.title,
           score: 0.9,
           status: g.status,
-          created_at: g.created_at,
+          created_at: toLocalDateTime(g.created_at),
         });
       }
     }
@@ -297,7 +295,7 @@ async function searchTodos(
         title: t.text,
         score: 0.8,
         status: t.done ? "completed" : "pending",
-        created_at: t.created_at,
+        created_at: toLocalDateTime(t.created_at),
       });
     }
   } catch (err) {
@@ -325,7 +323,7 @@ async function searchMemories(
         title: m.content.slice(0, 60) + (m.content.length > 60 ? "…" : ""),
         snippet: m.content.slice(0, 100),
         score: query ? 0.7 : (m.importance / 10),
-        created_at: m.created_at,
+        created_at: toLocalDateTime(m.created_at),
       });
     }
   } catch (err) {

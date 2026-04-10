@@ -20,6 +20,8 @@ import { digestRecords } from "../handlers/digest.js";
 import { runDailyCognitiveCycle } from "../cognitive/daily-cycle.js";
 import { generateMorningBriefing, generateEveningSummary } from "../handlers/daily-loop.js";
 import { fmt } from "../lib/date-anchor.js";
+import { now as tzNow } from "../lib/tz.js";
+import { addDays as dfAddDays } from "date-fns";
 
 
 interface ConnectedDevice {
@@ -309,14 +311,12 @@ export class ProactiveEngine {
           });
           this.persistNotification(device, "proactive.evening_summary", "日终总结", eText);
           // Regenerate diary summaries for today
-          const todayStr = fmt(new Date());
+          const todayStr = fmt(tzNow());
           regenerateSummary(device.deviceId, "default", todayStr).catch(() => {});
           regenerateSummary(device.deviceId, "ai-self", todayStr).catch(() => {});
           // Weekly deep memory extraction (every Sunday)
-          if (new Date().getDay() === 0) {
-            const weekAgoDate = new Date();
-            weekAgoDate.setDate(weekAgoDate.getDate() - 7);
-            const weekAgo = fmt(weekAgoDate);
+          if (tzNow().getDay() === 0) {
+            const weekAgo = fmt(dfAddDays(tzNow(), -7));
             extractToMemory(device.deviceId, { start: weekAgo, end: todayStr }).catch(() => {});
           }
           break;
@@ -515,7 +515,7 @@ export class ProactiveEngine {
   }
 
   private async checkDevice(device: ConnectedDevice): Promise<void> {
-    const now = new Date();
+    const now = tzNow();
     const hour = now.getHours();
     const today = fmt(now);
     const nudgeKey = `${device.deviceId}:${today}`;
@@ -613,8 +613,8 @@ export class ProactiveEngine {
 
     // ── 提醒检查：reminder_at 在 30 分钟窗口内 ──
     try {
-      const windowStart = new Date().toISOString();
-      const windowEnd = new Date(Date.now() + 30 * 60000).toISOString();
+      const windowStart = tzNow().toISOString();
+      const windowEnd = new Date(tzNow().getTime() + 30 * 60000).toISOString();
       const reminders = await todoRepo.findPendingReminders(windowStart, windowEnd);
       for (const todo of reminders) {
         // 只推送给相关设备

@@ -4,7 +4,7 @@
  * 在 daily-cycle 末尾调用，产出结构化报告供晨间/晚间简报使用。
  */
 import { query } from "../db/pool.js";
-const today = () => new Date().toISOString().split("T")[0];
+import { today } from "../lib/tz.js";
 export async function generateCognitiveReport(opts) {
     const todayStr = today();
     // 支持 userId 或 deviceId 查询（无登录用户时走 device 路径）

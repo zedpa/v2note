@@ -7,16 +7,16 @@ interface UseTopicsResult {
   topics: TopicItem[];
   /** 有活跃目标的主题 */
   active: TopicItem[];
-  /** 无聚类关联的独立目标 */
+  /** 无聚类关联的独立目标（recordCount < 3 且无活跃目标） */
   independent: TopicItem[];
-  /** 无活跃目标但成员数 >= 3 的静默主题 */
+  /** 无活跃目标但 recordCount >= 3 的沉默主题 */
   silent: TopicItem[];
   loading: boolean;
 }
 
 /**
  * 侧边栏主题列表 hook
- * 拉取所有主题并按状态分组：active / independent / silent
+ * 拉取所有 wiki-page-based 主题并按状态分组：active / independent / silent
  */
 export function useTopics(): UseTopicsResult {
   const [topics, setTopics] = useState<TopicItem[]>([]);
@@ -49,11 +49,11 @@ export function useTopics(): UseTopicsResult {
     for (const topic of topics) {
       if (topic.hasActiveGoal) {
         activeTopics.push(topic);
-      } else if (topic.memberCount < 3) {
-        // 独立目标：没有活跃目标且成员数不足以形成聚类
+      } else if (topic.recordCount < 3) {
+        // 独立目标：没有活跃目标且关联 record 数不足
         independentTopics.push(topic);
       } else {
-        // 静默主题：无活跃目标但成员数 >= 3
+        // 沉默主题：无活跃目标但有足够内容
         silentTopics.push(topic);
       }
     }

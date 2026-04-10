@@ -18,10 +18,13 @@ import { createLinkTool } from "./create-link.js";
 import { searchTool } from "./search.js";
 import { confirmTool } from "./confirm.js";
 import { getCurrentTimeTool } from "./get-current-time.js";
-import { viewRecordTool } from "./view-record.js";
-import { viewTodoTool } from "./view-todo.js";
-import { viewGoalTool } from "./view-goal.js";
+import { viewTool } from "./view.js";
 import { saveConversationTool } from "./save-conversation.js";
+import { updateSoulTool } from "./update-soul.js";
+import { updateProfileTool } from "./update-profile-tool.js";
+import { updateUserAgentTool } from "./update-user-agent-tool.js";
+import { createMemoryTool } from "./create-memory-tool.js";
+import { sendNotificationTool } from "./send-notification-tool.js";
 import { manageFolderTool } from "./manage-folder.js";
 import { moveRecordTool } from "./move-record.js";
 import { listFoldersTool } from "./list-folders.js";
@@ -44,10 +47,14 @@ export const ALL_TOOL_DEFINITIONS = [
     createLinkTool,
     // 搜索
     searchTool,
-    // 查看
-    viewRecordTool,
-    viewTodoTool,
-    viewGoalTool,
+    // 统一查看
+    viewTool,
+    // 自我维护工具（AI 对话中自主调用）
+    updateSoulTool,
+    updateProfileTool,
+    updateUserAgentTool,
+    createMemoryTool,
+    sendNotificationTool,
     // 对话保存
     saveConversationTool,
     // 文件夹管理

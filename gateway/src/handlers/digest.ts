@@ -1,49 +1,50 @@
 /**
- * Digest Tier1 — 实时 Strike 分解
+ * Ingest Pipeline（Phase 2 — 认知 Wiki）
  *
- * 每条记录 1 次 AI 调用：分解为 Strike + 内部 Bond。
- * 跨 Strike 关系由 Tier2 批量分析统一处理。
+ * 简化后的 digest 流程：
+ * - 1 次 AI 调用提取 intend（待办/目标），不再拆解 Strike/Bond
+ * - 生成 record-level embedding（整条文本向量化）
+ * - 生成 content_hash（SHA256）
+ * - Record 标记为 pending_compile（等待每日 Wiki 编译）
+ * - 保留 Memory/Soul/Profile 更新
  */
 
+import crypto from "crypto";
 import { chatCompletion, type ChatMessage } from "../ai/provider.js";
 import {
-  strikeRepo,
-  bondRepo,
   recordRepo,
   transcriptRepo,
   summaryRepo,
-  snapshotRepo,
 } from "../db/repositories/index.js";
-import { buildDigestPrompt } from "./digest-prompt.js";
+import { buildIngestPrompt } from "./digest-prompt.js";
 import { projectIntendStrike } from "../cognitive/todo-projector.js";
-import { linkNewStrikesToGoals } from "../cognitive/goal-auto-link.js";
+import { writeRecordEmbedding } from "../cognitive/embed-writer.js";
 import { getSession } from "../session/manager.js";
 import { updateSoul } from "../soul/manager.js";
 import { updateProfile } from "../profile/manager.js";
 import { mayProfileUpdate, safeParseJson } from "../lib/text-utils.js";
 import { shouldUpdateSoulStrict } from "../cognitive/self-evolution.js";
-import { TIER2_STRIKE_THRESHOLD } from "../cognitive/batch-analyze.js";
-import { writeStrikeEmbedding } from "../cognitive/embed-writer.js";
-import { today as tzToday } from "../lib/tz.js";
+import { today as tzToday, now as tzNow } from "../lib/tz.js";
+import type { StrikeEntry } from "../db/repositories/strike.js";
 
-interface RawStrike {
-  nucleus: string;
-  polarity: string;
-  confidence: number;
-  tags?: string[]; // 已弃用，兼容旧 AI 返回
-  field?: Record<string, any>;
+/** AI 返回的 intend 数据结构 */
+interface RawIntend {
+  text: string;
+  granularity?: "action" | "goal" | "project";
+  scheduled_start?: string;
+  deadline?: string;
+  person?: string;
+  priority?: "high" | "medium" | "low";
 }
 
-interface RawBond {
-  source_idx: number;
-  target_idx: number;
-  type: string;
-  strength: number;
+/** AI 返回的完整 JSON 结构 */
+interface IngestResult {
+  intends?: RawIntend[];
 }
 
 /**
  * Main digest entry point.
- * Tier1: 1 次 AI 调用分解 Strike + 内部 Bond。
+ * Phase 2: 只提取 intend + 标记 pending_compile，不再拆解 Strike/Bond。
  */
 export async function digestRecords(
   recordIds: string[],
@@ -89,12 +90,6 @@ export async function digestRecords(
       .filter((r) => r !== null)
       .map((r) => r!.id);
 
-    // Build sourceType mapping: material stays material, everything else → think
-    const sourceTypeMap = new Map<string, string>();
-    for (const r of records.filter(Boolean)) {
-      sourceTypeMap.set(r!.id, r!.source_type === "material" ? "material" : "think");
-    }
-
     if (validIds.length === 0) {
       console.warn("[digest] No valid records found for ids:", recordIds);
       return;
@@ -129,136 +124,91 @@ export async function digestRecords(
     const combinedText = textParts.join("\n\n---\n\n");
     console.log(`[digest][⏱ load-text] ${Date.now() - dt0}ms — text: ${combinedText.length} chars`);
 
-    // ── Step 1.5: 查询用户已有 domain 列表（供 AI 保持分类一致性）──
-    const existingDomains = await recordRepo.listUserDomains(userId).catch(() => [] as string[]);
-
-    // ── Step 2: AI decomposition (1 次调用) ─────────────────────
-    const digestMessages: ChatMessage[] = [
-      { role: "system", content: buildDigestPrompt(existingDomains) },
+    // ── Step 2: AI 调用 — 只提取 intend（1 次调用）─────────────
+    const ingestMessages: ChatMessage[] = [
+      { role: "system", content: buildIngestPrompt() },
       { role: "user", content: combinedText },
     ];
 
     const dtAi = Date.now();
-    const digestResp = await chatCompletion(digestMessages, {
+    const aiResp = await chatCompletion(ingestMessages, {
       json: true,
       temperature: 0.3,
       tier: "fast",
     });
-    console.log(`[digest][⏱ ai-call] ${Date.now() - dtAi}ms — response: ${digestResp.content.length} chars`);
+    console.log(`[digest][⏱ ai-call] ${Date.now() - dtAi}ms — response: ${aiResp.content.length} chars`);
 
-    let rawStrikes: RawStrike[];
-    let rawBonds: RawBond[];
-    const parsed = safeParseJson<{ strikes?: RawStrike[]; bonds?: RawBond[]; domain?: string | null }>(digestResp.content);
+    const parsed = safeParseJson<IngestResult>(aiResp.content);
     if (!parsed) {
-      console.error("[digest] Failed to parse AI response as JSON:", digestResp.content.slice(0, 300));
+      console.error("[digest] Failed to parse AI response as JSON:", aiResp.content.slice(0, 300));
       await unclaimRecords(claimedIds);
       return;
     }
-    rawStrikes = parsed.strikes ?? [];
-    rawBonds = parsed.bonds ?? [];
 
-    // ── 写入 record.domain（自动归类）──
-    const recordDomain = parsed.domain ?? null;
-    if (recordDomain && validIds[0]) {
-      await recordRepo.updateDomain(validIds[0], recordDomain).catch((e) =>
-        console.warn("[digest] Failed to update record domain:", e),
-      );
-    }
+    const intends = parsed.intends ?? [];
 
-    if (rawStrikes.length === 0) {
-      console.log("[digest] AI returned no strikes, skipping");
-      // record 已在 Step 0 被 claimForDigest 标记为 digested
-      return;
-    }
-
-    // ── Step 3: Write Strikes to DB（含去重）─────────────────────
-    const idxToId = new Map<number, string>();
-    const intendEntries: { entry: Awaited<ReturnType<typeof strikeRepo.create>>; idx: number }[] = [];
-
-    for (let i = 0; i < rawStrikes.length; i++) {
-      const s = rawStrikes[i];
-      try {
-        // Strike 去重：同一 source_id + 相同 nucleus → 跳过
-        if (validIds[0] && await strikeRepo.existsBySourceAndNucleus(validIds[0], s.nucleus)) {
-          console.log(`[digest] Skipping duplicate strike: "${s.nucleus.slice(0, 30)}..."`);
-          continue;
-        }
-
-        const strikeSourceType = sourceTypeMap.get(validIds[0]) ?? "think";
-        const entry = await strikeRepo.create({
-          user_id: userId,
-          nucleus: s.nucleus,
-          polarity: s.polarity,
-          field: s.field,
-          confidence: s.confidence ?? 0.5,
-          salience: strikeSourceType === "material" ? 0.2 : undefined,
-          source_id: validIds[0],
-          source_type: strikeSourceType,
-        });
-        idxToId.set(i, entry.id);
-
-        // 异步写入 embedding（不阻塞主流程）
-        void writeStrikeEmbedding(entry.id, s.nucleus);
-
-        // 收集 intend Strike，后面并行投影
-        if (s.polarity === "intend") {
-          intendEntries.push({ entry, idx: i });
-        }
-      } catch (e) {
-        console.error(`[digest] Failed to write strike ${i}:`, e);
-      }
-    }
-
-    console.log(`[digest][⏱ write-strikes] ${Date.now() - dt0}ms — ${idxToId.size} strikes, ${intendEntries.length} intend`);
-
-    // intend Strike 并行投影为 todo/goal
-    if (intendEntries.length > 0) {
+    // ── Step 3: intend 投影为 todo/goal ────────────────────────
+    if (intends.length > 0) {
       const dtProj = Date.now();
       await Promise.all(
-        intendEntries.map(({ entry }) =>
-          projectIntendStrike(entry, userId).catch((e) =>
-            console.error(`[digest] Failed to project intend strike ${entry.id} to todo:`, e),
-          ),
-        ),
+        intends.map((intend) => {
+          // 构造 fake StrikeEntry 传给 projectIntendStrike（最小改动）
+          // id 为空：fake strike 不存在于 DB，todo-projector 中 strike_id 会跳过
+          const fakeStrike: StrikeEntry = {
+            id: "",
+            user_id: userId!,
+            nucleus: intend.text,
+            polarity: "intend",
+            field: {
+              granularity: intend.granularity ?? "action",
+              scheduled_start: intend.scheduled_start,
+              deadline: intend.deadline,
+              person: intend.person,
+              priority: intend.priority,
+            },
+            confidence: 0.9,
+            source_id: validIds[0],
+            source_span: null,
+            source_type: "think",
+            salience: 1.0,
+            status: "active",
+            superseded_by: null,
+            is_cluster: false,
+            level: null,
+            origin: null,
+            domain: null,
+            embedding: null,
+            created_at: tzNow().toISOString(),
+            digested_at: null,
+          };
+
+          return projectIntendStrike(fakeStrike, userId!).catch((e) =>
+            console.error(`[digest] Failed to project intend "${intend.text.slice(0, 30)}" to todo:`, e),
+          );
+        }),
       );
-      console.log(`[digest][⏱ project-intend] ${Date.now() - dtProj}ms — ${intendEntries.length} items`);
+      console.log(`[digest][⏱ project-intend] ${Date.now() - dtProj}ms — ${intends.length} items`);
     }
 
-    // ── Step 4: Write internal Bonds ─────────────────────────────
-    const bondsToInsert = rawBonds
-      .filter((b) => idxToId.has(b.source_idx) && idxToId.has(b.target_idx))
-      .map((b) => ({
-        source_strike_id: idxToId.get(b.source_idx)!,
-        target_strike_id: idxToId.get(b.target_idx)!,
-        type: b.type,
-        strength: b.strength ?? 0.5,
-        created_by: "digest",
-      }));
-
-    if (bondsToInsert.length > 0) {
-      try {
-        await bondRepo.createMany(bondsToInsert);
-      } catch (e) {
-        console.error("[digest] Failed to write internal bonds:", e);
+    // ── Step 5: 生成 record-level embedding ──────────────────────
+    // 对每条 record 的文本异步写入 embedding（火后不管）
+    for (const id of validIds) {
+      const text = summaryByRecord.get(id) ?? transcriptByRecord.get(id);
+      if (text) {
+        void writeRecordEmbedding(id, text);
       }
     }
 
-    // ── Step 5: 新 Strike 自动关联已有目标 ─────────────────────
-    const dtGoalLink = Date.now();
-    try {
-      const newStrikesForGoalLink = Array.from(idxToId.entries()).map(([_idx, id]) => ({
-        id,
-        source_id: validIds[0] ?? null,
-      }));
-      await linkNewStrikesToGoals(newStrikesForGoalLink, userId);
-    } catch (e) {
-      console.error("[digest] Goal auto-link failed:", e);
+    // ── Step 6: 生成 content_hash + 标记 pending_compile ────────
+    for (const id of validIds) {
+      const text = summaryByRecord.get(id) ?? transcriptByRecord.get(id) ?? "";
+      const contentHash = crypto.createHash("sha256").update(text).digest("hex");
+      await recordRepo.updateCompileStatus(id, "pending", contentHash).catch((e) =>
+        console.warn(`[digest] Failed to update compile status for ${id}:`, e),
+      );
     }
-    console.log(`[digest][⏱ goal-link] ${Date.now() - dtGoalLink}ms`);
 
-    // Step 6 已移除：record 在 Step 0 由 claimForDigest 原子标记
-
-    // ── Step 7: 记忆/Soul/Profile 更新（Mem0 两阶段） ──────────
+    // ── Step 7: 记忆/Soul/Profile 更新 ──────────────────────────
     try {
       const today = tzToday();
       const session = getSession(context.deviceId);
@@ -266,16 +216,16 @@ export async function digestRecords(
 
       memoryManager
         .maybeCreateMemory(context.deviceId, combinedText, today, context.userId)
-        .catch((e) => console.warn("[digest] Memory creation failed:", e.message));
+        .catch((e: any) => console.warn("[digest] Memory creation failed:", e.message));
 
       if (shouldUpdateSoulStrict([combinedText])) {
-        updateSoul(context.deviceId, combinedText, context.userId).catch((e) =>
+        updateSoul(context.deviceId, combinedText, context.userId).catch((e: any) =>
           console.warn("[digest] Soul update failed:", e.message),
         );
       }
 
       if (mayProfileUpdate(combinedText)) {
-        updateProfile(context.deviceId, combinedText, context.userId).catch((e) =>
+        updateProfile(context.deviceId, combinedText, context.userId).catch((e: any) =>
           console.warn("[digest] Profile update failed:", e.message),
         );
       }
@@ -283,22 +233,6 @@ export async function digestRecords(
       console.warn("[digest] Memory/soul/profile step failed:", e);
     }
 
-    // ── Step 8: 检查是否触发 Tier2 批量分析 ─────────────────────
-    try {
-      const newCount = await snapshotRepo.countNewStrikes(userId);
-      // 冷启动加速：总 Strike < 20 时阈值降为 2，让新用户尽快看到聚类
-      const totalStrikes = await snapshotRepo.countTotalStrikes(userId);
-      const threshold = totalStrikes < 20 ? 2 : TIER2_STRIKE_THRESHOLD;
-      if (newCount >= threshold) {
-        console.log(`[digest][⏱ tier2-trigger] newStrikes=${newCount} >= ${threshold} (total=${totalStrikes}, coldStart=${totalStrikes < 20}), launching batch-analyze`);
-        const { runBatchAnalyze } = await import("../cognitive/batch-analyze.js");
-        runBatchAnalyze(userId).catch((e) =>
-          console.warn("[digest] Tier2 batch-analyze failed:", e.message),
-        );
-      }
-    } catch (e) {
-      console.warn("[digest] Tier2 trigger check failed:", e);
-    }
     console.log(`[digest][⏱ total] ${Date.now() - dt0}ms — pipeline done for ${claimedIds.length} records`);
   } catch (e) {
     console.error("[digest] Pipeline failed:", e);
