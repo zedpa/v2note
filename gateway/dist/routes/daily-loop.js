@@ -12,6 +12,10 @@ export function registerDailyLoopRoutes(router) {
             const url = new URL(req.url ?? "", `http://${req.headers.host}`);
             const forceRefresh = url.searchParams.get("refresh") === "true";
             const briefing = await generateMorningBriefing(deviceId, userId ?? undefined, forceRefresh);
+            if (briefing === null) {
+                sendJson(res, { disabled: true, reason: "晨间简报已在用户设置中关闭" });
+                return;
+            }
             sendJson(res, briefing);
         }
         catch (err) {
@@ -28,6 +32,10 @@ export function registerDailyLoopRoutes(router) {
             const url = new URL(req.url ?? "", `http://${req.headers.host}`);
             const forceRefresh = url.searchParams.get("refresh") === "true";
             const summary = await generateEveningSummary(deviceId, userId ?? undefined, forceRefresh);
+            if (summary === null) {
+                sendJson(res, { disabled: true, reason: "晚间回顾已在用户设置中关闭" });
+                return;
+            }
             sendJson(res, summary);
         }
         catch (err) {

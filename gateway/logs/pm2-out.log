@@ -1,0 +1,22 @@
+2026-04-11T06:22:30: [prompt-builder] SHARED_AGENT.md loaded
+2026-04-11T06:22:30: [prompt-builder] Agent loaded: briefing.md
+2026-04-11T06:22:30: [prompt-builder] Agent loaded: onboarding.md
+2026-04-11T06:22:33: [gateway] Primary 3290: forking 2 workers
+2026-04-11T06:22:36: [prompt-builder] SHARED_AGENT.md loaded
+2026-04-11T06:22:36: [prompt-builder] Agent loaded: briefing.md
+2026-04-11T06:22:36: [prompt-builder] Agent loaded: onboarding.md
+2026-04-11T06:22:36: [prompt-builder] SHARED_AGENT.md loaded
+2026-04-11T06:22:36: [prompt-builder] Agent loaded: briefing.md
+2026-04-11T06:22:36: [prompt-builder] Agent loaded: onboarding.md
+2026-04-11T06:22:39: [mcp-server] MCP endpoint registered at POST /mcp
+2026-04-11T06:22:39: [gateway] Worker 3331: v2note Dialog Gateway on port 3001
+2026-04-11T06:22:39: [gateway] WebSocket: ws://0.0.0.0:3001
+2026-04-11T06:22:39: [gateway] REST API: http://0.0.0.0:3001/api/v1/
+2026-04-11T06:22:39: [gateway] Health: http://0.0.0.0:3001/health
+2026-04-11T06:22:39: [mcp-server] MCP endpoint registered at POST /mcp
+2026-04-11T06:22:39: [proactive] Engine started with BullMQ (Redis: localhost:6379)
+2026-04-11T06:22:39: [gateway] Worker 3330: v2note Dialog Gateway on port 3001
+2026-04-11T06:22:39: [gateway] WebSocket: ws://0.0.0.0:3001
+2026-04-11T06:22:39: [gateway] REST API: http://0.0.0.0:3001/api/v1/
+2026-04-11T06:22:39: [gateway] Health: http://0.0.0.0:3001/health
+2026-04-11T06:22:39: [proactive] Engine started with BullMQ (Redis: localhost:6379)

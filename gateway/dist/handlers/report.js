@@ -4,7 +4,7 @@
  */
 import { chatCompletion } from "../ai/provider.js";
 import { todoRepo, recordRepo } from "../db/repositories/index.js";
-import { toDateString } from "./daily-loop.js";
+import { toLocalDateStr } from "./daily-loop.js";
 import { MORNING_PROMPT, EVENING_PROMPT } from "../prompts/templates.js";
 import { fmt } from "../lib/date-anchor.js";
 import { dayRange, now as tzNow, toLocalDateTime } from "../lib/tz.js";
@@ -40,7 +40,7 @@ export async function generateMorningReport(deviceId, userId) {
         loadSoul(deviceId, userId).catch(() => null),
         loadProfile(deviceId, userId).catch(() => null),
     ]);
-    const todayScheduled = pendingTodos.filter((t) => toDateString(t.scheduled_start)?.startsWith(today));
+    const todayScheduled = pendingTodos.filter((t) => toLocalDateStr(t.scheduled_start) === today);
     const overdue = pendingTodos.filter((t) => t.scheduled_end ? new Date(t.scheduled_end) < now : false);
     const pendingText = pendingTodos.length > 0
         ? pendingTodos.slice(0, 10).map((t) => `- ${t.text}`).join("\n")
@@ -92,16 +92,16 @@ export async function generateEveningReport(deviceId, userId) {
         loadSoul(deviceId, userId).catch(() => null),
         loadProfile(deviceId, userId).catch(() => null),
     ]);
-    const todayDone = allTodos.filter((t) => t.done && t.completed_at && toDateString(t.completed_at)?.startsWith(today));
+    const todayDone = allTodos.filter((t) => t.done && t.completed_at && toLocalDateStr(t.completed_at) === today);
     let newRecordCount = 0;
     try {
         const records = userId
             ? await recordRepo.findByUser(userId, { limit: 100 })
             : await recordRepo.findByDevice(deviceId, { limit: 100 });
-        newRecordCount = records.filter((r) => r.created_at && toDateString(r.created_at)?.startsWith(today)).length;
+        newRecordCount = records.filter((r) => r.created_at && toLocalDateStr(r.created_at) === today).length;
     }
     catch { /* non-critical */ }
-    const tomorrowScheduled = pendingTodos.filter((t) => toDateString(t.scheduled_start)?.startsWith(tomorrow));
+    const tomorrowScheduled = pendingTodos.filter((t) => toLocalDateStr(t.scheduled_start) === tomorrow);
     const doneText = todayDone.length > 0
         ? todayDone.map((t) => `- ${t.text}`).join("\n")
         : "今日无完成事项";

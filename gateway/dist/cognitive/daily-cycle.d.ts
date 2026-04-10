@@ -1,18 +1,13 @@
 /**
- * Daily cognitive cycle — 3 步：批量分析 + 维护 + 报告
+ * Daily cognitive cycle — Wiki 编译 + 认知报告
  *
- * v2: 从 8 步简化为 3 步，clustering/emergence/contradiction/promote/tag-sync
- *     全部由 batch-analyze 单次 AI 调用替代。
+ * v3: Strike/Bond/Cluster 引擎已移除。
+ *     每日流程：周期任务 → Wiki 编译 → 认知报告 → AI 日记
  */
-import { type BatchAnalyzeResult } from "./batch-analyze.js";
+import { type CompileResult } from "./wiki-compiler.js";
 import { type CognitiveReport } from "./report.js";
 export interface CognitiveCycleResult {
-    batchAnalyze: BatchAnalyzeResult | null;
-    maintenance: {
-        normalized: number;
-        decayed: number;
-        salience: number;
-    } | null;
+    wikiCompile: CompileResult | null;
     report: CognitiveReport | null;
     recurringInstances: number;
 }

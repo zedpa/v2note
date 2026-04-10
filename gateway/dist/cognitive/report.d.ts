@@ -1,27 +1,25 @@
 /**
  * 认知报告生成 — 纯数据聚合，0 AI 调用。
  *
+ * v3: 数据源从 strike/bond/cluster 切换到 wiki page + record。
  * 在 daily-cycle 末尾调用，产出结构化报告供晨间/晚间简报使用。
  */
 export interface CognitiveReport {
-    today_strikes: {
-        perceive: number;
-        judge: number;
-        realize: number;
-        intend: number;
-        feel: number;
-    };
+    /** 今日新增 record 数量 */
+    today_records: number;
+    /** wiki page 中「矛盾/未决」段落（从 content 中提取） */
     contradictions: Array<{
-        strikeA_nucleus: string;
-        strikeB_nucleus: string;
-        strength: number;
+        page_title: string;
+        snippet: string;
     }>;
-    cluster_changes: Array<{
-        name: string;
-        type: "created" | "merged" | "archived";
+    /** 今日新建/更新的 wiki page */
+    wiki_changes: Array<{
+        title: string;
+        type: "created" | "updated";
     }>;
+    /** 行为偏差：今日待办完成率 */
     behavior_drift: {
-        intend_count: number;
+        today_records: number;
         todo_completed: number;
         completion_rate: number;
     };

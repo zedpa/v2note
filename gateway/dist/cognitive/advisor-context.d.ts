@@ -2,9 +2,9 @@
  * 参谋上下文合并 — 为 chat 注入认知引擎数据。
  *
  * 场景：
- * 1. 目标详情"深入讨论"：注入 Strike/Bond 链路、矛盾、完成率
- * 2. 普通 chat 认知注入：关键词检测 + top-3 clusters + alerts
- * 3. 洞察"展开讨论"：矛盾双方 + 相关 cluster 成员 + 时间线
+ * 1. 目标详情"深入讨论"：注入 wiki page 知识、完成率
+ * 2. 普通 chat 认知注入：关键词检测 + top-3 wiki pages + 思考变化
+ * 3. 洞察"展开讨论"：wiki page 全文
  * 4. 引用格式区分：📝 原声 vs 📄 素材
  * 5. 对话保存为日记：record(source_type='think', type='conversation')
  */

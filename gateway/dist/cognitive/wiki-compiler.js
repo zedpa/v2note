@@ -508,11 +508,19 @@ export async function executeInstructions(instructions, userId, recordIds) {
                 continue;
             }
             if (gs.action === "create" && gs.title) {
-                // 从 record 中获取 device_id（使用第一条 record 的 device_id）
+                // 验证 wiki_page_id 存在
+                let goalPageId = gs.wiki_page_id ?? null;
+                if (goalPageId) {
+                    const gpExists = await client.query(`SELECT 1 FROM wiki_page WHERE id = $1`, [goalPageId]);
+                    if (gpExists.rowCount === 0) {
+                        console.warn(`[wiki-compiler] goal_sync create: wiki_page_id 不存在 "${goalPageId}"，置为 null`);
+                        goalPageId = null;
+                    }
+                }
                 const deviceRow = await client.query(`SELECT device_id FROM record WHERE user_id = $1 LIMIT 1`, [userId]);
                 const deviceId = deviceRow.rows[0]?.device_id ?? userId;
                 await client.query(`INSERT INTO todo (device_id, user_id, text, status, level, done, category, wiki_page_id)
-           VALUES ($1, $2, $3, $4, 1, false, 'emerged', $5)`, [deviceId, userId, gs.title, gs.status ?? "active", gs.wiki_page_id ?? null]);
+           VALUES ($1, $2, $3, $4, 1, false, 'emerged', $5)`, [deviceId, userId, gs.title, gs.status ?? "active", goalPageId]);
             }
             else if (gs.action === "update" && gs.goal_id) {
                 const sets = ["updated_at = now()"];
@@ -525,8 +533,14 @@ export async function executeInstructions(instructions, userId, recordIds) {
                     params.push(gs.status === "completed");
                 }
                 if (gs.wiki_page_id) {
-                    sets.push(`wiki_page_id = $${i++}`);
-                    params.push(gs.wiki_page_id);
+                    const guExists = await client.query(`SELECT 1 FROM wiki_page WHERE id = $1`, [gs.wiki_page_id]);
+                    if (guExists.rowCount === 0) {
+                        console.warn(`[wiki-compiler] goal_sync update: wiki_page_id 不存在，跳过`);
+                    }
+                    else {
+                        sets.push(`wiki_page_id = $${i++}`);
+                        params.push(gs.wiki_page_id);
+                    }
                 }
                 if (params.length > 0) {
                     params.push(gs.goal_id);

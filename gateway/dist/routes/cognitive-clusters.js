@@ -1,140 +1,24 @@
-import { sendJson, sendError, getUserId } from "../lib/http-helpers.js";
-import { readBody } from "../lib/http-helpers.js";
-import { query } from "../db/pool.js";
-import { strikeRepo, strikeTagRepo, bondRepo } from "../db/repositories/index.js";
+import { sendJson, sendError } from "../lib/http-helpers.js";
 export function registerCognitiveClusterRoutes(router) {
-    // List top-level clusters
-    router.get("/api/v1/cognitive/clusters", async (req, res) => {
-        const userId = getUserId(req);
-        const clusters = await query(`SELECT s.id, s.nucleus,
-              COUNT(cm.target_strike_id)::text AS member_count,
-              MAX(ms.created_at)::text AS last_record_at
-       FROM strike s
-       LEFT JOIN bond cm ON cm.source_strike_id = s.id AND cm.type = 'cluster_member'
-       LEFT JOIN strike ms ON ms.id = cm.target_strike_id
-       WHERE s.user_id = $1 AND s.is_cluster = true AND s.status = 'active'
-       GROUP BY s.id, s.nucleus
-       ORDER BY COUNT(cm.target_strike_id) DESC`, [userId]);
-        // Check contradiction & recency for each cluster
-        const results = await Promise.all(clusters.map(async (c) => {
-            const memberIds = await query(`SELECT target_strike_id FROM bond WHERE source_strike_id = $1 AND type = 'cluster_member'`, [c.id]);
-            const ids = memberIds.map((m) => m.target_strike_id);
-            let hasContradiction = false;
-            if (ids.length > 0) {
-                const [{ count }] = await query(`SELECT COUNT(*) as count FROM bond
-             WHERE type = 'contradiction'
-               AND source_strike_id = ANY($1) AND target_strike_id = ANY($1)`, [ids]);
-                hasContradiction = parseInt(count) > 0;
-            }
-            const lastDate = c.last_record_at ? new Date(c.last_record_at) : null;
-            const twoWeeksAgo = new Date(Date.now() - 14 * 86400000);
-            const recentlyActive = lastDate ? lastDate > twoWeeksAgo : false;
-            return {
-                id: c.id,
-                name: c.nucleus,
-                memberCount: parseInt(c.member_count),
-                lastRecordAt: c.last_record_at,
-                hasContradiction,
-                recentlyActive,
-            };
-        }));
-        sendJson(res, results);
+    // List clusters — @deprecated 返回空列表
+    router.get("/api/v1/cognitive/clusters", async (_req, res) => {
+        sendJson(res, []);
     });
-    // Cluster detail
-    router.get("/api/v1/cognitive/clusters/:id", async (req, res, params) => {
-        const cluster = await strikeRepo.findById(params.id);
-        if (!cluster) {
-            res.writeHead(404);
-            res.end(JSON.stringify({ error: "Cluster not found" }));
-            return;
-        }
-        // Members with tags
-        const members = await query(`SELECT s.id, s.nucleus, s.polarity, s.confidence, s.field, s.created_at
-       FROM strike s
-       JOIN bond cm ON cm.target_strike_id = s.id AND cm.type = 'cluster_member'
-       WHERE cm.source_strike_id = $1 AND s.status = 'active'
-       ORDER BY s.created_at DESC`, [params.id]);
-        const membersWithTags = await Promise.all(members.map(async (m) => {
-            const tags = await strikeTagRepo.findByStrike(m.id);
-            return { ...m, tags: tags.map((t) => t.label) };
-        }));
-        // Contradictions among members
-        const memberIds = members.map((m) => m.id);
-        const contradictions = memberIds.length > 0
-            ? await query(`SELECT sa.id as sa_id, sa.nucleus as sa_nucleus,
-                    sb.id as sb_id, sb.nucleus as sb_nucleus
-             FROM bond b
-             JOIN strike sa ON sa.id = b.source_strike_id
-             JOIN strike sb ON sb.id = b.target_strike_id
-             WHERE b.type = 'contradiction'
-               AND b.source_strike_id = ANY($1) AND b.target_strike_id = ANY($1)`, [memberIds])
-            : [];
-        // Patterns (realize + inference source_type)
-        const patterns = members.filter((m) => m.polarity === "realize");
-        // Intents
-        const intents = membersWithTags.filter((m) => m.polarity === "intend");
-        sendJson(res, {
-            id: cluster.id,
-            name: cluster.nucleus,
-            members: membersWithTags,
-            contradictions: contradictions.map((c) => ({
-                strikeA: { id: c.sa_id, nucleus: c.sa_nucleus },
-                strikeB: { id: c.sb_id, nucleus: c.sb_nucleus },
-            })),
-            patterns: patterns.map((p) => ({
-                id: p.id,
-                nucleus: p.nucleus,
-                confidence: p.confidence,
-            })),
-            intents,
-        });
+    // Cluster detail — @deprecated 返回 410
+    router.get("/api/v1/cognitive/clusters/:id", async (_req, res) => {
+        sendError(res, "Cluster engine deprecated", 410);
     });
-    // Update cluster name
-    router.patch("/api/v1/cognitive/clusters/:id", async (req, res, params) => {
-        const body = await readBody(req);
-        if (!body.name?.trim()) {
-            sendError(res, "name is required");
-            return;
-        }
-        const cluster = await strikeRepo.findById(params.id);
-        if (!cluster || !cluster.is_cluster) {
-            sendError(res, "Cluster not found", 404);
-            return;
-        }
-        // 保留描述部分，只更新名称
-        const descPart = cluster.nucleus.replace(/^\[.+?\]\s*/, "");
-        const newNucleus = `[${body.name.trim()}] ${descPart}`.trim();
-        await query(`UPDATE strike SET nucleus = $1 WHERE id = $2`, [newNucleus, params.id]);
-        sendJson(res, { ok: true });
+    // Update cluster name — @deprecated
+    router.patch("/api/v1/cognitive/clusters/:id", async (_req, res) => {
+        sendError(res, "Cluster engine deprecated", 410);
     });
-    // Dissolve cluster（解散：不删除 strike，只取消 is_cluster；关联目标变独立）
-    router.delete("/api/v1/cognitive/clusters/:id", async (req, res, params) => {
-        const cluster = await strikeRepo.findById(params.id);
-        if (!cluster || !cluster.is_cluster) {
-            sendError(res, "Cluster not found", 404);
-            return;
-        }
-        // 1. 取消聚类标记
-        await query(`UPDATE strike SET is_cluster = false WHERE id = $1`, [params.id]);
-        // 2. 关联目标的 cluster_id 置 null
-        await query(`UPDATE todo SET cluster_id = NULL WHERE cluster_id = $1`, [params.id]);
-        sendJson(res, { ok: true });
+    // Dissolve cluster — @deprecated
+    router.delete("/api/v1/cognitive/clusters/:id", async (_req, res) => {
+        sendError(res, "Cluster engine deprecated", 410);
     });
-    // Create a manual bond between two strikes/clusters
-    router.post("/api/v1/cognitive/bonds", async (req, res) => {
-        const body = await readBody(req);
-        if (!body.sourceStrikeId || !body.targetStrikeId) {
-            sendError(res, "sourceStrikeId and targetStrikeId are required");
-            return;
-        }
-        const bond = await bondRepo.create({
-            source_strike_id: body.sourceStrikeId,
-            target_strike_id: body.targetStrikeId,
-            type: body.type ?? "manual",
-            strength: 0.7,
-            created_by: "user",
-        });
-        sendJson(res, { ok: true, bondId: bond.id }, 201);
+    // Create bond — @deprecated
+    router.post("/api/v1/cognitive/bonds", async (_req, res) => {
+        sendError(res, "Bond engine deprecated", 410);
     });
 }
 //# sourceMappingURL=cognitive-clusters.js.map
