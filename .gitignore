@@ -10,3 +10,5 @@ ios/App/Pods/
 Thumbs.db
 .claude/settings.local.json
 dist-electron/
+gateway/dist/
+gateway/.cache/
