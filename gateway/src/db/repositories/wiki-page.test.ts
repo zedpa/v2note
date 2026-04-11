@@ -74,8 +74,9 @@ describe("wiki-page repository", () => {
 
       const sql = vi.mocked(queryOne).mock.calls[0][0];
       expect(sql).toContain("::vector");
+      expect(sql).toContain("$12::vector");
       const params = vi.mocked(queryOne).mock.calls[0][1]!;
-      // embedding 参数是最后一个，格式为 "[0.1,0.2,0.3]"
+      // embedding 参数是最后一个（第 12 个，索引 11），格式为 "[0.1,0.2,0.3]"
       expect(params[params.length - 1]).toBe("[0.1,0.2,0.3]");
     });
 
@@ -99,6 +100,26 @@ describe("wiki-page repository", () => {
       expect(params[2]).toBe("");
     });
 
+    it("should_default_page_type_to_topic_when_not_specified", async () => {
+      vi.mocked(queryOne).mockResolvedValue(mockPage as any);
+
+      await create({ user_id: "u-1", title: "测试" });
+
+      const params = vi.mocked(queryOne).mock.calls[0][1]!;
+      // page_type 是第 8 个参数（索引 7）
+      expect(params[7]).toBe("topic");
+    });
+
+    it("should_default_token_count_to_0_when_not_specified", async () => {
+      vi.mocked(queryOne).mockResolvedValue(mockPage as any);
+
+      await create({ user_id: "u-1", title: "测试" });
+
+      const params = vi.mocked(queryOne).mock.calls[0][1]!;
+      // token_count 是第 9 个参数（索引 8）
+      expect(params[8]).toBe(0);
+    });
+
     it("should_serialize_metadata_as_json_when_provided", async () => {
       vi.mocked(queryOne).mockResolvedValue(mockPage as any);
 
@@ -109,8 +130,8 @@ describe("wiki-page repository", () => {
       });
 
       const params = vi.mocked(queryOne).mock.calls[0][1]!;
-      // metadata 是第 8 个参数（索引 7）
-      expect(params[7]).toBe(JSON.stringify({ contradictions: 2 }));
+      // metadata 是第 11 个参数（索引 10）
+      expect(params[10]).toBe(JSON.stringify({ contradictions: 2 }));
     });
   });
 

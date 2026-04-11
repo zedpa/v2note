@@ -18,6 +18,7 @@ export interface Record {
   file_name: string | null;
   domain?: string | null;
   hierarchy_tags?: Array<{ label: string; level: number }>;
+  metadata: { [key: string]: any } | null;
   compile_status: string;
   content_hash: string | null;
   created_at: string;
@@ -464,4 +465,15 @@ export async function updateCompileStatus(
       [status, recordId],
     );
   }
+}
+
+/** 更新 record.metadata（JSONB 合并，不覆盖已有字段） */
+export async function mergeMetadata(
+  recordId: string,
+  patch: { [key: string]: unknown },
+): Promise<void> {
+  await execute(
+    `UPDATE record SET metadata = COALESCE(metadata, '{}'::jsonb) || $1::jsonb, updated_at = now() WHERE id = $2`,
+    [JSON.stringify(patch), recordId],
+  );
 }

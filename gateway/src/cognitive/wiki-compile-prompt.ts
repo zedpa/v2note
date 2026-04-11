@@ -130,6 +130,15 @@ ${domainHint}
 - domain 是简短中文一级分类："工作"、"生活"、"学习"、"健康"等
 - 可带二级路径："工作/采购"、"生活/旅行"
 - 不确定时设为 null
+
+### Title 命名规则
+
+- 自然语言命名，如同笔记本目录中的标题
+- L3 domain page title 可以简短："工作"、"思考"、"学习"（分类标签，允许宽泛）
+- L2/L1 topic page title 应具体自然："供应链优化"、"React Hook 实践"、"家庭装修计划"
+- goal page 的 title = 目标本身："通过四级考试"、"今年减重10kg"
+- 好的例子："Q2 采购策略"、"React 学习笔记"
+- 坏的例子："工作管理"（太泛）、"明天要和张总确认报价"（太长/临时）
 ${coldStartHint}
 
 ## JSON 输出格式
@@ -148,7 +157,7 @@ ${coldStartHint}
   ],
   "create_pages": [
     {
-      "title": "新主题名称（2-8个中文字符）",
+      "title": "自然语言命名的主题标题",
       "content": "markdown 内容",
       "summary": "一句话摘要",
       "parent_id": "UUID 或 null",

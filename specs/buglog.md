@@ -211,3 +211,19 @@
 - **回归测试**：无（纯后端 AI 逻辑，需集成测试验证）
 - **教训**：限制类修复必须检查所有写入路径，不能只修 API 层。应列出所有 `addToRecord` / `createMany` 调用点逐一排查
 - **已提炼**：❌ 仅此例，无通用性（等出现第二次再提炼）
+
+### [2026-04-11] [bug] 录音处理通知状态滞后
+- **现象**：录音完成后日记已在时间线可见，但 FAB 胶囊仍显示"处理中"5-30 秒，等 AI 后处理完成才消失
+- **根因**：`fab.tsx` 在 `asr.done` 时设置 `processing=true` 显示"处理中"胶囊，要等 `process.result` 消息才清除。但日记在 `asr.done` 时已创建可见，用户感知与系统状态不匹配
+- **修复**：`asr.done` 不再设 `processing=true`，改为 `fabNotify.success("已记录")` 短暂提示；`process.result` 静默刷新时间线不弹通知；`error` case 用 `pipelineIdRef` 判断是否显示错误；移除 30s safety timeout
+- **回归测试**：`features/recording/components/fab-notify-stale.test.ts` — 标注 `regression: fix-recording-notify-stale`
+- **教训**：异步管线的通知粒度应与用户感知对齐——用户关心的是"我的内容保存了吗"，而非"AI 后处理完了吗"
+- **已提炼**：❌ 仅此例，无通用性
+
+### [2026-04-12] [bug] 上滑指令 CommandSheet 堵塞无响应
+- **现象**：用户上滑触发指令后，长时间无响应或 CommandSheet 永远卡在"处理中"
+- **根因**：三层问题叠加：(1) Layer 2 双阶段串行 AI 调用（classifyVoiceIntent + matchTodoByHint/executeVoiceAction），总耗时 5-20 秒；(2) AI 返回空 actions 时 process.result 无 todo_commands，CommandSheet phase 永远停在 "processing"；(3) 上滑松手后到 CommandSheet 打开前无视觉反馈
+- **修复**：(1) 新建 commandFullMode 单阶段模式，预加载待办+目标+文件夹上下文，单次 AI 调用替代双阶段串行，支持待办/日记/搜索/文件夹四类工具，预期 2-5 秒；(2) app/page.tsx process.result handler 兜底空结果和错误，CommandSheet 新增 empty/error phase + 20 秒超时保护；(3) 上滑松手后 fabNotify.info("指令处理中...")
+- **回归测试**：`gateway/src/handlers/command-full-mode.test.ts`（13 个）+ `gateway/src/handlers/command-full-prompt.test.ts`（9 个）+ `features/todos/components/command-sheet.test.tsx`（8 个）— 标注 `regression: fix-command-sheet-stuck`
+- **教训**：多阶段串行 AI 调用应尽量合并为单阶段含上下文的调用。上下文越完整，后处理越少，总耗时越低。
+- **已提炼**：❌ 仅此例（等出现第二次再提炼）

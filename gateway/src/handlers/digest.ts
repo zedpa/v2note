@@ -26,6 +26,7 @@ import { mayProfileUpdate, safeParseJson } from "../lib/text-utils.js";
 import { shouldUpdateSoulStrict } from "../cognitive/self-evolution.js";
 import { today as tzToday, now as tzNow } from "../lib/tz.js";
 import type { StrikeEntry } from "../db/repositories/strike.js";
+import { processAtRoute } from "../cognitive/at-route-parser.js";
 
 /** AI 返回的 intend 数据结构 */
 interface RawIntend {
@@ -123,6 +124,27 @@ export async function digestRecords(
 
     const combinedText = textParts.join("\n\n---\n\n");
     console.log(`[digest][⏱ load-text] ${Date.now() - dt0}ms — text: ${combinedText.length} chars`);
+
+    // ── Step 1.5: @路由解析（确定性预抽取）───────────────────
+    // 解析 @domain/subdomain 语法，自动创建 page 并建立关联
+    const atRouteResults = new Map<string, boolean>(); // recordId → 是否有 @路由
+    for (const id of validIds) {
+      const text = summaryByRecord.get(id) ?? transcriptByRecord.get(id);
+      if (text) {
+        try {
+          const result = await processAtRoute(userId!, id, text);
+          atRouteResults.set(id, result !== null);
+          if (result) {
+            // 将 target_path 写入 record.metadata
+            await recordRepo.mergeMetadata(id, { target_path: result.targetPath });
+            console.log(`[digest] @路由命中: record=${id} → page=${result.pageId} (${result.targetPath})`);
+          }
+        } catch (e) {
+          console.warn(`[digest] @路由解析失败 for record ${id}:`, e);
+          atRouteResults.set(id, false);
+        }
+      }
+    }
 
     // ── Step 2: AI 调用 — 只提取 intend（1 次调用）─────────────
     const ingestMessages: ChatMessage[] = [

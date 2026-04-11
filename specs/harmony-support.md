@@ -1,17 +1,19 @@
 ---
 id: "087"
 title: "鸿蒙 HarmonyOS NEXT 适配"
-status: draft
+status: active
 domain: infra
+risk: high
 dependencies: []
 superseded_by: null
 created: 2026-03-23
-updated: 2026-03-30
+updated: 2026-04-11
 ---
 # 鸿蒙 HarmonyOS NEXT 适配
 
-> 状态：🟡 待开发 | 优先级：Phase 6+（平台扩展）| 预计：3-4 周
+> 状态：🔵 前端适配层已完成，鸿蒙壳待真机验证 | 优先级：Phase 6+（平台扩展）
 > 依赖：华为开发者账号、DevEco Studio、HarmonyOS SDK
+> 完成进度：Step 1-3 前端适配层 ✅ / Step 4 录音桥接 ✅（前端） / Step 5 存储+状态栏 ✅ / Step 6 构建脚本 ✅ / 鸿蒙壳 ArkTS 代码 ✅（待编译验证）
 
 ## 概述
 将念念有路适配到鸿蒙 NEXT（纯鸿蒙，无 Android 兼容层）。采用 **WebView 壳 + 原生桥接** 策略——复用现有 Next.js 静态导出，用 ArkUI WebView 加载，通过 JSBridge 桥接原生能力（录音、设备ID、存储、状态栏），替代 Capacitor 插件层。
@@ -64,6 +66,9 @@ updated: 2026-03-30
 
 ### 场景 3: 录音桥接——鸿蒙原生录音替代 capacitor-voice-recorder
 
+> ⚠️ **关键适配点**：现有 `use-audio-recorder.ts` 使用**静态 import** `capacitor-voice-recorder`，
+> 在鸿蒙 WebView 中该模块不存在会直接报错。必须重构为动态 import + 平台分支。
+
 ```
 假设 (Given)  用户在鸿蒙设备上点击录音按钮
 当   (When)   调用 startRecording()
@@ -82,7 +87,15 @@ updated: 2026-03-30
 那么 (Then)   JSBridge 先请求 ohos.permission.MICROPHONE
 并且 (And)    用户拒绝时抛出 Error("Microphone permission denied")
 并且 (And)    错误处理逻辑与 Capacitor 版一致
+
+假设 (Given)  应用运行在非 Capacitor 非 Harmony 环境（纯浏览器）
+当   (When)   调用 startRecording()
+那么 (Then)   录音模块不加载 capacitor-voice-recorder（避免 import 报错）
+并且 (And)    提示用户当前环境不支持录音
 ```
+
+**重构方案**：将 `use-audio-recorder.ts` 中的 `VoiceRecorder` 从静态 import 改为动态 import，
+并按 `getPlatform()` 结果选择录音后端：harmony → JSBridge / capacitor → VoiceRecorder / web → 不支持
 
 ### 场景 4: 存储桥接——鸿蒙 Preferences 替代 @capacitor/preferences
 
@@ -97,6 +110,10 @@ updated: 2026-03-30
 当   (When)   调用 storage 方法
 那么 (Then)   降级到 localStorage（与 Web 行为一致）
 ```
+
+> ⚠️ **适配注意**：现有 `storage.ts` 的 `useNative()` 使用 `_useNative` 缓存检测结果，
+> 重构时需改为基于 `getPlatform()` 的三级判断（harmony / capacitor / web），
+> 而非简单的 native true/false 二值。
 
 ### 场景 5: 状态栏桥接——鸿蒙原生状态栏控制
 
@@ -187,14 +204,67 @@ updated: 2026-03-30
       else                          → Web API fallback
 
 并且 (And)    改动文件：
-      shared/lib/platform.ts      — 新增，平台检测
-      shared/lib/device.ts        — 修改，加入 harmony 分支
-      shared/lib/storage.ts       — 修改，加入 harmony 分支
-      shared/lib/status-bar.ts    — 修改，加入 harmony 分支
-      features/recording/hooks/use-audio-recorder.ts — 修改，加入 harmony 录音桥接
+      shared/lib/platform.ts        — 新增，平台检测 + isNativePlatform()
+      shared/lib/harmony-bridge.ts  — 新增，JSBridge 类型定义 + 获取函数
+      shared/lib/device.ts          — 修改，加入 harmony 分支
+      shared/lib/storage.ts         — 修改，重构 useNative() 为三级平台判断
+      shared/lib/status-bar.ts      — 修改，加入 harmony 分支
+      shared/lib/notification.ts    — 修改，加入 harmony 通知桥接
+      features/recording/hooks/use-audio-recorder.ts — 修改，静态 import → 动态 import + harmony 分支
 
 并且 (And)    Capacitor 相关代码完全不变（只新增分支）
 ```
+
+### 场景 11: 本地通知桥接——鸿蒙原生通知替代 @capacitor/local-notifications
+
+```
+假设 (Given)  应用运行在鸿蒙环境
+当   (When)   需要发送本地通知（如待办提醒、早晚报）
+那么 (Then)   通过 JSBridge 调用 harmony.notification.schedule()
+并且 (And)    鸿蒙端使用 @ohos.notificationManager API
+并且 (And)    支持定时通知、重复通知、取消通知
+
+假设 (Given)  鸿蒙桥接不可用
+当   (When)   调用通知相关方法
+那么 (Then)   降级到 Web Notification API（如浏览器支持）
+```
+
+### 场景 12: Web API 兼容性——鸿蒙 WebView 非 Chromium 适配
+
+```
+假设 (Given)  鸿蒙 WebView 不支持 crypto.randomUUID()
+当   (When)   device.ts Web fallback 需要生成设备 ID
+那么 (Then)   使用 polyfill：crypto.getRandomValues + UUID v4 格式化
+并且 (And)    fallback 逻辑在 platform.ts 中统一处理
+
+假设 (Given)  鸿蒙 WebView 对 CSS env() 支持不完整
+当   (When)   页面使用 env(safe-area-inset-*)
+那么 (Then)   通过 JSBridge 获取安全区域尺寸
+并且 (And)    注入 CSS 自定义属性 --harmony-safe-area-top 等作为 fallback
+```
+
+## 验收行为（E2E 锚点）
+
+> 以下描述纯用户视角的操作路径，不涉及内部实现。
+> 注：鸿蒙原生壳的 E2E 需要 DevEco 模拟器/真机，当前阶段仅覆盖前端平台适配层的可测试行为。
+
+### 行为 1: 平台检测正确性
+1. 在浏览器中打开应用
+2. 调用 getPlatform() 返回 'web'
+3. 所有原生调用走 Web fallback
+
+### 行为 2: 鸿蒙桥接不可用时的降级
+1. 在非鸿蒙环境中（无 window.__harmony_bridge__）
+2. 调用 getDeviceIdentifier() 不报错，走 Web/Capacitor fallback
+3. 调用 storage.getItem/setItem 不报错，走 localStorage fallback
+4. 调用 initStatusBar() 静默返回
+
+### 行为 3: 鸿蒙环境下桥接调用（需鸿蒙模拟器）
+1. 在鸿蒙 WebView 中打开应用（window.__harmony_bridge__ 已注入）
+2. getPlatform() 返回 'harmony'
+3. 设备 ID 通过 JSBridge 获取
+4. 录音通过 JSBridge 调用原生 API
+5. 存储通过 JSBridge 调用 Preferences
 
 ## 边界条件
 - [ ] 鸿蒙 WebView 对 CSS 的兼容性（特别是 env(safe-area-inset-*)）
@@ -247,6 +317,20 @@ interface HarmonyBridge {
   };
   statusBar: {
     init(options: { backgroundColor: string; style: 'light' | 'dark' }): Promise<void>;
+  };
+  notification: {
+    schedule(options: {
+      id: number;
+      title: string;
+      body: string;
+      scheduledAt?: string;  // ISO 8601
+      repeatInterval?: 'daily' | 'weekly';
+    }): Promise<void>;
+    cancel(id: number): Promise<void>;
+    cancelAll(): Promise<void>;
+  };
+  safeArea: {
+    getInsets(): Promise<{ top: number; bottom: number; left: number; right: number }>;
   };
   system: {
     openUrl(url: string): Promise<void>;  // 系统浏览器打开

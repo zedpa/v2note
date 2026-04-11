@@ -29,4 +29,5 @@ export * as notificationRepo from "./notification.js";
 export * as chatMessageRepo from "./chat-message.js";
 export * as wikiPageRepo from "./wiki-page.js";
 export * as wikiPageRecordRepo from "./wiki-page-record.js";
+export * as wikiPageLinkRepo from "./wiki-page-link.js";
 export * as userAgentRepo from "./user-agent.js";

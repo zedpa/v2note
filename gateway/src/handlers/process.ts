@@ -6,6 +6,7 @@ import { safeParseJson } from "../lib/text-utils.js";
 import { toLocalDateTime } from "../lib/tz.js";
 import { buildTodoExtractPrompt, buildTodoRefinePrompt, type TodoModeContext } from "./todo-extract-prompt.js";
 import { buildUnifiedProcessPrompt, type UnifiedProcessContext } from "./unified-process-prompt.js";
+import { commandFullMode } from "./command-full-mode.js";
 
 export interface LocalConfigPayload {
   soul?: { content: string };
@@ -136,76 +137,20 @@ export async function processEntry(payload: ProcessPayload): Promise<ProcessResu
       return result;
     }
 
-    // ── Layer 2: 全量 Agent 模式（上滑手势） ──────────────────────
-    // 只分类 + 提取，不执行。写入操作由前端确认后走 REST API
-    // 查询操作直接执行并返回结果
+    // ── Layer 2: 全量指令模式（上滑手势） ──────────────────────
+    // 单阶段 AI 调用：预加载上下文 → 注入 prompt → 单次 AI → 后处理
     if (payload.forceCommand) {
-      console.log(`[process] Layer 2: Agent command mode`);
+      console.log(`[process] Layer 2: Command full mode`);
       result.voice_intent_type = "action";
       try {
-        const intentResult = await classifyVoiceIntent(payload.text, true);
-        if (intentResult.actions.length > 0) {
-          const ACTION_TYPE_MAP: Record<string, TodoCommand["action_type"]> = {
-            create_todo: "create", complete_todo: "complete",
-            modify_todo: "modify", query_todo: "query",
-          };
-
-          const todoCommands: TodoCommand[] = [];
-          const actionResults: ActionExecResult[] = [];
-
-          for (const action of intentResult.actions) {
-            const mappedType = ACTION_TYPE_MAP[action.type];
-
-            // 查询操作直接执行
-            if (mappedType === "query") {
-              const queryResult = await executeVoiceAction(action, {
-                userId: payload.userId,
-                deviceId: payload.deviceId,
-                recordId: payload.recordId,
-              });
-              todoCommands.push({
-                action_type: "query",
-                confidence: action.confidence,
-                query_params: action.query_params,
-                query_result: queryResult.items?.map((t: any) => ({
-                  id: t.id, text: t.text,
-                  scheduled_start: t.scheduled_start,
-                  done: t.done, priority: t.priority,
-                })),
-              });
-              actionResults.push(queryResult);
-              continue;
-            }
-
-            // 写入操作（create/complete/modify）→ 提取信息返回前端确认
-            // complete/modify 需要先匹配 target_id
-            let targetId: string | undefined;
-            if ((mappedType === "complete" || mappedType === "modify") && action.target_hint) {
-              const match = await matchTodoByHint(action.target_hint, {
-                userId: payload.userId,
-                deviceId: payload.deviceId,
-              });
-              targetId = match?.id;
-            }
-
-            todoCommands.push({
-              action_type: mappedType ?? "create",
-              confidence: action.confidence,
-              target_hint: action.target_hint,
-              target_id: targetId,
-              todo: mappedType === "create" ? {
-                text: action.changes?.text ?? action.original_text,
-                scheduled_start: action.changes?.scheduled_start,
-                priority: action.changes?.priority,
-              } : undefined,
-              changes: mappedType === "modify" ? action.changes as any : undefined,
-            });
-          }
-
-          result.todo_commands = todoCommands;
-          if (actionResults.length > 0) {
-            result.action_results = actionResults;
-          }
+        const cmdResult = await commandFullMode({
+          text: payload.text,
+          deviceId: payload.deviceId,
+          userId: payload.userId,
+        });
+        result.todo_commands = cmdResult.commands as any;
+        if (cmdResult.actionResults.length > 0) {
+          result.action_results = cmdResult.actionResults;
         }
       } catch (err: any) {
         console.error(`[process] Layer 2 failed: ${err.message}`);

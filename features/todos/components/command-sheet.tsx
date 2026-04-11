@@ -51,7 +51,7 @@ export interface ExtractedTodo {
   };
 }
 
-type SheetPhase = "transcribing" | "processing" | "result" | "detail";
+type SheetPhase = "transcribing" | "processing" | "result" | "detail" | "empty" | "error";
 
 interface CommandSheetProps {
   open: boolean;
@@ -128,6 +128,7 @@ export function CommandSheet({
   const [editableCommands, setEditableCommands] = useState<TodoCommand[]>([]);
   const [textInputMode, setTextInputMode] = useState(false);
   const [textInputValue, setTextInputValue] = useState("");
+  const [errorMessage, setErrorMessage] = useState("");
   const textInputRef = useRef<HTMLInputElement>(null);
 
   // 根据 props 更新阶段
@@ -138,12 +139,31 @@ export function CommandSheet({
       return;
     }
     if (commands && commands.length > 0) {
-      setEditableCommands([...commands]);
-      setPhase("result");
+      // 检查是否是 error/empty 特殊 command
+      const first = commands[0];
+      if (first?.action_type === ("error" as any)) {
+        setErrorMessage((first as any).error_message || "指令处理失败");
+        setPhase("error");
+      } else if (first?.action_type === ("empty" as any)) {
+        setPhase("empty");
+      } else {
+        setEditableCommands([...commands]);
+        setPhase("result");
+      }
     } else if (transcript) {
       setPhase("processing");
     }
   }, [open, commands, transcript]);
+
+  // processing 超时保护（20 秒）
+  useEffect(() => {
+    if (!open || phase !== "processing") return;
+    const timer = setTimeout(() => {
+      setErrorMessage("指令处理超时，请重试");
+      setPhase("error");
+    }, 20000);
+    return () => clearTimeout(timer);
+  }, [open, phase]);
 
   const handleDismissCommand = useCallback((idx: number) => {
     setEditableCommands((prev) => {
@@ -226,6 +246,42 @@ export function CommandSheet({
                     ))}
                   </div>
                 )}
+              </motion.div>
+            )}
+
+            {phase === "empty" && (
+              <motion.div
+                key="empty"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="flex flex-col items-center gap-3 py-8"
+              >
+                <span className="text-white/50 text-sm">未识别到指令，请重新说</span>
+                <button
+                  onClick={onClose}
+                  className="rounded-full bg-white/10 px-5 py-2 text-sm text-white/70 hover:bg-white/20 transition-colors"
+                >
+                  关闭
+                </button>
+              </motion.div>
+            )}
+
+            {phase === "error" && (
+              <motion.div
+                key="error"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="flex flex-col items-center gap-3 py-8"
+              >
+                <span className="text-red-400 text-sm">{errorMessage || "指令处理超时，请重试"}</span>
+                <button
+                  onClick={onClose}
+                  className="rounded-full bg-white/10 px-5 py-2 text-sm text-white/70 hover:bg-white/20 transition-colors"
+                >
+                  关闭
+                </button>
               </motion.div>
             )}
 

@@ -39,7 +39,7 @@
 | 120 | 原生体验深度优化 — 路线A | ui | native-experience-deep.md | Phase 0-D 分阶段 |
 | 123 | 提示词架构 v2 — SharedAgent/UserAgent 分层 | agent | prompt-architecture-v2.md | 五层存储互斥+AI自主维护+wiki注入 |
 | 125 | 待办写入系统日历 & 闹钟 | todo | todo-calendar-alarm.md | Intent方案+SystemIntentPlugin |
-
+| 087 | 鸿蒙 HarmonyOS NEXT 适配 | infra | harmony-support.md | WebView壳+JSBridge+前端适配层 |
 ## 🟡 Draft（规划中，尚未开始实施）
 
 | id | title | domain | file |
@@ -47,13 +47,14 @@
 | 124 | Android App Shortcuts — 长按快捷指令 | ui | android-app-shortcuts.md |
 | 075 | 发现页 | ui | discovery-page.md |
 | 080 | 外部数据源集成 | infra | external-integration.md |
-| 087 | 鸿蒙适配 | infra | harmony-support.md |
 | 094 | 阅读器 | ui | reader.md |
 
 ## ✅ Completed（已实现，仅供历史参考）
 
 | id | title | domain | file |
 |----|-------|--------|------|
+| fix-command-sheet-stuck | Fix: 上滑指令 CommandSheet 堵塞 | voice | fix-command-sheet-stuck.md |
+| fix-recording-notify-stale | Fix: 录音处理通知状态滞后 | voice | fix-recording-notify-stale.md |
 | fix-recording-hint-style | Fix: 录音模式方向提示改为小按钮样式 | voice | fix-recording-hint-style.md |
 | fix-card-expand-collapse | Fix: 日记卡片展开逻辑优化+收起按钮高度 | ui | fix-card-expand-collapse.md |
 | 122 | 日程提醒 — 本地通知调度 | todo | todo-reminder-notify.md |

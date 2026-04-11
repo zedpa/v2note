@@ -1,0 +1,261 @@
+import { describe, it, expect, vi, beforeEach } from "vitest";
+
+// ── Mocks ──────────────────────────────────────────────────────────────
+
+vi.mock("../db/repositories/index.js", () => ({
+  todoRepo: {
+    findPendingByUser: vi.fn(),
+    findPendingByDevice: vi.fn(),
+    findActiveGoalsByUser: vi.fn(),
+    findActiveGoalsByDevice: vi.fn(),
+    findByUser: vi.fn(),
+    findByDevice: vi.fn(),
+  },
+  notebookRepo: {
+    findByUser: vi.fn(),
+    findByDevice: vi.fn(),
+  },
+  recordRepo: {
+    updateStatus: vi.fn(),
+  },
+}));
+
+vi.mock("../ai/provider.js", () => ({
+  chatCompletion: vi.fn(),
+}));
+
+import { todoRepo, notebookRepo } from "../db/repositories/index.js";
+import { chatCompletion } from "../ai/provider.js";
+import { commandFullMode } from "./command-full-mode.js";
+
+// ── Helpers ────────────────────────────────────────────────────────────
+
+function mockTodo(id: string, text: string, overrides?: Record<string, any>) {
+  return {
+    id, text, done: false, record_id: "r1",
+    estimated_minutes: null, scheduled_start: null, scheduled_end: null,
+    priority: 0, completed_at: null, created_at: "2026-04-11",
+    ...overrides,
+  };
+}
+
+function mockGoal(id: string, text: string) {
+  return { id, text, done: false, level: 1, status: "active", priority: 0 } as any;
+}
+
+function mockNotebook(name: string) {
+  return { id: `nb-${name}`, device_id: "d1", name, description: null, color: "#000", is_system: false, created_at: "2026-04-11" };
+}
+
+// ══════════════════════════════════════════════════════════════════════
+
+describe("commandFullMode", () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    (todoRepo.findPendingByDevice as any).mockResolvedValue([mockTodo("t1", "买牛奶")]);
+    (todoRepo.findActiveGoalsByDevice as any).mockResolvedValue([mockGoal("g1", "健康")]);
+    (notebookRepo.findByDevice as any).mockResolvedValue([mockNotebook("工作")]);
+    (todoRepo.findPendingByUser as any).mockResolvedValue([mockTodo("t1", "买牛奶")]);
+    (todoRepo.findActiveGoalsByUser as any).mockResolvedValue([mockGoal("g1", "健康")]);
+    (notebookRepo.findByUser as any).mockResolvedValue([mockNotebook("工作")]);
+  });
+
+  it("should_return_commands_when_ai_returns_valid_create_todo", async () => {
+    (chatCompletion as any).mockResolvedValue({
+      content: JSON.stringify({
+        commands: [{
+          action_type: "create_todo",
+          confidence: 0.95,
+          todo: { text: "开会", scheduled_start: "2026-04-12T09:00:00", priority: 3 },
+        }],
+      }),
+    });
+
+    const result = await commandFullMode({ text: "明天九点开会", deviceId: "d1" });
+
+    expect(result.commands).toHaveLength(1);
+    expect(result.commands[0].action_type).toBe("create");
+    expect(result.commands[0].todo?.text).toBe("开会");
+  });
+
+  it("should_return_commands_when_ai_returns_complete_todo_with_target_id", async () => {
+    (chatCompletion as any).mockResolvedValue({
+      content: JSON.stringify({
+        commands: [{
+          action_type: "complete_todo",
+          confidence: 0.9,
+          target_hint: "买牛奶",
+          target_id: "t1",
+        }],
+      }),
+    });
+
+    const result = await commandFullMode({ text: "买牛奶搞定了", deviceId: "d1" });
+
+    expect(result.commands).toHaveLength(1);
+    expect(result.commands[0].action_type).toBe("complete");
+    expect(result.commands[0].target_id).toBe("t1");
+  });
+
+  it("should_fallback_match_target_id_when_ai_returns_complete_without_target_id", async () => {
+    (chatCompletion as any).mockResolvedValue({
+      content: JSON.stringify({
+        commands: [{
+          action_type: "complete_todo",
+          confidence: 0.9,
+          target_hint: "牛奶",
+        }],
+      }),
+    });
+
+    const result = await commandFullMode({ text: "牛奶搞定了", deviceId: "d1" });
+
+    expect(result.commands).toHaveLength(1);
+    expect(result.commands[0].target_id).toBe("t1");
+  });
+
+  it("should_throw_when_ai_returns_empty_content", async () => {
+    (chatCompletion as any).mockResolvedValue({ content: "" });
+
+    await expect(commandFullMode({ text: "test", deviceId: "d1" })).rejects.toThrow("AI 返回空结果");
+  });
+
+  it("should_throw_when_ai_returns_invalid_json", async () => {
+    (chatCompletion as any).mockResolvedValue({ content: "not json" });
+
+    await expect(commandFullMode({ text: "test", deviceId: "d1" })).rejects.toThrow("AI 返回格式错误");
+  });
+
+  it("should_handle_query_todo_with_post_processing", async () => {
+    (todoRepo.findPendingByDevice as any).mockResolvedValue([
+      mockTodo("t1", "买牛奶", { scheduled_start: "2026-04-12T09:00:00" }),
+      mockTodo("t2", "开会", { scheduled_start: "2026-04-12T14:00:00" }),
+      mockTodo("t3", "跑步", { scheduled_start: "2026-04-13T07:00:00" }),
+    ]);
+
+    (chatCompletion as any).mockResolvedValue({
+      content: JSON.stringify({
+        commands: [{
+          action_type: "query_todo",
+          confidence: 0.95,
+          query_params: { date: "2026-04-12" },
+        }],
+      }),
+    });
+
+    const result = await commandFullMode({ text: "明天有什么安排", deviceId: "d1" });
+
+    expect(result.commands).toHaveLength(1);
+    expect(result.commands[0].action_type).toBe("query");
+    expect(result.commands[0].query_result).toBeDefined();
+    expect(result.commands[0].query_result!.length).toBe(2);
+  });
+
+  it("should_return_empty_commands_when_ai_returns_no_commands", async () => {
+    (chatCompletion as any).mockResolvedValue({
+      content: JSON.stringify({ commands: [] }),
+    });
+
+    const result = await commandFullMode({ text: "啊啊啊", deviceId: "d1" });
+
+    expect(result.commands).toHaveLength(0);
+  });
+
+  it("should_use_userId_repos_when_userId_is_provided", async () => {
+    (chatCompletion as any).mockResolvedValue({
+      content: JSON.stringify({ commands: [] }),
+    });
+
+    await commandFullMode({ text: "test", deviceId: "d1", userId: "u1" });
+
+    expect(todoRepo.findPendingByUser).toHaveBeenCalledWith("u1");
+    expect(todoRepo.findActiveGoalsByUser).toHaveBeenCalledWith("u1");
+    expect(notebookRepo.findByUser).toHaveBeenCalledWith("u1");
+  });
+
+  it("should_use_deviceId_repos_when_no_userId", async () => {
+    (chatCompletion as any).mockResolvedValue({
+      content: JSON.stringify({ commands: [] }),
+    });
+
+    await commandFullMode({ text: "test", deviceId: "d1" });
+
+    expect(todoRepo.findPendingByDevice).toHaveBeenCalledWith("d1");
+    expect(todoRepo.findActiveGoalsByDevice).toHaveBeenCalledWith("d1");
+    expect(notebookRepo.findByDevice).toHaveBeenCalledWith("d1");
+  });
+
+  it("should_handle_multiple_commands_in_single_response", async () => {
+    (chatCompletion as any).mockResolvedValue({
+      content: JSON.stringify({
+        commands: [
+          { action_type: "complete_todo", confidence: 0.9, target_hint: "牛奶", target_id: "t1" },
+          { action_type: "create_todo", confidence: 0.95, todo: { text: "找张总", scheduled_start: "2026-04-12T15:00:00", priority: 3 } },
+        ],
+      }),
+    });
+
+    const result = await commandFullMode({ text: "牛奶搞定了，明天3点找张总", deviceId: "d1" });
+
+    expect(result.commands).toHaveLength(2);
+    expect(result.commands[0].action_type).toBe("complete");
+    expect(result.commands[1].action_type).toBe("create");
+  });
+
+  it("should_handle_create_record_command", async () => {
+    (chatCompletion as any).mockResolvedValue({
+      content: JSON.stringify({
+        commands: [{
+          action_type: "create_record",
+          confidence: 0.9,
+          record: { content: "今天心情很好，和朋友吃了火锅", notebook: "生活" },
+        }],
+      }),
+    });
+
+    const result = await commandFullMode({ text: "记一下今天心情很好和朋友吃了火锅", deviceId: "d1" });
+
+    expect(result.commands).toHaveLength(1);
+    expect(result.commands[0].action_type).toBe("create_record");
+    expect(result.commands[0].record?.content).toContain("心情很好");
+  });
+
+  it("should_handle_manage_folder_command", async () => {
+    (chatCompletion as any).mockResolvedValue({
+      content: JSON.stringify({
+        commands: [{
+          action_type: "manage_folder",
+          confidence: 0.9,
+          folder: { action: "create", name: "旅行" },
+        }],
+      }),
+    });
+
+    const result = await commandFullMode({ text: "创建一个旅行文件夹", deviceId: "d1" });
+
+    expect(result.commands).toHaveLength(1);
+    expect(result.commands[0].action_type).toBe("manage_folder");
+    expect(result.commands[0].folder?.action).toBe("create");
+  });
+
+  it("should_filter_system_notebooks_from_folders", async () => {
+    (notebookRepo.findByDevice as any).mockResolvedValue([
+      { id: "nb-1", name: "default", is_system: true, device_id: "d1", description: null, color: "#000", created_at: "2026-04-11" },
+      { id: "nb-2", name: "ai-self", is_system: true, device_id: "d1", description: null, color: "#000", created_at: "2026-04-11" },
+      { id: "nb-3", name: "工作", is_system: false, device_id: "d1", description: null, color: "#000", created_at: "2026-04-11" },
+    ]);
+
+    (chatCompletion as any).mockResolvedValue({
+      content: JSON.stringify({ commands: [] }),
+    });
+
+    await commandFullMode({ text: "test", deviceId: "d1" });
+
+    // 验证 chatCompletion 被调用时 prompt 不包含系统文件夹
+    const callArgs = (chatCompletion as any).mock.calls[0];
+    const systemPrompt = callArgs[0][0].content;
+    expect(systemPrompt).toContain("工作");
+    expect(systemPrompt).not.toContain('"default"');
+    expect(systemPrompt).not.toContain('"ai-self"');
+  });
+});

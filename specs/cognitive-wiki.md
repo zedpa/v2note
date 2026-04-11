@@ -7,7 +7,7 @@ risk: high
 dependencies: ["todo-core.md", "topic-lifecycle.md"]
 superseded_by: null
 created: 2026-04-08
-updated: 2026-04-08
+updated: 2026-04-11
 ---
 
 # 认知 Wiki — 从原子拆解到知识编译
@@ -62,7 +62,7 @@ updated: 2026-04-08
 那么 (Then)   表结构如下：
   - id: UUID PK
   - user_id: UUID FK → app_user
-  - title: TEXT NOT NULL — 页面标题（2-8 个中文字符，如"供应链管理"）
+  - title: TEXT NOT NULL — 页面标题（自然语言，如"Q2 采购策略"、"React 学习笔记"、"今年减重10kg"）
   - content: TEXT NOT NULL — markdown 格式的知识文档（AI 编写维护）
   - summary: TEXT — 一句话摘要（用于索引和搜索结果展示）
   - parent_id: UUID FK → wiki_page（NULL 表示顶层页面）
@@ -116,17 +116,20 @@ updated: 2026-04-08
 并且 (And)    用户原话中的不确定语气（"可能""觉得"）和归属（"张总说"）必须保留
 ```
 
-### 场景 1.4: Domain 分类规则
+### 场景 1.4: Domain = Wiki Page 根节点（统一模型）
 ```
-假设 (Given)  AI 创建或更新 wiki page
-当   (When)   需要赋值 domain 字段
-那么 (Then)   遵循以下规则：
-  - domain 是简短中文一级分类："工作"、"生活"、"学习"、"健康"等
-  - 可带二级路径："工作/采购"、"生活/旅行"
-  - 优先复用该用户已有 page 的 domain 值（保持一致性）
-  - 新建 page 时 AI 自行判断，不确定时设为 null
-  - parent page 和 children page 共享相同 domain
-  - 用户可通过 UI 手动修改 domain（下次编译时 AI 尊重用户选择）
+假设 (Given)  系统需要分类组织用户内容
+当   (When)   需要 domain 分类
+那么 (Then)   domain 不再是独立的 text 字段，而是 L3 wiki page 本身：
+  - 每个 L3 page 即一个 domain（如 title="工作" 的 L3 page 就是 "工作" domain）
+  - domain 不硬编码，完全从用户内容自然涌现
+  - 只有一条关于人生感悟的日记 → domain 只有一个 "思考"，下面就挂这一条内容
+  - 日记涉及工作讨论 → domain "工作" 自动创建
+  - wiki_page.domain 字段保留但语义改变：值 = 该 page 所属 L3 祖先的 title
+  - 用户可手动创建空 L3 page（= 手动创建 domain）
+  - AI 创建新 domain 时需自然命名（不硬编码"工作""生活"等固定集合）
+并且 (And)    parent page 和 children page 共享相同 domain（= L3 祖先 title）
+并且 (And)    用户可通过 UI 手动修改 page title（下次编译时 AI 尊重用户选择）
 ```
 
 ### 场景 1.3: Wiki Page 与 Goal 的双重表示
@@ -171,16 +174,52 @@ updated: 2026-04-08
 并且 (And)    content_hash 用于每日编译时跳过内容未变的 Record（编辑后重新编译场景）
 ```
 
-### 场景 2.2: 待办抽取（从 digest 中保留的部分）
+### 场景 2.2: 待办抽取（仅 action 级别）
 ```
-假设 (Given)  ingest 阶段 AI 识别到 intend 类型的内容
-当   (When)   提取出 action/goal/project 粒度的意图
-那么 (Then)   直接创建 todo/goal record：
-  - todo.source_record_id = record.id（取代原来的 todo.strike_id）
-  - todo.wiki_page_id = NULL（等待每日编译后关联）
+假设 (Given)  ingest 阶段 AI 识别到用户表达了可执行的意图
+当   (When)   提取出 action 粒度的待办（一次可完成的事）
+那么 (Then)   直接创建 todo record（level=0）：
+  - todo.source_record_id = record.id
+  - todo.wiki_page_id = NULL（等待编译后关联）
   - 其余字段（title, scheduled_start, deadline, priority）不变
-并且 (And)    granularity 判断逻辑不变：action → todo, goal/project → goal
+并且 (And)    **禁止在 digest 阶段提取 goal/project**
+  - goal 的判断需要更多上下文（多条日记积累后才能识别长期目标）
+  - goal 统一由 wiki compile 阶段的 goal_sync 创建（场景 3.2）
+  - 判断标准：不是一次能做完的事 → goal（如"通过四级考试""今年减重10kg"）
+  - 简单一步可做完的事 → action/todo（如"明天下午3点开会""买牛奶"）
 并且 (And)    如果可以匹配到已有 wiki page（通过 embedding 相似度），提前填充 wiki_page_id
+```
+
+### 场景 2.4: @路由语法解析
+```
+假设 (Given)  用户在日记中写了 @domain/subdomain 格式的文本
+当   (When)   ingest 阶段解析 Record 文本
+那么 (Then)   提取 target_path 信息存入 record.metadata.target_path：
+  - "@工作/采购" → target_path = "工作/采购"
+  - "@思考" → target_path = "思考"
+  - 多个 @ 引用 → 只取第一个（一条日记归属一个主 page）
+并且 (And)    如果 target_path 对应的 page 不存在 → 自动创建：
+  - "工作" L3 page 不存在 → 创建空 L3 page（created_by='user'）
+  - "工作" 存在但 "采购" L2 不存在 → 在"工作"下创建空 L2 page
+并且 (And)    该 Record 在编译时直接路由到目标 page，跳过 embedding 匹配
+并且 (And)    @语法是可选的，不用 @ 的日记走正常 AI 分类路由
+```
+
+### 场景 2.5: 异步轻量分类（Record 创建时）
+```
+假设 (Given)  用户录入一条日记（语音/文字），Record 已入库
+当   (When)   Record 没有 @路由指定
+那么 (Then)   异步触发一次轻量 AI 调用（不阻塞录音按钮，用户可继续录音）：
+  1. 输入：Record 文本 + 当前所有 L3 page 的 title 列表
+  2. AI 返回：{ domain_title: string, page_title?: string }
+     - domain_title: 该日记应归属的 L3 page title（已有的或建议新建的）
+     - page_title: 如果内容更具体，建议归属的 L2 page title（可选）
+  3. 将分类结果存入 record.metadata.classified_path
+  4. 如果匹配到已有 page → 立即建立 wiki_page_record 关联（前端可展示归属）
+  5. 如果需要新建 page → 等编译阶段确认后创建
+并且 (And)    轻量调用 token 预算：输入 < 500 tokens，输出 < 100 tokens
+并且 (And)    调用失败不影响 Record 入库（分类信息非关键路径）
+并且 (And)    编译阶段可覆盖轻量分类的结果（编译有更多上下文）
 ```
 
 ### 场景 2.3: 外部素材降权
@@ -198,17 +237,28 @@ updated: 2026-04-08
 
 ## 3. 每日编译（替换 Digest Tier1 的 Strike 拆解 + Tier2 batch-analyze + Emergence）
 
-### 场景 3.1: 每日编译触发
+### 场景 3.1: 编译触发（双模式）
 ```
-假设 (Given)  系统定时任务运行（每日 3AM）或手动触发
-当   (When)   触发 wiki 编译
-那么 (Then)   对每个用户执行两阶段检索 + 一次编译：
+假设 (Given)  wiki page 下挂载了日记内容
+当   (When)   触发编译
+那么 (Then)   编译有两种触发模式：
+
+  模式 1 — Token 阈值触发（实时）：
+  - 当某个 page 下所有未编译日记的总 token 数 ≥ 5000 时自动触发
+  - 只编译该 page 下的内容（不需要全用户编译）
+  - 低于 5000 token 的 page 不编译，前端直接展示日记原文列表
+
+  模式 2 — 每日定时触发（3AM 批量）：
+  - 检查所有用户的所有 page，执行满足阈值但未触发的编译
+  - 同时执行跨 page 的结构优化（拆分/合并建议）
+
+  编译流程（两种模式共用）：
 
   阶段 A — 路由（轻量，不调 AI）：
   1. 查询所有 pending_compile 的 Record（自上次编译以来）
-  2. 加载所有 active wiki page 的 title + summary（不加载 content）
-  3. 对每条新 Record 的 embedding 与所有 page embedding 做相似度匹配
-  4. 选出相关 page（相似度 > 0.5 或 AI 路由判断命中），最多 10 个
+  2. 有 @路由或 classified_path 的 Record → 直接路由到目标 page
+  3. 无分类的 Record → embedding 与 page embedding 做相似度匹配
+  4. 选出相关 page（相似度 > 0.5），最多 10 个
   5. 仅对命中的 page 加载完整 content
 
   阶段 B — 编译（1 次 AI 调用）：
@@ -281,28 +331,43 @@ updated: 2026-04-08
   - 一个 page 覆盖了多个明显不同的子主题 → split_page
 ```
 
-### 场景 3.3: 自顶向下拆分（L3 → L2 → L1）
+### 场景 3.3: 编译即压缩 + 分形拆分
 ```
-假设 (Given)  一个 L3 wiki page "工作" 已经积累了大量内容
-当   (When)   AI 判断该页覆盖了多个明显不同的子主题
-那么 (Then)   执行拆分：
-  1. 原 page 保留为 parent，content 缩减为高层摘要 + 子页索引
-  2. 创建 N 个子 page（level = parent.level - 1），各自包含对应的详细内容
-  3. 子 page 的 parent_id 指向原 page
-  4. 子 page 继承原 page 的相关 wiki_page_record 关联
-  5. 原 page 的 level 不变（仍为 L3）
-并且 (And)    拆分方向始终是从抽象到具体（L3→L2→L1）
-并且 (And)    拆分不是硬编码的行数阈值，而是 AI 判断"是否覆盖了多个不同子主题"
-并且 (And)    最低拆分到 L1（不再往下拆，L1 是叶子节点）
+假设 (Given)  一个 wiki page 下挂载了多条日记
+当   (When)   该 page 下日记总 token ≥ 5000，触发编译
+那么 (Then)   编译 = 对子级内容的向上压缩：
+  1. 编译输入 = page.content(旧) + 新增/修改的素材（日记、AI 交互摘要、todo 状态变化等）
+  2. AI 基于旧 content 和新素材，生成更新后的结构化总结
+  3. 将总结写入 page 自身的 content 字段（不创建新子页）
+  4. 日记原文仍通过 wiki_page_record 关联保留（可展开查看）
+  5. page.content = AI 对所有子级素材的综合总结（增量更新，非全量重写）
 
-示例：
-  初期：L3 "生活与工作"（一页纸承载所有）
-  积累后拆分 →
-    L3 "工作"（摘要 + 索引）
-      L2 "供应链管理"（详细内容）
-      L2 "产品推广"（详细内容）
-    L3 "生活"（摘要 + 索引）
-      L2 "健康"（详细内容）
+示例（阶段1 → 阶段2）：
+  阶段1（日记少，未编译）：
+    思考/ (L3, content="")
+    ├── 日记1, 日记2, 日记3   ← 前端直接展示原文
+
+  阶段2（日记多了，≥ 5000 token，触发编译）：
+    思考/ (L3, content="[对所有日记的结构化总结]")
+    ├── 日记1, 日记2, 日记3   ← 仍关联，可展开
+
+当   (When)   编译后 page.content 本身也臃肿了（AI 判断覆盖多个不同子主题）
+那么 (Then)   自发拆分为 N 个 L2 子页：
+  1. 原 page 的 content 缩减为对子页的总结 + 索引
+  2. 创建 N 个子 page（level = parent.level - 1）
+  3. 每个子页 content = 对归属该子主题的日记的编译总结
+  4. 日记的 wiki_page_record 关联从 parent 迁移到对应子页
+  5. parent.content 只存"这些子页讲了什么"的高层摘要
+
+  阶段3（编译内容臃肿，拆分）：
+    思考/ (L3, content="[对 L2 子页的总结 + 索引]")
+    ├── 人生感悟 (L2, content="[编译总结]") + 日记1, 日记2
+    └── 哲学阅读 (L2, content="[编译总结]") + 日记3, 日记4
+
+并且 (And)    核心原则：编译始终是对子级的总结，L3 总结 L2，L2 总结其下的日记
+并且 (And)    拆分方向始终是从抽象到具体（L3→L2→L1）
+并且 (And)    最低拆分到 L1（不再往下拆，L1 是叶子节点）
+并且 (And)    低于 5000 token 的 page 不编译，前端直接展示日记原文列表
 ```
 
 ### 场景 3.4: 页面合并
@@ -392,11 +457,12 @@ updated: 2026-04-08
 ```
 假设 (Given)  用户总共只有 1-5 条 Record
 当   (When)   首次编译
-那么 (Then)   创建 1-2 个宽泛的 L3 page（如"工作与生活"）
-并且 (And)    不强制拆分，等内容自然积累
-并且 (And)    冷启动引导产出的内容（5 问回答）直接编译到初始 page
-当   (When)   后续编译发现内容已跨 3+ 个明显不同主题
-那么 (Then)   触发首次拆分
+那么 (Then)   根据内容自然创建 L3 page：
+  - 只有一条关于工作的日记 → 创建 "工作" L3 page，日记直接挂在下面
+  - 有工作和生活两类 → 创建 "工作" + "生活" 两个 L3 page
+  - 不强制合并为"工作与生活"这种笼统 page
+并且 (And)    低于 5000 token 的 page 不编译，直接展示原文
+并且 (And)    冷启动引导产出的内容（5 问回答）直接作为日记挂到对应 page
 ```
 
 ---
@@ -1080,6 +1146,30 @@ GET /api/v1/records?cluster_id=xxx
 
 降低人的手动录入
 
+### 核心架构演进（Batch 4 后）
+
+```
+一切皆 Page：
+  Page（容器）
+  ├── domain page (L3) — 自然涌现，不硬编码
+  │   ├── topic page (L2) — 编译后拆分产生
+  │   └── goal page (L2, page_type='goal') — 长期目标
+  │       ├── todo（具体步骤）
+  │       ├── 日记（相关记录）
+  │       └── 素材（参考资料）
+  └── 收件箱 — 未分类的 record
+
+  编译 = 压缩：
+  token < 5000 → 不编译，展示原文
+  token ≥ 5000 → 触发压缩编译，结果写入 page.content
+  page.content 臃肿 → 拆分为子页，parent 只存索引摘要
+
+  目标提取 = 单链路：
+  digest 只提取 action（简单待办）
+  goal 统一由 wiki compile 的 goal_sync 创建
+  判断标准：不是一次能做完的事 → goal
+```
+
 ---
 
 ## Batch 3: Wiki Page 统一组织层（Strike 全面退役 + Domain 退场）
@@ -1157,3 +1247,314 @@ GET /api/v1/records?cluster_id=xxx
   - 侧边栏已不读取 domain 数据
   - digest prompt 已不含 domain 概念（Phase 11 完成）
   - listUserDomains / batchUpdateDomain 保留（folder-tools 仍活跃使用 record.domain）
+
+---
+
+## Batch 4: 统一 Page 模型（Domain 即 Page + 编译即压缩 + Goal Page）
+
+> 目标：一切皆 Page。Domain、主题、知识、目标统一为 Page 树。日记 + Todo 是原子单位。
+> 核心改变：
+> - Domain 不再是 text 字段，而是 L3 wiki page 本身（自然涌现，不硬编码）
+> - 编译 = 压缩（token < 5000 不编译，直接展示原文；≥ 5000 触发压缩编译）
+> - Goal = 特殊类型的 Page（多步骤长周期意图升级为 Goal Page）
+> - 目标提取统一为 wiki compile 一条链路（废弃 digest 阶段的 goal/project 提取）
+> - @domain/path 语法让用户手动路由内容
+> - AI 结构建议通过通知征求用户授权
+
+### Phase 14: 统一 Page 模型 — 核心架构（P0）
+
+#### 14.1 数据模型变更
+
+```
+假设 (Given)  wiki_page 表已存在
+当   (When)   执行 Phase 14 迁移
+那么 (Then)   新增/修改以下字段：
+  - wiki_page 新增 page_type TEXT DEFAULT 'topic' CHECK IN ('topic', 'goal')
+    - 'topic': 普通主题 page（日记聚合 + 编译总结）
+    - 'goal': 目标 page（多步骤长周期目标，下面挂 todo + 日记 + 素材）
+  - wiki_page 新增 token_count INTEGER DEFAULT 0
+    - 记录该 page 下所有未编译日记的总 token 数（用于触发编译阈值判断）
+    - 更新时机：Record 通过 wiki_page_record 挂载到 page 时，累加该 record 的 token 数
+    - 编译完成后重置为 0（已编译内容进入 page.content，新 record 重新累加）
+  - wiki_page 新增 created_by TEXT DEFAULT 'ai' CHECK IN ('ai', 'user')
+    - 标记 page 创建者，用于分级授权（14.7）
+  - record 表新增 source_type 值：'ai_diary'（AI 交互摘要，与 'voice'/'text' 同级）
+  - record.metadata 新增 target_path 字段（存 @路由解析结果）
+  - record.metadata 新增 classified_path 字段（存轻量分类结果）
+  - 新增 wiki_page_link 表（跨页链接）：
+    { source_page_id, target_page_id, link_type, context_text, created_at }
+    - link_type CHECK IN ('reference', 'related', 'contradicts')
+    - UNIQUE(source_page_id, target_page_id, link_type) — 同方向同类型不重复
+    - source/target FK ON DELETE CASCADE — page 归档/删除时链接自动清理
+并且 (And)    todo 表关联变更（软约束，应用层校验，不加 DB CHECK）：
+  - goal（level>=1）的 wiki_page_id 应指向 page_type='goal' 的 page
+  - action（level=0）的 parent_id 指向 goal todo，间接关联到 goal page
+  - 现有数据中 wiki_page_id 指向 topic page 的记录保留，迁移时不强制修正（见 15.1）
+```
+
+#### 14.2 废弃 Digest 阶段的 Goal 提取
+
+```
+假设 (Given)  当前 digest-prompt.ts 提取 action/goal/project 三种粒度
+当   (When)   实施 Phase 14
+那么 (Then)   digest prompt 只保留 action 粒度：
+  - 移除 granularity: "goal" | "project" 的提取逻辑
+  - todo-projector.ts 中创建 goal 的分支移除
+  - Goal 统一由 wiki compile 的 goal_sync 创建
+并且 (And)    Goal 判断标准（在 wiki compile prompt 中明确）：
+  - 不是一次能做完的事 → goal（如"通过四级考试""今年减重10kg""完成毕业论文"）
+  - 一次能做完的事 → action（如"明天下午3点开会""买牛奶""给张总打电话"）
+  - 区分关键：是否需要多步骤、长周期、持续投入
+并且 (And)    Goal 创建时自动创建对应的 goal page（page_type='goal'）
+```
+
+#### 14.3 @路由语法实现
+
+```
+假设 (Given)  用户在日记中使用 @domain/subdomain 语法
+当   (When)   Record 入库后进入 ingest 流程
+那么 (Then)   正则解析 @路由（Step 1 确定性预抽取中执行）：
+  - 正则：/@([\u4e00-\u9fa5a-zA-Z0-9_/]+)/g
+  - 提取第一个匹配作为 target_path
+  - 存入 record.metadata.target_path
+并且 (And)    自动创建不存在的 page：
+  - "@工作" → 检查 L3 "工作" 是否存在，不存在则创建空 L3 page（created_by='user'）
+  - "@工作/采购" → 确保 L3 "工作" 和 L2 "采购" 都存在
+  - 自动创建的 page 标记 created_by='user'（因为是用户主动指定的路径）
+并且 (And)    立即建立 wiki_page_record 关联（不等编译）
+并且 (And)    编译时该 Record 跳过 embedding 路由，直接归属到目标 page
+```
+
+#### 14.4 异步轻量分类（Title 立即生成）
+
+```
+假设 (Given)  用户录入日记，Record 入库，没有 @路由
+当   (When)   Record 创建完成
+那么 (Then)   异步触发轻量 AI 分类（不阻塞用户继续录音）：
+  
+  **这是"编译分两部分"的第一部分 — Title/路由（立即）**：
+  输入：Record 文本（截断到 200 字）+ 所有现有 page 的 title 列表（含层级）
+  输出：{ domain_title: string, page_title?: string }
+     - domain_title: 归属的 L3 page title（已有的或建议新建的）
+     - page_title: 更具体的 L2 归属（可选）
+  
+  处理逻辑：
+  1. 如果匹配到已有 L3 page → 立即建立 wiki_page_record 关联
+  2. 如果匹配到已有 L2 page → 直接关联到 L2
+  3. 如果 domain_title 是新的 → 创建新 L3 page（created_by='ai'），然后关联
+  4. 用户体感：录完音几秒后，侧边栏 page 树中该日记就出现在正确位置
+  
+  **第二部分 — Content 编译（异步 + 按规则触发）**：
+  - 见场景 14.5（token ≥ 5000 时触发）
+  - 见场景 14.9（每日 3AM 全量维护编译）
+  
+并且 (And)    token 预算：输入 < 500 tokens，输出 < 100 tokens（用 haiku 级模型）
+并且 (And)    调用失败不影响 Record 入库（分类非关键路径，降级为等编译时分类）
+并且 (And)    已有 @路由的 Record 跳过轻量分类
+```
+
+#### 14.5 编译阈值触发
+
+```
+假设 (Given)  某个 page 下的日记在持续增加
+当   (When)   新日记挂载到 page 后，更新该 page 的 token_count
+那么 (Then)   检查 token_count 是否 ≥ 5000：
+  - 未达阈值 → 不编译，前端展示日记原文列表
+  - 达到阈值 → 标记该 page 为"待编译"，触发编译流程
+并且 (And)    编译完成后 token_count 重置为 0（已编译内容进入 page.content）
+并且 (And)    后续新日记继续累加 token_count，再次达到阈值时触发增量编译
+并且 (And)    每日 3AM 定时任务也会扫描并编译满足阈值的 page
+```
+
+#### 14.9 每日全量编译维护（3AM）
+
+```
+假设 (Given)  每日 3AM 定时任务触发
+当   (When)   执行全量编译维护
+那么 (Then)   对每个用户执行以下操作（这是 content 编译的全量维护时段）：
+
+  1. **日记编译**：扫描所有 page，token_count ≥ 5000 且未编译的 → 触发编译
+  2. **Todo 状态同步**：检查 goal page 关联的 todo 完成状态变化 → 更新 page content
+  3. **AI 交互素材分发**：将用户与 AI 的有价值对话摘要，作为素材挂载到对应主题的 page 下（同日记一样参与编译）
+  4. **跨 page 结构优化**：AI 评估整体 page 树，生成拆分/合并建议
+  5. **Link 发现**：检测跨 page 的语义关联，插入链接指针（见 14.11）
+
+并且 (And)    这是唯一的全量编译时段，白天的编译都是单 page 级别的
+并且 (And)    每日编译是 content 维护的核心，保证所有 page 的 content 处于最新状态
+```
+
+#### 14.10 AI 交互素材（AI Diary Record）
+
+```
+假设 (Given)  用户与 AI 参谋进行了有认知价值的对话（非闲聊）
+当   (When)   每日 3AM 编译维护时
+那么 (Then)   将有价值的对话摘要**作为素材 record**挂载到对应主题 page 下：
+  - AI 交互摘要和用户日记是**同级素材**，都是 page 编译的输入
+  - 内容来源：
+    - 参谋对话中的 Q&A（AI 使用了工具或产生了新认知的对话）
+    - AI 的编译变更摘要（今天整理了什么、发现了什么矛盾）
+    - AI 对用户行为模式的观察（完成率、关注方向变化等）
+  - 素材按主题归属到对应 page，编译时和日记一起压缩进 page.content
+  - 如果对话涉及多个主题 → 拆分为多条素材，分别挂载
+并且 (And)    record 表新增 source_type = 'ai_diary'，区分 AI 生成的素材
+并且 (And)    AI 素材参与正常编译流程（page.content(旧) + 新素材 → page.content(新)）
+并且 (And)    参谋对话检索上下文时，AI 素材和日记素材同等权重
+并且 (And)    前端展示时可按 source_type 过滤，区分用户日记和 AI 观察
+```
+
+#### 14.11 Page 间链接（Cross-Link）
+
+```
+假设 (Given)  用户的知识分布在多个 page 中
+当   (When)   AI 编译时发现跨 page 的语义关联
+那么 (Then)   在 content 中插入跨页链接：
+  - 格式：[→ page:UUID "页面标题"] — 指向相关 page
+  - 产生条件：
+    a. 编译时 AI 看到全量 page 索引，发现"这条日记提到了另一个 page 的内容"
+    b. 用户日记中 @引用了多个 page → 这些 page 之间形成关联
+    c. 同一条日记被分类到 A page，但内容也涉及 B page 的主题
+  - 链接方向：双向（A 提到 B 时，B 的下次编译也会标注与 A 的关联）
+
+并且 (And)    链接存储：wiki_page_link 表
+  { source_page_id, target_page_id, link_type('reference'|'related'|'contradicts'), context_text, created_at }
+并且 (And)    link_type 分类：
+  - 'reference'：A 内容直接引用了 B 的内容（如"与采购策略相关"）
+  - 'related'：A 和 B 讨论了相关主题（AI 判断）
+  - 'contradicts'：A 和 B 存在矛盾观点（AI 发现的认知矛盾）
+并且 (And)    链接是编译的自然产物，不需要额外 AI 调用
+并且 (And)    前端：page 内容中的链接可点击跳转
+并且 (And)    后期认知地图中，链接构成节点间的边
+```
+
+#### 14.12 去除 Embedding 依赖（核心流程）
+
+```
+假设 (Given)  新架构中树形结构 + 关键字搜索已覆盖大部分检索场景
+当   (When)   实施 Phase 14
+那么 (Then)   核心流程不再依赖 embedding：
+  - Record 入库不再生成 embedding（省掉 embedding API 调用）
+  - 日记路由：@语法 + 轻量 AI 分类（替代 embedding 匹配）
+  - 搜索：关键字搜索 page title + content（PostgreSQL 全文索引）
+  - Chat 参谋上下文：按 page 树检索 + 关键字匹配
+  - 相关 page 发现：通过 wiki_page_link 表（编译时 AI 建立的链接）
+并且 (And)    Embedding 降级为可选增强（Batch 5）：
+  - 语义搜索（关键字搜不到但语义相关的内容）
+  - 模糊匹配（用户表述和 page 用词不同但含义相近）
+  - 当前保留 wiki_page.embedding 字段和 record.embedding 字段，但不强制生成
+并且 (And)    降低每条 record 的入库成本（少一次 API 调用 + 向量存储）
+```
+
+#### 14.6 Goal Page 概念
+
+```
+假设 (Given)  AI 在编译时发现用户表达了一个长期目标
+当   (When)   通过 goal_sync 创建 goal
+那么 (Then)   同时创建 goal page（page_type='goal'）：
+  - page.title = 目标标题（如"通过四级考试"）
+  - page 下可挂载：
+    - todo（具体步骤）：通过 todo.parent_id → goal todo → goal page
+    - 日记（相关记录）：通过 wiki_page_record
+    - 素材（参考资料）：source_type='material' 的 record
+  - goal page 的 content 编译逻辑同普通 page（对子级内容的总结）
+  - goal page 额外包含目标进度信息（完成的 todo 数 / 总 todo 数）
+并且 (And)    用户也可手动创建 goal page：
+  - 前端提供"新建目标"入口
+  - 创建空 goal page + 对应的 goal todo（level=1）
+  - 用户在 page 下添加具体 todo 步骤
+并且 (And)    goal page 在侧边栏中用特殊图标标识（⭐ 或进度条）
+并且 (And)    goal page 完成（所有 todo 完成或用户手动标记）→ page 归入 harvest 区
+```
+
+#### 14.7 AI 结构管理 — 分级授权机制
+
+```
+假设 (Given)  AI 在编译时发现需要调整 page 结构（拆分/合并/重命名/删除）
+当   (When)   目标 page 的 created_by = 'ai'
+那么 (Then)   AI 可自主执行所有结构操作，无需用户授权：
+  - 拆分：AI 创建的 page 内容臃肿 → 直接拆分
+  - 合并：两个 AI 创建的 page 高度重叠 → 直接合并
+  - 重命名：AI 认为 title 不准确 → 直接改
+  - 删除：AI 创建的空 page 长期无内容 → 直接归档
+  - 内容追加/修改：正常编译流程，自动执行
+
+当   (When)   目标 page 的 created_by = 'user'
+那么 (Then)   任何结构修改都必须通知用户获取授权：
+  - 生成预编译方案（含结构调整）+ 保守方案（不调整）
+  - 将预编译方案作为通知发送给用户
+  - 通知内容：简要说明建议（如"'Q2采购' 内容涵盖了采购和供应商管理，建议拆分"）
+  - 通知渠道：app 内通知 / 参谋聊天中询问
+  - 用户确认 → 执行预编译方案
+  - 用户拒绝 → 执行保守方案（只追加内容，不改结构）
+  - 注意：向用户创建的 page 下**追加日记内容**不需要授权（这是正常编译）
+
+并且 (And)    预编译方案存入 wiki_compile_suggestion 表：
+  { id, user_id, suggestion_type, payload(JSON), status('pending'|'accepted'|'rejected'), created_at }
+并且 (And)    用户也可在参谋聊天中主动授权 AI 修改 page 结构（"帮我整理一下工作 page"）
+```
+
+#### 14.8 Title 自然化规则
+
+```
+假设 (Given)  AI 需要为新 page 或 goal 生成 title
+当   (When)   创建 wiki page 或 goal
+那么 (Then)   title 遵循以下规则：
+  - 自然语言命名，如同笔记本目录中的标题
+  - 好的例子："Q2 采购策略"、"React 学习笔记"、"家庭装修计划"、"通过四级考试"、"供应链管理"
+  - 坏的例子："工作管理"（太泛，像 domain 名不像 page 名）、"明天要和张总确认报价"（太长/临时）、"工生"（强行压缩）
+  - L3 domain page title 可以简短："工作"、"思考"、"学习"（这是分类，允许宽泛）
+  - L2/L1 topic page title 应具体自然："供应链优化"、"React Hook 实践"
+  - goal page title = 目标本身："通过四级考试"、"今年减重10kg"
+  - 移除旧的"2-8个中文字符"硬限制
+```
+
+### Phase 15: 现有数据迁移 + 前端适配（P1）
+
+#### 15.1 现有 wiki page 迁移
+
+```
+假设 (Given)  系统中已有 153 个 wiki page（Batch 1-3 产出）
+当   (When)   执行 Phase 15 迁移
+那么 (Then)   保留现有数据，补充新字段：
+  1. 所有现有 page 设 page_type = 'topic'
+  2. 有关联 goal（wiki_page_id）的 page → 评估是否应转为 'goal' 类型
+  3. 补充 token_count（统计关联的未编译 record 的 token 总数）
+  4. domain 字段值与 L3 page title 对齐（确保一致性）
+  5. 不重新编译已有 page，保留现有 content
+  6. 所有现有 page 设 created_by = 'ai'（Batch 1-3 均为 AI 编译产出）
+  7. 现有 todo.wiki_page_id 指向 topic page 的记录保留不动（应用层软约束，不加 DB CHECK）
+```
+
+#### 15.2 前端 Page 展示 — 文件夹模式
+
+```
+假设 (Given)  Page 是内容的容器
+当   (When)   用户与 page 交互
+那么 (Then)   page 表现为文件夹，不展示 page content 详情页：
+  - 点击 page title → 展开/折叠，显示该 page 下的子 page 和日记列表
+  - L3 page 点击 → 显示 L2 子页列表 + 直接挂载的日记
+  - L2 page 点击 → 显示其下的日记列表
+  - goal page 点击 → 显示 todo 列表 + 相关日记
+  - 日记在 page 下按时间倒序排列
+并且 (And)    page content（编译后的总结）当前不需要前端展示
+  - content 是 AI 的内部知识库，用于搜索和参谋上下文
+  - 后期通过认知地图等专门视图展示编译内容
+并且 (And)    侧边栏 page 树结构：
+  - 收件箱（未分类的 record）在顶部
+  - L3 page = 一级文件夹
+  - L2 page = 二级文件夹
+  - goal page 用 ⭐ 图标标识
+  - 文件夹旁显示未读日记数量角标
+```
+
+#### 15.3 wiki_compile_suggestion 表 + 通知 UI
+
+```
+假设 (Given)  AI 生成了结构建议
+当   (When)   用户打开 app
+那么 (Then)   侧边栏显示未处理的建议数量角标
+并且 (And)    点击进入建议列表：
+  - 每条建议：类型图标 + 简述 + 接受/拒绝按钮
+  - 接受 → 调用 POST /api/v1/wiki/suggestion/:id/accept → 执行预编译方案
+  - 拒绝 → 调用 POST /api/v1/wiki/suggestion/:id/reject → 执行保守方案
+并且 (And)    参谋聊天中也可展示建议并获取确认（自然对话方式）
+```

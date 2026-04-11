@@ -364,6 +364,26 @@ export default function Page() {
             });
             break;
           }
+
+          // 兜底：CommandSheet 已打开但没有匹配的 commands
+          if (commandSheetOpenRef.current) {
+            const error = (payload as any).error;
+            if (error) {
+              // 传递错误给 CommandSheet
+              setCommandSheetCommands([{ action_type: "error" as any, error_message: error, confidence: 0 } as any]);
+            } else {
+              // 无 commands 也无 error → 空结果
+              setCommandSheetCommands([{ action_type: "empty" as any, confidence: 0 } as any]);
+            }
+          } else {
+            // 静默模式或 CommandSheet 未打开 → 通知用户
+            const error = (payload as any).error;
+            if (error) {
+              fabNotify.info(error);
+            } else {
+              fabNotify.info("未识别到指令");
+            }
+          }
           break;
         }
 

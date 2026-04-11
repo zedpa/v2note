@@ -222,12 +222,7 @@ export function FAB({
 
           if (msg.payload.recordId) {
             emit("recording:uploaded");
-            setProcessing(true);
-            setWittyText(
-              WITTY_PROCESSING[
-                Math.floor(Math.random() * WITTY_PROCESSING.length)
-              ],
-            );
+            fabNotify.success("已记录");
             pipelineIdRef.current = startAiPipeline();
           }
           break;
@@ -252,9 +247,6 @@ export function FAB({
           break;
         case "process.result":
           emit("recording:processed");
-          fabNotify.success("处理完成");
-          setProcessing(false);
-          setWittyText("");
           // 标记本地缓存为已完成（不自动删除，由用户决定）
           if (cacheIdRef.current) {
             markCompleted(cacheIdRef.current).catch(() => {});
@@ -281,10 +273,8 @@ export function FAB({
           break;
         }
         case "error":
-          setProcessing((was) => {
-            if (was) fabNotify.error("处理失败");
-            return false;
-          });
+          if (pipelineIdRef.current) fabNotify.error("整理失败");
+          setProcessing(false);
           setWittyText("");
           if (pipelineIdRef.current) { endAiPipeline(pipelineIdRef.current); pipelineIdRef.current = null; }
           break;
@@ -296,16 +286,6 @@ export function FAB({
 
     return () => unsub();
   }, [onCommandDetected, onOpenCommandChat, stopTimers]);
-
-  // Safety timeout: auto-reset processing capsule after 30s
-  useEffect(() => {
-    if (!processing) return;
-    const timer = setTimeout(() => {
-      setProcessing(false);
-      setWittyText("");
-    }, 30000);
-    return () => clearTimeout(timer);
-  }, [processing]);
 
   const asrModeRef = useRef<"realtime" | "upload">("realtime");
 
@@ -551,6 +531,7 @@ export function FAB({
         if (asCommand) {
           commandReleaseRef.current = true;
           client.send({ type: "asr.stop", payload: { deviceId, saveAudio: false, forceCommand: true } });
+          fabNotify.info("指令处理中...");
         } else {
           commandReleaseRef.current = false;
           client.send({ type: "asr.stop", payload: { deviceId } });

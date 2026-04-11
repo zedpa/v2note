@@ -17,6 +17,8 @@ export interface WikiPage {
   status: "active" | "archived" | "merged";
   merged_into: string | null;
   domain: string | null;
+  page_type: "topic" | "goal";
+  token_count: number;
   created_by: "ai" | "user";
   embedding: any | null;
   metadata: Record<string, any>;
@@ -34,17 +36,19 @@ export async function create(fields: {
   parent_id?: string;
   level?: number;
   domain?: string;
+  page_type?: "topic" | "goal";
+  token_count?: number;
   created_by?: "ai" | "user";
   embedding?: number[];
   metadata?: Record<string, any>;
 }): Promise<WikiPage> {
   const hasEmbedding = fields.embedding && fields.embedding.length > 0;
   const cols =
-    "user_id, title, content, summary, parent_id, level, domain, created_by, metadata" +
+    "user_id, title, content, summary, parent_id, level, domain, page_type, token_count, created_by, metadata" +
     (hasEmbedding ? ", embedding" : "");
   const placeholders =
-    "$1, $2, $3, $4, $5, $6, $7, $8, $9" +
-    (hasEmbedding ? ", $10::vector" : "");
+    "$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11" +
+    (hasEmbedding ? ", $12::vector" : "");
   const params: any[] = [
     fields.user_id,
     fields.title,
@@ -53,6 +57,8 @@ export async function create(fields: {
     fields.parent_id ?? null,
     fields.level ?? 3,
     fields.domain ?? null,
+    fields.page_type ?? "topic",
+    fields.token_count ?? 0,
     fields.created_by ?? "ai",
     JSON.stringify(fields.metadata ?? {}),
   ];
@@ -100,6 +106,8 @@ export async function update(
     summary?: string;
     level?: number;
     domain?: string;
+    page_type?: "topic" | "goal";
+    token_count?: number;
     embedding?: number[];
     metadata?: Record<string, any>;
     compiled_at?: string;
@@ -127,6 +135,14 @@ export async function update(
   if (fields.domain !== undefined) {
     sets.push(`domain = $${i++}`);
     params.push(fields.domain);
+  }
+  if (fields.page_type !== undefined) {
+    sets.push(`page_type = $${i++}`);
+    params.push(fields.page_type);
+  }
+  if (fields.token_count !== undefined) {
+    sets.push(`token_count = $${i++}`);
+    params.push(fields.token_count);
   }
   if (fields.embedding !== undefined) {
     sets.push(`embedding = $${i++}::vector`);

@@ -159,4 +159,39 @@ describe("wiki-compile-prompt", () => {
     expect(result.system.length).toBeGreaterThan(100);
     expect(result.user.length).toBeGreaterThan(10);
   });
+
+  // ── Phase 14.8: Title 自然化规则 ──
+
+  describe("Title 自然化 (14.8)", () => {
+    it("should_not_contain_character_count_limit_when_prompt_built", () => {
+      const { system } = buildCompilePrompt(baseInput);
+      // 旧限制："2-8个中文字符" 应被移除
+      expect(system).not.toContain("2-8个中文字符");
+      expect(system).not.toContain("2-8");
+    });
+
+    it("should_contain_natural_naming_rules_when_prompt_built", () => {
+      const { system } = buildCompilePrompt(baseInput);
+      expect(system).toContain("自然语言命名");
+    });
+
+    it("should_contain_level_specific_naming_guidance_when_prompt_built", () => {
+      const { system } = buildCompilePrompt(baseInput);
+      // L3 允许简短
+      expect(system).toMatch(/L3.*简短/);
+      // L2/L1 应具体
+      expect(system).toMatch(/L2.*具体/);
+    });
+
+    it("should_contain_goal_page_naming_rule_when_prompt_built", () => {
+      const { system } = buildCompilePrompt(baseInput);
+      // goal page title = 目标本身
+      expect(system).toMatch(/goal.*目标本身/i);
+    });
+
+    it("should_not_contain_old_title_format_in_json_example_when_prompt_built", () => {
+      const { system } = buildCompilePrompt(baseInput);
+      expect(system).not.toContain("新主题名称（2-8个中文字符）");
+    });
+  });
 });

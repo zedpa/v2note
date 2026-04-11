@@ -1,0 +1,12 @@
+{
+  "name": "v2note-harmony",
+  "version": "1.0.0",
+  "description": "V2Note HarmonyOS NEXT Shell",
+  "main": "",
+  "author": "v2note",
+  "license": "MIT",
+  "dependencies": {},
+  "devDependencies": {
+    "@ohos/hvigor-ohos-plugin": "5.0.0"
+  }
+}
