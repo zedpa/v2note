@@ -2,6 +2,13 @@ import { z } from "zod";
 import { todoRepo } from "../../db/repositories/index.js";
 import type { ToolDefinition } from "../types.js";
 
+/** 裸时间字符串补上 +08:00（防御 AI 不带时区偏移） */
+function ensureTz(ts: string | undefined | null): string | null {
+  if (!ts) return null;
+  if (/[+-]\d{2}:\d{2}$/.test(ts) || /Z$/i.test(ts)) return ts;
+  return `${ts}+08:00`;
+}
+
 export const updateTodoTool: ToolDefinition = {
   name: "update_todo",
   description: `更新待办事项——修改文本、时间、优先级，或标记完成/重新打开。
@@ -12,8 +19,8 @@ export const updateTodoTool: ToolDefinition = {
     todo_id: z.string().min(1).describe("待办事项 ID"),
     text: z.string().optional().describe("可选：新的待办文本"),
     done: z.boolean().optional().describe("可选：true=标记完成，false=重新打开"),
-    scheduled_start: z.string().nullable().optional().describe("可选：开始时间（ISO字符串，null 清除）"),
-    scheduled_end: z.string().nullable().optional().describe("可选：结束时间（ISO字符串，null 清除）"),
+    scheduled_start: z.string().nullable().optional().describe("可选：开始时间（必须带时区的 ISO 字符串如 2026-04-11T07:30:00+08:00，null 清除）"),
+    scheduled_end: z.string().nullable().optional().describe("可选：结束时间（必须带时区的 ISO 字符串，null 清除）"),
     estimated_minutes: z.number().optional().describe("可选：预估时长（分钟）"),
     priority: z.number().optional().describe("可选：优先级（整数，越大越高）"),
   }),
@@ -24,8 +31,8 @@ export const updateTodoTool: ToolDefinition = {
     const updates: Record<string, any> = {};
     if (fields.text !== undefined) updates.text = fields.text;
     if (fields.done !== undefined) updates.done = fields.done;
-    if (fields.scheduled_start !== undefined) updates.scheduled_start = fields.scheduled_start ?? null;
-    if (fields.scheduled_end !== undefined) updates.scheduled_end = fields.scheduled_end ?? null;
+    if (fields.scheduled_start !== undefined) updates.scheduled_start = fields.scheduled_start === null ? null : ensureTz(fields.scheduled_start);
+    if (fields.scheduled_end !== undefined) updates.scheduled_end = fields.scheduled_end === null ? null : ensureTz(fields.scheduled_end);
     if (fields.estimated_minutes !== undefined) updates.estimated_minutes = fields.estimated_minutes;
     if (fields.priority !== undefined) updates.priority = fields.priority;
 

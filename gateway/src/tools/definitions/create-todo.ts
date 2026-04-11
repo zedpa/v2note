@@ -3,6 +3,15 @@ import { recordRepo, todoRepo } from "../../db/repositories/index.js";
 import { writeTodoEmbedding } from "../../cognitive/embed-writer.js";
 import type { ToolDefinition } from "../types.js";
 
+/** 裸时间字符串补上 +08:00（防御 AI 不带时区偏移） */
+function ensureTz(ts: string | undefined | null): string | null {
+  if (!ts) return null;
+  // 已有时区（+XX:XX, -XX:XX, Z）→ 原样
+  if (/[+-]\d{2}:\d{2}$/.test(ts) || /Z$/i.test(ts)) return ts;
+  // 裸时间 → 补 +08:00（Asia/Shanghai）
+  return `${ts}+08:00`;
+}
+
 export const createTodoTool: ToolDefinition = {
   name: "create_todo",
   description: `创建一条待办事项。
@@ -13,8 +22,8 @@ export const createTodoTool: ToolDefinition = {
   parameters: z.object({
     text: z.string().min(1).describe("待办文本（动词开头，简洁可执行）"),
     link_record_id: z.string().optional().describe("可选：关联到已有记录的ID"),
-    scheduled_start: z.string().optional().describe("可选：开始时间（ISO字符串）"),
-    scheduled_end: z.string().optional().describe("可选：结束时间（ISO字符串）"),
+    scheduled_start: z.string().optional().describe("可选：开始时间（必须带时区的 ISO 字符串，如 2026-04-11T07:30:00+08:00。使用 get_current_time 获取用户时区）"),
+    scheduled_end: z.string().optional().describe("可选：结束时间（必须带时区的 ISO 字符串）"),
     estimated_minutes: z.number().optional().describe("可选：预估时长（分钟）"),
     priority: z.number().optional().describe("可选：优先级（整数，越大越高）"),
   }),
@@ -56,10 +65,10 @@ export const createTodoTool: ToolDefinition = {
     // 异步写入 embedding
     void writeTodoEmbedding(todo.id, text, 0);
 
-    // 更新可选的日程字段
+    // 更新可选的日程字段（裸时间自动补 +08:00 防御 AI 不带时区）
     const updates: Record<string, any> = {};
-    if (schedule.scheduled_start !== undefined) updates.scheduled_start = schedule.scheduled_start || null;
-    if (schedule.scheduled_end !== undefined) updates.scheduled_end = schedule.scheduled_end || null;
+    if (schedule.scheduled_start !== undefined) updates.scheduled_start = ensureTz(schedule.scheduled_start) || null;
+    if (schedule.scheduled_end !== undefined) updates.scheduled_end = ensureTz(schedule.scheduled_end) || null;
     if (schedule.estimated_minutes !== undefined) updates.estimated_minutes = schedule.estimated_minutes;
     if (schedule.priority !== undefined) updates.priority = schedule.priority;
     if (Object.keys(updates).length > 0) {

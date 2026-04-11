@@ -5,6 +5,11 @@ const { Pool, types } = pg;
 // Return DATE (OID 1082) as plain string "YYYY-MM-DD" instead of JS Date object
 types.setTypeParser(1082, (val: string) => val);
 
+// Return TIMESTAMPTZ (OID 1184) as ISO string with Z suffix instead of JS Date object.
+// pg 返回格式如 "2026-04-11 22:00:00+08"，转为标准 ISO UTC "2026-04-11T14:00:00.000Z"。
+// 这确保 JSON.stringify 不经过 Date 对象，前端收到的始终是 UTC ISO 字符串。
+types.setTypeParser(1184, (val: string) => new Date(val).toISOString());
+
 let pool: pg.Pool | null = null;
 
 export function getPool(): pg.Pool {

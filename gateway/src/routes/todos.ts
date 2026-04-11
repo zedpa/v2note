@@ -3,6 +3,13 @@ import { readBody, sendJson, getDeviceId, getUserId } from "../lib/http-helpers.
 import { todoRepo } from "../db/repositories/index.js";
 import { onTodoComplete } from "../cognitive/todo-projector.js";
 
+/** 裸时间字符串补上 +08:00（防御无时区的 ISO 输入） */
+function ensureTz(ts: string | undefined | null): string | undefined | null {
+  if (ts === undefined || ts === null) return ts;
+  if (/[+-]\d{2}:\d{2}$/.test(ts) || /Z$/i.test(ts)) return ts;
+  return `${ts}+08:00`;
+}
+
 export function registerTodoRoutes(router: Router) {
   // List todos
   router.get("/api/v1/todos", async (req, res) => {
@@ -50,7 +57,7 @@ export function registerTodoRoutes(router: Router) {
       domain: body.domain,
       impact: body.impact,
       goal_id: body.goal_id,
-      scheduled_start: body.scheduled_start,
+      scheduled_start: ensureTz(body.scheduled_start) ?? undefined,
       estimated_minutes: body.estimated_minutes,
       parent_id: body.parent_id,
       level: body.level,
@@ -99,6 +106,10 @@ export function registerTodoRoutes(router: Router) {
       recurrence_rule?: string | null;
       recurrence_end?: string | null;
     }>(req);
+
+    // 裸时间防御
+    if (body.scheduled_start) body.scheduled_start = ensureTz(body.scheduled_start) as string;
+    if (body.scheduled_end) body.scheduled_end = ensureTz(body.scheduled_end) as string;
 
     // 计算 reminder_at
     const updateFields: Record<string, any> = { ...body };
