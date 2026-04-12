@@ -221,12 +221,10 @@ export function TextBottomSheet({
       onClose();
       try {
         const { getGatewayClient } = await import("@/features/chat/lib/gateway-client");
-        const { getDeviceId } = await import("@/shared/lib/device");
         const client = getGatewayClient();
-        const deviceId = await getDeviceId();
         client.send({
           type: "process",
-          payload: { text: trimmed, deviceId, sourceContext: "todo" },
+          payload: { text: trimmed, sourceContext: "todo" },
         });
       } catch (err: any) {
         fabNotify.error(`发送失败: ${err.message}`);

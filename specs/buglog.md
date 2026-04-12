@@ -19,6 +19,30 @@
 
 （按时间倒序，新条目添加在此处下方）
 
+### 2026-04-12 [bug] 录音按钮无法中断系统音频播放
+- **现象**：用户按住录音按钮时，后台音乐不会暂停
+- **根因**：(1) Pre-capture 阶段（120ms 后）打开麦克风但不请求音频焦点，音频焦点在 startRecording（长按确认后）才请求，存在时间窗口；(2) Android 使用 AUDIOFOCUS_GAIN_TRANSIENT，部分播放器只降低音量不暂停；(3) Android WebView getUserMedia 不会自动请求音频焦点（Chromium 已知行为）
+- **修复**：startPreCapture 中在 getUserMedia 前调用 activateAudioSession()；stopPreCapture 和 catch 中添加 deactivateAudioSession()；Android 插件改用 AUDIOFOCUS_GAIN_TRANSIENT_EXCLUSIVE
+- **回归测试**：无（涉及原生平台音频硬件，无法自动化测试）
+- **教训**：WebView 中 getUserMedia 不管音频焦点，必须用原生插件显式控制；录音场景用 EXCLUSIVE 而非 TRANSIENT
+- **已提炼**：❌ 仅此例，原生平台特定问题
+
+### [2026-04-12] [流程改进] 全面清除 deviceId 概念
+- **现象**：deviceId 是早期无用户系统时的设备标识，遗留在 JWT、Session、WS 消息、Handler、前端 API 等 250+ 处引用
+- **根因**：Migration 044 已将身份主键从 device_id 迁移到 user_id，但代码层未同步清理
+- **修复**：JWT 移除 deviceId；Session key 改 userId；WS 消息全部移除 deviceId；前端 device.ts 改为 no-op；auth 路由 deviceId 改为可选；diary/manager 参数统一用 userId
+- **回归测试**：`shared/lib/__tests__/device.test.ts`、`gateway/src/diary/manager.test.ts`
+- **教训**：身份系统迁移时应一次性清理所有层（JWT → Session → WS → Handler → Frontend），不要只改 DB 层留下代码残留
+- **已提炼**：❌ 此例特殊，无通用性
+
+### [2026-04-12] [bug] 删除日记卡片报错 relation "strike" does not exist
+- **现象**：用户删除日记时弹出「删除失败：relation "strike" does not exist」
+- **根因**：migration 064 已删除 strike 表，但 `gateway/src/db/repositories/record.ts` 的 `deleteByIds()` 仍执行 `DELETE FROM strike WHERE source_id IN (...)`
+- **修复**：全面清理 13 个文件中的 strike/bond 表引用。CRITICAL SQL（11处）全部改为 no-op 或迁移到 wiki_page。WARNING 字段（4处）删除 strike_id。LOW 测试 mock（5处）清理。
+- **回归测试**：424 个单元测试全部通过
+- **教训**：删除数据库表（DROP TABLE migration）后，必须全局搜索 `FROM/INTO/UPDATE/JOIN/DELETE FROM <table>` 并清理所有引用。仅清理触发报错的代码不够，非高频调用路径的残留 SQL 会在后续运行时爆炸。
+- **已提炼**：✅ 写入 CLAUDE.md 已知陷阱
+
 ### [2026-04-12] [流程改进] UI/UX 审查 Round 1 移动端精修
 
 - **现象**：移动端存在多项 WCAG/HIG 不达标问题（对比度、触控目标、ARIA 语义），首屏加载 51 个组件无懒加载，FAB 与弹窗层级冲突
@@ -253,3 +277,11 @@
 - **回归测试**：`gateway/src/handlers/command-full-mode.test.ts`（13 个）+ `gateway/src/handlers/command-full-prompt.test.ts`（9 个）+ `features/todos/components/command-sheet.test.tsx`（8 个）— 标注 `regression: fix-command-sheet-stuck`
 - **教训**：多阶段串行 AI 调用应尽量合并为单阶段含上下文的调用。上下文越完整，后处理越少，总耗时越低。
 - **已提炼**：❌ 仅此例（等出现第二次再提炼）
+
+### [2026-04-12] [bug] 提醒功能未生效 — Agent工具+编辑页+recalc
+- **现象**：闹钟、日历、提前通知等提醒功能实际均未生效，AI Agent 工具也无法设置提醒
+- **根因**：三个集成断点：(1) Agent 工具 create_todo/update_todo 的 schema 缺少 reminder_before、reminder_types 参数，AI 无法设置提醒；(2) update_todo handler 修改 scheduled_start 后未触发 recalcReminderAt，已有提醒时间不同步；(3) todo-edit-sheet 完全没有提醒设置 UI
+- **修复**：(1) create_todo/update_todo schema 添加 reminder_before + reminder_types，handler 添加 reminder_at 计算和 recalc 逻辑（含 scheduled_start=null 时清除 reminder_at）；(2) todo-edit-sheet 添加提醒选项（不提醒/5分/15分/30分/1小时前），清除 date 时自动重置 reminderBefore；(3) 对抗审查发现的3个边界问题均已修复
+- **回归测试**：`gateway/src/tools/definitions/create-todo.test.ts`（5个）+ `gateway/src/tools/definitions/update-todo.test.ts`（6个）+ `features/todos/components/todo-edit-sheet.test.tsx`（5个）— 标注 `regression: fix-reminder-not-working`
+- **教训**：Agent 工具 schema 必须与 REST API 参数保持同步。当 REST 路由支持某个参数但工具不支持时，AI 等于缺了一只手。新增 DB 字段时应同时检查所有写入路径（REST + 工具 + 前端）
+- **已提炼**：❌ 首次出现

@@ -21,8 +21,6 @@ vi.mock("../db/repositories/index.js", () => ({
     findById: vi.fn(),
     claimForDigest: vi.fn(),
     unclaimDigest: vi.fn().mockResolvedValue(undefined),
-    listUserDomains: vi.fn().mockResolvedValue([]),
-    updateDomain: vi.fn().mockResolvedValue(undefined),
     updateCompileStatus: vi.fn().mockResolvedValue(undefined),
   },
   transcriptRepo: {
@@ -91,7 +89,6 @@ const mockClaimForDigest = vi.mocked(recordRepo.claimForDigest);
 const mockFindById = vi.mocked(recordRepo.findById);
 const mockFindByRecordIds = vi.mocked(transcriptRepo.findByRecordIds);
 const mockFindSummary = vi.mocked(summaryRepo.findByRecordId);
-const mockUpdateDomain = vi.mocked(recordRepo.updateDomain);
 const mockUpdateCompileStatus = vi.mocked(recordRepo.updateCompileStatus);
 const mockProjectIntendStrike = vi.mocked(projectIntendStrike);
 
@@ -156,8 +153,7 @@ describe("digestRecords (Phase 2 — Ingest 改造)", () => {
       "pending",
       expect.any(String), // content_hash
     );
-    // Phase 11: domain 分配已移除，不应调用 updateDomain
-    expect(mockUpdateDomain).not.toHaveBeenCalled();
+    // Phase 11: domain 分配已移除（domain 方法已清理）
   });
 
   it("should_create_todo_and_mark_pending_compile_when_intend_extracted", async () => {

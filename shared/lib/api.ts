@@ -5,15 +5,10 @@
 
 import { getGatewayHttpUrl } from "./gateway-url";
 
-let _deviceId: string | null = null;
-
-export function setApiDeviceId(id: string) {
-  _deviceId = id;
-}
-
-export function getApiDeviceId(): string | null {
-  return _deviceId;
-}
+/** @deprecated deviceId 已废弃，保留空实现供未清理的调用方编译通过 */
+export function setApiDeviceId(_id: string) { /* no-op */ }
+/** @deprecated */
+export function getApiDeviceId(): string | null { return null; }
 
 /** Get auth module lazily to avoid circular imports */
 async function getAuth() {
@@ -51,10 +46,6 @@ async function request<T>(
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
   };
-  if (_deviceId) {
-    headers["X-Device-Id"] = _deviceId;
-  }
-
   // Add Authorization header if logged in
   const auth = await getAuth();
   const token = auth.getAccessToken();

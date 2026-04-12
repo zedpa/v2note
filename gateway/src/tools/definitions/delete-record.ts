@@ -7,7 +7,7 @@ export const deleteRecordTool: ToolDefinition = {
   description: `删除日记/笔记。⚠️ 此操作不可恢复，必须先确认用户明确要求删除。
 使用：用户明确要求删除（"把那条日记删了"、"删除这条记录"）。
 不用：用户只是想归档 → 建议归档而非删除。
-不用：用户想移动日记到其他分类 → 用 move_record。`,
+不用：用户想移动日记到其他主题 → 用 manage_wiki_page(action="move_record")。`,
   parameters: z.object({
     record_id: z.string().min(1).describe("要删除的记录 ID"),
   }),

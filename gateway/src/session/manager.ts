@@ -11,8 +11,7 @@ export interface PendingConfirm {
 
 export interface Session {
   id: string;
-  deviceId: string;
-  userId?: string;
+  userId: string;
   context: SessionContext;
   mode: "idle" | "process" | "chat";
   memoryManager: MemoryManager;
@@ -46,10 +45,10 @@ function evictOldest(): void {
 }
 
 /**
- * Get or create a session for a device.
+ * Get or create a session for a user.
  */
-export function getSession(deviceId: string): Session {
-  let session = sessions.get(deviceId);
+export function getSession(userId: string): Session {
+  let session = sessions.get(userId);
   if (!session) {
     // 超限时淘汰最久未活跃的 session
     if (sessions.size >= MAX_SESSIONS) {
@@ -57,7 +56,7 @@ export function getSession(deviceId: string): Session {
     }
     session = {
       id: crypto.randomUUID(),
-      deviceId,
+      userId,
       context: new SessionContext(),
       mode: "idle",
       memoryManager: new MemoryManager(),
@@ -65,7 +64,7 @@ export function getSession(deviceId: string): Session {
       createdAt: new Date(),
       lastActivity: new Date(),
     };
-    sessions.set(deviceId, session);
+    sessions.set(userId, session);
   }
   session.lastActivity = new Date();
   return session;
@@ -74,8 +73,8 @@ export function getSession(deviceId: string): Session {
 /**
  * Remove a session.
  */
-export function removeSession(deviceId: string) {
-  sessions.delete(deviceId);
+export function removeSession(userId: string) {
+  sessions.delete(userId);
 }
 
 /**

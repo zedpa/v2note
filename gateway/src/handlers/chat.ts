@@ -34,7 +34,7 @@ const MAX_TRANSCRIPT_CHARS = 8000;
 const toolRegistry = createDefaultRegistry();
 
 export interface ChatStartPayload {
-  deviceId: string;
+  deviceId: string; // 已弃用，保留兼容，内部使用 userId
   userId?: string;
   mode: "review" | "command" | "insight" | "decision";
   dateRange: { start: string; end: string };
@@ -119,16 +119,13 @@ function getTimeOfDay(hour: number): { label: string; guidance: string } {
 }
 
 async function buildGreetingPrompt(
-  userId: string | undefined,
-  deviceId: string,
+  userId: string,
   transcriptSummary: string,
 ): Promise<string> {
   // 加载未完成待办
   let todosText = "";
   try {
-    const todos = userId
-      ? await todoRepo.findPendingByUser(userId)
-      : await todoRepo.findPendingByDevice(deviceId);
+    const todos = await todoRepo.findPendingByUser(userId);
     if (todos.length > 0) {
       const lines = todos.slice(0, 8).map((t) => {
         const dueInfo = t.scheduled_start
@@ -182,32 +179,26 @@ ${contextBlock}
 export async function initChat(
   payload: ChatStartPayload,
 ): Promise<void> {
-  const session = getSession(payload.deviceId);
+  const userId = payload.userId ?? payload.deviceId;
+  const session = getSession(userId);
   session.mode = "chat";
-  session.userId = payload.userId;
 
   // Load context in parallel using tiered loader (soul + memories)
   const memoryManager = session.memoryManager;
-  const loaded = await memoryManager.loadRelevantContext(payload.deviceId, {
+  const loaded = await memoryManager.loadRelevantContext(userId, {
     mode: "chat",
     dateRange: payload.dateRange,
     localSoul: payload.localConfig?.soul?.content,
-    userId: payload.userId,
+    userId,
   });
   const memories = loaded.memories;
 
   // Load records from the date range for context
-  const records = payload.userId
-    ? await recordRepo.findByUserAndDateRange(
-        payload.userId,
-        `${payload.dateRange.start}T00:00:00`,
-        `${payload.dateRange.end}T23:59:59`,
-      )
-    : await recordRepo.findByDeviceAndDateRange(
-        payload.deviceId,
-        `${payload.dateRange.start}T00:00:00`,
-        `${payload.dateRange.end}T23:59:59`,
-      );
+  const records = await recordRepo.findByUserAndDateRange(
+    userId,
+    `${payload.dateRange.start}T00:00:00`,
+    `${payload.dateRange.end}T23:59:59`,
+  );
 
   // Load transcripts for these records
   let transcriptSummary = "";
@@ -271,9 +262,7 @@ export async function initChat(
   let pendingIntentContext = "";
   if (payload.mode !== "command") {
     try {
-      const pendingIntents = payload.userId
-        ? await pendingIntentRepo.findPendingByUser(payload.userId)
-        : await pendingIntentRepo.findPendingByDevice(payload.deviceId);
+      const pendingIntents = await pendingIntentRepo.findPendingByUser(userId);
       if (pendingIntents.length > 0) {
         const lines = pendingIntents.slice(0, 5).map((pi) => {
           const date = formatDateWithRelative(new Date(pi.created_at));
@@ -290,8 +279,7 @@ export async function initChat(
   let cognitiveContext: string | undefined;
   if (payload.mode === "review" || payload.mode === "insight") {
     try {
-      const uid = payload.userId ?? payload.deviceId;
-      const cognitive = await loadChatCognitive(uid);
+      const cognitive = await loadChatCognitive(userId);
       if (cognitive.contextString) {
         cognitiveContext = cognitive.contextString;
       }
@@ -318,10 +306,10 @@ export async function initChat(
   session.context.setSystemPrompt(systemPrompt);
 
   // ── 上下文恢复：从 DB 加载历史摘要 + 最近消息（command 模式） ──
-  if (payload.mode === "command" && payload.userId) {
+  if (payload.mode === "command" && userId) {
     try {
       // 1. 加载所有 context-summary（压缩摘要）
-      const summaries = await chatMessageRepo.getContextSummaries(payload.userId);
+      const summaries = await chatMessageRepo.getContextSummaries(userId);
       if (summaries.length > 0) {
         const summaryText = summaries.map(s => s.content).join("\n\n");
         session.context.addMessage({
@@ -330,7 +318,7 @@ export async function initChat(
         });
       }
       // 2. 加载最近 20 条未压缩消息（按时间正序注入，跨天插入日期分隔）
-      const recentMessages = await chatMessageRepo.getUncompressedMessages(payload.userId, 20);
+      const recentMessages = await chatMessageRepo.getUncompressedMessages(userId, 20);
       const nowDate = tzNow();
       let lastDateStr = "";
       for (const msg of recentMessages.reverse()) {
@@ -368,8 +356,7 @@ export async function initChat(
  * - 认知上下文（活跃 cluster + 近期矛盾）
  */
 async function prefetchDeepSkillContext(
-  userId: string | undefined,
-  deviceId: string,
+  userId: string,
 ): Promise<string> {
   const parts: string[] = [];
   const weekAgo = daysAgo(7);
@@ -377,9 +364,7 @@ async function prefetchDeepSkillContext(
 
   // 1. 最近 7 天日记
   try {
-    const records = userId
-      ? await recordRepo.findByUserAndDateRange(userId, `${weekAgo}T00:00:00`, `${todayStr}T23:59:59`)
-      : await recordRepo.findByDeviceAndDateRange(deviceId, `${weekAgo}T00:00:00`, `${todayStr}T23:59:59`);
+    const records = await recordRepo.findByUserAndDateRange(userId, `${weekAgo}T00:00:00`, `${todayStr}T23:59:59`);
     if (records.length > 0) {
       const recordIds = records.map(r => r.id);
       const transcripts = await transcriptRepo.findByRecordIds(recordIds);
@@ -402,9 +387,7 @@ async function prefetchDeepSkillContext(
 
   // 2. 未完成待办
   try {
-    const todos = userId
-      ? await todoRepo.findPendingByUser(userId)
-      : await todoRepo.findPendingByDevice(deviceId);
+    const todos = await todoRepo.findPendingByUser(userId);
     if (todos.length > 0) {
       const lines = todos.slice(0, 15).map(t => {
         const dueInfo = t.scheduled_start
@@ -453,14 +436,14 @@ async function prefetchDeepSkillContext(
  */
 async function* streamDeepSkill(
   session: ReturnType<typeof getSession>,
-  deviceId: string,
+  userId: string,
   skill: Skill,
   userMessage: string,
 ): AsyncGenerator<string, void, undefined> {
   const t0 = Date.now();
 
   // 1. DB 直查预取上下文
-  const context = await prefetchDeepSkillContext(session.userId, deviceId);
+  const context = await prefetchDeepSkillContext(userId);
   console.log(`[chat] Deep skill context prefetched in ${Date.now() - t0}ms (${context.length} chars)`);
 
   // 2. 构建独立消息（不污染 session context）
@@ -511,10 +494,10 @@ function refreshDateAnchorIfNeeded(session: ReturnType<typeof getSession>) {
 }
 
 export async function sendChatMessage(
-  deviceId: string,
+  userId: string,
   text: string,
 ): Promise<AsyncGenerator<string, void, undefined>> {
-  const session = getSession(deviceId);
+  const session = getSession(userId);
   if (session.mode !== "chat") {
     throw new Error("No active chat session");
   }
@@ -568,13 +551,13 @@ export async function sendChatMessage(
       const userPrompt = userText || "请根据以上技能指导开始。";
       console.log(`[chat] Skill activated (explicit): ${explicitSkill.name}${userText ? ` with text: ${userText.slice(0, 50)}` : ""}`);
       if (DEEP_SKILLS.has(explicitSkill.name)) {
-        return streamDeepSkill(session, deviceId, explicitSkill, userPrompt);
+        return streamDeepSkill(session, userId, explicitSkill, userPrompt);
       }
       session.context.addMessage({
         role: "user",
         content: `[系统：已激活「${explicitSkill.name}」技能]\n\n${explicitSkill.prompt}\n\n---\n\n${userPrompt}`,
       });
-      return streamWithNativeTools(session, deviceId);
+      return streamWithNativeTools(session, userId);
     }
   }
 
@@ -587,13 +570,13 @@ export async function sendChatMessage(
       if (skill) {
         console.log(`[chat] Skill auto-routed: ${matchedSkillName} (deep: ${DEEP_SKILLS.has(matchedSkillName)})`);
         if (DEEP_SKILLS.has(matchedSkillName)) {
-          return streamDeepSkill(session, deviceId, skill, text);
+          return streamDeepSkill(session, userId, skill, text);
         }
         session.context.addMessage({
           role: "user",
           content: `[系统：已激活「${skill.name}」技能]\n\n${skill.prompt}\n\n---\n\n${text}`,
         });
-        return streamWithNativeTools(session, deviceId);
+        return streamWithNativeTools(session, userId);
       }
     } else {
       console.log(`[chat] Skill ${matchedSkillName} matched but not enabled in UserAgent`);
@@ -609,7 +592,7 @@ export async function sendChatMessage(
           role: "user",
           content: `[系统补充上下文]\n${cognitive.contextString}\n\n${text}`,
         });
-        return streamWithNativeTools(session, deviceId);
+        return streamWithNativeTools(session, userId);
       }
     } catch {
       // non-critical
@@ -617,7 +600,7 @@ export async function sendChatMessage(
   }
 
   session.context.addMessage({ role: "user", content: text });
-  return streamWithNativeTools(session, deviceId);
+  return streamWithNativeTools(session, userId);
 }
 
 // ── 聊天复杂度分类（关键词快筛，无 AI 调用） ────────────────────────
@@ -685,13 +668,13 @@ function classifyChatTier(text: string): ModelTier {
  */
 async function* streamWithNativeTools(
   session: ReturnType<typeof getSession>,
-  deviceId: string,
+  userId: string,
   tierOverride?: ModelTier,
 ): AsyncGenerator<string, void, undefined> {
   // 构建工具执行上下文
   const toolCtx: ToolContext = {
-    deviceId,
-    userId: session.userId,
+    deviceId: userId,
+    userId,
     sessionId: session.id,
     getMessages: () => session.context.getHistory(),
   };
@@ -744,13 +727,12 @@ async function* streamWithNativeTools(
  * AI 日记由 daily-loop 的 generateChatDiary 批量生成。
  * endChat 做轻量 fallback 检测 + 清理 session。
  */
-export async function endChat(deviceId: string): Promise<void> {
-  const session = getSession(deviceId);
+export async function endChat(userId: string): Promise<void> {
+  const session = getSession(userId);
   if (session.mode !== "chat") return;
 
   // 轻量 fallback: 如果对话中有明显的 soul/profile 信号但 AI 没调工具，
   // 异步触发后台更新（不阻塞 endChat）
-  const userId = session.userId;
   if (userId) {
     const history = session.context.getHistory();
     const userMessages = history.filter(m => m.role === "user").map(m => m.content);
@@ -775,12 +757,12 @@ export async function endChat(deviceId: string): Promise<void> {
           .map(m => `${m.role}: ${m.content.slice(0, 200)}`).join("\n");
         if (hasSoulSignal) {
           import("../soul/manager.js").then(({ updateSoul }) =>
-            updateSoul(deviceId, `[对话 fallback] ${summary}`, userId),
+            updateSoul(userId, `[对话 fallback] ${summary}`, userId),
           ).catch(() => {});
         }
         if (hasProfileSignal) {
           import("../profile/manager.js").then(({ updateProfile }) =>
-            updateProfile(deviceId, `[对话 fallback] ${summary}`, userId),
+            updateProfile(userId, `[对话 fallback] ${summary}`, userId),
           ).catch(() => {});
         }
         console.log(`[chat] endChat fallback: soul=${hasSoulSignal}, profile=${hasProfileSignal}`);

@@ -11,13 +11,11 @@ interface AuthResponse {
 export async function registerUser(
   phone: string,
   password: string,
-  deviceId: string,
   displayName?: string,
 ): Promise<AuthResponse> {
   return api.post("/api/v1/auth/register", {
     phone,
     password,
-    deviceId,
     displayName,
   });
 }
@@ -25,12 +23,10 @@ export async function registerUser(
 export async function loginUser(
   phone: string,
   password: string,
-  deviceId: string,
 ): Promise<AuthResponse> {
   return api.post("/api/v1/auth/login", {
     phone,
     password,
-    deviceId,
   });
 }
 
@@ -40,14 +36,12 @@ export async function registerWithEmail(
   email: string,
   verificationToken: string,
   password: string,
-  deviceId: string,
   displayName?: string,
 ): Promise<AuthResponse> {
   return api.post("/api/v1/auth/register", {
     email,
     verificationToken,
     password,
-    deviceId,
     displayName,
   });
 }
@@ -55,12 +49,10 @@ export async function registerWithEmail(
 export async function loginWithEmail(
   email: string,
   password: string,
-  deviceId: string,
 ): Promise<AuthResponse> {
   return api.post("/api/v1/auth/login", {
     email,
     password,
-    deviceId,
   });
 }
 

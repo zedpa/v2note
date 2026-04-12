@@ -26,11 +26,11 @@ export function registerAuthRoutes(router: Router) {
       verificationToken?: string;
       password: string;
       displayName?: string;
-      deviceId: string;
+      deviceId?: string; // deprecated, optional for backward compat
     }>(req);
 
-    if (!body.password || !body.deviceId) {
-      sendError(res, "password and deviceId are required", 400);
+    if (!body.password) {
+      sendError(res, "password is required", 400);
       return;
     }
 
@@ -91,8 +91,10 @@ export function registerAuthRoutes(router: Router) {
       return;
     }
 
-    // Link device + backfill data
-    await linkDeviceToUser(body.deviceId, user.id);
+    // Link device + backfill data (optional, for backward compat)
+    if (body.deviceId) {
+      await linkDeviceToUser(body.deviceId, user.id);
+    }
 
     // Issue tokens
     const tokens = await issueTokens(user.id, body.deviceId);
@@ -105,18 +107,18 @@ export function registerAuthRoutes(router: Router) {
 
   /**
    * POST /api/v1/auth/login
-   * Body: { phone, password, deviceId } or { email, password, deviceId }
+   * Body: { phone, password } or { email, password }
    */
   router.post("/api/v1/auth/login", async (req, res) => {
     const body = await readBody<{
       phone?: string;
       email?: string;
       password: string;
-      deviceId: string;
+      deviceId?: string; // deprecated, optional for backward compat
     }>(req);
 
-    if ((!body.phone && !body.email) || !body.password || !body.deviceId) {
-      sendError(res, "phone or email, password, and deviceId are required", 400);
+    if ((!body.phone && !body.email) || !body.password) {
+      sendError(res, "phone or email, and password are required", 400);
       return;
     }
 
@@ -139,8 +141,10 @@ export function registerAuthRoutes(router: Router) {
       return;
     }
 
-    // Link device + backfill data
-    await linkDeviceToUser(body.deviceId, user.id);
+    // Link device + backfill data (optional, for backward compat)
+    if (body.deviceId) {
+      await linkDeviceToUser(body.deviceId, user.id);
+    }
 
     // Issue tokens
     const tokens = await issueTokens(user.id, body.deviceId);
@@ -182,7 +186,7 @@ export function registerAuthRoutes(router: Router) {
     // Rotate: delete old, issue new
     await refreshTokenRepo.deleteByHash(tokenHash);
 
-    const deviceId = stored.device_id ?? getDeviceId(req); // 从 stored 或请求头取设备 ID
+    const deviceId = stored.device_id ?? undefined;
     const tokens = await issueTokens(payload.userId, deviceId);
 
     sendJson(res, tokens);
@@ -474,8 +478,8 @@ export function registerAuthRoutes(router: Router) {
 }
 
 /** Issue access + refresh token pair */
-async function issueTokens(userId: string, deviceId: string) {
-  const accessToken = signAccessToken({ userId, deviceId });
+async function issueTokens(userId: string, deviceId?: string) {
+  const accessToken = signAccessToken({ userId });
 
   const tokenId = crypto.randomUUID();
   const refreshToken = signRefreshToken({ userId, tokenId });
@@ -485,7 +489,7 @@ async function issueTokens(userId: string, deviceId: string) {
   await refreshTokenRepo.create({
     user_id: userId,
     token_hash: tokenHash,
-    device_id: deviceId,
+    device_id: deviceId ?? null,
     expires_at: expiresAt,
   });
 

@@ -56,7 +56,7 @@ export interface ActionExecResult {
 
 interface ActionContext {
   userId?: string;
-  deviceId: string;
+  deviceId: string; // 已弃用，保留兼容
   recordId?: string;  // 当前正在处理的记录 ID，用于 create_todo 关联
 }
 
@@ -159,9 +159,8 @@ export async function matchTodoByHint(
 ): Promise<{ id: string; text: string } | null> {
   if (!hint || hint.trim().length === 0) return null;
 
-  const todos = ctx.userId
-    ? await todoRepo.findPendingByUser(ctx.userId)
-    : await todoRepo.findPendingByDevice(ctx.deviceId);
+  const uid = ctx.userId ?? ctx.deviceId;
+  const todos = await todoRepo.findPendingByUser(uid);
 
   if (todos.length === 0) return null;
 
@@ -314,9 +313,8 @@ async function executeCompleteTodo(action: VoiceAction, ctx: ActionContext): Pro
 }
 
 async function executeQueryTodo(action: VoiceAction, ctx: ActionContext): Promise<ActionExecResult> {
-  const todos = ctx.userId
-    ? await todoRepo.findPendingByUser(ctx.userId)
-    : await todoRepo.findPendingByDevice(ctx.deviceId);
+  const uid = ctx.userId ?? ctx.deviceId;
+  const todos = await todoRepo.findPendingByUser(uid);
 
   let filtered = todos;
 
@@ -408,9 +406,7 @@ async function executeCreateTodo(action: VoiceAction, ctx: ActionContext): Promi
 }
 
 async function executeQueryGoal(action: VoiceAction, ctx: ActionContext): Promise<ActionExecResult> {
-  const goals = ctx.userId
-    ? await goalRepo.findActiveByUser(ctx.userId)
-    : await goalRepo.findActiveByDevice(ctx.deviceId);
+  const goals = await goalRepo.findActiveByUser(ctx.userId ?? ctx.deviceId);
 
   if (goals.length === 0) {
     return {

@@ -2,7 +2,6 @@
 
 import { useState, useRef, useCallback, useEffect } from "react";
 import { getGatewayClient, type GatewayResponse } from "@/features/chat/lib/gateway-client";
-import { getDeviceId } from "@/shared/lib/device";
 import { loadLocalConfig } from "@/shared/lib/local-config";
 import { getCommandDefs } from "@/features/commands/lib/registry";
 import { fetchChatHistory, clearChatHistory, type ChatHistoryMessage } from "@/shared/lib/api/chat";
@@ -209,7 +208,7 @@ export function useChat(
         });
         // 数据变更类工具执行完后，触发前端列表 + 文件夹刷新
         const dataTools = [
-          "manage_folder", "move_record", "create_record", "update_record",
+          "manage_wiki_page", "create_record", "update_record",
           "delete_record", "create_todo", "update_todo", "delete_todo",
           "create_goal", "update_goal", "update_user_info",
         ];
@@ -381,8 +380,6 @@ export function useChat(
     setConnected(true);
 
     // Start chat session
-    const deviceId = await getDeviceId();
-    if (gen !== connectGenRef.current) return;
     const localConfig = await loadLocalConfig();
     if (gen !== connectGenRef.current) return;
 
@@ -435,7 +432,6 @@ export function useChat(
     client.send({
       type: "chat.start",
       payload: {
-        deviceId,
         mode,
         dateRange,
         skill: options?.skill,
@@ -509,22 +505,6 @@ export function useChat(
     // 写入本地缓存
     cacheMsg("user", text, userMsgId);
 
-    let deviceId: string;
-    try {
-      deviceId = await getDeviceId();
-    } catch {
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: crypto.randomUUID(),
-          role: "assistant",
-          content: "无法连接服务器，请检查网络或在设置中配置正确的服务器地址。",
-          timestamp: new Date(),
-        },
-      ]);
-      return;
-    }
-
     const client = getGatewayClient();
     const ready = await client.waitForReady(5000);
 
@@ -560,7 +540,7 @@ export function useChat(
     // 统一走 chat.message
     client.send({
       type: "chat.message",
-      payload: { text, deviceId },
+      payload: { text },
     });
     armResponseTimeout("请求超时，AI暂未返回。请稍后重试。");
   }, [armResponseTimeout, clearResponseTimeout]);
@@ -570,10 +550,8 @@ export function useChat(
   const disconnect = useCallback(() => {
     const client = getGatewayClient();
 
-    // Fire-and-forget chat.end (needs async deviceId)
-    void getDeviceId().then((deviceId) => {
-      client.send({ type: "chat.end", payload: { deviceId } });
-    }).catch(() => {});
+    // Fire-and-forget chat.end
+    client.send({ type: "chat.end", payload: {} });
 
     if (unsubRef.current) {
       unsubRef.current();
@@ -602,10 +580,9 @@ export function useChat(
     modifications?: Array<{ stepIndex: number; description?: string; deleted?: boolean }>,
   ) => {
     const client = getGatewayClient();
-    const deviceId = await getDeviceId();
     client.send({
       type: "plan.confirm",
-      payload: { deviceId, planId, action, modifications },
+      payload: { planId, action, modifications },
     });
     // 标记 plan 消息为已确认
     setMessages((prev) =>

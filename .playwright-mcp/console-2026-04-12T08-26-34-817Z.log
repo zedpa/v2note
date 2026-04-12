@@ -1,0 +1,168 @@
+[     137ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[     275ms] [LOG] [Fast Refresh] done in 249ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[     475ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[     518ms] [LOG] [HMR] connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[     615ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[   21389ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[   21405ms] [LOG] [Fast Refresh] done in 129ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[   47583ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[   47599ms] [LOG] [Fast Refresh] done in 117ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 1479234ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 1479234ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 1484277ms] [ERROR] WebSocket connection to 'ws://localhost:3001/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/_next/static/chunks/features_5526488e._.js:378
+[ 1484277ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 1484277ms] [LOG] [gateway-client] Reconnect attempt 2/10 in 6000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 1492342ms] [ERROR] WebSocket connection to 'ws://localhost:3001/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/_next/static/chunks/features_5526488e._.js:378
+[ 1492342ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 1492343ms] [LOG] [gateway-client] Reconnect attempt 3/10 in 12000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 1506048ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 1871857ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 1871857ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 1876917ms] [ERROR] WebSocket connection to 'ws://localhost:3001/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/_next/static/chunks/features_5526488e._.js:378
+[ 1876917ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 1876917ms] [LOG] [gateway-client] Reconnect attempt 2/10 in 6000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 1882928ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 1883976ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 1883976ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 1889027ms] [ERROR] WebSocket connection to 'ws://localhost:3001/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/_next/static/chunks/features_5526488e._.js:378
+[ 1889028ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 1889028ms] [LOG] [gateway-client] Reconnect attempt 2/10 in 6000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 1895045ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 1904228ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 1904228ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 1909286ms] [ERROR] WebSocket connection to 'ws://localhost:3001/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/_next/static/chunks/features_5526488e._.js:378
+[ 1909287ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 1909287ms] [LOG] [gateway-client] Reconnect attempt 2/10 in 6000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 1915306ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 1972446ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 1972446ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 1977491ms] [ERROR] WebSocket connection to 'ws://localhost:3001/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/_next/static/chunks/features_5526488e._.js:378
+[ 1977492ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 1977492ms] [LOG] [gateway-client] Reconnect attempt 2/10 in 6000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 1985532ms] [ERROR] WebSocket connection to 'ws://localhost:3001/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/_next/static/chunks/features_5526488e._.js:378
+[ 1985532ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 1985532ms] [LOG] [gateway-client] Reconnect attempt 3/10 in 12000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 1999087ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 2006806ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 2006806ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 2011856ms] [ERROR] WebSocket connection to 'ws://localhost:3001/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/_next/static/chunks/features_5526488e._.js:378
+[ 2011857ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 2011857ms] [LOG] [gateway-client] Reconnect attempt 2/10 in 6000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 2017872ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 2027294ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 2027294ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 2032342ms] [ERROR] WebSocket connection to 'ws://localhost:3001/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/_next/static/chunks/features_5526488e._.js:378
+[ 2032342ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 2032342ms] [LOG] [gateway-client] Reconnect attempt 2/10 in 6000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 2038351ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 2061160ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 2061160ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 2066212ms] [ERROR] WebSocket connection to 'ws://localhost:3001/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/_next/static/chunks/features_5526488e._.js:378
+[ 2066212ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 2066212ms] [LOG] [gateway-client] Reconnect attempt 2/10 in 6000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 2072216ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 2083641ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 2083641ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 2088688ms] [ERROR] WebSocket connection to 'ws://localhost:3001/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/_next/static/chunks/features_5526488e._.js:378
+[ 2088688ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 2088688ms] [LOG] [gateway-client] Reconnect attempt 2/10 in 6000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 2094705ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 2129099ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 2129192ms] [LOG] [Fast Refresh] done in 194ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 2192511ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 2192573ms] [LOG] [Fast Refresh] done in 165ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 2210048ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 2210050ms] [LOG] [Fast Refresh] done in 102ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 2327502ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 2327549ms] [LOG] [Fast Refresh] done in 159ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 2418219ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 2418219ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 2423267ms] [ERROR] WebSocket connection to 'ws://localhost:3001/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/_next/static/chunks/features_5526488e._.js:378
+[ 2423267ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 2423268ms] [LOG] [gateway-client] Reconnect attempt 2/10 in 6000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 2429285ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 2512525ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 2512525ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 2517552ms] [ERROR] WebSocket connection to 'ws://localhost:3001/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/_next/static/chunks/features_5526488e._.js:378
+[ 2517552ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 2517553ms] [LOG] [gateway-client] Reconnect attempt 2/10 in 6000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 2525597ms] [ERROR] WebSocket connection to 'ws://localhost:3001/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/_next/static/chunks/features_5526488e._.js:378
+[ 2525598ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 2525598ms] [LOG] [gateway-client] Reconnect attempt 3/10 in 12000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 2537623ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 2546437ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 2546758ms] [LOG] [Fast Refresh] done in 423ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 2553618ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 2553618ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 2558662ms] [ERROR] WebSocket connection to 'ws://localhost:3001/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/_next/static/chunks/features_5526488e._.js:378
+[ 2558662ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 2558663ms] [LOG] [gateway-client] Reconnect attempt 2/10 in 6000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 2566699ms] [ERROR] WebSocket connection to 'ws://localhost:3001/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/_next/static/chunks/features_5526488e._.js:378
+[ 2566699ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 2566699ms] [LOG] [gateway-client] Reconnect attempt 3/10 in 12000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 2580742ms] [ERROR] WebSocket connection to 'ws://localhost:3001/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/_next/static/chunks/features_5526488e._.js:378
+[ 2580742ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 2580743ms] [LOG] [gateway-client] Reconnect attempt 4/10 in 24000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 2606805ms] [ERROR] WebSocket connection to 'ws://localhost:3001/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/_next/static/chunks/features_5526488e._.js:378
+[ 2606805ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 2606805ms] [LOG] [gateway-client] Reconnect attempt 5/10 in 48000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 2654827ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 2764060ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 2764060ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 2769106ms] [ERROR] WebSocket connection to 'ws://localhost:3001/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/_next/static/chunks/features_5526488e._.js:378
+[ 2769106ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 2769107ms] [LOG] [gateway-client] Reconnect attempt 2/10 in 6000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 2775124ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 3148189ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 3148348ms] [LOG] [Fast Refresh] done in 264ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 3165839ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 3166015ms] [LOG] [Fast Refresh] done in 257ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 3175505ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 3175780ms] [LOG] [Fast Refresh] done in 375ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 3186258ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 3186369ms] [LOG] [Fast Refresh] done in 204ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 3239414ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 3239868ms] [LOG] [Fast Refresh] done in 549ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 3251017ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 3251266ms] [LOG] [Fast Refresh] done in 211ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 3307753ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 3307853ms] [LOG] [Fast Refresh] done in 180ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 3308754ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 3308786ms] [LOG] [Fast Refresh] done in 132ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5375086ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5375086ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5380121ms] [ERROR] WebSocket connection to 'ws://localhost:3001/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/_next/static/chunks/features_5526488e._.js:378
+[ 5380122ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5380122ms] [LOG] [gateway-client] Reconnect attempt 2/10 in 6000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5388164ms] [ERROR] WebSocket connection to 'ws://localhost:3001/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/_next/static/chunks/features_5526488e._.js:378
+[ 5388165ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5388165ms] [LOG] [gateway-client] Reconnect attempt 3/10 in 12000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5402215ms] [ERROR] WebSocket connection to 'ws://localhost:3001/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/_next/static/chunks/features_5526488e._.js:378
+[ 5402216ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5402216ms] [LOG] [gateway-client] Reconnect attempt 4/10 in 24000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5428259ms] [ERROR] WebSocket connection to 'ws://localhost:3001/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/_next/static/chunks/features_5526488e._.js:378
+[ 5428259ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5428260ms] [LOG] [gateway-client] Reconnect attempt 5/10 in 48000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5438259ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5438347ms] [LOG] [Fast Refresh] done in 169ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5472231ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5472330ms] [LOG] [Fast Refresh] done in 178ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5476268ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5483695ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5483860ms] [LOG] [Fast Refresh] done in 213ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5502524ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5502524ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5507563ms] [ERROR] WebSocket connection to 'ws://localhost:3001/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/_next/static/chunks/features_5526488e._.js:378
+[ 5507564ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5507564ms] [LOG] [gateway-client] Reconnect attempt 2/10 in 6000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5513582ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5557758ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5557822ms] [LOG] [Fast Refresh] done in 147ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5567648ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5567743ms] [LOG] [Fast Refresh] done in 163ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5593716ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5593716ms] [LOG] [gateway-client] Reconnect attempt 1/10 in 3000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5598767ms] [ERROR] WebSocket connection to 'ws://localhost:3001/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/_next/static/chunks/features_5526488e._.js:378
+[ 5598767ms] [LOG] [gateway-client] Disconnected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5598767ms] [LOG] [gateway-client] Reconnect attempt 2/10 in 6000ms @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297
+[ 5604780ms] [LOG] [gateway-client] Connected @ http://localhost:3000/_next/static/chunks/dd884_next_dist_273b0bec._.js:2297

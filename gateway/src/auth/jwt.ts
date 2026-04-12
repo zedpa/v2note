@@ -4,7 +4,6 @@ const SECRET = process.env.JWT_SECRET ?? "dev-jwt-secret-change-me";
 
 export interface AccessTokenPayload {
   userId: string;
-  deviceId: string;
 }
 
 export interface RefreshTokenPayload {

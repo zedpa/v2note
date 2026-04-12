@@ -105,7 +105,7 @@ export async function findById(id: string): Promise<Record | null> {
 }
 
 export async function create(fields: {
-  device_id: string;
+  device_id?: string;
   user_id?: string;
   status?: string;
   source?: string;
@@ -121,7 +121,7 @@ export async function create(fields: {
     `INSERT INTO record (device_id, user_id, status, source, source_type, audio_path, duration_seconds, location_text, notebook, file_url, file_name)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`,
     [
-      fields.device_id,
+      fields.device_id ?? null,
       fields.user_id ?? null,
       fields.status ?? "uploading",
       fields.source ?? "voice",
@@ -186,8 +186,6 @@ export async function updateFields(
 export async function deleteByIds(ids: string[]): Promise<number> {
   if (ids.length === 0) return 0;
   const placeholders = ids.map((_, i) => `$${i + 1}`).join(", ");
-  // 先删除关联的 Strike（Bond/StrikeTag 有 ON DELETE CASCADE 自动清理）
-  await execute(`DELETE FROM strike WHERE source_id IN (${placeholders})`, ids);
   return execute(`DELETE FROM record WHERE id IN (${placeholders})`, ids);
 }
 
@@ -340,74 +338,6 @@ export async function updateCreatedAt(id: string, createdAt: string): Promise<vo
 }
 
 /** 更新层级标签（L1/L2/L3 涌现结构反向标注） */
-/** 更新 record 的自动归类 domain */
-export async function updateDomain(id: string, domain: string | null): Promise<void> {
-  await execute(
-    `UPDATE record SET domain = $1, updated_at = now() WHERE id = $2`,
-    [domain, id],
-  );
-}
-
-/** 查询用户已有的 domain 列表（去重，按使用频次降序） */
-export async function listUserDomains(userId: string): Promise<string[]> {
-  const rows = await query<{ domain: string }>(
-    `SELECT domain FROM record
-     WHERE user_id = $1 AND domain IS NOT NULL
-     GROUP BY domain ORDER BY count(*) DESC`,
-    [userId],
-  );
-  return rows.map(r => r.domain);
-}
-
-/** 查询用户 domain 列表 + 计数（供侧边栏文件夹展示） */
-export async function listUserDomainsWithCount(userId: string): Promise<Array<{ domain: string; count: number }>> {
-  return query<{ domain: string; count: number }>(
-    `SELECT domain, count(*)::int as count FROM record
-     WHERE user_id = $1 AND domain IS NOT NULL
-     GROUP BY domain ORDER BY count(*) DESC`,
-    [userId],
-  );
-}
-
-/** 批量替换 domain 前缀（rename/merge 用） */
-export async function batchUpdateDomain(
-  userId: string,
-  oldPrefix: string,
-  newPrefix: string,
-): Promise<number> {
-  // 精确匹配 + 子级路径匹配
-  const result = await execute(
-    `UPDATE record SET
-       domain = $3 || SUBSTRING(domain FROM LENGTH($2) + 1),
-       updated_at = now()
-     WHERE user_id = $1 AND (domain = $2 OR domain LIKE $2 || '/%')`,
-    [userId, oldPrefix, newPrefix],
-  );
-  return (result as any)?.rowCount ?? 0;
-}
-
-/** 清空指定前缀的 domain（delete folder 用） */
-export async function clearDomainByPrefix(
-  userId: string,
-  prefix: string,
-): Promise<number> {
-  const result = await execute(
-    `UPDATE record SET domain = NULL, updated_at = now()
-     WHERE user_id = $1 AND (domain = $2 OR domain LIKE $2 || '/%')`,
-    [userId, prefix],
-  );
-  return (result as any)?.rowCount ?? 0;
-}
-
-/** 统计未分类记录数 */
-export async function countUncategorized(userId: string): Promise<number> {
-  const row = await queryOne<{ count: number }>(
-    `SELECT count(*)::int as count FROM record
-     WHERE user_id = $1 AND domain IS NULL`,
-    [userId],
-  );
-  return row?.count ?? 0;
-}
 
 export async function updateHierarchyTags(
   id: string,

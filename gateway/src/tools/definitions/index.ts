@@ -25,9 +25,7 @@ import { updateProfileTool } from "./update-profile-tool.js";
 import { updateUserAgentTool } from "./update-user-agent-tool.js";
 import { createMemoryTool } from "./create-memory-tool.js";
 import { sendNotificationTool } from "./send-notification-tool.js";
-import { manageFolderTool } from "./manage-folder.js";
-import { moveRecordTool } from "./move-record.js";
-import { listFoldersTool } from "./list-folders.js";
+import { manageWikiPageTool } from "./manage-wiki-page.js";
 import { webSearchToolDef } from "../../web/web-search-tool.js";
 import { fetchUrlToolDef } from "../../web/fetch-url-tool.js";
 import { getSearchProvider } from "../../web/search-provider.js";
@@ -56,10 +54,8 @@ export const ALL_TOOL_DEFINITIONS = [
   sendNotificationTool,
   // 对话保存
   saveConversationTool,
-  // 文件夹管理
-  manageFolderTool,
-  moveRecordTool,
-  listFoldersTool,
+  // 主题管理（wiki page）
+  manageWikiPageTool,
   // 系统
   confirmTool,
   getCurrentTimeTool,

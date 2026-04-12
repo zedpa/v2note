@@ -82,7 +82,7 @@ related: [voice-input-unify.md]
 | 快速连续录音（上一条刚结束立刻下一条） | 每次 activate 独立，deactivate 在录音结束时调用 |
 | 应用切后台再切回 | 音频会话状态由 OS 管理，不额外处理 |
 | activate/deactivate 抛异常 | catch 并静默（console.warn），不阻塞录音流程 |
-| 短按（< 300ms 未触发录音） | 不调用 activate（pre-capture 阶段不 activate，仅 `startRecording` 才 activate） |
+| 短按（< 300ms 未触发录音） | pre-capture 阶段已 activate，stopPreCapture 中 deactivate 释放焦点（fix-recording-audio-focus） |
 | `startRecording()` 中 activate 成功但后续步骤失败 | catch 块中必须 deactivate（使用 `activatedRef` 追踪状态） |
 
 ## 接口约定
@@ -123,9 +123,9 @@ AVAudioSession 配置:
 文件: android/app/src/main/java/com/v2note/app/AudioSessionPlugin.kt
 
 AudioManager 配置:
-- API 26+: AudioFocusRequest.Builder(AUDIOFOCUS_GAIN_TRANSIENT).build()
+- API 26+: AudioFocusRequest.Builder(AUDIOFOCUS_GAIN_TRANSIENT_EXCLUSIVE).build()
   + requestAudioFocus(request) / abandonAudioFocusRequest(request)
-- API < 26: requestAudioFocus(listener, STREAM_MUSIC, AUDIOFOCUS_GAIN_TRANSIENT)
+- API < 26: requestAudioFocus(listener, STREAM_MUSIC, AUDIOFOCUS_GAIN_TRANSIENT_EXCLUSIVE)
   + abandonAudioFocus(listener)
 
 项目 minSdk 如果 >= 26 则只需新 API 路径。
@@ -171,7 +171,7 @@ async function deactivateAudioSession() {
 | recorder.onError | `deactivateAudioSession()` | `fab.tsx` → PCM recorder onError 回调 |
 | asr.done 超时 | 走 `handleRecordingFailure` → 已覆盖 | `fab.tsx:533` setTimeout 回调 |
 
-**注意**：`activatedRef` 保证 deactivate 只在 activate 成功后才调用，短按/pre-capture 取消时不会误 deactivate。
+**注意**：`activatedRef` 保证 deactivate 只在 activate 成功后才调用。pre-capture 阶段已调用 activate，短按取消时 stopPreCapture 中会调用 deactivate 释放焦点（fix-recording-audio-focus）。
 
 ## 实现阶段
 

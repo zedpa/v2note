@@ -9,18 +9,14 @@ import { today as tzToday } from "../lib/tz.js";
  * Fast operation — no AI call, just DB append.
  */
 export async function appendToDiary(
-  deviceId: string,
+  userId: string,
   notebook: string,
   content: string,
-  userId?: string,
 ): Promise<void> {
   const today = tzToday();
-  if (userId) {
-    await notebookRepo.ensureSystemNotebooksByUser(userId, deviceId);
-  } else {
-    await notebookRepo.ensureSystemNotebooks(deviceId);
-  }
-  await aiDiaryRepo.upsertEntry(deviceId, notebook, today, content, userId);
+  // ensureSystemNotebooksByUser 的 deviceId 参数仅用于写入 metadata，传空字符串
+  await notebookRepo.ensureSystemNotebooksByUser(userId, "");
+  await aiDiaryRepo.upsertEntry("", notebook, today, content, userId);
 }
 
 /**
@@ -28,14 +24,11 @@ export async function appendToDiary(
  * Uses AI to create a concise summary.
  */
 export async function regenerateSummary(
-  deviceId: string,
+  userId: string,
   notebook: string,
   date: string,
-  userId?: string,
 ): Promise<void> {
-  const entry = userId
-    ? await aiDiaryRepo.findFullByUser(userId, notebook, date)
-    : await aiDiaryRepo.findFull(deviceId, notebook, date);
+  const entry = await aiDiaryRepo.findFullByUser(userId, notebook, date);
   if (!entry || !entry.full_content.trim()) return;
 
   const result = await chatCompletion(
@@ -63,13 +56,10 @@ export async function regenerateSummary(
  * Identifies recurring patterns, important changes, and key insights.
  */
 export async function extractToMemory(
-  deviceId: string,
+  userId: string,
   dateRange: { start: string; end: string },
-  userId?: string,
 ): Promise<void> {
-  const entries = userId
-    ? await aiDiaryRepo.findSummariesByUser(userId, "default", dateRange.start, dateRange.end)
-    : await aiDiaryRepo.findSummaries(deviceId, "default", dateRange.start, dateRange.end);
+  const entries = await aiDiaryRepo.findSummariesByUser(userId, "default", dateRange.start, dateRange.end);
 
   if (entries.length === 0) return;
 
@@ -106,7 +96,7 @@ export async function extractToMemory(
   const memoryManager = new MemoryManager();
   for (const line of lines) {
     await memoryManager.maybeCreateMemory(
-      deviceId,
+      userId,
       line,
       dateRange.end,
       userId,

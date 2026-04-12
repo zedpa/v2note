@@ -26,6 +26,9 @@ export const createTodoTool: ToolDefinition = {
     scheduled_end: z.string().optional().describe("可选：结束时间（必须带时区的 ISO 字符串）"),
     estimated_minutes: z.number().optional().describe("可选：预估时长（分钟）"),
     priority: z.number().optional().describe("可选：优先级（整数，越大越高）"),
+    reminder_before: z.number().min(1).optional().describe("可选：提前提醒分钟数（5/15/30/60）"),
+    reminder_types: z.array(z.enum(["notification", "alarm", "calendar"])).optional()
+      .describe("可选：提醒类型，默认 [\"notification\"]"),
   }),
   autonomy: "notify",
   handler: async (args, ctx) => {
@@ -71,6 +74,15 @@ export const createTodoTool: ToolDefinition = {
     if (schedule.scheduled_end !== undefined) updates.scheduled_end = ensureTz(schedule.scheduled_end) || null;
     if (schedule.estimated_minutes !== undefined) updates.estimated_minutes = schedule.estimated_minutes;
     if (schedule.priority !== undefined) updates.priority = schedule.priority;
+    // 计算 reminder：需要同时有 reminder_before 和 scheduled_start 才有意义
+    if (schedule.reminder_before && schedule.reminder_before > 0 && schedule.scheduled_start) {
+      updates.reminder_before = schedule.reminder_before;
+      updates.reminder_types = schedule.reminder_types ?? ["notification"];
+      updates.reminder_at = new Date(
+        new Date(ensureTz(schedule.scheduled_start)!).getTime() - schedule.reminder_before * 60000,
+      ).toISOString();
+    }
+    // 无 scheduled_start 时忽略 reminder_before（无法计算 reminder_at）
     if (Object.keys(updates).length > 0) {
       await todoRepo.update(todo.id, updates);
     }

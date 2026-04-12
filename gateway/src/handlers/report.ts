@@ -35,24 +35,23 @@ function safeParseJson<T>(text: string): T | null {
 // ── Morning Report ──
 
 export async function generateMorningReport(
-  deviceId: string,
+  deviceId: string, // 已弃用，保留兼容
   userId?: string,
 ): Promise<any> {
+  const uid = userId ?? deviceId;
   const now = tzNow();
   const today = fmt(now);
   const yesterday = fmt(dfAddDays(now, -1));
 
   const [pendingTodos, yesterdayStats, soul, profile] = await Promise.all([
-    (userId ? todoRepo.findPendingByUser(userId) : todoRepo.findPendingByDevice(deviceId)).catch(() => []),
+    todoRepo.findPendingByUser(uid).catch(() => []),
     (() => {
       const yd = dayRange(yesterday);
-      return (userId
-        ? todoRepo.countByUserDateRange(userId, yd.start, yd.end)
-        : todoRepo.countByDateRange(deviceId, yd.start, yd.end)
-      ).catch(() => ({ done: 0, total: 0 }));
+      return todoRepo.countByUserDateRange(uid, yd.start, yd.end)
+        .catch(() => ({ done: 0, total: 0 }));
     })(),
-    loadSoul(deviceId, userId).catch(() => null),
-    loadProfile(deviceId, userId).catch(() => null),
+    loadSoul(uid, uid).catch(() => null),
+    loadProfile(uid, uid).catch(() => null),
   ]);
 
   const todayScheduled = pendingTodos.filter((t) =>
@@ -108,18 +107,19 @@ export async function generateMorningReport(
 // ── Evening Report ──
 
 export async function generateEveningReport(
-  deviceId: string,
+  deviceId: string, // 已弃用，保留兼容
   userId?: string,
 ): Promise<any> {
+  const uid = userId ?? deviceId;
   const now = tzNow();
   const today = fmt(now);
   const tomorrow = fmt(dfAddDays(now, 1));
 
   const [allTodos, pendingTodos, soul, profile] = await Promise.all([
-    (userId ? todoRepo.findByUser(userId) : todoRepo.findByDevice(deviceId)).catch(() => []),
-    (userId ? todoRepo.findPendingByUser(userId) : todoRepo.findPendingByDevice(deviceId)).catch(() => []),
-    loadSoul(deviceId, userId).catch(() => null),
-    loadProfile(deviceId, userId).catch(() => null),
+    todoRepo.findByUser(uid).catch(() => []),
+    todoRepo.findPendingByUser(uid).catch(() => []),
+    loadSoul(uid, uid).catch(() => null),
+    loadProfile(uid, uid).catch(() => null),
   ]);
 
   const todayDone = allTodos.filter(
@@ -128,9 +128,7 @@ export async function generateEveningReport(
 
   let newRecordCount = 0;
   try {
-    const records = userId
-      ? await recordRepo.findByUser(userId, { limit: 100 })
-      : await recordRepo.findByDevice(deviceId, { limit: 100 });
+    const records = await recordRepo.findByUser(uid, { limit: 100 });
     newRecordCount = records.filter(
       (r: any) => r.created_at && toLocalDateStr(r.created_at) === today,
     ).length;

@@ -134,7 +134,7 @@ async function searchRecords(
         if (dateTo && createdDate && createdDate > dateTo) continue;
       }
 
-      // domain 过滤
+      // domain 过滤（兼容旧数据，record.domain 列仍存在但不再写入）
       if (filters.domain && r.domain !== filters.domain) continue;
 
       const summary = summaryMap.get(r.id);

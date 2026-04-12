@@ -1,109 +1,36 @@
 /**
- * Cognitive maintenance: bond normalization, strength decay, salience decay/boost.
+ * Cognitive maintenance — 原 strike/bond 系统的维护逻辑。
+ * strike/bond 表已在 migration 064 中删除，所有函数保留签名但改为 no-op。
  */
 
-import { query, execute } from "../db/pool.js";
-
 // ---------------------------------------------------------------------------
-// Bond type normalization mapping
+// 1. Bond type normalization (no-op: bond 表已删除)
 // ---------------------------------------------------------------------------
 
-const BOND_TYPE_MAP: Record<string, string> = {
-  causes: "causal",
-  caused_by: "causal",
-  leads_to: "causal",
-  led_to: "causal",
-  supports: "supports",
-  backed_by: "supports",
-  evidence_for: "supports",
-  contradicts: "contradiction",
-  conflicts_with: "contradiction",
-  opposes: "contradiction",
-  evolves_from: "evolution",
-  evolved_into: "evolution",
-  changed_to: "evolution",
-  elaborates: "elaborates",
-  details: "elaborates",
-  expands: "elaborates",
-  triggers: "triggers",
-  triggered_by: "triggers",
-  prompted: "triggers",
-  resolves: "resolves",
-  resolved_by: "resolves",
-  addresses: "resolves",
-};
-
-// ---------------------------------------------------------------------------
-// 1. Bond type normalization
-// ---------------------------------------------------------------------------
-
-export async function normalizeBondTypes(userId: string): Promise<number> {
-  const synonyms = Object.keys(BOND_TYPE_MAP);
-  // Build CASE expression
-  const caseClauses = synonyms
-    .map((s, i) => `WHEN b.type = $${i + 2} THEN '${BOND_TYPE_MAP[s]}'`)
-    .join(" ");
-
-  const sql = `
-    UPDATE bond AS b
-    SET type = CASE ${caseClauses} END
-    FROM strike AS s
-    WHERE b.source_strike_id = s.id
-      AND s.user_id = $1
-      AND b.type IN (${synonyms.map((_, i) => `$${i + 2}`).join(", ")})
-  `;
-
-  return execute(sql, [userId, ...synonyms]);
+export async function normalizeBondTypes(_userId: string): Promise<number> {
+  return 0;
 }
 
 // ---------------------------------------------------------------------------
-// 2. Bond strength decay
+// 2. Bond strength decay (no-op: bond 表已删除)
 // ---------------------------------------------------------------------------
 
-export async function decayBondStrength(userId: string): Promise<number> {
-  const sql = `
-    UPDATE bond AS b
-    SET strength = CASE
-      WHEN b.updated_at < now() - interval '90 days' THEN b.strength * 0.7
-      WHEN b.updated_at < now() - interval '30 days' THEN b.strength * 0.9
-    END
-    FROM strike AS s
-    WHERE b.source_strike_id = s.id
-      AND s.user_id = $1
-      AND b.strength > 0.1
-      AND b.type != 'cluster_member'
-      AND b.updated_at < now() - interval '30 days'
-  `;
-
-  return execute(sql, [userId]);
+export async function decayBondStrength(_userId: string): Promise<number> {
+  return 0;
 }
 
 // ---------------------------------------------------------------------------
-// 3. Salience decay
+// 3. Salience decay (no-op: strike 表已删除)
 // ---------------------------------------------------------------------------
 
-export async function decaySalience(userId: string): Promise<number> {
-  const sql = `
-    UPDATE strike SET salience = GREATEST(0.01, salience * 0.95)
-    WHERE user_id = $1 AND status = 'active'
-      AND id NOT IN (
-        SELECT source_strike_id FROM bond WHERE created_at > now() - interval '30 days'
-        UNION
-        SELECT target_strike_id FROM bond WHERE created_at > now() - interval '30 days'
-      )
-      AND (digested_at IS NULL OR digested_at < now() - interval '30 days')
-  `;
-
-  return execute(sql, [userId]);
+export async function decaySalience(_userId: string): Promise<number> {
+  return 0;
 }
 
 // ---------------------------------------------------------------------------
-// 4. Salience boost
+// 4. Salience boost (no-op: strike 表已删除)
 // ---------------------------------------------------------------------------
 
-export async function boostSalience(strikeId: string): Promise<void> {
-  await execute(
-    `UPDATE strike SET salience = LEAST(1.0, salience + 0.1) WHERE id = $1`,
-    [strikeId],
-  );
+export async function boostSalience(_strikeId: string): Promise<void> {
+  // no-op
 }

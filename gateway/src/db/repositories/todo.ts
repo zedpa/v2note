@@ -27,7 +27,6 @@ export interface Todo {
   impact?: number;
   ai_actionable?: boolean;
   ai_action_plan?: string[];
-  strike_id?: string | null;
   parent_id?: string | null;
   subtask_count?: number;
   subtask_done_count?: number;
@@ -156,7 +155,6 @@ export async function create(fields: {
   record_id?: string | null;
   text: string;
   done?: boolean;
-  strike_id?: string;
   domain?: string;
   impact?: number;
   goal_id?: string;
@@ -183,7 +181,6 @@ export async function create(fields: {
 
   const optionals: Array<[string, any]> = [
     ["record_id", fields.record_id],
-    ["strike_id", fields.strike_id],
     ["domain", fields.domain],
     ["impact", fields.impact],
     ["goal_id", fields.goal_id],
@@ -249,7 +246,6 @@ export async function update(
     ai_actionable?: boolean;
     ai_action_plan?: string[] | null;
     goal_id?: string | null;
-    strike_id?: string | null;
     level?: number;
     status?: string;
     // 提醒
@@ -280,7 +276,6 @@ export async function update(
     ["ai_actionable", fields.ai_actionable],
     ["ai_action_plan", fields.ai_action_plan, (v: any) => JSON.stringify(v)],
     ["goal_id", fields.goal_id],
-    ["strike_id", fields.strike_id],
     ["level", fields.level],
     ["status", fields.status],
     ["reminder_at", fields.reminder_at],
@@ -522,7 +517,6 @@ export async function dedupCreate(fields: {
   record_id?: string | null;
   text: string;
   done?: boolean;
-  strike_id?: string;
   domain?: string;
   impact?: number;
   goal_id?: string;
@@ -724,49 +718,31 @@ export interface MyWorldNode {
   children: MyWorldNode[];
 }
 
-/** 从 strike.nucleus 提取聚类名称：格式 "[名称] 描述" → "名称" */
+/** 从 nucleus 字符串提取聚类名称：格式 "[名称] 描述" → "名称" */
 function extractClusterName(nucleus: string): string {
   const m = nucleus.match(/^\[(.+?)\]/);
   return m ? m[1] : nucleus.slice(0, 20);
 }
 
-/** 侧边栏"我的世界"：组装三级树结构 */
+/** 侧边栏"我的世界"：组装树结构（wiki_page → 目标 → 行动） */
 export async function getMyWorldData(userId: string): Promise<MyWorldNode[]> {
-  // 1. 查所有活跃聚类（L1 + L2）
-  const clusters = await query<{
+  // 1. 查所有有目标关联的活跃 wiki_page
+  const wikiPages = await query<{
     id: string;
-    nucleus: string;
-    level: number;
-    member_count: number;
+    title: string;
+    record_count: number;
   }>(
-    `SELECT s.id, s.nucleus, COALESCE(s.level, 1) AS level,
-            COUNT(cm.target_strike_id)::int AS member_count
-     FROM strike s
-     LEFT JOIN bond cm ON cm.source_strike_id = s.id AND cm.type = 'cluster_member'
-     WHERE s.user_id = $1 AND s.is_cluster = true AND s.status = 'active'
-     GROUP BY s.id, s.nucleus, s.level
-     ORDER BY COUNT(cm.target_strike_id) DESC`,
+    `SELECT wp.id, wp.title,
+            COUNT(wpr.record_id)::int AS record_count
+     FROM wiki_page wp
+     LEFT JOIN wiki_page_record wpr ON wpr.wiki_page_id = wp.id
+     WHERE wp.user_id = $1 AND wp.status = 'active'
+     GROUP BY wp.id, wp.title
+     ORDER BY COUNT(wpr.record_id) DESC`,
     [userId],
   );
 
-  const l2Clusters = clusters.filter(c => c.level === 2);
-  const l1Clusters = clusters.filter(c => c.level !== 2);
-
-  // 2. 查 L2 的 L1 成员
-  const l2Ids = l2Clusters.map(c => c.id);
-  const l2Members = l2Ids.length > 0
-    ? await query<{ source_strike_id: string; target_strike_id: string }>(
-        `SELECT source_strike_id, target_strike_id FROM bond
-         WHERE source_strike_id = ANY($1) AND type = 'cluster_member'`,
-        [l2Ids],
-      )
-    : [];
-
-  const l1InL2 = new Set(l2Members.map(m => m.target_strike_id));
-  const independentL1 = l1Clusters.filter(c => !l1InL2.has(c.id));
-
-  // 3. 查所有 level>=1 目标（挂在聚类下或独立）
-  const allClusterIds = clusters.map(c => c.id);
+  // 2. 查所有 level>=1 目标
   const goals = await query<Todo & { subtask_count: number; subtask_done_count: number }>(
     `SELECT t.*,
             COALESCE(sc.cnt, 0)::int AS subtask_count,
@@ -782,21 +758,21 @@ export async function getMyWorldData(userId: string): Promise<MyWorldNode[]> {
     [userId],
   );
 
-  // 按 cluster_id 分组
-  const goalsByCluster = new Map<string, typeof goals>();
+  // 按 wiki_page_id 分组
+  const goalsByPage = new Map<string, typeof goals>();
   const orphanGoals: typeof goals = [];
   for (const g of goals) {
-    const cid = g.cluster_id;
-    if (cid && allClusterIds.includes(cid)) {
-      const list = goalsByCluster.get(cid) ?? [];
+    const pid = g.wiki_page_id;
+    if (pid) {
+      const list = goalsByPage.get(pid) ?? [];
       list.push(g);
-      goalsByCluster.set(cid, list);
+      goalsByPage.set(pid, list);
     } else if (!g.parent_id) {
       orphanGoals.push(g);
     }
   }
 
-  // 4. 查第三级子任务（goals 的子项）
+  // 3. 查第三级子任务（goals 的子项）
   const goalIds = goals.map(g => g.id);
   const actions = goalIds.length > 0
     ? await query<Todo>(
@@ -834,49 +810,24 @@ export async function getMyWorldData(userId: string): Promise<MyWorldNode[]> {
     };
   }
 
-  // ── 辅助函数：构建 L1 聚类节点 ──
-  function buildL1Node(c: typeof l1Clusters[0]): MyWorldNode {
-    const clusterGoals = goalsByCluster.get(c.id) ?? [];
-    return {
-      id: c.id,
-      type: "l1_cluster",
-      title: extractClusterName(c.nucleus),
-      memberCount: c.member_count,
-      children: clusterGoals.slice(0, 8).map(buildGoalNode),
-    };
-  }
-
-  // ── 组装第一级 ──
+  // ── 组装节点 ──
   const nodes: MyWorldNode[] = [];
+  const allPageIds = wikiPages.map(p => p.id);
 
-  // 有 L2 时：L2 → L1 → 目标
-  for (const l2 of l2Clusters) {
-    const memberL1Ids = l2Members
-      .filter(m => m.source_strike_id === l2.id)
-      .map(m => m.target_strike_id);
-    const memberL1s = l1Clusters.filter(c => memberL1Ids.includes(c.id));
-
-    // L2 下也可能直接挂目标
-    const l2Goals = goalsByCluster.get(l2.id) ?? [];
-
+  // wiki_page 主题节点（有目标关联的）
+  for (const page of wikiPages) {
+    const pageGoals = goalsByPage.get(page.id) ?? [];
+    if (pageGoals.length === 0) continue;
     nodes.push({
-      id: l2.id,
-      type: "l2_cluster",
-      title: extractClusterName(l2.nucleus),
-      memberCount: l2.member_count,
-      children: [
-        ...memberL1s.map(buildL1Node),
-        ...l2Goals.slice(0, 8).map(buildGoalNode),
-      ],
+      id: page.id,
+      type: "l1_cluster",
+      title: page.title,
+      memberCount: page.record_count,
+      children: pageGoals.slice(0, 8).map(buildGoalNode),
     });
   }
 
-  // 独立 L1 聚类
-  for (const c of independentL1) {
-    nodes.push(buildL1Node(c));
-  }
-
-  // 独立目标（无聚类归属、无父级）
+  // 独立目标（无 wiki_page 归属、无父级）
   for (const g of orphanGoals.slice(0, 15)) {
     nodes.push(buildGoalNode(g));
   }

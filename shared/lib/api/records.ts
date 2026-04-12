@@ -64,7 +64,6 @@ export async function retryRecordAudio(
   // 需要直接 fetch（非 JSON body）
   const { getGatewayHttpUrl } = await import("../gateway-url");
   const { getAccessToken } = await import("../auth");
-  const { getApiDeviceId } = await import("../api");
 
   const base = getGatewayHttpUrl();
   const headers: Record<string, string> = {
@@ -72,8 +71,6 @@ export async function retryRecordAudio(
   };
   const token = getAccessToken();
   if (token) headers["Authorization"] = `Bearer ${token}`;
-  const deviceId = getApiDeviceId();
-  if (deviceId) headers["X-Device-Id"] = deviceId;
 
   const res = await fetch(`${base}/api/v1/records/${recordId}/retry-audio`, {
     method: "POST",

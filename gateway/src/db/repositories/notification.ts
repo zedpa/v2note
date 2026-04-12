@@ -18,7 +18,7 @@ export interface Notification {
 }
 
 export interface CreateNotificationInput {
-  deviceId: string;
+  deviceId?: string;
   userId?: string | null;
   type: string;
   title?: string | null;
@@ -90,7 +90,7 @@ export async function create(input: CreateNotificationInput): Promise<Notificati
      VALUES ($1, $2, $3, $4, $5)
      RETURNING *`,
     [
-      input.deviceId,
+      input.deviceId ?? null,
       input.userId ?? null,
       input.type,
       input.title ?? null,

@@ -4,7 +4,6 @@ import { HttpError } from "../lib/http-helpers.js";
 
 export interface AuthContext {
   userId: string;
-  deviceId: string;
 }
 
 /**
@@ -19,7 +18,7 @@ export function getAuthContext(req: IncomingMessage): AuthContext {
   const token = authHeader.slice(7);
   try {
     const payload = verifyAccessToken(token);
-    return { userId: payload.userId, deviceId: payload.deviceId };
+    return { userId: payload.userId };
   } catch {
     throw new HttpError(401, "Invalid or expired access token");
   }
@@ -37,7 +36,7 @@ export function tryGetAuthContext(req: IncomingMessage): AuthContext | null {
   try {
     const token = authHeader.slice(7);
     const payload = verifyAccessToken(token);
-    return { userId: payload.userId, deviceId: payload.deviceId };
+    return { userId: payload.userId };
   } catch {
     return null;
   }

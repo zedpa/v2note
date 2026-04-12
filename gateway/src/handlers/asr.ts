@@ -39,8 +39,7 @@ const MAX_AUDIO_BYTES = 120 * 32000;
 export type ASRMode = "realtime" | "upload";
 
 interface ASRSession {
-  deviceId: string;
-  userId?: string;
+  userId: string;
   ownerWs: WsWebSocket;
   mode: ASRMode;
   pythonProcess: ChildProcess | null;
@@ -72,11 +71,11 @@ const sessions = new Map<string, ASRSession>();
  */
 export async function startASR(
   clientWs: WsWebSocket,
-  deviceId: string,
+  userId: string,
   locationText?: string,
   mode: ASRMode = "realtime",
   notebook?: string,
-  userId?: string,
+  _userId2?: string,
   sourceContext?: "todo" | "timeline" | "chat" | "review",
   saveAudio?: boolean,
 ): Promise<void> {
@@ -84,15 +83,16 @@ export async function startASR(
   const apiKey = process.env.DASHSCOPE_API_KEY;
   if (!apiKey) throw new Error("Missing DASHSCOPE_API_KEY");
 
-  const existingSession = sessions.get(deviceId);
+  // Cancel 已有 ASR session（防止多设备并发覆盖导致资源泄漏）
+  const existingSession = sessions.get(userId);
   if (existingSession) {
     if (existingSession.pythonProcess) {
-      console.log(`[asr] Killing existing Python process (PID: ${existingSession.pythonProcess.pid}) for device ${deviceId}`);
+      console.log(`[asr] Killing existing Python process (PID: ${existingSession.pythonProcess.pid}) for user ${userId}`);
       existingSession.pythonProcess.kill('SIGKILL');
     }
     cleanupSessionFiles(existingSession);
-    sessions.delete(deviceId);
-    console.warn(`[asr] Replaced existing ASR session for device ${deviceId}`);
+    sessions.delete(userId);
+    console.warn(`[asr] Replaced existing ASR session for user ${userId}`);
   }
 
   const taskId = randomUUID();
@@ -100,7 +100,6 @@ export async function startASR(
   const audioStream = createWriteStream(audioFile);
 
   const session: ASRSession = {
-    deviceId,
     userId,
     ownerWs: clientWs,
     mode,
@@ -120,18 +119,18 @@ export async function startASR(
     startTime: Date.now(),
     sourceContext,
   };
-  sessions.set(deviceId, session);
+  sessions.set(userId, session);
   console.log(`[asr][⏱ session-create] ${Date.now() - asrT0}ms`);
 
   if (mode === "upload") {
     // Upload mode: no subprocess, just accumulate chunks
-    console.log(`[asr] Upload mode started for device ${deviceId}`);
+    console.log(`[asr] Upload mode started for user ${userId}`);
     return;
   }
 
   // 查询用户的 DashScope 热词 ID（用户维度，跨设备共享）
   const tVocab = Date.now();
-  const vocabularyId = await getVocabularyIdForDevice(deviceId);
+  const vocabularyId = await getVocabularyIdForDevice(userId);
   console.log(`[asr][⏱ vocabulary-query] ${Date.now() - tVocab}ms — buffered chunks during wait: ${session.preFlushBuffer.length}`);
 
   // Realtime mode: spawn Python streaming ASR process
@@ -173,7 +172,7 @@ export async function startASR(
   rl.on("line", (line) => {
     try {
       const event = JSON.parse(line);
-      handleRealtimeEvent(clientWs, deviceId, taskId, event);
+      handleRealtimeEvent(clientWs, userId, taskId, event);
     } catch (err) {
       console.error("[asr] Failed to parse Python event:", line, err);
     }
@@ -184,23 +183,23 @@ export async function startASR(
   });
 
   py.on("error", (err) => {
-    const sess = sessions.get(deviceId);
+    const sess = sessions.get(userId);
     if (!sess || sess.taskId !== taskId || sess.pythonProcess !== py) return;
     console.error(`[asr] Python process error (PID: ${py.pid}):`, err);
     sendToClient(clientWs, {
       type: "asr.error",
       payload: { message: "ASR process error" },
     });
-    sessions.delete(deviceId);
+    sessions.delete(userId);
   });
 
   py.on("close", (code) => {
-    console.log(`[asr] Python realtime process (PID: ${py.pid}) exited with code ${code} for device ${deviceId}`);
-    const sess = sessions.get(deviceId);
+    console.log(`[asr] Python realtime process (PID: ${py.pid}) exited with code ${code} for user ${userId}`);
+    const sess = sessions.get(userId);
     
     // Only finish if this is still the active session AND it hasn't been replaced
     if (sess && sess.taskId === taskId && sess.pythonProcess === py) {
-      finishRealtimeASR(clientWs, deviceId, taskId).catch((err) => {
+      finishRealtimeASR(clientWs, userId, taskId).catch((err) => {
         console.error("[asr] Finish error:", err);
       });
     } else {
@@ -208,7 +207,7 @@ export async function startASR(
     }
   });
 
-  console.log(`[asr] Realtime mode started (Python SDK) for device ${deviceId}`);
+  console.log(`[asr] Realtime mode started (Python SDK) for user ${userId}`);
 }
 
 /**
@@ -216,11 +215,11 @@ export async function startASR(
  */
 function handleRealtimeEvent(
   clientWs: WsWebSocket,
-  deviceId: string,
+  userId: string,
   taskId: string,
   event: any,
 ): void {
-  const session = sessions.get(deviceId);
+  const session = sessions.get(userId);
   if (!session || session.taskId !== taskId || session.ownerWs !== clientWs) return;
 
   switch (event.type) {
@@ -285,8 +284,8 @@ function handleRealtimeEvent(
       break;
 
     case "complete":
-      console.log(`[asr] Python ASR complete for device ${deviceId}`);
-      finishRealtimeASR(clientWs, deviceId, taskId).catch((err) => {
+      console.log(`[asr] Python ASR complete for user ${userId}`);
+      finishRealtimeASR(clientWs, userId, taskId).catch((err) => {
         console.error("[asr] Finish error:", err);
       });
       break;
@@ -298,16 +297,16 @@ function handleRealtimeEvent(
  * - realtime: writes to Python subprocess stdin
  * - upload: accumulates in memory
  */
-export function sendAudioChunk(deviceId: string, chunk: Buffer, sourceWs?: WsWebSocket): void {
-  const session = sessions.get(deviceId);
+export function sendAudioChunk(userId: string, chunk: Buffer, sourceWs?: WsWebSocket): void {
+  const session = sessions.get(userId);
   if (!session) return;
   if (sourceWs && session.ownerWs !== sourceWs) return;
 
   // 录音时长限制
   if (session.audioBytes >= MAX_AUDIO_BYTES) {
     if (session.audioBytes - chunk.length < MAX_AUDIO_BYTES) {
-      console.log(`[asr] Max audio duration reached (120s) for device ${deviceId}, auto-stopping`);
-      stopASR(session.ownerWs, deviceId, session.saveAudio, session.forceCommand).catch(console.error);
+      console.log(`[asr] Max audio duration reached (120s) for user ${userId}, auto-stopping`);
+      stopASR(session.ownerWs, userId, session.saveAudio, session.forceCommand).catch(console.error);
     }
     return;
   }
@@ -353,11 +352,11 @@ export function sendAudioChunk(deviceId: string, chunk: Buffer, sourceWs?: WsWeb
  */
 export async function stopASR(
   clientWs: WsWebSocket,
-  deviceId: string,
+  userId: string,
   saveAudio?: boolean,
   forceCommand?: boolean,
 ): Promise<void> {
-  const session = sessions.get(deviceId);
+  const session = sessions.get(userId);
   if (!session) return;
   if (session.ownerWs !== clientWs) return;
 
@@ -371,13 +370,13 @@ export async function stopASR(
   if (forceCommand) session.forceCommand = true;
 
   if (session.mode === "upload") {
-    finishUploadASR(clientWs, deviceId, session.taskId).catch((err) => {
+    finishUploadASR(clientWs, userId, session.taskId).catch((err) => {
       console.error("[asr] Upload finish error:", err);
       sendToClient(clientWs, {
         type: "asr.error",
         payload: { message: `识别失败: ${err.message}` },
       });
-      sessions.delete(deviceId);
+      sessions.delete(userId);
     });
     return;
   }
@@ -394,15 +393,15 @@ export async function stopASR(
  */
 async function finishRealtimeASR(
   clientWs: WsWebSocket,
-  deviceId: string,
+  userId: string,
   expectedTaskId: string,
 ): Promise<void> {
-  const session = sessions.get(deviceId);
+  const session = sessions.get(userId);
   // Remove "session.ownerWs !== clientWs" check for internal cleanup
   if (!session || session.taskId !== expectedTaskId) return;
 
   // Prevent double-finish
-  sessions.delete(deviceId);
+  sessions.delete(userId);
 
   // Combine all confirmed sentences
   const transcript = session.sentences.map((s) => s.text).join("");
@@ -450,7 +449,7 @@ async function finishRealtimeASR(
 
     processEntry({
       text: transcript,
-      deviceId: session.deviceId,
+      deviceId: session.userId,
       userId: session.userId,
       notebook: session.notebook,
       forceCommand: true,
@@ -480,10 +479,10 @@ async function finishRealtimeASR(
  */
 async function finishUploadASR(
   clientWs: WsWebSocket,
-  deviceId: string,
+  userId: string,
   expectedTaskId: string,
 ): Promise<void> {
-  const session = sessions.get(deviceId);
+  const session = sessions.get(userId);
   if (!session || session.taskId !== expectedTaskId || session.ownerWs !== clientWs) return;
 
   const durationSeconds = Math.round((Date.now() - session.startTime) / 1000);
@@ -494,7 +493,7 @@ async function finishUploadASR(
       payload: { transcript: "", recordId: "", duration: 0 },
     });
     cleanupSessionFiles(session);
-    sessions.delete(deviceId);
+    sessions.delete(userId);
     return;
   }
 
@@ -508,11 +507,11 @@ async function finishUploadASR(
   const pcmData = readFileSync(session.audioFile);
   const wavBuffer = pcmToWavFromBuffer(pcmData);
 
-  console.log(`[asr] Upload mode: transcribing ${wavBuffer.length} bytes WAV for device ${deviceId}`);
+  console.log(`[asr] Upload mode: transcribing ${wavBuffer.length} bytes WAV for user ${userId}`);
 
   // Transcribe via Python SDK
   // 查询用户的 DashScope 热词 ID（用户维度，跨设备共享）
-  const uploadVocabId = await getVocabularyIdForDevice(session.deviceId);
+  const uploadVocabId = await getVocabularyIdForDevice(session.userId);
 
   const transcript = await transcribeAudioFile(wavBuffer, uploadVocabId);
 
@@ -521,7 +520,7 @@ async function finishUploadASR(
       type: "asr.done",
       payload: { transcript: "", recordId: "", duration: 0 },
     });
-    sessions.delete(deviceId);
+    sessions.delete(userId);
     return;
   }
 
@@ -532,7 +531,7 @@ async function finishUploadASR(
       payload: { transcript, recordId: "", duration: durationSeconds },
     });
     cleanupSessionFiles(session);
-    sessions.delete(deviceId);
+    sessions.delete(userId);
     return;
   }
 
@@ -543,11 +542,11 @@ async function finishUploadASR(
       payload: { transcript, recordId: "", duration: durationSeconds },
     });
     cleanupSessionFiles(session);
-    sessions.delete(deviceId);
+    sessions.delete(userId);
 
     processEntry({
       text: transcript,
-      deviceId: session.deviceId,
+      deviceId: session.userId,
       userId: session.userId,
       notebook: session.notebook,
       forceCommand: true,
@@ -572,13 +571,13 @@ async function finishUploadASR(
       payload: { command: voiceCmd.command, args: voiceCmd.args },
     });
     cleanupSessionFiles(session);
-    sessions.delete(deviceId);
+    sessions.delete(userId);
     return;
   }
 
   await createRecordAndProcess(clientWs, session, transcript, durationSeconds);
 
-  sessions.delete(deviceId);
+  sessions.delete(userId);
 }
 
 /**
@@ -599,7 +598,6 @@ async function createRecordAndProcess(
       : "voice";
 
   const record = await recordRepo.create({
-    device_id: session.deviceId,
     user_id: session.userId,
     status: "processing",
     source: recordSource,
@@ -630,7 +628,7 @@ async function createRecordAndProcess(
       if (isOssConfigured()) {
         // 从磁盘读取 PCM 数据，分块传入 uploadPCM
         const pcmData = readFileSync(session.audioFile);
-        const audioUrl = await uploadPCM(session.deviceId, [pcmData]);
+        const audioUrl = await uploadPCM(session.userId, [pcmData]);
         await recordRepo.updateFields(record.id, { audio_path: audioUrl });
       }
     } catch (err) {
@@ -643,7 +641,7 @@ async function createRecordAndProcess(
   // Trigger AI processing in background
   processEntry({
     text: transcript,
-    deviceId: session.deviceId,
+    deviceId: session.userId,
     userId: session.userId,
     recordId: record.id,
     notebook: session.notebook,
@@ -661,7 +659,6 @@ async function createRecordAndProcess(
       try {
         const question = await generateReflection(
           transcript,
-          session.deviceId,
           session.userId,
         );
         if (question) {
@@ -793,8 +790,8 @@ export async function transcribeAudioFile(wavBuffer: Buffer, vocabularyId?: stri
 /**
  * Cancel ASR session.
  */
-export function cancelASR(deviceId: string, clientWs?: WsWebSocket): void {
-  const session = sessions.get(deviceId);
+export function cancelASR(userId: string, clientWs?: WsWebSocket): void {
+  const session = sessions.get(userId);
   if (!session) return;
   if (clientWs && session.ownerWs !== clientWs) return;
 
@@ -803,8 +800,8 @@ export function cancelASR(deviceId: string, clientWs?: WsWebSocket): void {
     session.pythonProcess.kill('SIGKILL');
   }
   cleanupSessionFiles(session);
-  sessions.delete(deviceId);
-  console.log(`[asr] Session cancelled for device ${deviceId}`);
+  sessions.delete(userId);
+  console.log(`[asr] Session cancelled for user ${userId}`);
 }
 
 function sendToClient(ws: WsWebSocket, msg: any): void {
@@ -814,8 +811,8 @@ function sendToClient(ws: WsWebSocket, msg: any): void {
 }
 
 /**
- * Check if a session exists for the given device.
+ * Check if a session exists for the given user.
  */
-export function getSessionDeviceId(deviceId: string): boolean {
-  return sessions.has(deviceId);
+export function hasASRSession(userId: string): boolean {
+  return sessions.has(userId);
 }

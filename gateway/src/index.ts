@@ -82,17 +82,17 @@ function startWorker() {
 // ── Message types ──
 
 type GatewayMessage =
-  | { type: "auth"; payload: { token: string; deviceId: string } }
+  | { type: "auth"; payload: { token: string } }
   | { type: "process"; payload: ProcessPayload }
   | { type: "chat.start"; payload: ChatStartPayload }
-  | { type: "chat.message"; payload: { text: string; deviceId: string } }
-  | { type: "chat.end"; payload: { deviceId: string } }
-  | { type: "todo.aggregate"; payload: { deviceId: string } }
-  | { type: "asr.start"; payload: { deviceId: string; locationText?: string; mode?: ASRMode; notebook?: string; sourceContext?: "todo" | "timeline" | "chat" | "review"; saveAudio?: boolean } }
-  | { type: "asr.stop"; payload: { deviceId: string; saveAudio?: boolean; forceCommand?: boolean } }
-  | { type: "asr.cancel"; payload: { deviceId: string } }
-  | { type: "action.confirm_reply"; payload: { deviceId: string; confirm_id: string; confirmed: boolean } }
-  | { type: "todo.refine"; payload: { deviceId: string; commands: any[]; modificationText: string } };
+  | { type: "chat.message"; payload: { text: string } }
+  | { type: "chat.end"; payload: Record<string, never> }
+  | { type: "todo.aggregate"; payload: Record<string, never> }
+  | { type: "asr.start"; payload: { locationText?: string; mode?: ASRMode; notebook?: string; sourceContext?: "todo" | "timeline" | "chat" | "review"; saveAudio?: boolean } }
+  | { type: "asr.stop"; payload: { saveAudio?: boolean; forceCommand?: boolean } }
+  | { type: "asr.cancel"; payload: Record<string, never> }
+  | { type: "action.confirm_reply"; payload: { confirm_id: string; confirmed: boolean } }
+  | { type: "todo.refine"; payload: { commands: any[]; modificationText: string } };
 
 type GatewayResponse =
   | { type: "process.result"; payload: ProcessResult }
@@ -212,11 +212,10 @@ server.keepAliveTimeout = 10 * 60 * 1000;
 
 const wss = new WebSocketServer({ server });
 
-// Map WebSocket connections to device IDs and user IDs
-const connectionDeviceMap = new Map<WebSocket, string>();
+// Map WebSocket connections to user IDs
 const connectionUserMap = new Map<WebSocket, string>();
-// 反向映射：deviceId → 当前活跃 ws（断连重连后自动更新）
-const deviceToWsMap = new Map<string, WebSocket>();
+// 反向映射：userId → 当前活跃 ws（断连重连后自动更新）
+const userToWsMap = new Map<string, WebSocket>();
 
 function send(ws: WebSocket, msg: GatewayResponse) {
   if (ws.readyState === WebSocket.OPEN) {
@@ -224,9 +223,9 @@ function send(ws: WebSocket, msg: GatewayResponse) {
   }
 }
 
-/** 向设备当前活跃的 WebSocket 发送消息（断连重连后自动切换到新连接） */
-function sendToDevice(deviceId: string, msg: GatewayResponse) {
-  const ws = deviceToWsMap.get(deviceId);
+/** 向用户当前活跃的 WebSocket 发送消息（断连重连后自动切换到新连接） */
+function sendToUser(userId: string, msg: GatewayResponse) {
+  const ws = userToWsMap.get(userId);
   if (ws && ws.readyState === WebSocket.OPEN) {
     ws.send(JSON.stringify(msg));
   }
@@ -240,16 +239,7 @@ proactiveEngine.start().catch((err) => {
 // 监听 todo.created 事件，通过 WS 通知对应客户端
 eventBus.on("todo.created", (evt: TodoCreatedEvent) => {
   for (const [ws, uid] of connectionUserMap.entries()) {
-    if (uid === evt.deviceId || uid === evt.userId) {
-      send(ws, {
-        type: "todo.created",
-        payload: { todoId: evt.todoId, text: evt.todoText },
-      });
-    }
-  }
-  // 也检查 deviceMap（未登录用户）
-  for (const [ws, did] of connectionDeviceMap.entries()) {
-    if (did === evt.deviceId && !connectionUserMap.has(ws)) {
+    if (uid === evt.userId) {
       send(ws, {
         type: "todo.created",
         payload: { todoId: evt.todoId, text: evt.todoText },
@@ -264,9 +254,9 @@ wss.on("connection", (ws) => {
   ws.on("message", async (raw, isBinary) => {
     // Binary frame: PCM audio data for ASR
     if (isBinary) {
-      const deviceId = connectionDeviceMap.get(ws);
-      if (deviceId) {
-        sendAudioChunk(deviceId, Buffer.from(raw as Buffer), ws);
+      const userId = connectionUserMap.get(ws);
+      if (userId) {
+        sendAudioChunk(userId, Buffer.from(raw as Buffer), ws);
       }
       return;
     }
@@ -285,14 +275,13 @@ wss.on("connection", (ws) => {
         try {
           const payload = verifyAccessToken(msg.payload.token);
           connectionUserMap.set(ws, payload.userId);
-          connectionDeviceMap.set(ws, payload.deviceId);
-          deviceToWsMap.set(payload.deviceId, ws);
-          console.log(`[gateway] WebSocket authenticated: user=${payload.userId}, device=${payload.deviceId}`);
+          userToWsMap.set(payload.userId, ws);
+          console.log(`[gateway] WebSocket authenticated: user=${payload.userId}`);
           send(ws, { type: "auth.ok", payload: { userId: payload.userId } });
 
-          proactiveEngine.registerDevice(payload.deviceId, ws, payload.userId);
+          proactiveEngine.registerUser(payload.userId, ws);
 
-          generateAiStatus(payload.deviceId, payload.userId)
+          generateAiStatus(payload.userId, payload.userId)
             .then((text) => {
               send(ws, { type: "ai.status", payload: { text } });
             })
@@ -306,9 +295,9 @@ wss.on("connection", (ws) => {
       }
 
       // ── WebSocket 速率限制 ──
-      const wsDeviceId = connectionDeviceMap.get(ws);
-      if (wsDeviceId) {
-        const wsRateResult = checkWsRateLimit(wsDeviceId);
+      const wsUserId = connectionUserMap.get(ws);
+      if (wsUserId) {
+        const wsRateResult = checkWsRateLimit(wsUserId);
         if (!wsRateResult.allowed) {
           send(ws, { type: "error", payload: { message: "rate_limited", code: "rate_limited", retryAfter: wsRateResult.retryAfter ?? 1 } as any });
           return;
@@ -346,13 +335,13 @@ wss.on("connection", (ws) => {
         case "chat.message": {
           // 自动恢复：如果 session 不在 chat mode（断连重连后未 chat.start），自动初始化
           {
-            const session = getSession(msg.payload.deviceId);
+            const session = getSession(authedUserId);
             if (session.mode !== "chat") {
-              console.log(`[chat] Auto-recovering chat session for device ${msg.payload.deviceId}`);
+              console.log(`[chat] Auto-recovering chat session for user ${authedUserId}`);
               try {
                 const todayStr = tzToday();
                 await initChat({
-                  deviceId: msg.payload.deviceId,
+                  deviceId: authedUserId,
                   userId: authedUserId,
                   mode: "command",
                   dateRange: { start: todayStr, end: todayStr },
@@ -371,30 +360,30 @@ wss.on("connection", (ws) => {
             );
             // 即时记忆触发：关键词快筛 + 异步 maybeCreateMemory
             if (shouldTriggerMemory(msg.payload.text)) {
-              const session = getSession(msg.payload.deviceId);
+              const session = getSession(authedUserId);
               const todayStr = tzToday();
               session.memoryManager.maybeCreateMemory(
-                msg.payload.deviceId, msg.payload.text, todayStr, authedUserId,
+                authedUserId, msg.payload.text, todayStr, authedUserId,
               ).catch(e => console.warn(`[chat] Memory trigger failed: ${e.message}`));
             }
           }
-          const chatDeviceId = msg.payload.deviceId;
+          const chatUserId = authedUserId;
           let fullText = "";
           try {
             const stream = await sendChatMessage(
-              chatDeviceId,
+              chatUserId,
               msg.payload.text,
             );
-            // 使用 sendToDevice 替代 send(ws)：断连重连后自动切换到新连接
+            // 使用 sendToUser 替代 send(ws)：断连重连后自动切换到新连接
             await iterateStreamWithTimeout(stream, (chunk) => {
               if (chunk.startsWith("\x00TOOL_STATUS:")) {
                 const parts = chunk.slice(13).split(":", 3);
-                sendToDevice(chatDeviceId, { type: "tool.status", payload: { toolName: parts[0], label: parts[1], callId: parts[2] ?? "" } });
+                sendToUser(chatUserId, { type: "tool.status", payload: { toolName: parts[0], label: parts[1], callId: parts[2] ?? "" } });
                 return;
               }
               if (chunk.startsWith("\x00TOOL_DONE:")) {
                 const parts = chunk.slice(11).split(":", 5);
-                sendToDevice(chatDeviceId, { type: "tool.done", payload: {
+                sendToUser(chatUserId, { type: "tool.done", payload: {
                   toolName: parts[0], callId: parts[1] ?? "",
                   success: parts[2] === "true", message: parts[3] ?? "",
                   durationMs: parseInt(parts[4] ?? "0", 10),
@@ -402,15 +391,15 @@ wss.on("connection", (ws) => {
                 return;
               }
               fullText += chunk;
-              sendToDevice(chatDeviceId, { type: "chat.chunk", payload: { text: chunk } });
+              sendToUser(chatUserId, { type: "chat.chunk", payload: { text: chunk } });
             });
           } catch (streamErr: any) {
             console.error(`[gateway] chat.message stream error:`, streamErr.message);
             if (!fullText) fullText = "抱歉，出了点问题，请稍后再试。";
           }
-          const session = getSession(chatDeviceId);
+          const session = getSession(chatUserId);
           session.context.addMessage({ role: "assistant", content: fullText });
-          sendToDevice(chatDeviceId, { type: "chat.done", payload: { full_text: fullText } });
+          sendToUser(chatUserId, { type: "chat.done", payload: { full_text: fullText } });
           // 持久化 AI 回复（异步）
           if (fullText && authedUserId) {
             chatMessageRepo.saveMessage(authedUserId, "assistant", fullText).catch(e =>
@@ -423,40 +412,30 @@ wss.on("connection", (ws) => {
         }
 
         case "chat.end": {
-          await endChat(msg.payload.deviceId);
+          await endChat(authedUserId);
           send(ws, { type: "chat.done", payload: { full_text: "" } });
           break;
         }
 
         case "todo.aggregate": {
-          const result = await aggregateTodos(msg.payload.deviceId, authedUserId);
+          const result = await aggregateTodos(authedUserId, authedUserId);
           send(ws, { type: "todo.result", payload: result });
           break;
         }
 
         case "asr.start": {
           console.log(`[asr.start] notebook=${msg.payload.notebook}, mode=${msg.payload.mode}, sourceContext=${msg.payload.sourceContext}`);
-          connectionDeviceMap.set(ws, msg.payload.deviceId);
-          proactiveEngine.registerDevice(msg.payload.deviceId, ws, authedUserId);
-          await startASR(ws, msg.payload.deviceId, msg.payload.locationText, msg.payload.mode, msg.payload.notebook, authedUserId, msg.payload.sourceContext, msg.payload.saveAudio);
+          await startASR(ws, authedUserId, msg.payload.locationText, msg.payload.mode, msg.payload.notebook, authedUserId, msg.payload.sourceContext, msg.payload.saveAudio);
           break;
         }
 
         case "asr.stop": {
-          const deviceId = connectionDeviceMap.get(ws);
-          if (deviceId) {
-            await stopASR(ws, deviceId, msg.payload.saveAudio, msg.payload.forceCommand);
-            connectionDeviceMap.delete(ws);
-          }
+          await stopASR(ws, authedUserId, msg.payload.saveAudio, msg.payload.forceCommand);
           break;
         }
 
         case "asr.cancel": {
-          const deviceId = connectionDeviceMap.get(ws);
-          if (deviceId) {
-            cancelASR(deviceId, ws);
-            connectionDeviceMap.delete(ws);
-          }
+          cancelASR(authedUserId, ws);
           break;
         }
 
@@ -472,8 +451,8 @@ wss.on("connection", (ws) => {
         }
 
         case "action.confirm_reply": {
-          const { deviceId, confirm_id, confirmed } = msg.payload;
-          const session = getSession(deviceId);
+          const { confirm_id, confirmed } = msg.payload;
+          const session = getSession(authedUserId);
           const pending = session.pendingConfirms.get(confirm_id);
 
           if (!pending) {
@@ -523,13 +502,12 @@ wss.on("connection", (ws) => {
 
   ws.on("close", () => {
     // Cleanup ASR session on disconnect
-    const deviceId = connectionDeviceMap.get(ws);
-    if (deviceId) {
-      cancelASR(deviceId, ws);
-      connectionDeviceMap.delete(ws);
-      // 仅当 deviceToWsMap 指向本连接时才清除（新连接可能已覆盖）
-      if (deviceToWsMap.get(deviceId) === ws) {
-        deviceToWsMap.delete(deviceId);
+    const userId = connectionUserMap.get(ws);
+    if (userId) {
+      cancelASR(userId, ws);
+      // 仅当 userToWsMap 指向本连接时才清除（新连接可能已覆盖）
+      if (userToWsMap.get(userId) === ws) {
+        userToWsMap.delete(userId);
       }
     }
     connectionUserMap.delete(ws);

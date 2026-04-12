@@ -1,8 +1,11 @@
 /**
  * 目标自动关联模块
- * - goalAutoLink: 创建后全量扫描（cluster + 历史记录 + todo）
- * - linkNewStrikesToGoals: digest 后增量关联新 Strike 到已有目标
+ * - goalAutoLink: 创建后全量扫描（wiki_page + todo）
+ * - linkNewStrikesToGoals: digest 后增量关联（已废弃，保留签名兼容）
  * - getProjectProgress: 项目级子目标进度汇总
+ *
+ * 注：原 strike/cluster 关联已随 strike 系统清理。
+ * cluster 匹配改为基于 wiki_page，todo 匹配改为基于 goal_embedding。
  */
 
 import * as goalRepo from "../db/repositories/goal.js";
@@ -10,9 +13,7 @@ import * as todoRepo from "../db/repositories/todo.js";
 import { query } from "../db/pool.js";
 import type { Goal } from "../db/repositories/goal.js";
 
-const CLUSTER_LINK_THRESHOLD = 0.7;
 const TODO_LINK_THRESHOLD = 0.65;
-const STRIKE_GOAL_LINK_THRESHOLD = 0.6;
 
 // ── 场景 1: 全量关联 ─────────────────────────────────────────────────
 
@@ -24,7 +25,7 @@ export interface AutoLinkResult {
 
 /**
  * 目标创建后全量关联扫描：
- * 1. 语义匹配 Cluster → 关联
+ * 1. 语义匹配 wiki_page → 关联
  * 2. 统计相关历史记录数
  * 3. 匹配已有 pending todo → 关联到目标
  */
@@ -34,26 +35,23 @@ export async function goalAutoLink(goalId: string, userId: string): Promise<Auto
   const goal = await goalRepo.findById(goalId);
   if (!goal) return result;
 
-  // 1. 关联 Cluster（如果还没有）
-  if (!goal.cluster_id) {
+  // 1. 关联 wiki_page（如果还没有）
+  if (!goal.wiki_page_id) {
     try {
-      const clusters = await query<{ id: string; similarity: number }>(
-        `SELECT s.id,
-                1 - (s.embedding <=> (
-                  SELECT embedding FROM strike
-                  WHERE nucleus = $1 AND user_id = $2
-                  ORDER BY created_at DESC LIMIT 1
-                )) as similarity
-         FROM strike s
-         WHERE s.user_id = $2 AND s.is_cluster = true AND s.status = 'active'
-           AND s.embedding IS NOT NULL
+      const pages = await query<{ id: string; similarity: number }>(
+        `SELECT wp.id,
+                1 - (wp.embedding <=> ge.embedding) as similarity
+         FROM wiki_page wp, goal_embedding ge
+         WHERE ge.goal_id = $1
+           AND wp.user_id = $2 AND wp.status = 'active'
+           AND wp.embedding IS NOT NULL AND ge.embedding IS NOT NULL
          ORDER BY similarity DESC
          LIMIT 1`,
-        [goal.title, userId],
+        [goalId, userId],
       );
 
-      if (clusters.length > 0 && clusters[0].similarity >= CLUSTER_LINK_THRESHOLD) {
-        await goalRepo.update(goalId, { cluster_id: clusters[0].id });
+      if (pages.length > 0 && pages[0].similarity >= 0.7) {
+        await goalRepo.update(goalId, { wiki_page_id: pages[0].id });
         result.clusterLinked = true;
       }
     } catch {
@@ -63,23 +61,22 @@ export async function goalAutoLink(goalId: string, userId: string): Promise<Auto
     result.clusterLinked = true;
   }
 
-  // 2. 统计相关记录数（通过 Strike 追溯 source_id）
+  // 2. 统计相关记录数（通过 wiki_page_record 追溯）
   try {
-    const records = await query<{ id: string }>(
-      `SELECT DISTINCT s.source_id as id
-       FROM strike s
-       WHERE s.user_id = $1 AND s.source_id IS NOT NULL
-         AND s.status = 'active'
-         AND s.embedding IS NOT NULL
-         AND 1 - (s.embedding <=> (
-           SELECT embedding FROM strike
-           WHERE nucleus = $2 AND user_id = $1
-           ORDER BY created_at DESC LIMIT 1
-         )) > $3
-       LIMIT 50`,
-      [userId, goal.title, STRIKE_GOAL_LINK_THRESHOLD],
+    const records = await query<{ count: string }>(
+      `SELECT COUNT(DISTINCT wpr.record_id) as count
+       FROM wiki_page_record wpr
+       JOIN wiki_page wp ON wp.id = wpr.wiki_page_id
+       WHERE wp.user_id = $1 AND wp.status = 'active'
+         AND wp.embedding IS NOT NULL
+         AND EXISTS (
+           SELECT 1 FROM goal_embedding ge
+           WHERE ge.goal_id = $2 AND ge.embedding IS NOT NULL
+             AND 1 - (wp.embedding <=> ge.embedding) > 0.6
+         )`,
+      [userId, goalId],
     );
-    result.recordsFound = records.length;
+    result.recordsFound = parseInt(records[0]?.count ?? "0", 10);
   } catch {
     // 静默
   }
@@ -88,18 +85,17 @@ export async function goalAutoLink(goalId: string, userId: string): Promise<Auto
   try {
     const matchingTodos = await query<{ id: string; text: string; similarity: number }>(
       `SELECT t.id, t.text,
-              1 - (te.embedding <=> (
-                SELECT embedding FROM strike
-                WHERE nucleus = $1 AND user_id = $2
-                ORDER BY created_at DESC LIMIT 1
-              )) as similarity
+              1 - (te.embedding <=> ge.embedding) as similarity
        FROM todo t
        JOIN todo_embedding te ON te.todo_id = t.id
-       WHERE t.done = false AND t.goal_id IS NULL
-         AND te.embedding IS NOT NULL
+       CROSS JOIN goal_embedding ge
+       WHERE ge.goal_id = $1
+         AND t.user_id = $2
+         AND t.done = false AND t.goal_id IS NULL
+         AND te.embedding IS NOT NULL AND ge.embedding IS NOT NULL
        ORDER BY similarity DESC
        LIMIT 10`,
-      [goal.title, userId],
+      [goalId, userId],
     );
 
     for (const todo of matchingTodos) {
@@ -122,39 +118,37 @@ export interface IncrementalLinkResult {
 }
 
 /**
- * digest 后检查无 cluster_id 的活跃目标，尝试匹配新 Strike 所属的集群。
- * 如果目标 embedding 与某集群相似度 > 阈值，设置 todo.cluster_id。
+ * @deprecated strike 系统已废弃，增量关联改为基于 wiki_page。
+ * 保留签名以兼容调用方，实际使用 wiki_page + goal_embedding 匹配。
  */
 export async function linkNewStrikesToGoals(
-  newStrikes: Array<{ id: string; source_id: string | null }>,
+  _newStrikes: Array<{ id: string; source_id: string | null }>,
   userId: string,
 ): Promise<IncrementalLinkResult> {
   const result: IncrementalLinkResult = { linked: 0 };
 
-  if (newStrikes.length === 0) return result;
-
-  // 获取无 cluster_id 的活跃目标（统一模型：todo 表 level>=1）
+  // 获取无 wiki_page_id 的活跃目标
   const allGoals = await goalRepo.findActiveByUser(userId);
-  const orphanGoals = allGoals.filter((g) => !g.cluster_id);
+  const orphanGoals = allGoals.filter((g) => !g.wiki_page_id && !g.cluster_id);
   if (orphanGoals.length === 0) return result;
 
-  // 对每个孤立目标，用 embedding 匹配最近的活跃集群
+  // 对每个孤立目标，用 embedding 匹配最近的活跃 wiki_page
   for (const goal of orphanGoals) {
     try {
-      const matches = await query<{ cluster_id: string; similarity: number }>(
-        `SELECT s.id as cluster_id,
-                1 - (s.embedding <=> ge.embedding) as similarity
-         FROM strike s, goal_embedding ge
+      const matches = await query<{ page_id: string; similarity: number }>(
+        `SELECT wp.id as page_id,
+                1 - (wp.embedding <=> ge.embedding) as similarity
+         FROM wiki_page wp, goal_embedding ge
          WHERE ge.goal_id = $1
-           AND s.user_id = $2 AND s.is_cluster = true AND s.status = 'active'
-           AND s.embedding IS NOT NULL AND ge.embedding IS NOT NULL
+           AND wp.user_id = $2 AND wp.status = 'active'
+           AND wp.embedding IS NOT NULL AND ge.embedding IS NOT NULL
          ORDER BY similarity DESC
          LIMIT 1`,
         [goal.id, userId],
       );
 
-      if (matches.length > 0 && matches[0].similarity >= STRIKE_GOAL_LINK_THRESHOLD) {
-        await goalRepo.update(goal.id, { cluster_id: matches[0].cluster_id });
+      if (matches.length > 0 && matches[0].similarity >= 0.6) {
+        await goalRepo.update(goal.id, { wiki_page_id: matches[0].page_id });
         result.linked++;
       }
     } catch {

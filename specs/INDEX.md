@@ -39,6 +39,7 @@
 | 123 | 提示词架构 v2 — SharedAgent/UserAgent 分层 | agent | prompt-architecture-v2.md | 五层存储互斥+AI自主维护+wiki注入 |
 | 125 | 待办写入系统日历 & 闹钟 | todo | todo-calendar-alarm.md | Intent方案+SystemIntentPlugin |
 | 087 | 鸿蒙 HarmonyOS NEXT 适配 | infra | harmony-support.md | WebView壳+JSBridge+前端适配层 |
+| fix-sidebar-wiki-mgmt | Fix: 侧边栏 Wiki 页面管理 | ui | fix-sidebar-wiki-mgmt.md | 数据对齐+CRUD UI+Agent工具 |
 ## 🟡 Draft（规划中，尚未开始实施）
 
 | id | title | domain | file |
@@ -52,6 +53,10 @@
 
 | id | title | domain | file |
 |----|-------|--------|------|
+| fix-recording-audio-focus | Fix: 录音按钮无法中断系统音频播放 | voice | fix-recording-audio-focus.md |
+| fix-onboarding-step2-guide | Fix: 冷启动第二步改为聚焦操作引导 | onboarding | fix-onboarding-step2-guide.md |
+| fix-remove-device-id | Fix: 全面清除 deviceId 概念 | infra | fix-remove-device-id.md |
+| fix-record-delete-strike | Fix: 删除日记报错 strike 表不存在 | infra | fix-record-delete-strike.md |
 | 119 | 认知 Wiki — 从原子拆解到知识编译 | cognitive | cognitive-wiki.md |
 | fix-briefing-stale-todos | Fix: 早晚报待办过时+数据范围修正 | report | fix-briefing-stale-todos.md |
 | fix-command-sheet-stuck | Fix: 上滑指令 CommandSheet 堵塞 | voice | fix-command-sheet-stuck.md |
@@ -120,6 +125,7 @@
 | fix-todo-project-vanish | Fix: 待办项目视图添加后消失 | todo | fix-todo-project-vanish.md |
 | fix-image-thumbnail | Fix: 图片插入后显示文字描述而非缩略图 | ui | fix-image-thumbnail.md |
 | fix-briefing-prompt-v2 | Fix: 早晚报接入 v2 提示词架构 | report | fix-briefing-prompt-v2.md |
+| fix-reminder-not-working | Fix: 提醒功能未生效 — Agent工具+编辑页+recalc | todo | fix-reminder-not-working.md |
 
 ## ⛔ Superseded（已被合并，不要引用）
 

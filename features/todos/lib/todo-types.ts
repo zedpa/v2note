@@ -37,7 +37,6 @@ export interface TodoDTO {
   /** wiki page 关联 ID（认知 Wiki 模式） */
   wiki_page_id?: string | null;
   status: string;         // active|progressing|blocked|paused|completed|...
-  strike_id: string | null;
   goal_id: string | null; // deprecated
 
   // 计算字段（后端 JOIN）

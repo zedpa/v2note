@@ -113,7 +113,7 @@ export function buildSystemPrompt(opts: {
 
   // 9. 认知上下文
   if (opts.cognitiveContext) {
-    parts.push(`## 用户思考动态\n${opts.cognitiveContext}\n在对话中自然提及这些变化和演进，用"变化""演进""不同角度"等温和措辞。不要使用"矛盾""聚类""Strike"等技术术语。`);
+    parts.push(`## 用户思考动态\n${opts.cognitiveContext}\n在对话中自然提及这些变化和演进，用"变化""演进""不同角度"等温和措辞。`);
   }
 
   // 10. 待确认意图

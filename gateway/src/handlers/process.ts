@@ -1,6 +1,7 @@
 import { chatCompletion, type ChatMessage } from "../ai/provider.js";
 import { appendToDiary } from "../diary/manager.js";
 import { recordRepo, summaryRepo, todoRepo, tagRepo } from "../db/repositories/index.js";
+import * as wikiPageRepo from "../db/repositories/wiki-page.js";
 import { classifyVoiceIntent, executeVoiceAction, matchTodoByHint, type VoiceAction, type ActionExecResult } from "./voice-action.js";
 import { safeParseJson } from "../lib/text-utils.js";
 import { toLocalDateTime } from "../lib/tz.js";
@@ -175,7 +176,7 @@ export async function processEntry(payload: ProcessPayload): Promise<ProcessResu
         ? todoRepo.findActiveGoalsByUser(payload.userId)
         : todoRepo.findActiveGoalsByDevice(payload.deviceId),
       payload.userId
-        ? recordRepo.listUserDomains(payload.userId)
+        ? wikiPageRepo.findAllActive(payload.userId).then(pages => pages.map(p => p.title))
         : Promise.resolve([] as string[]),
     ]);
 
@@ -345,7 +346,7 @@ export async function processEntry(payload: ProcessPayload): Promise<ProcessResu
       ? `[${timeTag}] ${result.summary}`
       : `[${timeTag}] ${payload.text.slice(0, 200)}`;
     const diaryNotebook = payload.notebook && payload.notebook !== "ai-self" ? payload.notebook : "default";
-    appendToDiary(payload.deviceId, diaryNotebook, diaryLine, payload.userId).catch((e) => {
+    appendToDiary(payload.userId ?? payload.deviceId, diaryNotebook, diaryLine).catch((e) => {
       console.warn("[process] Diary append failed:", e.message);
     });
   } catch (err: any) {

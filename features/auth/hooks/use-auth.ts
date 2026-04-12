@@ -11,8 +11,6 @@ import {
   onAuthEvent,
 } from "@/shared/lib/auth";
 import { registerUser, loginUser, logoutUser, registerWithEmail, loginWithEmail } from "@/shared/lib/api/auth";
-import { getDeviceId } from "@/shared/lib/device";
-import { setApiDeviceId } from "@/shared/lib/api";
 import type { AppUser } from "@/shared/lib/types";
 import { fabNotify } from "@/shared/lib/fab-notify";
 
@@ -74,10 +72,8 @@ export function useAuth() {
     setError(null);
     setLoading(true);
     try {
-      const deviceId = await getDeviceId();
-      const result = await loginUser(phone, password, deviceId);
+      const result = await loginUser(phone, password);
       await saveAuthTokens(result);
-      setApiDeviceId(deviceId);
       try { localStorage.setItem("voicenote:lastPhone", phone); } catch { /* ignore */ }
       setLoggedInUser(result);
     } catch (err: any) {
@@ -93,10 +89,8 @@ export function useAuth() {
     setError(null);
     setLoading(true);
     try {
-      const deviceId = await getDeviceId();
-      const result = await loginWithEmail(email, password, deviceId);
+      const result = await loginWithEmail(email, password);
       await saveAuthTokens(result);
-      setApiDeviceId(deviceId);
       try { localStorage.setItem("voicenote:lastEmail", email); } catch { /* ignore */ }
       setLoggedInUser(result);
     } catch (err: any) {
@@ -112,10 +106,8 @@ export function useAuth() {
     setError(null);
     setLoading(true);
     try {
-      const deviceId = await getDeviceId();
-      const result = await registerUser(phone, password, deviceId, displayName);
+      const result = await registerUser(phone, password, displayName);
       await saveAuthTokens(result);
-      setApiDeviceId(deviceId);
       try { localStorage.setItem("voicenote:lastPhone", phone); } catch { /* ignore */ }
       setLoggedInUser(result);
     } catch (err: any) {
@@ -131,10 +123,8 @@ export function useAuth() {
     setError(null);
     setLoading(true);
     try {
-      const deviceId = await getDeviceId();
-      const result = await registerWithEmail(email, verificationToken, password, deviceId, displayName);
+      const result = await registerWithEmail(email, verificationToken, password, displayName);
       await saveAuthTokens(result);
-      setApiDeviceId(deviceId);
       try { localStorage.setItem("voicenote:lastEmail", email); } catch { /* ignore */ }
       setLoggedInUser(result);
     } catch (err: any) {

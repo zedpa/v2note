@@ -32,8 +32,7 @@ function loadReflectSkillPrompt(): string {
  */
 export async function generateReflection(
   text: string,
-  deviceId: string,
-  userId?: string,
+  userId: string,
 ): Promise<string | null> {
   // Skip very short entries
   if (text.trim().length < 10) return null;
@@ -43,7 +42,7 @@ export async function generateReflection(
   // Load recent memories for pattern detection
   let memoryContext = "";
   try {
-    const memories = await loadMemory(deviceId, undefined, userId);
+    const memories = await loadMemory(userId, undefined, userId);
     if (memories.length > 0) {
       memoryContext = memories
         .slice(0, 5)
@@ -87,11 +86,11 @@ export async function generateReflection(
  * Generate a personalized AI status message based on soul.
  */
 export async function generateAiStatus(
-  deviceId: string,
-  userId?: string,
+  userId: string,
+  _userId2?: string,
 ): Promise<string> {
   try {
-    const soul = await loadSoul(deviceId, userId);
+    const soul = await loadSoul(userId, userId);
 
     if (soul?.content) {
       const response = await chatCompletion(

@@ -71,23 +71,26 @@ export function WorkspaceHeader({
         </button>
 
         {/* 中间: Segment 切换器 */}
-        <div role="tablist" aria-label="主视图切换" className="flex items-center bg-surface-high rounded-full min-h-[48px] p-0.5 w-[160px]">
-          <button
-            role="tab"
-            aria-selected={activeTab === "diary"}
-            onClick={() => onTabChange("diary")}
-            className={cn(
-              "flex-1 h-full rounded-full text-sm font-medium transition-all duration-200 py-2 px-4",
-              activeTab === "diary"
-                ? "bg-surface-lowest text-on-surface shadow-sm"
-                : "text-muted-accessible",
-            )}
-          >
-            日记
-          </button>
-          <div className="flex-1 h-full relative" ref={menuRef}>
+        <div role="tablist" aria-label="主视图切换" className="flex items-center bg-surface-high rounded-full min-h-[48px] p-0.5 w-[160px] shrink-0">
+          <div role="presentation" className="flex-1 min-w-0 h-full">
             <button
               role="tab"
+              aria-selected={activeTab === "diary"}
+              onClick={() => onTabChange("diary")}
+              className={cn(
+                "w-full h-full rounded-full text-sm font-medium transition-all duration-200 flex items-center justify-center py-2 px-4 whitespace-nowrap",
+                activeTab === "diary"
+                  ? "bg-surface-lowest text-on-surface shadow-sm"
+                  : "text-muted-accessible",
+              )}
+            >
+              日记
+            </button>
+          </div>
+          <div role="presentation" className="flex-1 min-w-0 h-full relative" ref={menuRef}>
+            <button
+              role="tab"
+              data-guide="tab-todo"
               aria-selected={activeTab === "todo"}
               onClick={() => {
                 if (activeTab === "todo") {
@@ -97,7 +100,7 @@ export function WorkspaceHeader({
                 }
               }}
               className={cn(
-                "w-full h-full rounded-full text-sm font-medium transition-all duration-200 flex items-center justify-center gap-0.5 py-2 px-4",
+                "w-full h-full rounded-full text-sm font-medium transition-all duration-200 flex items-center justify-center gap-0.5 py-2 px-4 whitespace-nowrap",
                 activeTab === "todo"
                   ? "bg-surface-lowest text-on-surface shadow-sm"
                   : "text-muted-accessible",

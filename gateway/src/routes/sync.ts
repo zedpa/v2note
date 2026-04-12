@@ -1,17 +1,17 @@
 import type { Router } from "../router.js";
-import { readBody, sendJson, getDeviceId, getUserId } from "../lib/http-helpers.js";
+import { readBody, sendJson, getUserId } from "../lib/http-helpers.js";
 import { recordRepo } from "../db/repositories/index.js";
 import { query } from "../db/pool.js";
 
 export function registerSyncRoutes(router: Router) {
   // Push sync entries
   router.post("/api/v1/sync/push", async (req, res) => {
-    const deviceId = getDeviceId(req);
+    const userId = getUserId(req);
     const { entries } = await readBody<{ entries: any[] }>(req);
     let uploaded = 0;
     for (const entry of entries ?? []) {
       await recordRepo.create({
-        device_id: deviceId,
+        user_id: userId ?? undefined,
         status: entry.status ?? "completed",
         source: entry.source ?? "voice",
       });
@@ -22,13 +22,12 @@ export function registerSyncRoutes(router: Router) {
 
   // Pull sync (cursor-based) — uses userId for cross-device data
   router.get("/api/v1/sync/pull", async (req, res, _params, qp) => {
-    const deviceId = getDeviceId(req);
     const userId = getUserId(req);
     const cursor = qp.cursor;
     const limit = 50;
 
-    const idCol = userId ? "user_id" : "device_id";
-    const idVal = userId ?? deviceId;
+    const idCol = "user_id";
+    const idVal = userId;
 
     let rows;
     if (cursor) {

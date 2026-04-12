@@ -1,5 +1,4 @@
 import { getGatewayClient } from "@/features/chat/lib/gateway-client";
-import { getDeviceId } from "@/shared/lib/device";
 
 /**
  * Process a recording via the Gateway WebSocket.
@@ -9,7 +8,6 @@ export async function processRecording(
   recordId: string,
   text: string,
 ): Promise<void> {
-  const deviceId = await getDeviceId();
   const client = getGatewayClient();
 
   if (!client.connected) {
@@ -20,6 +18,6 @@ export async function processRecording(
 
   client.send({
     type: "process",
-    payload: { text, deviceId, recordId },
+    payload: { text, recordId },
   });
 }

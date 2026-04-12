@@ -8,7 +8,7 @@
  */
 
 import { chatCompletion, type ChatMessage } from "../ai/provider.js";
-import { todoRepo, notebookRepo } from "../db/repositories/index.js";
+import { todoRepo, wikiPageRepo } from "../db/repositories/index.js";
 import { safeParseJson } from "../lib/text-utils.js";
 import { buildCommandFullPrompt, type CommandFullContext } from "./command-full-prompt.js";
 import type { TodoCommand, ExtractedTodo } from "./process.js";
@@ -25,13 +25,12 @@ export interface CommandItem {
   changes?: Record<string, any>;
   query_params?: Record<string, any>;
   query_result?: any[];
-  folder?: { action: "create" | "rename" | "delete"; name: string; new_name?: string };
-  move?: { record_hint: string; target_folder: string };
+  wiki_page?: { action: string; title?: string; page_id?: string; new_title?: string; record_id?: string };
 }
 
 interface CommandFullPayload {
   text: string;
-  deviceId: string;
+  deviceId: string; // 已弃用，保留兼容
   userId?: string;
 }
 
@@ -40,16 +39,11 @@ export async function commandFullMode(payload: CommandFullPayload): Promise<{
   actionResults: ActionExecResult[];
 }> {
   // 1. 预加载上下文
-  const [pendingTodos, activeGoals, notebooks] = await Promise.all([
-    payload.userId
-      ? todoRepo.findPendingByUser(payload.userId)
-      : todoRepo.findPendingByDevice(payload.deviceId),
-    payload.userId
-      ? todoRepo.findActiveGoalsByUser(payload.userId)
-      : todoRepo.findActiveGoalsByDevice(payload.deviceId),
-    payload.userId
-      ? notebookRepo.findByUser(payload.userId)
-      : notebookRepo.findByDevice(payload.deviceId),
+  const userId = payload.userId ?? payload.deviceId;
+  const [pendingTodos, activeGoals, wikiPages] = await Promise.all([
+    todoRepo.findPendingByUser(userId),
+    todoRepo.findActiveGoalsByUser(userId),
+    wikiPageRepo.findAllActive(userId),
   ]);
 
   const ctx: CommandFullContext = {
@@ -62,9 +56,10 @@ export async function commandFullMode(payload: CommandFullPayload): Promise<{
       id: g.id,
       title: g.text,
     })),
-    folders: notebooks
-      .filter(n => !n.is_system)
-      .map(n => ({ name: n.name })),
+    wikiPages: wikiPages.slice(0, 50).map(p => ({
+      id: p.id,
+      title: p.title,
+    })),
   };
 
   // 2. 构建 prompt + 单次 AI 调用

@@ -179,7 +179,7 @@ describe("场景 1.1: 早报接入 v2 prompt 架构", () => {
 
     expect(mockedLoadWarmContext).toHaveBeenCalledWith(
       expect.objectContaining({
-        deviceId: "device-1",
+        deviceId: "user-1",
         userId: "user-1",
         mode: "briefing",
       }),
@@ -487,7 +487,7 @@ describe("场景 2.1: 晚报接入 v2 prompt 架构", () => {
 
     expect(mockedLoadWarmContext).toHaveBeenCalledWith(
       expect.objectContaining({
-        deviceId: "device-1",
+        deviceId: "user-1",
         userId: "user-1",
         mode: "briefing",
       }),
@@ -815,7 +815,7 @@ describe("regression: fix-morning-briefing — Bug 1: UTC 时区错位", () => {
 
       expect(mockedFindByUserAndDate).toHaveBeenCalledWith("user-1", "2026-04-08", "morning");
       expect(mockedUpsert).toHaveBeenCalledWith(
-        "device-1",
+        "user-1",
         "2026-04-08",
         "morning",
         expect.any(Object),
@@ -872,7 +872,7 @@ describe("regression: fix-morning-briefing — Bug 1: UTC 时区错位", () => {
 
       expect(mockedFindByUserAndDate).toHaveBeenCalledWith("user-1", "2026-04-08", "evening");
       expect(mockedUpsert).toHaveBeenCalledWith(
-        "device-1",
+        "user-1",
         "2026-04-08",
         "evening",
         expect.any(Object),
@@ -896,7 +896,7 @@ describe("regression: fix-morning-briefing — Bug 1: UTC 时区错位", () => {
 
       expect(mockedFindByUserAndDate).not.toHaveBeenCalled();
       expect(mockedUpsert).toHaveBeenCalledWith(
-        "device-1",
+        "user-1",
         "2026-04-08",
         "morning",
         expect.any(Object),

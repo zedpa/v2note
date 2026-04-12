@@ -22,7 +22,6 @@ function makeTodo(overrides: Partial<TodoDTO> = {}): TodoDTO {
     parent_id: null,
     cluster_id: null,
     status: "active",
-    strike_id: null,
     goal_id: null,
     subtask_count: 0,
     subtask_done_count: 0,

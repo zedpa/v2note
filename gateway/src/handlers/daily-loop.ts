@@ -70,7 +70,7 @@ export async function isBriefingDisabled(
 // ── Morning Briefing ──
 
 export async function generateMorningBriefing(
-  deviceId: string,
+  deviceId: string, // 已弃用，保留兼容签名
   userId?: string,
   forceRefresh?: boolean,
 ): Promise<BriefingResult | null> {
@@ -87,11 +87,10 @@ export async function generateMorningBriefing(
   // 当日持久缓存（仅 forceRefresh 时跳过）
   if (!forceRefresh) {
     try {
-      const cached = userId
-        ? await briefingRepo.findByUserAndDate(userId, today, "morning")
-        : await briefingRepo.findByDeviceAndDate(deviceId, today, "morning");
+      const uid = userId ?? deviceId;
+      const cached = await briefingRepo.findByUserAndDate(uid, today, "morning");
       if (cached) {
-        console.log(`[daily-loop] Using cached morning briefing for ${userId ?? deviceId}`);
+        console.log(`[daily-loop] Using cached morning briefing for ${uid}`);
         return cached.content as BriefingResult;
       }
     } catch (err: any) {
@@ -106,15 +105,14 @@ export async function generateMorningBriefing(
     goals: [],
   };
   try {
-    loaded = await loadWarmContext({ deviceId, userId, mode: "briefing" });
+    loaded = await loadWarmContext({ deviceId: userId ?? deviceId, userId, mode: "briefing" });
   } catch (err: any) {
     console.warn(`[daily-loop] loadWarmContext failed, using defaults: ${err.message}`);
   }
 
   // 2. 待办事项
-  const pendingTodos = userId
-    ? await todoRepo.findPendingByUser(userId)
-    : await todoRepo.findPendingByDevice(deviceId);
+  const uid = userId ?? deviceId;
+  const pendingTodos = await todoRepo.findPendingByUser(uid);
 
   const todayScheduled = pendingTodos.filter((t) =>
     toLocalDateStr(t.scheduled_start) === today,
@@ -139,15 +137,13 @@ export async function generateMorningBriefing(
   // 3. 昨日统计
   const yesterdayStats = await (async () => {
     const yd = dayRange(yesterday);
-    return userId
-      ? todoRepo.countByUserDateRange(userId, yd.start, yd.end)
-      : todoRepo.countByDateRange(deviceId, yd.start, yd.end);
+    return todoRepo.countByUserDateRange(uid, yd.start, yd.end);
   })();
 
   // 4. 加载活跃目标 + 待办进度（目标脉搏）
   let goalPulseData: Array<{ title: string; done: number; total: number }> = [];
   try {
-    const goals = userId ? await goalRepo.findActiveByUser(userId) : [];
+    const goals = await goalRepo.findActiveByUser(uid);
     const limitedGoals = goals.slice(0, 5);
     const goalTodos = limitedGoals.length > 0
       ? await goalRepo.findTodosByGoalIds(limitedGoals.map((g) => g.id))
@@ -240,11 +236,11 @@ ${goalPulseText}`,
 
     // Cache
     try {
-      await briefingRepo.upsert(deviceId, today, "morning", parsed, userId);
+      await briefingRepo.upsert(uid, today, "morning", parsed, userId);
     } catch (cacheErr: any) {
       console.warn(`[daily-loop] Failed to cache briefing: ${cacheErr.message}`);
     }
-    console.log(`[daily-loop] Morning briefing generated for ${userId ?? deviceId}`);
+    console.log(`[daily-loop] Morning briefing generated for ${uid}`);
     return parsed;
   } catch (err: any) {
     console.error(`[daily-loop] AI briefing generation failed: ${err.message}`);
@@ -257,7 +253,7 @@ ${goalPulseText}`,
       stats: { yesterday_done: yesterdayStats.done, yesterday_total: yesterdayStats.total },
     };
 
-    try { await briefingRepo.upsert(deviceId, today, "morning", fallback, userId); } catch { /* ignore */ }
+    try { await briefingRepo.upsert(uid, today, "morning", fallback, userId); } catch { /* ignore */ }
     return fallback;
   }
 }
@@ -265,13 +261,15 @@ ${goalPulseText}`,
 // ── Evening Summary ──
 
 export async function generateEveningSummary(
-  deviceId: string,
+  deviceId: string, // 已弃用，保留兼容签名
   userId?: string,
   forceRefresh?: boolean,
 ): Promise<SummaryResult | null> {
+  const uid = userId ?? deviceId;
+
   // 检查 UserAgent 通知偏好
-  if (await isBriefingDisabled(userId, "晚间回顾")) {
-    console.log(`[daily-loop] Evening summary disabled by UserAgent for ${userId}`);
+  if (await isBriefingDisabled(uid, "晚间回顾")) {
+    console.log(`[daily-loop] Evening summary disabled by UserAgent for ${uid}`);
     return null;
   }
 
@@ -282,11 +280,9 @@ export async function generateEveningSummary(
   // 当日持久缓存（仅 forceRefresh 时跳过）
   if (!forceRefresh) {
     try {
-      const cached = userId
-        ? await briefingRepo.findByUserAndDate(userId, today, "evening")
-        : await briefingRepo.findByDeviceAndDate(deviceId, today, "evening");
+      const cached = await briefingRepo.findByUserAndDate(uid, today, "evening");
       if (cached) {
-        console.log(`[daily-loop] Using cached evening summary for ${userId ?? deviceId}`);
+        console.log(`[daily-loop] Using cached evening summary for ${uid}`);
         return cached.content as SummaryResult;
       }
     } catch (err: any) {
@@ -301,23 +297,19 @@ export async function generateEveningSummary(
     goals: [],
   };
   try {
-    loaded = await loadWarmContext({ deviceId, userId, mode: "briefing" });
+    loaded = await loadWarmContext({ deviceId: uid, userId: uid, mode: "briefing" });
   } catch (err: any) {
     console.warn(`[daily-loop] loadWarmContext failed, using defaults: ${err.message}`);
   }
 
   // 2. 今日完成的待办（DB 层按 completed_at 范围过滤，避免全量查询）
   const todayRng = dayRange(today);
-  const todayDone = userId
-    ? await todoRepo.findCompletedByUserInRange(userId, todayRng.start, todayRng.end)
-    : await todoRepo.findCompletedByDeviceInRange(deviceId, todayRng.start, todayRng.end);
+  const todayDone = await todoRepo.findCompletedByUserInRange(uid, todayRng.start, todayRng.end);
 
   // 3. 今日新记录数
   let newRecordCount = 0;
   try {
-    const records = userId
-      ? await recordRepo.findByUser(userId, { limit: 100 })
-      : await recordRepo.findByDevice(deviceId, { limit: 100 });
+    const records = await recordRepo.findByUser(uid, { limit: 100 });
     newRecordCount = records.filter(
       (r: any) => r.created_at && toLocalDateStr(r.created_at) === today,
     ).length;
@@ -326,9 +318,7 @@ export async function generateEveningSummary(
   }
 
   // 4. 明日排期
-  const pending = userId
-    ? await todoRepo.findPendingByUser(userId)
-    : await todoRepo.findPendingByDevice(deviceId);
+  const pending = await todoRepo.findPendingByUser(uid);
   const tomorrowScheduled = pending.filter((t) =>
     toLocalDateStr(t.scheduled_start) === tomorrow,
   );
@@ -336,9 +326,9 @@ export async function generateEveningSummary(
   // 5. 加载今日日记（record + transcript）— 含条目级摘要
   let diaryText = "";
   let diaryEntrySummaries: string[] = [];  // 每条日记的 HH:mm + 前100字
-  if (userId) {
+  {
     try {
-      const records = await recordRepo.findByUserAndDateRange(userId, todayRng.start, todayRng.end);
+      const records = await recordRepo.findByUserAndDateRange(uid, todayRng.start, todayRng.end);
       if (records.length > 0) {
         const transcripts = await transcriptRepo.findByRecordIds(records.map((r: any) => r.id));
         // 按完整 record 边界截断到 2000 字（至少保留第一条）
@@ -437,16 +427,16 @@ export async function generateEveningSummary(
     if (!parsed.affirmation) parsed.affirmation = "";
 
     // Cache
-    try { await briefingRepo.upsert(deviceId, today, "evening", parsed, userId); } catch { /* ignore */ }
+    try { await briefingRepo.upsert(uid, today, "evening", parsed, userId); } catch { /* ignore */ }
 
     // 异步生成聊天日记（不阻塞 evening summary 返回）
     if (userId) {
-      generateChatDiary(deviceId, userId, today).catch(e =>
+      generateChatDiary(uid, uid, today).catch(e =>
         console.warn(`[daily-loop] Chat diary failed: ${e.message}`),
       );
     }
 
-    console.log(`[daily-loop] Evening summary generated for ${deviceId}`);
+    console.log(`[daily-loop] Evening summary generated for ${uid}`);
     return parsed;
   } catch (err: any) {
     console.error(`[daily-loop] AI summary generation failed: ${err.message}`);
@@ -460,7 +450,7 @@ export async function generateEveningSummary(
       stats: { done: todayDone.length, new_records: newRecordCount },
     };
 
-    try { await briefingRepo.upsert(deviceId, today, "evening", fallback, userId); } catch { /* ignore */ }
+    try { await briefingRepo.upsert(uid, today, "evening", fallback, userId); } catch { /* ignore */ }
     return fallback;
   }
 }

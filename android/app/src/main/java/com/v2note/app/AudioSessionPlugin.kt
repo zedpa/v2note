@@ -40,7 +40,7 @@ class AudioSessionPlugin : Plugin() {
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 // API 26+: 使用 AudioFocusRequest
-                val request = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
+                val request = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_EXCLUSIVE)
                     .setAudioAttributes(
                         AudioAttributes.Builder()
                             .setUsage(AudioAttributes.USAGE_VOICE_COMMUNICATION)
@@ -56,7 +56,7 @@ class AudioSessionPlugin : Plugin() {
                 am.requestAudioFocus(
                     focusChangeListener,
                     AudioManager.STREAM_MUSIC,
-                    AudioManager.AUDIOFOCUS_GAIN_TRANSIENT
+                    AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_EXCLUSIVE
                 )
             }
 

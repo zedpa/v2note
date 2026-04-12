@@ -95,7 +95,6 @@ describe("场景 1: 自然语言创建待办 — intend 结构化投影", () => 
       priority: 5,
       completed_at: null,
       created_at: new Date().toISOString(),
-      strike_id: null,
     };
     mockTodoCreate.mockResolvedValue(createdTodo);
     mockTodoFindPendingByUser.mockResolvedValue([]); // 无重复

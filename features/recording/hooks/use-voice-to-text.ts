@@ -3,7 +3,6 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { usePCMRecorder } from "./use-pcm-recorder";
 import { getGatewayClient, type GatewayResponse } from "@/features/chat/lib/gateway-client";
-import { getDeviceId } from "@/shared/lib/device";
 
 export interface UseVoiceToTextOptions {
   onTranscript: (text: string) => void;
@@ -47,7 +46,6 @@ export function useVoiceToText({
     if (recorder.isActive.current || recordingRef.current) return;
 
     try {
-      const deviceId = await getDeviceId();
       const client = getGatewayClient();
 
       if (!client.connected) {
@@ -101,7 +99,6 @@ export function useVoiceToText({
       client.send({
         type: "asr.start",
         payload: {
-          deviceId,
           mode: "realtime",
           sourceContext,
           saveAudio: false,
@@ -134,13 +131,11 @@ export function useVoiceToText({
 
     recorder.stopRecording();
 
-    getDeviceId().then((deviceId) => {
-      const client = getGatewayClient();
-      client.send({
-        type: "asr.stop",
-        payload: { deviceId, saveAudio: false, forceCommand: true },
-      });
-    }).catch(() => {});
+    const client = getGatewayClient();
+    client.send({
+      type: "asr.stop",
+      payload: { saveAudio: false, forceCommand: true },
+    });
     // recording 状态会在 asr.done 回调中置 false
   }, [recorder]);
 
@@ -153,10 +148,8 @@ export function useVoiceToText({
     setConfirmedText("");
     setPartialText("");
 
-    getDeviceId().then((deviceId) => {
-      const client = getGatewayClient();
-      client.send({ type: "asr.cancel", payload: { deviceId } });
-    }).catch(() => {});
+    const client = getGatewayClient();
+    client.send({ type: "asr.cancel", payload: {} });
 
     unsubRef.current?.();
     unsubRef.current = null;

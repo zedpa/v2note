@@ -21,12 +21,11 @@ export interface LocalConfigPayload {
 }
 
 export type GatewayMessage =
-  | { type: "auth"; payload: { token: string; deviceId: string } }
-  | { type: "process"; payload: { text: string; deviceId: string; recordId?: string; sourceContext?: string; localConfig?: LocalConfigPayload } }
+  | { type: "auth"; payload: { token: string } }
+  | { type: "process"; payload: { text: string; recordId?: string; sourceContext?: string; localConfig?: LocalConfigPayload } }
   | {
       type: "chat.start";
       payload: {
-        deviceId: string;
         mode: "review" | "command" | "insight";
         dateRange: { start: string; end: string };
         initialMessage?: string;
@@ -35,14 +34,14 @@ export type GatewayMessage =
         localConfig?: Pick<LocalConfigPayload, "soul" | "skills">;
       };
     }
-  | { type: "chat.message"; payload: { text: string; deviceId: string } }
-  | { type: "chat.end"; payload: { deviceId: string } }
-  | { type: "todo.aggregate"; payload: { deviceId: string } }
-  | { type: "asr.start"; payload: { deviceId: string; locationText?: string; mode?: "realtime" | "upload"; notebook?: string; sourceContext?: "todo" | "timeline" | "chat" | "review"; saveAudio?: boolean } }
-  | { type: "asr.stop"; payload: { deviceId: string; saveAudio?: boolean; forceCommand?: boolean } }
-  | { type: "asr.cancel"; payload: { deviceId: string } }
-  | { type: "plan.confirm"; payload: { deviceId: string; planId: string; action: "execute_all" | "execute_modified" | "abandon"; modifications?: Array<{ stepIndex: number; description?: string; deleted?: boolean }> } }
-  | { type: "todo.refine"; payload: { deviceId: string; commands: any[]; modificationText: string } };
+  | { type: "chat.message"; payload: { text: string } }
+  | { type: "chat.end"; payload: Record<string, never> }
+  | { type: "todo.aggregate"; payload: Record<string, never> }
+  | { type: "asr.start"; payload: { locationText?: string; mode?: "realtime" | "upload"; notebook?: string; sourceContext?: "todo" | "timeline" | "chat" | "review"; saveAudio?: boolean } }
+  | { type: "asr.stop"; payload: { saveAudio?: boolean; forceCommand?: boolean } }
+  | { type: "asr.cancel"; payload: Record<string, never> }
+  | { type: "plan.confirm"; payload: { planId: string; action: "execute_all" | "execute_modified" | "abandon"; modifications?: Array<{ stepIndex: number; description?: string; deleted?: boolean }> } }
+  | { type: "todo.refine"; payload: { commands: any[]; modificationText: string } };
 
 export type GatewayResponse =
   | { type: "process.result"; payload: Record<string, unknown> }
@@ -74,8 +73,6 @@ type MessageHandler = (msg: GatewayResponse) => void;
 
 import { getGatewayWsUrl } from "@/shared/lib/gateway-url";
 import { getAccessToken, logout as authLogout, onAuthEvent } from "@/shared/lib/auth";
-import { getApiDeviceId } from "@/shared/lib/api";
-import { getDeviceId } from "@/shared/lib/device";
 
 const MAX_RECONNECT_ATTEMPTS = 10;
 const BASE_RECONNECT_DELAY = 3000;
@@ -136,56 +133,31 @@ export class GatewayClient {
           this.reconnectAttempts = 0;
           console.log("[gateway-client] Connected");
 
-          // Send auth message if logged in.
-          // getApiDeviceId() may be null on app reopen (only set during
-          // login() or getDeviceId()). Fall back to async getDeviceId()
-          // so the WebSocket is always authenticated.
+          // Send auth message if logged in
           const token = getAccessToken();
-          let deviceId = getApiDeviceId();
 
-          const sendAuth = (did: string) => {
-            if (token && this.ws?.readyState === WebSocket.OPEN) {
-              this.ws.send(JSON.stringify({
-                type: "auth",
-                payload: { token, deviceId: did },
-              }));
-            }
+          if (token && this.ws?.readyState === WebSocket.OPEN) {
+            this.ws.send(JSON.stringify({
+              type: "auth",
+              payload: { token },
+            }));
             // Flush pending messages after auth
-            if (this.pendingMessages.length > 0) {
-              for (const pending of this.pendingMessages) {
-                this.ws?.send(JSON.stringify(pending));
-              }
-              this.pendingMessages = [];
+            for (const pending of this.pendingMessages) {
+              this.ws?.send(JSON.stringify(pending));
             }
+            this.pendingMessages = [];
             // Flush pending binary data (PCM chunks queued during disconnect)
-            if (this.pendingBinaryData.length > 0) {
-              for (const chunk of this.pendingBinaryData) {
-                this.ws?.send(chunk);
-              }
-              this.pendingBinaryData = [];
+            for (const chunk of this.pendingBinaryData) {
+              this.ws?.send(chunk);
             }
-            resolve();
-          };
-
-          if (token && deviceId) {
-            sendAuth(deviceId);
-          } else if (token) {
-            // deviceId not yet initialized — fetch it, then send auth
-            getDeviceId()
-              .then((did) => sendAuth(did))
-              .catch(() => {
-                // device lookup 失败，无法认证，丢弃 pending 并断开
-                console.warn("[gateway-client] No deviceId available, cannot authenticate");
-                this.pendingMessages = [];
-                resolve();
-              });
-          } else {
+            this.pendingBinaryData = [];
+          } else if (!token) {
             // 无 token = 未登录，禁止使用 WebSocket，丢弃 pending 消息并断开
             console.warn("[gateway-client] No access token, closing unauthenticated connection");
             this.pendingMessages = [];
             this.ws?.close();
-            resolve();
           }
+          resolve();
         };
 
         this.ws.onmessage = (event) => {
@@ -321,11 +293,10 @@ export class GatewayClient {
       if (refreshed) {
         // token 刷新成功，重新发送 auth 消息
         const token = getAccessToken();
-        const deviceId = getApiDeviceId() ?? await getDeviceId();
         if (token && this.ws?.readyState === WebSocket.OPEN) {
           this.ws.send(JSON.stringify({
             type: "auth",
-            payload: { token, deviceId },
+            payload: { token },
           }));
           console.log("[gateway-client] Re-authenticated with refreshed token");
         }

@@ -36,9 +36,7 @@ const TOOL_ICON_MAP: Record<string, { icon: typeof Globe; color: string }> = {
   view_record:   { icon: BookOpen, color: "text-deer" },
   view_todo:     { icon: BookOpen, color: "text-deer" },
   view_goal:     { icon: BookOpen, color: "text-deer" },
-  manage_folder: { icon: FolderSync, color: "text-amber-500" },
-  move_record:   { icon: FolderSync, color: "text-amber-500" },
-  list_folders:  { icon: FolderOpen, color: "text-amber-500" },
+  manage_wiki_page: { icon: FolderSync, color: "text-amber-500" },
   get_current_time: { icon: Clock, color: "text-muted-foreground" },
 };
 

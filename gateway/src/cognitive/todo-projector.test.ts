@@ -32,7 +32,6 @@ function makeTodo(overrides: Partial<Todo> = {}): Todo {
     priority: 3,
     completed_at: null,
     created_at: new Date().toISOString(),
-    strike_id: null,
     ...overrides,
   };
 }

@@ -13,7 +13,6 @@ export const createRecordTool: ToolDefinition = {
   parameters: z.object({
     content: z.string().min(1).describe("日记正文内容"),
     title: z.string().max(50).optional().describe("标题（可选，不超过50字）"),
-    domain: z.string().optional().describe("分类文件夹路径（可选，如 '工作/v2note'）"),
   }),
   autonomy: "notify",
   handler: async (args, ctx) => {
@@ -55,11 +54,6 @@ export const createRecordTool: ToolDefinition = {
       title: title ?? content.slice(0, 50),
       short_summary: content,
     });
-
-    // 设置分类（如果指定了 domain）
-    if (args.domain) {
-      await recordRepo.updateDomain(record.id, args.domain);
-    }
 
     // 标记为已消化，避免 digest 管道重新处理（工具创建的记录已有完整 summary）
     await recordRepo.markDigested(record.id);

@@ -25,8 +25,7 @@ import { addDays as dfAddDays } from "date-fns";
 
 
 interface ConnectedDevice {
-  deviceId: string;
-  userId?: string;
+  userId: string;
   ws: WebSocket;
   lastNudge: number;
 }
@@ -58,33 +57,28 @@ export class ProactiveEngine {
     }
   }
 
-  registerDevice(deviceId: string, ws: WebSocket, userId?: string): void {
-    this.devices.set(deviceId, { deviceId, userId, ws, lastNudge: 0 });
-    console.log(`[proactive] Device registered: ${deviceId} (total: ${this.devices.size})`);
+  registerUser(userId: string, ws: WebSocket): void {
+    this.devices.set(userId, { userId, ws, lastNudge: 0 });
+    console.log(`[proactive] User registered: ${userId} (total: ${this.devices.size})`);
 
-    // Register per-device BullMQ schedulers if Redis is available
+    // Register per-user BullMQ schedulers if Redis is available
     if (this.redisAvailable && this.queue) {
-      this.registerDeviceSchedulers(deviceId).catch((err) => {
-        console.warn(`[proactive] Failed to register device schedulers: ${err.message}`);
+      this.registerUserSchedulers(userId).catch((err) => {
+        console.warn(`[proactive] Failed to register user schedulers: ${err.message}`);
       });
     }
   }
 
-  setDeviceUserId(deviceId: string, userId: string): void {
-    const device = this.devices.get(deviceId);
-    if (device) device.userId = userId;
-  }
-
-  unregisterDevice(deviceId: string): void {
-    this.devices.delete(deviceId);
-    console.log(`[proactive] Device unregistered: ${deviceId} (total: ${this.devices.size})`);
+  unregisterUser(userId: string): void {
+    this.devices.delete(userId);
+    console.log(`[proactive] User unregistered: ${userId} (total: ${this.devices.size})`);
   }
 
   unregisterByWs(ws: WebSocket): void {
-    for (const [deviceId, device] of this.devices) {
+    for (const [userId, device] of this.devices) {
       if (device.ws === ws) {
-        this.devices.delete(deviceId);
-        console.log(`[proactive] Device unregistered by ws: ${deviceId}`);
+        this.devices.delete(userId);
+        console.log(`[proactive] User unregistered by ws: ${userId}`);
         break;
       }
     }
@@ -174,13 +168,13 @@ export class ProactiveEngine {
             await this.checkAll();
             break;
           case "morning-briefing":
-            await this.handleTimedPush(job.data.deviceId, "morning");
+            await this.handleTimedPush(job.data.userId, "morning");
             break;
           case "relay-reminder":
-            await this.handleTimedPush(job.data.deviceId, "relay");
+            await this.handleTimedPush(job.data.userId, "relay");
             break;
           case "evening-summary":
-            await this.handleTimedPush(job.data.deviceId, "evening");
+            await this.handleTimedPush(job.data.userId, "evening");
             break;
           case "cognitive-digest":
             await this.runBatchDigest();
@@ -236,30 +230,30 @@ export class ProactiveEngine {
     console.log(`[proactive] Engine started with BullMQ (Redis: ${redisHost}:${redisPort})`);
   }
 
-  private async registerDeviceSchedulers(deviceId: string): Promise<void> {
+  private async registerUserSchedulers(userId: string): Promise<void> {
     if (!this.queue) return;
 
     await this.queue.upsertJobScheduler(
-      `morning-${deviceId}`,
+      `morning-${userId}`,
       { pattern: "30 7 * * *" },
-      { name: "morning-briefing", data: { deviceId } },
+      { name: "morning-briefing", data: { userId } },
     );
     await this.queue.upsertJobScheduler(
-      `relay-${deviceId}`,
+      `relay-${userId}`,
       { pattern: "0 14 * * *" },
-      { name: "relay-reminder", data: { deviceId } },
+      { name: "relay-reminder", data: { userId } },
     );
     await this.queue.upsertJobScheduler(
-      `evening-${deviceId}`,
+      `evening-${userId}`,
       { pattern: "0 20 * * *" },
-      { name: "evening-summary", data: { deviceId } },
+      { name: "evening-summary", data: { userId } },
     );
   }
 
-  private async handleTimedPush(deviceId: string | undefined, type: "morning" | "relay" | "evening"): Promise<void> {
-    // BullMQ scheduled job: push to all connected devices or specific device
-    const targets = deviceId
-      ? [this.devices.get(deviceId)].filter(Boolean) as ConnectedDevice[]
+  private async handleTimedPush(userId: string | undefined, type: "morning" | "relay" | "evening"): Promise<void> {
+    // BullMQ scheduled job: push to all connected users or specific user
+    const targets = userId
+      ? [this.devices.get(userId)].filter(Boolean) as ConnectedDevice[]
       : Array.from(this.devices.values());
 
     for (const device of targets) {
@@ -269,7 +263,7 @@ export class ProactiveEngine {
         case "morning": {
           // 先预生成简报内容，用户打开 app 时无需等待
           try {
-            await generateMorningBriefing(device.deviceId, device.userId);
+            await generateMorningBriefing(device.userId, device.userId);
           } catch (e: any) {
             console.warn(`[proactive] Morning briefing pre-generate failed: ${e.message}`);
           }
@@ -283,9 +277,7 @@ export class ProactiveEngine {
         }
         case "relay": {
           try {
-            const relays = device.userId
-              ? await todoRepo.findRelayByUser(device.userId)
-              : await todoRepo.findRelayByDevice(device.deviceId);
+            const relays = await todoRepo.findRelayByUser(device.userId);
             if (relays.length > 0) {
               const rText = `你有 ${relays.length} 条信息还需要转达`;
               this.sendMessage(device, {
@@ -300,7 +292,7 @@ export class ProactiveEngine {
         case "evening": {
           // 先预生成晚报内容
           try {
-            await generateEveningSummary(device.deviceId, device.userId);
+            await generateEveningSummary(device.userId, device.userId);
           } catch (e: any) {
             console.warn(`[proactive] Evening summary pre-generate failed: ${e.message}`);
           }
@@ -312,12 +304,12 @@ export class ProactiveEngine {
           this.persistNotification(device, "proactive.evening_summary", "日终总结", eText);
           // Regenerate diary summaries for today
           const todayStr = fmt(tzNow());
-          regenerateSummary(device.deviceId, "default", todayStr).catch(() => {});
-          regenerateSummary(device.deviceId, "ai-self", todayStr).catch(() => {});
+          regenerateSummary(device.userId, "default", todayStr).catch(() => {});
+          regenerateSummary(device.userId, "ai-self", todayStr).catch(() => {});
           // Weekly deep memory extraction (every Sunday)
           if (tzNow().getDay() === 0) {
             const weekAgo = fmt(dfAddDays(tzNow(), -7));
-            extractToMemory(device.deviceId, { start: weekAgo, end: todayStr }).catch(() => {});
+            extractToMemory(device.userId, { start: weekAgo, end: todayStr }).catch(() => {});
           }
           break;
         }
@@ -366,9 +358,9 @@ export class ProactiveEngine {
   async checkAll(): Promise<void> {
     const now = Date.now();
 
-    for (const [deviceId, device] of this.devices) {
+    for (const [userId, device] of this.devices) {
       if (device.ws.readyState !== WebSocket.OPEN) {
-        this.devices.delete(deviceId);
+        this.devices.delete(userId);
         continue;
       }
       if (now - device.lastNudge < this.intervalMs * 0.8) {
@@ -377,7 +369,7 @@ export class ProactiveEngine {
       try {
         await this.checkDevice(device);
       } catch (err: any) {
-        console.warn(`[proactive] Check failed for ${deviceId}: ${err.message}`);
+        console.warn(`[proactive] Check failed for ${userId}: ${err.message}`);
       }
     }
   }
@@ -419,16 +411,7 @@ export class ProactiveEngine {
           recordIds = records.map((r) => r.id);
           console.log(`[proactive:digest] User ${userId}: ${recordIds.length} undigested records`);
 
-          // Find deviceId from connected devices or use userId as fallback
-          let deviceId = userId;
-          for (const device of this.devices.values()) {
-            if (device.userId === userId) {
-              deviceId = device.deviceId;
-              break;
-            }
-          }
-
-          await digestRecords(recordIds, { deviceId, userId });
+          await digestRecords(recordIds, { deviceId: userId, userId });
         } catch (err: any) {
           console.error(`[proactive:digest] Failed for user ${userId}:`, err.message);
           // 失败时增加重试计数
@@ -447,18 +430,18 @@ export class ProactiveEngine {
   }
 
   /**
-   * Run daily cognitive cycle for all users with active Strikes.
+   * Run daily cognitive cycle for all users with active wiki pages.
    */
   private async runCognitiveDaily(): Promise<void> {
     try {
       const { query } = await import("../db/pool.js");
       const rows = await query<{ user_id: string }>(
-        `SELECT DISTINCT user_id FROM strike WHERE status = 'active'`,
+        `SELECT DISTINCT user_id FROM wiki_page WHERE status = 'active'`,
         [],
       );
 
       if (rows.length === 0) {
-        console.log("[proactive:cognitive-daily] No users with active strikes");
+        console.log("[proactive:cognitive-daily] No users with active wiki pages");
         return;
       }
 
@@ -490,7 +473,7 @@ export class ProactiveEngine {
     const now = tzNow();
     const hour = now.getHours();
     const today = fmt(now);
-    const nudgeKey = `${device.deviceId}:${today}`;
+    const nudgeKey = `${device.userId}:${today}`;
 
     // Time-aware pushes (only used in fallback mode — BullMQ uses cron)
     if (!this.redisAvailable) {
@@ -498,7 +481,7 @@ export class ProactiveEngine {
         const briefingKey = `morning:${nudgeKey}`;
         if (!this.dailyPushSent.has(briefingKey)) {
           try {
-            const cached = await dailyBriefingRepo.findByDeviceAndDate(device.deviceId, today, "morning");
+            const cached = await dailyBriefingRepo.findByDeviceAndDate(device.userId, today, "morning");
             if (!cached) {
               const briefingText = "新的一天开始了，查看今日简报";
               this.sendMessage(device, {
@@ -518,9 +501,7 @@ export class ProactiveEngine {
         const relayKey = `relay:${nudgeKey}`;
         if (!this.dailyPushSent.has(relayKey)) {
           try {
-            const relays = device.userId
-              ? await todoRepo.findRelayByUser(device.userId)
-              : await todoRepo.findRelayByDevice(device.deviceId);
+            const relays = await todoRepo.findRelayByUser(device.userId);
             if (relays.length > 0) {
               const relayText = `你有 ${relays.length} 条信息还需要转达`;
               this.sendMessage(device, {
@@ -556,15 +537,14 @@ export class ProactiveEngine {
     const harvestKey = `harvest:${nudgeKey}`;
     if (!this.dailyPushSent.has(harvestKey)) {
       try {
-        const uid = device.userId ?? device.deviceId;
         const completedGoals = await import("../db/pool.js").then(({ query: q }) =>
           q<{ id: string; title: string }>(
             `SELECT id, title FROM goal
-             WHERE ${device.userId ? "user_id" : "device_id"} = $1
+             WHERE user_id = $1
                AND status = 'completed'
                AND updated_at < NOW() - INTERVAL '7 days'
              ORDER BY updated_at ASC LIMIT 1`,
-            [uid],
+            [device.userId],
           ),
         );
         if (completedGoals.length > 0) {
@@ -589,9 +569,8 @@ export class ProactiveEngine {
       const windowEnd = new Date(tzNow().getTime() + 30 * 60000).toISOString();
       const reminders = await todoRepo.findPendingReminders(windowStart, windowEnd);
       for (const todo of reminders) {
-        // 只推送给相关设备
-        const isOwner = (todo.user_id && todo.user_id === device.userId)
-          || (todo.device_id && todo.device_id === device.deviceId);
+        // 只推送给相关用户
+        const isOwner = todo.user_id === device.userId;
         if (!isOwner) continue;
 
         this.sendMessage(device, {
@@ -614,9 +593,7 @@ export class ProactiveEngine {
     }
 
     // Standard todo checks
-    const pending = device.userId
-      ? await todoRepo.findPendingByUser(device.userId)
-      : await todoRepo.findPendingByDevice(device.deviceId);
+    const pending = await todoRepo.findPendingByUser(device.userId);
     if (pending.length === 0) return;
 
     const unscheduled = pending.filter((t) => !(t as any).scheduled_start);
@@ -666,15 +643,15 @@ export class ProactiveEngine {
     try {
       // DB 去重：今天是否已发过同类通知
       const exists = await notificationRepo.hasTodayNotification(
-        type, device.userId, device.deviceId,
+        type, device.userId, undefined,
       );
       if (exists) {
-        console.log(`[proactive] Notification ${type} already sent today for ${device.userId ?? device.deviceId}, skip`);
+        console.log(`[proactive] Notification ${type} already sent today for ${device.userId}, skip`);
         return false;
       }
       await notificationRepo.create({
-        deviceId: device.deviceId,
-        userId: device.userId ?? null,
+        deviceId: undefined,
+        userId: device.userId,
         type,
         title,
         body,

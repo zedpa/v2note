@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import {
   Zap, Settings, LogOut, Search, BookOpen, ChevronDown, ChevronRight,
-  Inbox, Plus, Target, Lightbulb,
+  Inbox, Plus, Target, Lightbulb, MoreVertical, Pencil, Trash2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -35,6 +35,9 @@ interface SidebarDrawerProps {
   inboxCount?: number;
   pendingSuggestionCount?: number;
   onOpenSuggestions?: () => void;
+  onCreatePage?: (title: string, pageType: "topic" | "goal") => void;
+  onRenamePage?: (pageId: string, newTitle: string) => void;
+  onDeletePage?: (pageId: string, recordCount: number) => void;
 }
 
 export function SidebarDrawer({
@@ -52,8 +55,18 @@ export function SidebarDrawer({
   inboxCount = 0,
   pendingSuggestionCount = 0,
   onOpenSuggestions,
+  onCreatePage,
+  onRenamePage,
+  onDeletePage,
 }: SidebarDrawerProps) {
   const [expandedPages, setExpandedPages] = useState<Set<string>>(new Set());
+  const [showCreateInput, setShowCreateInput] = useState(false);
+  const [createTitle, setCreateTitle] = useState("");
+  const [contextMenu, setContextMenu] = useState<{ pageId: string; title: string; recordCount: number } | null>(null);
+  const [renaming, setRenaming] = useState<{ pageId: string; title: string } | null>(null);
+  const [renameValue, setRenameValue] = useState("");
+  const createInputRef = useRef<HTMLInputElement>(null);
+  const renameInputRef = useRef<HTMLInputElement>(null);
 
   // 构建树结构：顶层 page (parentId=null) + 子 page
   const { roots, childrenMap } = useMemo(() => {
@@ -72,6 +85,49 @@ export function SidebarDrawer({
 
     return { roots: rootPages, childrenMap: cMap };
   }, [wikiPages]);
+
+  // 自动聚焦创建输入框
+  useEffect(() => {
+    if (showCreateInput) createInputRef.current?.focus();
+  }, [showCreateInput]);
+
+  // 自动聚焦重命名输入框
+  useEffect(() => {
+    if (renaming) renameInputRef.current?.focus();
+  }, [renaming]);
+
+  const handleCreate = () => {
+    const trimmed = createTitle.trim();
+    if (!trimmed) return;
+    onCreatePage?.(trimmed, "topic");
+    setCreateTitle("");
+    setShowCreateInput(false);
+  };
+
+  const handleRename = () => {
+    if (!renaming) return;
+    const trimmed = renameValue.trim();
+    if (!trimmed || trimmed === renaming.title) {
+      setRenaming(null);
+      return;
+    }
+    onRenamePage?.(renaming.pageId, trimmed);
+    setRenaming(null);
+  };
+
+  const [confirmDelete, setConfirmDelete] = useState<{ pageId: string; title: string; recordCount: number } | null>(null);
+
+  const handleDelete = () => {
+    if (!contextMenu) return;
+    setConfirmDelete(contextMenu);
+    setContextMenu(null);
+  };
+
+  const handleConfirmDelete = () => {
+    if (!confirmDelete) return;
+    onDeletePage?.(confirmDelete.pageId, confirmDelete.recordCount);
+    setConfirmDelete(null);
+  };
 
   // 锁定背景滚动
   useEffect(() => {
@@ -194,61 +250,137 @@ export function SidebarDrawer({
           )}
 
           {/* ── Wiki Page 主题树 ── */}
-          {roots.length > 0 && (
-            <>
-              <div className="my-5 flex items-center gap-3">
-                <div className="flex-1 h-px bg-border/40" />
-                <span className="text-xs text-muted-accessible tracking-widest">主题</span>
-                <div className="flex-1 h-px bg-border/40" />
+          <>
+            <div className="my-5 flex items-center gap-3">
+              <div className="flex-1 h-px bg-border/40" />
+              <span className="text-xs text-muted-accessible tracking-widest">主题</span>
+              <div className="flex-1 h-px bg-border/40" />
+              <button
+                type="button"
+                onClick={() => setShowCreateInput(true)}
+                className="w-5 h-5 flex items-center justify-center rounded text-muted-accessible hover:text-on-surface transition-colors"
+                aria-label="新建主题"
+              >
+                <Plus size={14} />
+              </button>
+            </div>
+
+            {/* 新建主题输入框 */}
+            {showCreateInput && (
+              <div className="flex items-center gap-2 px-3 mb-2">
+                <input
+                  ref={createInputRef}
+                  type="text"
+                  value={createTitle}
+                  onChange={(e) => setCreateTitle(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleCreate();
+                    if (e.key === "Escape") { setShowCreateInput(false); setCreateTitle(""); }
+                  }}
+                  placeholder="输入主题名称"
+                  className="flex-1 text-sm bg-surface rounded-lg px-3 py-2 text-on-surface placeholder:text-muted-accessible outline-none border border-border/40 focus:border-maple/50"
+                />
+                <button
+                  type="button"
+                  onClick={handleCreate}
+                  disabled={!createTitle.trim()}
+                  className="text-xs text-maple font-medium disabled:opacity-30"
+                >
+                  创建
+                </button>
               </div>
+            )}
+
+            {roots.length === 0 && !showCreateInput ? (
+              <p className="px-3 text-xs text-muted-accessible leading-relaxed">
+                录几段话，AI 会自动整理主题
+              </p>
+            ) : (
               <nav className="space-y-0.5">
                 {roots.map((page) => {
                   const children = childrenMap.get(page.id) ?? [];
                   const hasChildren = children.length > 0;
                   const isExpanded = expandedPages.has(page.id);
                   const totalRecords = page.recordCount + children.reduce((s, c) => s + c.recordCount, 0);
+                  const isRenaming = renaming?.pageId === page.id;
 
                   return (
                     <div key={page.id}>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (hasChildren) {
-                            setExpandedPages(prev => {
-                              const next = new Set(prev);
-                              next.has(page.id) ? next.delete(page.id) : next.add(page.id);
-                              return next;
-                            });
-                          } else {
-                            onClose();
-                            onSelectPage?.(page.id);
-                          }
-                        }}
-                        className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-left hover:bg-surface/60 active:bg-surface/80 transition-colors select-none"
-                      >
-                        <span className="text-muted-accessible shrink-0">
-                          {hasChildren
-                            ? (isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />)
-                            : <BookOpen size={16} />}
-                        </span>
-                        <div className="flex-1 min-w-0">
-                          <span className="text-sm text-on-surface truncate block">
-                            {page.pageType === "goal" && <span className="text-amber-500 mr-1">⭐</span>}
-                            {page.title}
+                      <div className="group flex items-center">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (hasChildren) {
+                              setExpandedPages(prev => {
+                                const next = new Set(prev);
+                                next.has(page.id) ? next.delete(page.id) : next.add(page.id);
+                                return next;
+                              });
+                            } else {
+                              onClose();
+                              onSelectPage?.(page.id);
+                            }
+                          }}
+                          onContextMenu={(e) => {
+                            e.preventDefault();
+                            setContextMenu({ pageId: page.id, title: page.title, recordCount: totalRecords });
+                          }}
+                          className="flex items-center gap-3 flex-1 min-w-0 px-3 py-2.5 rounded-xl text-left hover:bg-surface/60 active:bg-surface/80 transition-colors select-none"
+                        >
+                          <span className="text-muted-accessible shrink-0">
+                            {hasChildren
+                              ? (isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />)
+                              : <BookOpen size={16} />}
                           </span>
-                          {page.activeGoals.length > 0 && (
-                            <span className="text-[10px] text-muted-accessible truncate block flex items-center gap-1">
-                              <Target size={10} className="shrink-0" />
-                              {page.activeGoals[0].title}
-                              {page.activeGoals.length > 1 && ` +${page.activeGoals.length - 1}`}
-                            </span>
-                          )}
-                        </div>
-                        <span className="text-xs font-mono text-muted-accessible">{totalRecords || ""}</span>
-                      </button>
+                          <div className="flex-1 min-w-0">
+                            {isRenaming ? (
+                              <input
+                                ref={renameInputRef}
+                                type="text"
+                                value={renameValue}
+                                onChange={(e) => setRenameValue(e.target.value)}
+                                onKeyDown={(e) => {
+                                  e.stopPropagation();
+                                  if (e.key === "Enter") handleRename();
+                                  if (e.key === "Escape") setRenaming(null);
+                                }}
+                                onBlur={handleRename}
+                                onClick={(e) => e.stopPropagation()}
+                                className="text-sm bg-surface rounded px-1.5 py-0.5 text-on-surface outline-none border border-maple/50 w-full"
+                              />
+                            ) : (
+                              <>
+                                <span className="text-sm text-on-surface truncate block">
+                                  {page.pageType === "goal" && <span className="text-amber-500 mr-1">⭐</span>}
+                                  {page.title}
+                                </span>
+                                {page.activeGoals.length > 0 && (
+                                  <span className="text-[10px] text-muted-accessible truncate block flex items-center gap-1">
+                                    <Target size={10} className="shrink-0" />
+                                    {page.activeGoals[0].title}
+                                    {page.activeGoals.length > 1 && ` +${page.activeGoals.length - 1}`}
+                                  </span>
+                                )}
+                              </>
+                            )}
+                          </div>
+                          <span className="text-xs font-mono text-muted-accessible">{totalRecords || ""}</span>
+                        </button>
+                        {/* 三点菜单按钮 */}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setContextMenu({ pageId: page.id, title: page.title, recordCount: totalRecords });
+                          }}
+                          className="w-7 h-7 flex items-center justify-center rounded-full text-muted-accessible/50 hover:text-on-surface transition-all shrink-0"
+                          aria-label="更多操作"
+                        >
+                          <MoreVertical size={14} />
+                        </button>
+                      </div>
                       {hasChildren && isExpanded && (
                         <div className="ml-4">
-                          {/* 点击父节点本身也能过滤 */}
                           {page.recordCount > 0 && (
                             <button
                               type="button"
@@ -260,35 +392,140 @@ export function SidebarDrawer({
                               <span className="text-xs font-mono text-muted-accessible">{page.recordCount}</span>
                             </button>
                           )}
-                          {children.map((child) => (
-                            <button
-                              key={child.id}
-                              type="button"
-                              onClick={() => { onClose(); onSelectPage?.(child.id); }}
-                              className="flex items-center gap-3 w-full px-3 py-2 rounded-xl text-left hover:bg-surface/60 transition-colors select-none"
-                            >
-                              <span className="text-muted-accessible shrink-0"><BookOpen size={14} /></span>
-                              <div className="flex-1 min-w-0">
-                                <span className="text-sm text-on-surface truncate block">
-                                  {child.pageType === "goal" && <span className="text-amber-500 mr-1">⭐</span>}
-                                  {child.title}
-                                </span>
-                                {child.activeGoals.length > 0 && (
-                                  <span className="text-[10px] text-muted-accessible truncate block flex items-center gap-1">
-                                    <Target size={10} className="shrink-0" />
-                                    {child.activeGoals[0].title}
-                                  </span>
-                                )}
+                          {children.map((child) => {
+                            const isChildRenaming = renaming?.pageId === child.id;
+                            return (
+                              <div key={child.id} className="group flex items-center">
+                                <button
+                                  type="button"
+                                  onClick={() => { onClose(); onSelectPage?.(child.id); }}
+                                  onContextMenu={(e) => {
+                                    e.preventDefault();
+                                    setContextMenu({ pageId: child.id, title: child.title, recordCount: child.recordCount });
+                                  }}
+                                  className="flex items-center gap-3 flex-1 min-w-0 px-3 py-2 rounded-xl text-left hover:bg-surface/60 transition-colors select-none"
+                                >
+                                  <span className="text-muted-accessible shrink-0"><BookOpen size={14} /></span>
+                                  <div className="flex-1 min-w-0">
+                                    {isChildRenaming ? (
+                                      <input
+                                        ref={renameInputRef}
+                                        type="text"
+                                        value={renameValue}
+                                        onChange={(e) => setRenameValue(e.target.value)}
+                                        onKeyDown={(e) => {
+                                          e.stopPropagation();
+                                          if (e.key === "Enter") handleRename();
+                                          if (e.key === "Escape") setRenaming(null);
+                                        }}
+                                        onBlur={handleRename}
+                                        onClick={(e) => e.stopPropagation()}
+                                        className="text-sm bg-surface rounded px-1.5 py-0.5 text-on-surface outline-none border border-maple/50 w-full"
+                                      />
+                                    ) : (
+                                      <>
+                                        <span className="text-sm text-on-surface truncate block">
+                                          {child.pageType === "goal" && <span className="text-amber-500 mr-1">⭐</span>}
+                                          {child.title}
+                                        </span>
+                                        {child.activeGoals.length > 0 && (
+                                          <span className="text-[10px] text-muted-accessible truncate block flex items-center gap-1">
+                                            <Target size={10} className="shrink-0" />
+                                            {child.activeGoals[0].title}
+                                          </span>
+                                        )}
+                                      </>
+                                    )}
+                                  </div>
+                                  <span className="text-xs font-mono text-muted-accessible">{child.recordCount || ""}</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setContextMenu({ pageId: child.id, title: child.title, recordCount: child.recordCount });
+                                  }}
+                                  className="w-7 h-7 flex items-center justify-center rounded-full text-muted-accessible/50 hover:text-on-surface transition-all shrink-0"
+                                  aria-label="更多操作"
+                                >
+                                  <MoreVertical size={14} />
+                                </button>
                               </div>
-                              <span className="text-xs font-mono text-muted-accessible">{child.recordCount || ""}</span>
-                            </button>
-                          ))}
+                            );
+                          })}
                         </div>
                       )}
                     </div>
                   );
                 })}
               </nav>
+            )}
+          </>
+
+          {/* ── 上下文菜单弹窗 ── */}
+          {contextMenu && (
+            <>
+              <div className="fixed inset-0 z-[60]" onClick={() => setContextMenu(null)} />
+              <div className="fixed left-[50%] top-[50%] -translate-x-1/2 -translate-y-1/2 z-[60] bg-surface-high rounded-2xl shadow-xl border border-border/30 w-56 overflow-hidden">
+                <div className="px-4 py-3 border-b border-border/20">
+                  <p className="text-sm font-medium text-on-surface truncate">{contextMenu.title}</p>
+                  <p className="text-[10px] text-muted-accessible">{contextMenu.recordCount} 条记录</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRenaming({ pageId: contextMenu.pageId, title: contextMenu.title });
+                    setRenameValue(contextMenu.title);
+                    setContextMenu(null);
+                  }}
+                  className="flex items-center gap-3 w-full px-4 py-3 text-left text-sm text-on-surface hover:bg-surface/60 transition-colors"
+                >
+                  <Pencil size={16} className="text-muted-accessible" />
+                  重命名
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDelete}
+                  className="flex items-center gap-3 w-full px-4 py-3 text-left text-sm text-maple hover:bg-surface/60 transition-colors"
+                >
+                  <Trash2 size={16} />
+                  删除
+                </button>
+              </div>
+            </>
+          )}
+
+          {/* ── 删除确认对话框 ── */}
+          {confirmDelete && (
+            <>
+              <div className="fixed inset-0 z-[60]" onClick={() => setConfirmDelete(null)} />
+              <div className="fixed left-[50%] top-[50%] -translate-x-1/2 -translate-y-1/2 z-[60] bg-surface-high rounded-2xl shadow-xl border border-border/30 w-64 overflow-hidden">
+                <div className="px-4 py-4">
+                  <p className="text-sm font-medium text-on-surface mb-1">删除「{confirmDelete.title}」？</p>
+                  <p className="text-xs text-muted-accessible">
+                    {confirmDelete.recordCount > 0
+                      ? `其中 ${confirmDelete.recordCount} 条记录将变为未归类`
+                      : "该主题下没有记录"}
+                  </p>
+                </div>
+                <div className="flex border-t border-border/20">
+                  <button
+                    type="button"
+                    onClick={() => setConfirmDelete(null)}
+                    className="flex-1 py-3 text-sm text-on-surface hover:bg-surface/60 transition-colors"
+                  >
+                    取消
+                  </button>
+                  <div className="w-px bg-border/20" />
+                  <button
+                    type="button"
+                    onClick={handleConfirmDelete}
+                    className="flex-1 py-3 text-sm text-maple font-medium hover:bg-surface/60 transition-colors"
+                  >
+                    删除
+                  </button>
+                </div>
+              </div>
             </>
           )}
 

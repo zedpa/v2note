@@ -11,9 +11,8 @@ vi.mock("../db/repositories/index.js", () => ({
     findByUser: vi.fn(),
     findByDevice: vi.fn(),
   },
-  notebookRepo: {
-    findByUser: vi.fn(),
-    findByDevice: vi.fn(),
+  wikiPageRepo: {
+    findAllActive: vi.fn(),
   },
   recordRepo: {
     updateStatus: vi.fn(),
@@ -24,7 +23,7 @@ vi.mock("../ai/provider.js", () => ({
   chatCompletion: vi.fn(),
 }));
 
-import { todoRepo, notebookRepo } from "../db/repositories/index.js";
+import { todoRepo, wikiPageRepo } from "../db/repositories/index.js";
 import { chatCompletion } from "../ai/provider.js";
 import { commandFullMode } from "./command-full-mode.js";
 
@@ -43,8 +42,8 @@ function mockGoal(id: string, text: string) {
   return { id, text, done: false, level: 1, status: "active", priority: 0 } as any;
 }
 
-function mockNotebook(name: string) {
-  return { id: `nb-${name}`, device_id: "d1", name, description: null, color: "#000", is_system: false, created_at: "2026-04-11" };
+function mockWikiPage(id: string, title: string) {
+  return { id, title, level: 3, status: "active", user_id: "u1", page_type: "topic" } as any;
 }
 
 // ══════════════════════════════════════════════════════════════════════
@@ -54,10 +53,9 @@ describe("commandFullMode", () => {
     vi.resetAllMocks();
     (todoRepo.findPendingByDevice as any).mockResolvedValue([mockTodo("t1", "买牛奶")]);
     (todoRepo.findActiveGoalsByDevice as any).mockResolvedValue([mockGoal("g1", "健康")]);
-    (notebookRepo.findByDevice as any).mockResolvedValue([mockNotebook("工作")]);
     (todoRepo.findPendingByUser as any).mockResolvedValue([mockTodo("t1", "买牛奶")]);
     (todoRepo.findActiveGoalsByUser as any).mockResolvedValue([mockGoal("g1", "健康")]);
-    (notebookRepo.findByUser as any).mockResolvedValue([mockNotebook("工作")]);
+    (wikiPageRepo.findAllActive as any).mockResolvedValue([mockWikiPage("wp1", "工作")]);
   });
 
   it("should_return_commands_when_ai_returns_valid_create_todo", async () => {
@@ -127,7 +125,7 @@ describe("commandFullMode", () => {
   });
 
   it("should_handle_query_todo_with_post_processing", async () => {
-    (todoRepo.findPendingByDevice as any).mockResolvedValue([
+    (todoRepo.findPendingByUser as any).mockResolvedValue([
       mockTodo("t1", "买牛奶", { scheduled_start: "2026-04-12T09:00:00" }),
       mockTodo("t2", "开会", { scheduled_start: "2026-04-12T14:00:00" }),
       mockTodo("t3", "跑步", { scheduled_start: "2026-04-13T07:00:00" }),
@@ -170,19 +168,20 @@ describe("commandFullMode", () => {
 
     expect(todoRepo.findPendingByUser).toHaveBeenCalledWith("u1");
     expect(todoRepo.findActiveGoalsByUser).toHaveBeenCalledWith("u1");
-    expect(notebookRepo.findByUser).toHaveBeenCalledWith("u1");
+    expect(wikiPageRepo.findAllActive).toHaveBeenCalledWith("u1");
   });
 
-  it("should_use_deviceId_repos_when_no_userId", async () => {
+  it("should_use_deviceId_as_userId_fallback_when_no_userId", async () => {
     (chatCompletion as any).mockResolvedValue({
       content: JSON.stringify({ commands: [] }),
     });
 
     await commandFullMode({ text: "test", deviceId: "d1" });
 
-    expect(todoRepo.findPendingByDevice).toHaveBeenCalledWith("d1");
-    expect(todoRepo.findActiveGoalsByDevice).toHaveBeenCalledWith("d1");
-    expect(notebookRepo.findByDevice).toHaveBeenCalledWith("d1");
+    // deviceId 不再使用 byDevice，而是作为 userId fallback
+    expect(todoRepo.findPendingByUser).toHaveBeenCalledWith("d1");
+    expect(todoRepo.findActiveGoalsByUser).toHaveBeenCalledWith("d1");
+    expect(wikiPageRepo.findAllActive).toHaveBeenCalledWith("d1");
   });
 
   it("should_handle_multiple_commands_in_single_response", async () => {
@@ -220,42 +219,40 @@ describe("commandFullMode", () => {
     expect(result.commands[0].record?.content).toContain("心情很好");
   });
 
-  it("should_handle_manage_folder_command", async () => {
+  it("should_handle_manage_wiki_page_command", async () => {
     (chatCompletion as any).mockResolvedValue({
       content: JSON.stringify({
         commands: [{
-          action_type: "manage_folder",
+          action_type: "manage_wiki_page",
           confidence: 0.9,
-          folder: { action: "create", name: "旅行" },
+          wiki_page: { action: "create", title: "旅行" },
         }],
       }),
     });
 
-    const result = await commandFullMode({ text: "创建一个旅行文件夹", deviceId: "d1" });
+    const result = await commandFullMode({ text: "创建一个旅行主题", deviceId: "d1" });
 
     expect(result.commands).toHaveLength(1);
-    expect(result.commands[0].action_type).toBe("manage_folder");
-    expect(result.commands[0].folder?.action).toBe("create");
+    expect(result.commands[0].action_type).toBe("manage_wiki_page");
+    expect(result.commands[0].wiki_page?.action).toBe("create");
   });
 
-  it("should_filter_system_notebooks_from_folders", async () => {
-    (notebookRepo.findByDevice as any).mockResolvedValue([
-      { id: "nb-1", name: "default", is_system: true, device_id: "d1", description: null, color: "#000", created_at: "2026-04-11" },
-      { id: "nb-2", name: "ai-self", is_system: true, device_id: "d1", description: null, color: "#000", created_at: "2026-04-11" },
-      { id: "nb-3", name: "工作", is_system: false, device_id: "d1", description: null, color: "#000", created_at: "2026-04-11" },
+  it("should_include_wiki_pages_in_prompt", async () => {
+    (wikiPageRepo.findAllActive as any).mockResolvedValue([
+      mockWikiPage("wp1", "工作"),
+      mockWikiPage("wp2", "学习"),
     ]);
 
     (chatCompletion as any).mockResolvedValue({
       content: JSON.stringify({ commands: [] }),
     });
 
-    await commandFullMode({ text: "test", deviceId: "d1" });
+    await commandFullMode({ text: "test", deviceId: "d1", userId: "u1" });
 
-    // 验证 chatCompletion 被调用时 prompt 不包含系统文件夹
+    // 验证 chatCompletion 被调用时 prompt 包含 wiki pages
     const callArgs = (chatCompletion as any).mock.calls[0];
     const systemPrompt = callArgs[0][0].content;
     expect(systemPrompt).toContain("工作");
-    expect(systemPrompt).not.toContain('"default"');
-    expect(systemPrompt).not.toContain('"ai-self"');
+    expect(systemPrompt).toContain("学习");
   });
 });

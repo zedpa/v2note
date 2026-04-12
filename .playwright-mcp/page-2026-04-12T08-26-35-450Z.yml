@@ -1,0 +1,24 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - banner [ref=e3]:
+      - generic [ref=e4]:
+        - button "打开侧边栏" [ref=e5] [cursor=pointer]:
+          - generic [ref=e6]: E
+        - tablist "主视图切换" [ref=e7]:
+          - tab "日记" [ref=e9] [cursor=pointer]
+          - tab "待办" [selected] [ref=e11] [cursor=pointer]:
+            - text: 待办
+            - img [ref=e12]
+        - generic [ref=e14]:
+          - button "AI 聊天" [ref=e15] [cursor=pointer]:
+            - img [ref=e16]
+          - button "搜索" [ref=e18] [cursor=pointer]:
+            - img [ref=e19]
+    - main [ref=e22]
+    - button [ref=e27] [cursor=pointer]:
+      - img [ref=e28]
+    - button "Choose File" [ref=e31]
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=e37] [cursor=pointer]:
+    - img [ref=e38]
+  - alert [ref=e41]

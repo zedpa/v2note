@@ -25,12 +25,21 @@ const DURATION_OPTIONS = [
   { value: 120, label: "2小时" },
 ] as const;
 
+const REMINDER_OPTIONS = [
+  { value: null, label: "不提醒" },
+  { value: 5, label: "5分钟前" },
+  { value: 15, label: "15分钟前" },
+  { value: 30, label: "30分钟前" },
+  { value: 60, label: "1小时前" },
+] as const;
+
 export function TodoEditSheet({ todo, open, onClose, onUpdated, onAskAI }: TodoEditSheetProps) {
   const [text, setText] = useState("");
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");
   const [duration, setDuration] = useState<number | null>(null);
   const [priority, setPriority] = useState(3);
+  const [reminderBefore, setReminderBefore] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
   const dateRef = useRef<HTMLInputElement>(null);
   const timeRef = useRef<HTMLInputElement>(null);
@@ -48,6 +57,7 @@ export function TodoEditSheet({ todo, open, onClose, onUpdated, onAskAI }: TodoE
     }
     setDuration(t.estimated_minutes ?? null);
     setPriority(t.priority ?? 3);
+    setReminderBefore(t.reminder_before ?? null);
   }, []);
 
   // 打开时触发同步
@@ -81,6 +91,12 @@ export function TodoEditSheet({ todo, open, onClose, onUpdated, onAskAI }: TodoE
       }
       if (priority !== (todo.priority ?? 3)) updates.priority = priority;
 
+      // 提醒变更
+      const origReminder = todo.reminder_before ?? null;
+      if (reminderBefore !== origReminder) {
+        updates.reminder_before = reminderBefore; // null = 清除提醒
+      }
+
       if (Object.keys(updates).length > 0) {
         await updateTodo(todo.id, updates);
       }
@@ -90,7 +106,7 @@ export function TodoEditSheet({ todo, open, onClose, onUpdated, onAskAI }: TodoE
     } finally {
       setSaving(false);
     }
-  }, [todo, text, date, time, duration, priority, saving, onUpdated, onClose]);
+  }, [todo, text, date, time, duration, priority, reminderBefore, saving, onUpdated, onClose]);
 
   const handleDelete = useCallback(async () => {
     if (!todo) return;
@@ -152,7 +168,7 @@ export function TodoEditSheet({ todo, open, onClose, onUpdated, onAskAI }: TodoE
               {time ? formatTimeOnly(time) : "时间"}
             </span>
           </div>
-          <input ref={dateRef} type="date" value={date} onChange={(e) => setDate(e.target.value)} className="sr-only" tabIndex={-1} />
+          <input ref={dateRef} type="date" value={date} onChange={(e) => { setDate(e.target.value); if (!e.target.value) setReminderBefore(null); }} className="sr-only" tabIndex={-1} />
           <input ref={timeRef} type="time" value={time} onChange={(e) => setTime(e.target.value)} step="1800" className="sr-only" tabIndex={-1} />
         </div>
 
@@ -177,6 +193,30 @@ export function TodoEditSheet({ todo, open, onClose, onUpdated, onAskAI }: TodoE
             ))}
           </div>
         </div>
+
+        {/* 提醒（仅在有日期时显示） */}
+        {date && (
+          <div className="mb-6">
+            <div className="mb-2.5 ml-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/60">
+              提醒
+            </div>
+            <div className="flex flex-wrap gap-2.5">
+              {REMINDER_OPTIONS.map((opt) => (
+                <button
+                  key={opt.value ?? "none"}
+                  onClick={() => setReminderBefore(opt.value)}
+                  className={`rounded-[20px] px-4 py-2 text-[13px] font-medium transition-all ${
+                    reminderBefore === opt.value
+                      ? "bg-primary/15 text-primary"
+                      : "bg-muted/60 text-muted-foreground"
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* 优先级 */}
         <div className="mb-6">

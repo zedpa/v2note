@@ -5,7 +5,7 @@
  * - 待办：create_todo / complete_todo / modify_todo / delete_todo / query_todo
  * - 日记：create_record / query_record
  * - 搜索：search
- * - 文件夹：manage_folder / move_record
+ * - 主题：manage_wiki_page
  */
 
 import { buildDateAnchor } from "../lib/date-anchor.js";
@@ -13,7 +13,7 @@ import { buildDateAnchor } from "../lib/date-anchor.js";
 export interface CommandFullContext {
   pendingTodos: Array<{ id: string; text: string; scheduled_start?: string }>;
   activeGoals: Array<{ id: string; title: string }>;
-  folders: Array<{ name: string }>;
+  wikiPages: Array<{ id: string; title: string }>;
 }
 
 export function buildCommandFullPrompt(ctx: CommandFullContext): string {
@@ -29,9 +29,9 @@ export function buildCommandFullPrompt(ctx: CommandFullContext): string {
     ? ctx.activeGoals.map((g, i) => `  ${i + 1}. [${g.id}] "${g.title}"`).join("\n")
     : "  （无活跃目标）";
 
-  const folderList = ctx.folders.length > 0
-    ? ctx.folders.map((f, i) => `  ${i + 1}. "${f.name}"`).join("\n")
-    : "  （无自定义文件夹）";
+  const pageList = ctx.wikiPages.length > 0
+    ? ctx.wikiPages.map((p, i) => `  ${i + 1}. [${p.id}] "${p.title}"`).join("\n")
+    : "  （无主题）";
 
   return `你是全能语音指令助手。用户通过上滑手势触发指令模式，100% 是指令意图。判断操作类型并提取参数。
 
@@ -43,8 +43,8 @@ ${pendingList}
 ## 用户活跃目标/项目
 ${goalList}
 
-## 用户文件夹列表
-${folderList}
+## 用户主题列表
+${pageList}
 
 ## 支持的操作类型
 
@@ -62,9 +62,8 @@ ${folderList}
 ### 搜索操作
 **search** — 全文检索（跨日记/待办/目标）
 
-### 文件夹操作
-**manage_folder** — 创建/重命名/删除文件夹
-**move_record** — 移动日记到指定文件夹
+### 主题操作
+**manage_wiki_page** — 创建/重命名/删除/合并主题，移动记录到主题，查看主题列表
 
 ## 输出格式
 
@@ -120,14 +119,9 @@ ${folderList}
       "query_params": { "keyword": "搜索关键词" }
     },
     {
-      "action_type": "manage_folder",
+      "action_type": "manage_wiki_page",
       "confidence": 0.9,
-      "folder": { "action": "create", "name": "新文件夹名" }
-    },
-    {
-      "action_type": "move_record",
-      "confidence": 0.9,
-      "move": { "record_hint": "日记描述关键词", "target_folder": "目标文件夹名" }
+      "wiki_page": { "action": "create", "title": "新主题名" }
     }
   ]
 }
@@ -148,9 +142,9 @@ ${folderList}
 
 5. **scheduled_start**：日期从锚点表查找，时刻以用户原话为准精确到分钟
 
-6. **manage_folder** 的 action 只能是 "create"、"rename"、"delete"
+6. **manage_wiki_page** 的 action 可以是 "create"、"rename"、"delete"、"merge"、"move_record"、"list"
 
-7. **move_record** 的 target_folder 必须从文件夹列表匹配
+7. **manage_wiki_page** move_record 时 page_id 必须从主题列表匹配
 
 8. **search** 用于模糊查找，用户说"找一下""搜一下""有没有关于"时使用
 

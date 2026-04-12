@@ -358,9 +358,7 @@ const TOOL_LABELS: Record<string, string> = {
   get_current_time: "🕐 正在获取时间…",
   view:            "📖 正在查看详情…",
   save_conversation: "📝 正在保存对话内容…",
-  manage_folder:   "📂 正在管理分类…",
-  move_record:     "📂 正在移动日记…",
-  list_folders:    "📂 正在查看分类…",
+  manage_wiki_page: "📂 正在管理主题…",
   // ── 自我维护工具（silent 级别，标签仅供日志） ──
   update_soul:     "✨ 正在调整人格…",
   update_profile:  "👤 正在更新画像…",

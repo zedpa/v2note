@@ -9,7 +9,6 @@ import {
   getGatewayClient,
   type GatewayResponse,
 } from "@/features/chat/lib/gateway-client";
-import { getDeviceId } from "@/shared/lib/device";
 import { emit } from "@/features/recording/lib/events";
 import { getSettings } from "@/shared/lib/local-config";
 import { TextBottomSheet } from "./text-bottom-sheet";
@@ -266,7 +265,7 @@ export function FAB({
         case "tool.done": {
           // 数据变更类工具执行完后，刷新前端列表
           const dataTools = new Set([
-            "manage_folder", "move_record", "create_record", "update_record",
+            "manage_wiki_page", "create_record", "update_record",
             "delete_record", "create_todo", "update_todo", "delete_todo",
             "create_goal", "update_goal", "update_user_info",
           ]);
@@ -301,6 +300,9 @@ export function FAB({
     gwClientRef.current = null;
 
     try {
+      // pre-capture 阶段即请求音频焦点，打断系统音频（fix-recording-audio-focus）
+      await activateAudioSession();
+
       await recorder.startRecording({
         onPCMData: (chunk) => {
           if (pausedRef.current) return;
@@ -334,7 +336,8 @@ export function FAB({
         preBufferRef.current = [];
       }
     } catch {
-      // Mic permission denied
+      // Mic permission denied — 释放已获取的音频焦点（fix-recording-audio-focus）
+      deactivateAudioSession();
     }
   }, [recorder]);
 
@@ -350,6 +353,8 @@ export function FAB({
     preBufferRef.current = [];
     streamingRef.current = false;
     gwClientRef.current = null;
+    // 短按取消时释放音频焦点（fix-recording-audio-focus）
+    deactivateAudioSession();
   }, [recorder]);
 
   const startRecording = useCallback(async () => {
@@ -361,7 +366,7 @@ export function FAB({
       setLockedPaused(false);
       commandReleaseRef.current = false;
 
-      const [deviceId, settings] = await Promise.all([getDeviceId(), getSettings()]);
+      const settings = await getSettings();
       const asrMode = settings.asrMode ?? "realtime";
       asrModeRef.current = asrMode;
 
@@ -378,7 +383,7 @@ export function FAB({
       }
       gwClientRef.current = client;
 
-      client.send({ type: "asr.start", payload: { deviceId, mode: asrMode, notebook: activeNotebookRef.current ?? undefined, sourceContext: sourceContextRef.current } });
+      client.send({ type: "asr.start", payload: { mode: asrMode, notebook: activeNotebookRef.current ?? undefined, sourceContext: sourceContextRef.current } });
 
       for (const chunk of preBufferRef.current) {
         client.sendBinary(chunk);
@@ -522,7 +527,6 @@ export function FAB({
         recorder.stopRecording();
         // 恢复系统音频（不等 IndexedDB 写入）
         deactivateAudioSession();
-        const deviceId = await getDeviceId();
         const client = getGatewayClient();
 
         if (!client.connected) {
@@ -533,11 +537,11 @@ export function FAB({
 
         if (asCommand) {
           commandReleaseRef.current = true;
-          client.send({ type: "asr.stop", payload: { deviceId, saveAudio: false, forceCommand: true } });
+          client.send({ type: "asr.stop", payload: { saveAudio: false, forceCommand: true } });
           fabNotify.info("指令处理中...");
         } else {
           commandReleaseRef.current = false;
-          client.send({ type: "asr.stop", payload: { deviceId } });
+          client.send({ type: "asr.stop", payload: {} });
           setDisplayDuration(0);
           setConfirmedText("");
           setPartialText("");
@@ -574,9 +578,8 @@ export function FAB({
     deactivateAudioSession();
 
     try {
-      const deviceId = await getDeviceId();
       const client = getGatewayClient();
-      client.send({ type: "asr.cancel", payload: { deviceId } });
+      client.send({ type: "asr.cancel", payload: {} });
     } catch {
       // ignore
     }
@@ -864,6 +867,7 @@ export function FAB({
       {/* ─── FAB Button ─── */}
       <div
         data-testid="fab-button"
+        data-guide="fab"
         className="fixed left-1/2 z-40"
         style={{
           bottom: "calc(54px + var(--kb-offset, 0px))",

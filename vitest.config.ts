@@ -5,7 +5,7 @@ export default defineConfig({
   test: {
     globals: true,
     environment: "jsdom",
-    include: ["features/**/*.test.{ts,tsx}", "shared/**/*.test.{ts,tsx}"],
+    include: ["features/**/*.test.{ts,tsx}", "shared/**/*.test.{ts,tsx}", "components/**/*.test.{ts,tsx}"],
     setupFiles: [],
 
     // 超时设置

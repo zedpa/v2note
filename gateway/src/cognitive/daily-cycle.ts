@@ -77,8 +77,9 @@ export async function runDailyCognitiveCycle(
       }
     }
 
-    if (digestLines.length > 0 && deviceId) {
-      await appendToDiary(deviceId, "ai-self", `[认知摘要] ${digestLines.join("；")}`, userId);
+    const uid = userId ?? deviceId;
+    if (digestLines.length > 0 && uid) {
+      await appendToDiary(uid, "ai-self", `[认知摘要] ${digestLines.join("；")}`);
       console.log("[cognitive] Cognitive digest saved to ai-self diary");
     }
   } catch (err) {

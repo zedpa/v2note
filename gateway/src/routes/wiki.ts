@@ -346,6 +346,56 @@ export function registerWikiRoutes(router: Router) {
     }
   });
 
+  // DELETE /api/v1/wiki/pages/:id — 删除（归档）wiki page
+  router.delete("/api/v1/wiki/pages/:id", async (req, res, params) => {
+    const userId = getUserId(req);
+    if (!userId) {
+      sendError(res, "Unauthorized", 401);
+      return;
+    }
+
+    try {
+      const page = await wikiPageRepo.findById(params.id);
+      if (!page || page.user_id !== userId) {
+        sendError(res, "Page not found", 404);
+        return;
+      }
+
+      // 1. 解除所有 record 关联
+      const unlinkedIds = await wikiPageRecordRepo.unlinkAllByPage(params.id);
+
+      // 2. 清除被解除关联的 record 的 compile_status（回到收件箱）
+      if (unlinkedIds.length > 0) {
+        await query(
+          `UPDATE record SET compile_status = NULL WHERE id = ANY($1::uuid[])`,
+          [unlinkedIds],
+        );
+      }
+
+      // 3. 子页面提升为顶层
+      await query(
+        `UPDATE wiki_page SET parent_id = NULL, level = 3 WHERE parent_id = $1`,
+        [params.id],
+      );
+
+      // 4. goal page 清 todo.wiki_page_id
+      if (page.page_type === "goal") {
+        await query(
+          `UPDATE todo SET wiki_page_id = NULL WHERE wiki_page_id = $1`,
+          [params.id],
+        );
+      }
+
+      // 5. 归档
+      await wikiPageRepo.updateStatus(params.id, "archived");
+
+      sendJson(res, { ok: true, unlinked_records: unlinkedIds.length });
+    } catch (err: any) {
+      console.error(`[wiki] delete page error:`, err.message);
+      sendError(res, err.message ?? "Failed to delete page", 500);
+    }
+  });
+
   // ── Phase 14.7: 建议 API ──
 
   // GET /api/v1/wiki/suggestions — 查询待处理建议

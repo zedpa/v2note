@@ -217,21 +217,21 @@ export async function digestRecords(
     // ── Step 6: 记忆/Soul/Profile 更新 ──────────────────────────
     try {
       const today = tzToday();
-      const session = getSession(context.deviceId);
+      const session = getSession(userId!);
       const memoryManager = session.memoryManager;
 
       memoryManager
-        .maybeCreateMemory(context.deviceId, combinedText, today, context.userId)
+        .maybeCreateMemory(userId!, combinedText, today, userId)
         .catch((e: any) => console.warn("[digest] Memory creation failed:", e.message));
 
       if (shouldUpdateSoulStrict([combinedText])) {
-        updateSoul(context.deviceId, combinedText, context.userId).catch((e: any) =>
+        updateSoul(userId!, combinedText, userId).catch((e: any) =>
           console.warn("[digest] Soul update failed:", e.message),
         );
       }
 
       if (mayProfileUpdate(combinedText)) {
-        updateProfile(context.deviceId, combinedText, context.userId).catch((e: any) =>
+        updateProfile(userId!, combinedText, userId).catch((e: any) =>
           console.warn("[digest] Profile update failed:", e.message),
         );
       }

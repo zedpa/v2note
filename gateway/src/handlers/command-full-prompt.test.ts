@@ -10,9 +10,9 @@ describe("buildCommandFullPrompt", () => {
     activeGoals: [
       { id: "goal-1", title: "健康管理" },
     ],
-    folders: [
-      { name: "工作" },
-      { name: "生活" },
+    wikiPages: [
+      { id: "wp-1", title: "工作" },
+      { id: "wp-2", title: "生活" },
     ],
   };
 
@@ -30,7 +30,7 @@ describe("buildCommandFullPrompt", () => {
     expect(prompt).toContain("健康管理");
   });
 
-  it("should_include_folders_when_context_has_folders", () => {
+  it("should_include_wiki_pages_when_context_has_pages", () => {
     const prompt = buildCommandFullPrompt(baseCtx);
     expect(prompt).toContain("工作");
     expect(prompt).toContain("生活");
@@ -49,9 +49,8 @@ describe("buildCommandFullPrompt", () => {
     expect(prompt).toContain("query_record");
     // 搜索
     expect(prompt).toContain("search");
-    // 文件夹
-    expect(prompt).toContain("manage_folder");
-    expect(prompt).toContain("move_record");
+    // 主题
+    expect(prompt).toContain("manage_wiki_page");
   });
 
   it("should_include_date_anchor_in_prompt", () => {
@@ -66,12 +65,12 @@ describe("buildCommandFullPrompt", () => {
     const ctx: CommandFullContext = {
       pendingTodos: [],
       activeGoals: [],
-      folders: [],
+      wikiPages: [],
     };
     const prompt = buildCommandFullPrompt(ctx);
     expect(prompt).toContain("无未完成待办");
     expect(prompt).toContain("无活跃目标");
-    expect(prompt).toContain("无自定义文件夹");
+    expect(prompt).toContain("无主题");
   });
 
   it("should_include_scheduled_start_for_todos_that_have_it", () => {

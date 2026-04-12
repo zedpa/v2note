@@ -8,12 +8,12 @@ vi.mock("../ai/provider.js", () => ({
 vi.mock("../db/repositories/index.js", () => ({
   aiDiaryRepo: {
     upsertEntry: vi.fn().mockResolvedValue({ id: "d-1" }),
-    findFull: vi.fn(),
-    findSummaries: vi.fn(),
+    findFullByUser: vi.fn(),
+    findSummariesByUser: vi.fn(),
     updateSummary: vi.fn(),
   },
   notebookRepo: {
-    ensureSystemNotebooks: vi.fn(),
+    ensureSystemNotebooksByUser: vi.fn(),
   },
 }));
 
@@ -39,21 +39,21 @@ describe("diary manager", () => {
 
   describe("appendToDiary", () => {
     it("ensures system notebooks exist and appends content", async () => {
-      await appendToDiary("dev-1", "default", "Today I coded");
+      await appendToDiary("user-1", "default", "Today I coded");
 
-      expect(notebookRepo.ensureSystemNotebooks).toHaveBeenCalledWith("dev-1");
+      expect(notebookRepo.ensureSystemNotebooksByUser).toHaveBeenCalledWith("user-1", "");
       expect(aiDiaryRepo.upsertEntry).toHaveBeenCalledWith(
-        "dev-1",
+        "",
         "default",
         expect.any(String), // today's date
         "Today I coded",
-        undefined,
+        "user-1",
       );
     });
 
     it("uses today's date", async () => {
       const todayStr = today();
-      await appendToDiary("dev-1", "ai-self", "AI observation");
+      await appendToDiary("user-1", "ai-self", "AI observation");
 
       const [, , date] = vi.mocked(aiDiaryRepo.upsertEntry).mock.calls[0];
       expect(date).toBe(todayStr);
@@ -62,12 +62,12 @@ describe("diary manager", () => {
 
   describe("regenerateSummary", () => {
     it("generates summary via AI and saves it", async () => {
-      vi.mocked(aiDiaryRepo.findFull).mockResolvedValue({
+      vi.mocked(aiDiaryRepo.findFullByUser).mockResolvedValue({
         id: "d-1",
         full_content: "Long diary content here...",
       } as any);
 
-      await regenerateSummary("dev-1", "default", "2026-03-12");
+      await regenerateSummary("user-1", "default", "2026-03-12");
 
       expect(chatCompletion).toHaveBeenCalledWith(
         expect.arrayContaining([
@@ -83,35 +83,35 @@ describe("diary manager", () => {
     });
 
     it("skips when no entry found", async () => {
-      vi.mocked(aiDiaryRepo.findFull).mockResolvedValue(null);
-      await regenerateSummary("dev-1", "default", "2099-01-01");
+      vi.mocked(aiDiaryRepo.findFullByUser).mockResolvedValue(null);
+      await regenerateSummary("user-1", "default", "2099-01-01");
       expect(chatCompletion).not.toHaveBeenCalled();
     });
 
     it("skips when entry has empty content", async () => {
-      vi.mocked(aiDiaryRepo.findFull).mockResolvedValue({
+      vi.mocked(aiDiaryRepo.findFullByUser).mockResolvedValue({
         id: "d-1",
         full_content: "  ",
       } as any);
-      await regenerateSummary("dev-1", "default", "2026-03-12");
+      await regenerateSummary("user-1", "default", "2026-03-12");
       expect(chatCompletion).not.toHaveBeenCalled();
     });
   });
 
   describe("extractToMemory", () => {
     it("skips when no diary entries in range", async () => {
-      vi.mocked(aiDiaryRepo.findSummaries).mockResolvedValue([]);
-      await extractToMemory("dev-1", { start: "2026-03-01", end: "2026-03-12" });
+      vi.mocked(aiDiaryRepo.findSummariesByUser).mockResolvedValue([]);
+      await extractToMemory("user-1", { start: "2026-03-01", end: "2026-03-12" });
       expect(chatCompletion).not.toHaveBeenCalled();
     });
 
     it("calls AI to extract memories from diary summaries", async () => {
-      vi.mocked(aiDiaryRepo.findSummaries).mockResolvedValue([
+      vi.mocked(aiDiaryRepo.findSummariesByUser).mockResolvedValue([
         { id: "d-1", entry_date: "2026-03-10", summary: "Worked on feature X", notebook: "default" },
         { id: "d-2", entry_date: "2026-03-11", summary: "Meeting with team", notebook: "default" },
       ] as any);
 
-      await extractToMemory("dev-1", { start: "2026-03-01", end: "2026-03-12" });
+      await extractToMemory("user-1", { start: "2026-03-01", end: "2026-03-12" });
 
       expect(chatCompletion).toHaveBeenCalledWith(
         expect.arrayContaining([

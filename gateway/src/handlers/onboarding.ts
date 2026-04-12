@@ -1,41 +1,28 @@
 /**
- * Onboarding handler v3 — 极简两步引导。
+ * Onboarding handler v4 — 单步完成：存名字 + 标记 onboarding_done。
  *
- * Step 1: 输入名字 → 存 UserProfile.name
- * Step 2: 输入一句话 → 调用 process pipeline → 返回 AI 拆解结果
- *
- * 不再创建欢迎日记 / seed goals / seed strikes。
- * 不再收集 occupation / current_focus / pain_points / review_time。
+ * 不再调用 processEntry / 创建 record / transcript。
+ * 前端完成 onboarding 后直接进入主界面并触发 Coach Mark 引导。
  */
 
-import { userProfileRepo, recordRepo, transcriptRepo } from "../db/repositories/index.js";
-import { processEntry, type ProcessResult } from "./process.js";
+import { userProfileRepo } from "../db/repositories/index.js";
 
 // ── Types ────────────────────────────────────────────────────
 
 interface OnboardingChatInput {
   userId: string;
-  deviceId: string;
-  step: number;   // 1-2
+  deviceId: string; // 已弃用，保留兼容
+  step: number;   // 1 或 2（兼容旧前端）
   answer: string;
 }
 
-interface OnboardingStep1Result {
-  step: 1;
-  done: false;
+interface OnboardingResult {
+  step: number;
+  done: true;
   name: string;
 }
 
-interface OnboardingStep2Result {
-  step: 2;
-  done: true;
-  summary?: string;
-  todos?: string[];
-  tags?: string[];
-  recordId?: string;
-}
-
-export type OnboardingChatResult = OnboardingStep1Result | OnboardingStep2Result;
+export type OnboardingChatResult = OnboardingResult;
 
 // ── 主接口 ──────────────────────────────────────────────────
 
@@ -44,62 +31,18 @@ export async function handleOnboardingChat(
 ): Promise<OnboardingChatResult> {
   const { userId, deviceId, step, answer } = input;
   const trimmed = answer.trim();
+  const name = trimmed || "用户";
 
-  // ── Step 1: 存名字 ──
+  // Step 1: 存名字 + 标记完成（一次搞定）
   if (step === 1) {
-    const name = trimmed || "用户";
     await userProfileRepo.upsertOnboardingField(userId, "name", name, deviceId);
-    console.log(`[onboarding] Step 1: saved name="${name}" for user ${userId}`);
-    return { step: 1, done: false, name };
-  }
-
-  // ── Step 2: 调用 process pipeline，返回 AI 拆解结果 ──
-  if (step === 2) {
-    // 标记 onboarding 完成
     await userProfileRepo.upsertOnboardingField(userId, "onboarding_done", "true", deviceId);
-
-    if (!trimmed) {
-      console.log("[onboarding] Step 2: empty input, skipping process");
-      return { step: 2, done: true };
-    }
-
-    try {
-      // 创建 record + transcript
-      const record = await recordRepo.create({
-        device_id: deviceId,
-        user_id: userId,
-        status: "processing",
-        source: "manual",
-      });
-      await transcriptRepo.create({ record_id: record.id, text: trimmed, language: "zh" });
-
-      // 同步调用 process pipeline
-      const processResult: ProcessResult = await processEntry({
-        text: trimmed,
-        deviceId,
-        userId,
-        recordId: record.id,
-        sourceContext: "timeline",
-      });
-
-      console.log(`[onboarding] Step 2: processed record ${record.id}`);
-
-      return {
-        step: 2,
-        done: true,
-        summary: processResult.summary ?? trimmed,
-        todos: processResult.todos ?? [],
-        tags: processResult.tags ?? [],
-        recordId: record.id,
-      };
-    } catch (e: any) {
-      console.error("[onboarding] Step 2 process failed:", e.message);
-      // 即使处理失败也标记完成
-      return { step: 2, done: true };
-    }
+    console.log(`[onboarding] Completed: name="${name}" for user ${userId}`);
+    return { step: 1, done: true, name };
   }
 
-  // 非法 step
+  // Step 2: 兼容旧前端 / 跳过场景 — 只标记完成
   await userProfileRepo.upsertOnboardingField(userId, "onboarding_done", "true", deviceId);
-  return { step: 2, done: true };
+  console.log("[onboarding] Completed (step 2 compat)");
+  return { step: 2, done: true, name: "用户" };
 }

@@ -1,5 +1,4 @@
 export interface AuthIdentity {
-  deviceId: string
   userId: string
 }
 
@@ -24,7 +23,6 @@ export interface Device {
 
 export interface Record {
   id: string
-  device_id: string
   status: 'uploading' | 'uploaded' | 'processing' | 'completed' | 'failed' | 'error' | 'pending_retry' | 'expired'
   audio_path: string | null
   duration_seconds: number | null
@@ -137,7 +135,6 @@ export type WeeklyReviewStructuredData =
 
 export interface Review {
   id: string
-  device_id: string
   period: 'daily' | 'weekly' | 'monthly' | 'yearly'
   period_start: string
   period_end: string
@@ -220,7 +217,6 @@ export interface TodoItem {
 
 export interface Goal {
   id: string
-  device_id: string
   title: string
   parent_id: string | null
   cluster_id?: string | null
@@ -237,7 +233,6 @@ export interface Goal {
 
 export interface PendingIntent {
   id: string
-  device_id: string
   record_id: string | null
   intent_type: 'wish' | 'goal' | 'complaint' | 'reflection'
   text: string
@@ -257,7 +252,6 @@ export interface IdeaItem {
 
 export interface MemoryEntry {
   id: string
-  device_id: string
   content: string
   source_date: string | null
   importance: number
@@ -266,7 +260,6 @@ export interface MemoryEntry {
 
 export interface Soul {
   id: string
-  device_id: string
   content: string
   updated_at: string
 }

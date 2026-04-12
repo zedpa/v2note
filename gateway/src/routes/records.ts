@@ -43,6 +43,12 @@ export function registerRecordRoutes(router: Router) {
 
     let records;
 
+    // wiki_page_id 过滤需要 userId（通过 JWT 认证），无 userId 时返回 401
+    if (wikiPageId && !userId) {
+      sendJson(res, { error: "Unauthorized" }, 401);
+      return;
+    }
+
     if (wikiPageId === "__inbox__" && userId) {
       // 收件箱：未关联任何 wiki page 的 records
       const { query: dbQuery } = await import("../db/pool.js");
@@ -166,17 +172,6 @@ export function registerRecordRoutes(router: Router) {
     }));
 
     sendJson(res, items);
-  });
-
-  // 获取用户的 domain 列表 + 每个 domain 的记录数（侧边栏文件夹）
-  router.get("/api/v1/records/domains", async (req, res) => {
-    const userId = getUserId(req);
-    if (!userId) {
-      sendJson(res, { domains: [] });
-      return;
-    }
-    const domains = await recordRepo.listUserDomainsWithCount(userId);
-    sendJson(res, { domains });
   });
 
   // Get single record (with all associations)

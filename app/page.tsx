@@ -18,6 +18,7 @@ import { useSuggestions } from "@/features/sidebar/hooks/use-suggestions";
 import dynamic from 'next/dynamic';
 import { OfflineBanner } from "@/shared/components/offline-banner";
 import { fabNotify } from "@/shared/lib/fab-notify";
+import { CoachMark } from "@/components/coach-mark";
 
 // Overlay 组件懒加载 — 非首屏可见，按需加载减少首屏 bundle
 const SearchView = dynamic(() => import('@/features/search/components/search-view').then(m => ({ default: m.SearchView })));
@@ -182,11 +183,15 @@ export default function Page() {
 
   // Onboarding state — 按用户维度判断，旧设备新用户也能触发冷启动
   const [isFirstTime, setIsFirstTime] = useState(false);
+  const [showGuide, setShowGuide] = useState(false);
   useEffect(() => {
     if (!loggedIn || !user?.id) return;
     const key = `v2note:onboarded:${user.id}`;
     if (localStorage.getItem(key) !== "true") {
       setIsFirstTime(true);
+    } else if (localStorage.getItem(`v2note:guide-done:${user.id}`) !== "true") {
+      // 已完成 onboarding 但引导被中断（如强制关闭 app），重新触发引导
+      setShowGuide(true);
     }
   }, [loggedIn, user?.id]);
 
@@ -771,13 +776,15 @@ export default function Page() {
           localStorage.setItem("v2note:onboarded", "true");
           setIsFirstTime(false);
           setTimeout(() => emit("recording:processed"), 500);
+          // 触发功能引导
+          setShowGuide(true);
         }}
         onSkip={() => {
           if (user?.id) localStorage.setItem(`v2note:onboarded:${user.id}`, "true");
           localStorage.setItem("v2note:onboarded", "true");
           setIsFirstTime(false);
-          // 跳过时标记 onboarding 完成
-          api.post("/api/v1/onboarding/chat", { step: 2, answer: "" }).catch(() => {});
+          // 触发功能引导
+          setShowGuide(true);
         }}
       />
     );
@@ -802,6 +809,21 @@ export default function Page() {
         onSelectPage={(pageId) => {
           setWikiPageFilter(pageId);
           setActiveTab("diary");
+        }}
+        onCreatePage={(title, pageType) => {
+          api.post("/api/v1/wiki/pages", { title, page_type: pageType })
+            .then(() => fetchSidebar())
+            .catch(() => {});
+        }}
+        onRenamePage={(pageId, newTitle) => {
+          api.patch(`/api/v1/wiki/pages/${pageId}`, { title: newTitle })
+            .then(() => fetchSidebar())
+            .catch(() => {});
+        }}
+        onDeletePage={(pageId) => {
+          api.delete(`/api/v1/wiki/pages/${pageId}`)
+            .then(() => fetchSidebar())
+            .catch(() => {});
         }}
         onLogout={logout}
         userName={user?.displayName}
@@ -906,13 +928,11 @@ export default function Page() {
         onTextSubmit={async (text) => {
           try {
             const { getGatewayClient } = await import("@/features/chat/lib/gateway-client");
-            const { getDeviceId } = await import("@/shared/lib/device");
             const client = getGatewayClient();
-            const deviceId = await getDeviceId();
             // 发送修改指令，gateway 返回 process.result 会自动更新 commands
             client.send({
               type: "todo.refine",
-              payload: { deviceId, commands: commandSheetCommands, modificationText: text },
+              payload: { commands: commandSheetCommands, modificationText: text },
             });
           } catch (err: any) {
             console.error("[CommandSheet] text submit error:", err);
@@ -1039,6 +1059,28 @@ export default function Page() {
         </OverlayTransition>
       ) : null}
       </AnimatePresence>
+
+      {/* 冷启动功能引导 Coach Mark */}
+      {showGuide && (
+        <CoachMark
+          steps={[
+            {
+              target: "[data-guide='fab']",
+              message: "按住说话，松开自动记录",
+              placement: "top",
+            },
+            {
+              target: "[data-guide='tab-todo']",
+              message: "对路路说\u201C帮我建个待办\u201D\n试试语音指令",
+              placement: "bottom",
+            },
+          ]}
+          onComplete={() => {
+            setShowGuide(false);
+            if (user?.id) localStorage.setItem(`v2note:guide-done:${user.id}`, "true");
+          }}
+        />
+      )}
     </div>
   );
 }
