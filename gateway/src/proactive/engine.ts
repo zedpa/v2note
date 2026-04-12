@@ -480,38 +480,10 @@ export class ProactiveEngine {
   }
 
   /**
-   * Run weekly emergence engine for all users with active clusters.
+   * @deprecated Strike/Cluster emergence 已被 Wiki 系统替代，此方法保留为空操作。
    */
   private async runWeeklyEmergence(): Promise<void> {
-    try {
-      const { query } = await import("../db/pool.js");
-      const rows = await query<{ user_id: string }>(
-        `SELECT DISTINCT user_id FROM strike WHERE is_cluster = true AND status = 'active'`,
-        [],
-      );
-
-      if (rows.length === 0) {
-        console.log("[proactive:emergence] No users with active clusters");
-        return;
-      }
-
-      console.log(`[proactive:emergence] Processing ${rows.length} user(s)`);
-
-      const { runEmergence } = await import("../cognitive/emergence.js");
-      for (const row of rows) {
-        try {
-          const result = await runEmergence(row.user_id);
-          console.log(`[proactive:emergence] User ${row.user_id}: ${result.higherOrderClusters} L2 created`);
-        } catch (err: any) {
-          console.error(
-            `[proactive:emergence] Failed for user ${row.user_id}:`,
-            err.message,
-          );
-        }
-      }
-    } catch (err: any) {
-      console.error("[proactive:emergence] Failed:", err.message);
-    }
+    // No-op: emergence engine removed (strike system cleanup)
   }
 
   private async checkDevice(device: ConnectedDevice): Promise<void> {

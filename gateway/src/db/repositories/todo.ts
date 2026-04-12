@@ -106,6 +106,38 @@ export async function findPendingByUser(userId: string): Promise<Todo[]> {
   );
 }
 
+/** 查询用户在指定日期范围内完成的待办（按 completed_at 过滤） */
+export async function findCompletedByUserInRange(
+  userId: string,
+  start: string,
+  end: string,
+): Promise<Todo[]> {
+  return query<Todo>(
+    `SELECT t.* FROM todo t
+     JOIN record r ON r.id = t.record_id
+     WHERE r.user_id = $1 AND t.done = true
+       AND t.completed_at >= $2 AND t.completed_at <= $3
+     ORDER BY t.completed_at ASC`,
+    [userId, start, end],
+  );
+}
+
+/** 查询设备在指定日期范围内完成的待办（按 completed_at 过滤） */
+export async function findCompletedByDeviceInRange(
+  deviceId: string,
+  start: string,
+  end: string,
+): Promise<Todo[]> {
+  return query<Todo>(
+    `SELECT t.* FROM todo t
+     JOIN record r ON r.id = t.record_id
+     WHERE r.device_id = $1 AND t.done = true
+       AND t.completed_at >= $2 AND t.completed_at <= $3
+     ORDER BY t.completed_at ASC`,
+    [deviceId, start, end],
+  );
+}
+
 export async function findByGoalId(goalId: string): Promise<Todo[]> {
   return query<Todo>(
     `SELECT * FROM todo WHERE goal_id = $1 ORDER BY created_at`,

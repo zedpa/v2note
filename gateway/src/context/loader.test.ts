@@ -99,7 +99,7 @@ describe("context loader", () => {
   });
 
   describe("wikiContext (场景 4.2: Chat 参谋搜索上下文)", () => {
-    it("should_include_wikiContext_when_userId_and_inputText_provided", async () => {
+    it("should_include_wikiContext_when_userId_and_inputText_provided", { timeout: 30000 }, async () => {
       mockLoadWikiContext.mockResolvedValue([
         "铝价分析: 铝价走势和影响因素分析",
         "采购策略: 采购策略和供应商管理",

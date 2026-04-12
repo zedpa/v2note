@@ -10,6 +10,7 @@ import {
   unlink,
   findRecordsByPage,
   findPagesByRecord,
+  findPagesByRecords,
   countByPage,
 } from "./wiki-page-record.js";
 import { query, execute } from "../pool.js";
@@ -90,6 +91,38 @@ describe("wiki-page-record repository", () => {
       expect(sql).toContain("record_id = $1");
       expect(sql).toContain("ORDER BY added_at ASC");
       expect(vi.mocked(query).mock.calls[0][1]).toEqual(["rec-1"]);
+    });
+  });
+
+  describe("findPagesByRecords", () => {
+    it("should_return_pages_for_multiple_records_ordered_by_added_at", async () => {
+      const mockResults = [
+        { wiki_page_id: "wp-1", record_id: "rec-1", added_at: "2026-04-09T10:00:00Z" },
+        { wiki_page_id: "wp-2", record_id: "rec-1", added_at: "2026-04-09T11:00:00Z" },
+        { wiki_page_id: "wp-1", record_id: "rec-2", added_at: "2026-04-09T12:00:00Z" },
+      ];
+      vi.mocked(query).mockResolvedValue(mockResults as any);
+
+      const result = await findPagesByRecords(["rec-1", "rec-2"]);
+      expect(result).toHaveLength(3);
+      const sql = vi.mocked(query).mock.calls[0][0];
+      expect(sql).toContain("record_id IN");
+      expect(sql).toContain("ORDER BY added_at ASC");
+      expect(vi.mocked(query).mock.calls[0][1]).toEqual(["rec-1", "rec-2"]);
+    });
+
+    it("should_return_empty_array_when_no_record_ids_provided", async () => {
+      const result = await findPagesByRecords([]);
+      expect(result).toEqual([]);
+      // 不应发出 DB 查询
+      expect(vi.mocked(query)).not.toHaveBeenCalled();
+    });
+
+    it("should_return_empty_array_when_no_records_have_page_associations", async () => {
+      vi.mocked(query).mockResolvedValue([]);
+
+      const result = await findPagesByRecords(["rec-999"]);
+      expect(result).toEqual([]);
     });
   });
 

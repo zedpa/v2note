@@ -17,6 +17,7 @@ export interface Note {
   location?: string;
   type?: "diary" | "daily" | "weekly" | "monthly";
   status?: string;
+  source_type?: string | null;
 }
 
 const TAG_STYLES: Record<string, { bg: string; fg: string }> = {
@@ -40,6 +41,20 @@ function getTagStyle(tag: string): { className: string; style?: React.CSSPropert
       color: `hsl(${entry.fg})`,
     },
   };
+}
+
+/** 根据 source_type 返回左边框颜色样式 */
+function getSourceBorderStyle(sourceType: string | null | undefined): string | undefined {
+  switch (sourceType) {
+    case "voice":
+      return "hsl(var(--domain-health-fg))"; // 绿
+    case "ai_diary":
+      return "hsl(var(--primary))"; // 品牌橙
+    case "material":
+      return "hsl(var(--muted-foreground))"; // 灰
+    default:
+      return undefined;
+  }
 }
 
 const LONG_PRESS_MS = 500;
@@ -148,6 +163,8 @@ export function NoteCard({
     }
   }, [selectionMode, onToggleSelect, onClick]);
 
+  const sourceBorderColor = getSourceBorderStyle(note.source_type);
+
   return (
     <div className="flex gap-3 relative">
       {/* Timeline dot and line */}
@@ -171,12 +188,20 @@ export function NoteCard({
         onPointerLeave={handlePointerUp}
         onClick={handleClick}
         className={cn(
-          "flex-1 rounded-2xl p-4 mb-3 text-left transition-all duration-200 pressable",
+          "flex-1 rounded-2xl p-4 mb-3 text-left pressable",
+          "transition-[transform,opacity,box-shadow] duration-150",
           "hover:shadow-md",
           "border border-border/60",
+          "active:scale-[0.98] active:opacity-90",
           isSummary ? "bg-accent/5" : "bg-card",
           selectionMode && selected && "ring-2 ring-primary border-primary/40",
+          sourceBorderColor && "border-l-[3px]",
         )}
+        style={
+          sourceBorderColor
+            ? { borderLeftColor: sourceBorderColor }
+            : undefined
+        }
       >
         {/* Selection checkbox */}
         {selectionMode && (

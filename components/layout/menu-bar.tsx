@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Search, Mic, Zap, ClipboardList, Settings } from "lucide-react";
 import { LuluLogo } from "@/components/brand/lulu-logo";
 import { cn } from "@/lib/utils";
 
@@ -20,12 +21,12 @@ const scenes: { key: Scene; label: string }[] = [
   { key: "goals", label: "目标" },
 ];
 
-const actions: { emoji: string; label: string; action: string }[] = [
-  { emoji: "🔍", label: "", action: "搜索" },
-  { emoji: "🎙", label: "", action: "语音" },
-  { emoji: "⚡️", label: "行动", action: "行动" },
-  { emoji: "📋", label: "回顾", action: "回顾" },
-  { emoji: "⚙️", label: "", action: "设置" },
+const actions: { icon: React.ComponentType<{ size?: number }>; label: string; action: string }[] = [
+  { icon: Search, label: "", action: "搜索" },
+  { icon: Mic, label: "", action: "语音" },
+  { icon: Zap, label: "行动", action: "行动" },
+  { icon: ClipboardList, label: "回顾", action: "回顾" },
+  { icon: Settings, label: "", action: "设置" },
 ];
 
 export function MenuBar({
@@ -106,19 +107,22 @@ export function MenuBar({
 
       {/* Right: action buttons */}
       <div className="flex items-center gap-0.5">
-        {actions.map((a) => (
-          <button
-            key={a.action}
-            onClick={() => onAction(a.action)}
-            className="relative px-2 py-1 rounded-lg text-sm hover:bg-sand transition"
-          >
-            {a.emoji}
-            {a.label && <span className="ml-0.5">{a.label}</span>}
-            {a.action === "回顾" && hasNewReport && (
-              <span className="absolute top-0.5 right-0.5 w-2 h-2 rounded-full bg-deer" />
-            )}
-          </button>
-        ))}
+        {actions.map((a) => {
+          const Icon = a.icon;
+          return (
+            <button
+              key={a.action}
+              onClick={() => onAction(a.action)}
+              className="relative px-2 py-1 rounded-lg text-sm hover:bg-sand transition flex items-center gap-0.5"
+            >
+              <Icon size={18} />
+              {a.label && <span>{a.label}</span>}
+              {a.action === "回顾" && hasNewReport && (
+                <span className="absolute top-0.5 right-0.5 w-2 h-2 rounded-full bg-deer" />
+              )}
+            </button>
+          );
+        })}
       </div>
     </div>
   );

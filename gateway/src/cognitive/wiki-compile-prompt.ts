@@ -123,6 +123,17 @@ ${dateAnchor}
 - 两个 page 高度重叠 → \`merge_pages\`
 - 一个 page 覆盖了多个明显不同的子主题 → \`split_page\`
 - 发现新目标或目标状态变化 → \`goal_sync\`
+- 新 Record 内容涉及多个 page 的主题 → \`links\`（在 page 间建立语义关联）
+
+### 跨页链接规则（links）
+
+- 编译时如果发现新 Record 涉及多个 page 的主题，在 \`links\` 中输出关联
+- link_type 分类：
+  - \`reference\`：A 内容直接引用了 B 的内容（如"与采购策略相关"）
+  - \`related\`：A 和 B 讨论了相关主题
+  - \`contradicts\`：A 和 B 存在矛盾观点
+- source_page_id 和 target_page_id 必须来自上方的 page 索引，禁止编造 ID
+- context_text 简要描述关联原因
 
 ### Domain 分类规则
 
@@ -184,6 +195,14 @@ ${coldStartHint}
       "title": "目标标题",
       "status": "active",
       "wiki_page_id": "UUID"
+    }
+  ],
+  "links": [
+    {
+      "source_page_id": "UUID — 发起链接的 page",
+      "target_page_id": "UUID — 被链接到的 page",
+      "link_type": "reference | related | contradicts",
+      "context_text": "链接上下文描述（如'提到了采购策略'）"
     }
   ]
 }

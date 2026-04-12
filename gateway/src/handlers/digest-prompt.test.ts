@@ -1,10 +1,10 @@
 /**
- * 单元测试：digest-prompt.ts — Phase 2 Ingest 改造
+ * 单元测试：digest-prompt.ts — Phase 14.2 废弃 Goal 提取
  *
- * 核心变更：buildDigestPrompt → buildIngestPrompt
- * - 只提取 intend（待办/目标），不生成 Strike/Bond
+ * 核心变更：buildIngestPrompt 只提取 action 粒度的待办
+ * - 移除 goal/project 粒度的提取指令
  * - 保留 dateAnchor 时间锚点
- * - 输出 JSON 结构只含 intends[]（domain 已移除）
+ * - 输出 JSON 结构只含 intends[]（每条均为 action）
  */
 
 import { describe, it, expect, vi } from "vitest";
@@ -38,11 +38,19 @@ describe("buildIngestPrompt (Phase 2 — Ingest 改造)", () => {
     expect(prompt).not.toContain("一级分类");
   });
 
-  it("should_include_granularity_types", () => {
+  it("should_only_mention_action_granularity_not_goal_or_project", () => {
+    // Phase 14.2: digest prompt 只保留 action 粒度，移除 goal/project
     const prompt = buildIngestPrompt();
     expect(prompt).toContain("action");
-    expect(prompt).toContain("goal");
-    expect(prompt).toContain("project");
+    expect(prompt).not.toMatch(/granularity/);
+    expect(prompt).not.toMatch(/"goal"/);
+    expect(prompt).not.toMatch(/"project"/);
+  });
+
+  it("should_instruct_not_to_extract_multi_step_goals", () => {
+    const prompt = buildIngestPrompt();
+    // prompt 应明确指出多步骤/长周期目标不提取
+    expect(prompt).toMatch(/多步骤|长周期|目标.*不.*提取|不提取/);
   });
 
   it("should_not_mention_strike_decomposition", () => {

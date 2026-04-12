@@ -1,4 +1,7 @@
 import { webview } from '@kit.ArkWeb';
+import { window as windowManager } from '@kit.ArkUI';
+import { bundleManager } from '@kit.AbilityKit';
+import { common } from '@kit.AbilityKit';
 import { DeviceBridge } from './DeviceBridge';
 import { AudioBridge } from './AudioBridge';
 import { PreferencesBridge } from './PreferencesBridge';
@@ -119,6 +122,49 @@ export class BridgeManager {
     `);
   }
 
+  /** safeArea 模块处理 */
+  private async handleSafeArea(method: string): Promise<unknown> {
+    if (method === 'getInsets') {
+      try {
+        const win = await windowManager.getLastWindow(getContext() as common.UIAbilityContext);
+        const avoidArea = win.getWindowAvoidArea(windowManager.AvoidAreaType.TYPE_SYSTEM);
+        return {
+          top: avoidArea.topRect.height,
+          bottom: avoidArea.bottomRect.height,
+          left: avoidArea.leftRect.width,
+          right: avoidArea.rightRect.width,
+        };
+      } catch {
+        return { top: 0, bottom: 0, left: 0, right: 0 };
+      }
+    }
+    throw new Error(`Unknown safeArea method: ${method}`);
+  }
+
+  /** system 模块处理 */
+  private async handleSystem(method: string, args: Record<string, unknown>): Promise<unknown> {
+    if (method === 'openUrl') {
+      const url = args.url as string;
+      try {
+        const context = getContext() as common.UIAbilityContext;
+        const want = { action: 'ohos.want.action.viewData', uri: url };
+        await context.startAbility(want);
+      } catch (err) {
+        hilog.error(DOMAIN, TAG, 'openUrl failed: %{public}s', JSON.stringify(err));
+      }
+      return null;
+    }
+    if (method === 'getVersion') {
+      try {
+        const info = bundleManager.getBundleInfoForSelfSync(bundleManager.BundleFlag.GET_BUNDLE_INFO_DEFAULT);
+        return info.versionName;
+      } catch {
+        return '0.0.0';
+      }
+    }
+    throw new Error(`Unknown system method: ${method}`);
+  }
+
   /**
    * 处理来自 WebView 的原生调用请求
    * 在 Web 组件的 onPrompt 回调中调用此方法
@@ -149,6 +195,12 @@ export class BridgeManager {
           break;
         case 'notification':
           result = await this.notificationBridge.handle(request.method, request.args);
+          break;
+        case 'safeArea':
+          result = await this.handleSafeArea(request.method);
+          break;
+        case 'system':
+          result = await this.handleSystem(request.method, request.args);
           break;
         default:
           throw new Error(`Unknown module: ${request.module}`);

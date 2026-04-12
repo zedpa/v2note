@@ -1,7 +1,7 @@
 "use client";
 
 import { SwipeBack } from "@/shared/components/swipe-back";
-import { Loader2, CheckCircle2, RefreshCw, Calendar } from "lucide-react";
+import { Loader2, CheckCircle2, RefreshCw, Calendar, Sparkles, Heart } from "lucide-react";
 import { useEveningSummary } from "../hooks/use-daily-briefing";
 import { cn } from "@/lib/utils";
 
@@ -73,6 +73,24 @@ export function EveningSummary({ onClose }: EveningSummaryProps) {
                 ))}
               </Section>
             )}
+
+            {/* 今日亮点 */}
+            {summary.insight ? (
+              <Section title="今日亮点">
+                <div className="flex items-start gap-2 py-1.5">
+                  <Sparkles className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
+                  <p className="text-sm text-on-surface leading-relaxed">{summary.insight}</p>
+                </div>
+              </Section>
+            ) : null}
+
+            {/* 每日肯定 */}
+            {summary.affirmation ? (
+              <div className="bg-surface-lowest rounded-xl px-4 py-3 flex items-start gap-2">
+                <Heart className="w-4 h-4 text-rose-400 mt-0.5 shrink-0" />
+                <p className="text-sm text-on-surface italic">{summary.affirmation}</p>
+              </div>
+            ) : null}
 
             {/* 明日预告 */}
             {summary.tomorrow_preview.length > 0 && (

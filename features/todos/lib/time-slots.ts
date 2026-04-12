@@ -1,6 +1,6 @@
 "use client";
 
-import { Clock, Sun, Moon, type LucideIcon } from "lucide-react";
+import { Clock, Sun, CloudSun, Moon, type LucideIcon } from "lucide-react";
 import { parseScheduledTime } from "./date-utils";
 
 // ===== 时段类型 =====
@@ -41,7 +41,7 @@ export const TIME_SLOTS: TimeSlotConfig[] = [
   {
     key: "afternoon",
     label: "下午",
-    icon: Sun,
+    icon: CloudSun,
     hourRange: [12, 18],
     colorVar: "--tag-afternoon",
     textColorVar: "--tag-afternoon-text",

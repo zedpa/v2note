@@ -8,12 +8,15 @@ interface BriefingResult {
   greeting: string;
   today_focus: string[];
   carry_over: string[];
+  goal_pulse: Array<{ title: string; progress: string }>;
   stats: { yesterday_done: number; yesterday_total: number };
 }
 
 interface SummaryResult {
   headline: string;
   accomplishments: string[];
+  insight: string;
+  affirmation: string;
   tomorrow_preview: string[];
   stats: { done: number; new_records: number };
 }

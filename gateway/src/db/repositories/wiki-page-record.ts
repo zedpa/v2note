@@ -57,6 +57,18 @@ export async function findPagesByRecord(
   );
 }
 
+/** 批量查找多个 record 关联的所有 wiki page ID */
+export async function findPagesByRecords(
+  recordIds: string[],
+): Promise<WikiPageRecord[]> {
+  if (recordIds.length === 0) return [];
+  const placeholders = recordIds.map((_, i) => `$${i + 1}`).join(", ");
+  return query<WikiPageRecord>(
+    `SELECT * FROM wiki_page_record WHERE record_id IN (${placeholders}) ORDER BY added_at ASC`,
+    recordIds,
+  );
+}
+
 /** 统计某个 wiki page 关联的 record 数量 */
 export async function countByPage(wikiPageId: string): Promise<number> {
   const rows = await query<{ count: string }>(

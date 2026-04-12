@@ -1,20 +1,20 @@
 /**
  * 日报本地通知调度
- * Native: Capacitor LocalNotifications
+ * Capacitor: LocalNotifications 插件
+ * Harmony: JSBridge 通知桥接
  * Web: 静默跳过（浏览器不支持可靠定时通知）
  */
 
-let _isNative: boolean | null = null;
+import { getPlatform, type Platform } from "./platform";
+import { getHarmonyBridge } from "./harmony-bridge";
+
+function getNotificationPlatform(): Platform {
+  return getPlatform();
+}
 
 async function isNative(): Promise<boolean> {
-  if (_isNative !== null) return _isNative;
-  try {
-    const { Capacitor } = await import("@capacitor/core");
-    _isNative = Capacitor.isNativePlatform();
-  } catch {
-    _isNative = false;
-  }
-  return _isNative;
+  const p = getNotificationPlatform();
+  return p === "capacitor" || p === "harmony";
 }
 
 // 固定 ID，方便取消和更新
@@ -33,6 +33,11 @@ export interface NotificationScheduleOptions {
 export async function requestNotificationPermission(): Promise<boolean> {
   if (!(await isNative())) return false;
 
+  const platform = getNotificationPlatform();
+
+  // 鸿蒙：通知权限由系统在首次调用 schedule 时自动请求
+  if (platform === "harmony") return true;
+
   try {
     const { LocalNotifications } = await import("@capacitor/local-notifications");
     const result = await LocalNotifications.requestPermissions();
@@ -48,6 +53,9 @@ export async function requestNotificationPermission(): Promise<boolean> {
  */
 export async function checkNotificationPermission(): Promise<"granted" | "denied" | "prompt"> {
   if (!(await isNative())) return "denied";
+
+  const platform = getNotificationPlatform();
+  if (platform === "harmony") return "granted"; // 鸿蒙系统级权限，不通过 JS 查询
 
   try {
     const { LocalNotifications } = await import("@capacitor/local-notifications");
@@ -67,6 +75,49 @@ export async function scheduleDailyNotifications(
 ): Promise<void> {
   if (!(await isNative())) return;
 
+  const platform = getNotificationPlatform();
+
+  // 鸿蒙分支：通过 JSBridge 调度通知
+  if (platform === "harmony") {
+    try {
+      const bridge = getHarmonyBridge();
+      if (!bridge?.notification) return;
+
+      // 先取消旧通知
+      await bridge.notification.cancel(MORNING_NOTIFICATION_ID);
+      await bridge.notification.cancel(EVENING_NOTIFICATION_ID);
+
+      const name = opts.userName ?? "";
+      const morningTitle = name ? `早上好${name}` : "早上好";
+      const eveningTitle = name ? `${name}，今天辛苦了` : "今天辛苦了";
+
+      const now = new Date();
+      const morningAt = nextOccurrence(now, opts.morningHour);
+      const eveningAt = nextOccurrence(now, opts.eveningHour);
+
+      await bridge.notification.schedule({
+        id: MORNING_NOTIFICATION_ID,
+        title: morningTitle,
+        body: "看看今天有什么安排？",
+        scheduledAt: morningAt.toISOString(),
+        repeatInterval: "daily",
+      });
+      await bridge.notification.schedule({
+        id: EVENING_NOTIFICATION_ID,
+        title: eveningTitle,
+        body: "看看今天完成了什么？",
+        scheduledAt: eveningAt.toISOString(),
+        repeatInterval: "daily",
+      });
+
+      console.log(`[notifications] Harmony scheduled: morning=${opts.morningHour}:00, evening=${opts.eveningHour}:00`);
+    } catch (e) {
+      console.warn("[notifications] Harmony schedule failed:", e);
+    }
+    return;
+  }
+
+  // Capacitor 分支（原有逻辑不变）
   try {
     const { LocalNotifications } = await import("@capacitor/local-notifications");
 
@@ -126,6 +177,21 @@ export async function scheduleDailyNotifications(
  */
 export async function cancelDailyNotifications(): Promise<void> {
   if (!(await isNative())) return;
+
+  const platform = getNotificationPlatform();
+
+  if (platform === "harmony") {
+    try {
+      const bridge = getHarmonyBridge();
+      if (!bridge?.notification) return;
+      await bridge.notification.cancel(MORNING_NOTIFICATION_ID);
+      await bridge.notification.cancel(EVENING_NOTIFICATION_ID);
+      console.log("[notifications] Harmony cancelled daily notifications");
+    } catch (e) {
+      console.warn("[notifications] Harmony cancel failed:", e);
+    }
+    return;
+  }
 
   try {
     const { LocalNotifications } = await import("@capacitor/local-notifications");
@@ -197,14 +263,32 @@ export async function scheduleTodoReminder(todo: {
 }): Promise<void> {
   if (!(await isNative())) return;
 
+  const platform = getNotificationPlatform();
+  const notifId = todoNotificationId(todo.id);
+
+  if (platform === "harmony") {
+    try {
+      const bridge = getHarmonyBridge();
+      if (!bridge?.notification) return;
+      await bridge.notification.cancel(notifId);
+      await bridge.notification.schedule({
+        id: notifId,
+        title: "待办提醒",
+        body: todo.text,
+        scheduledAt: todo.reminder_at,
+      });
+    } catch (e) {
+      console.warn("[notifications] Harmony scheduleTodoReminder failed:", e);
+    }
+    return;
+  }
+
   try {
     const { LocalNotifications } = await import("@capacitor/local-notifications");
 
     // 请求权限
     const perm = await LocalNotifications.requestPermissions();
     if (perm.display !== "granted") return;
-
-    const notifId = todoNotificationId(todo.id);
 
     // 先取消（幂等）
     await LocalNotifications.cancel({
@@ -238,9 +322,22 @@ export async function scheduleTodoReminder(todo: {
 export async function cancelTodoReminder(todoId: string): Promise<void> {
   if (!(await isNative())) return;
 
+  const platform = getNotificationPlatform();
+  const notifId = todoNotificationId(todoId);
+
+  if (platform === "harmony") {
+    try {
+      const bridge = getHarmonyBridge();
+      if (!bridge?.notification) return;
+      await bridge.notification.cancel(notifId);
+    } catch (e) {
+      console.warn("[notifications] Harmony cancelTodoReminder failed:", e);
+    }
+    return;
+  }
+
   try {
     const { LocalNotifications } = await import("@capacitor/local-notifications");
-    const notifId = todoNotificationId(todoId);
     await LocalNotifications.cancel({
       notifications: [{ id: notifId }],
     });

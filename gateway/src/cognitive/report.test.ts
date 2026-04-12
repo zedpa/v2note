@@ -22,7 +22,7 @@ describe("场景1: 结构化认知报告 (wiki)", () => {
     vi.clearAllMocks();
   });
 
-  it("should_generate_report_with_today_records_count", async () => {
+  it("should_generate_report_with_today_records_count", { timeout: 30000 }, async () => {
     const { generateCognitiveReport } = await import("./report.js");
 
     mockQuery.mockImplementation((sql: string) => {

@@ -1,26 +1,27 @@
 /**
  * Prompts for the Ingest pipeline (Phase 2 — 认知 Wiki).
  *
- * - buildIngestPrompt: 只提取 intend 类型的待办/目标，不拆解 Strike/Bond
+ * - buildIngestPrompt: 只提取 action 粒度的待办（单步可执行），不提取 goal/project
  * - domain 分配已移除（Phase 11: Wiki Page 统一组织层）
  */
 
 import { buildDateAnchor } from "../lib/date-anchor.js";
 
 /**
- * 构建 Ingest prompt — 指导 AI 从用户输入中提取 intend（待办/目标）。
+ * 构建 Ingest prompt — 指导 AI 从用户输入中提取 action 粒度的待办。
  *
- * 不再生成 Strike/Bond 列表，不再分配 domain。
- * 输出 JSON 结构只含 intends[]。
+ * Phase 14.2: 移除 goal/project 粒度提取，Goal 统一由 wiki compile 的 goal_sync 创建。
+ * 输出 JSON 结构只含 intends[]（每条均为单步可执行的 action）。
  */
 export function buildIngestPrompt(): string {
   const dateAnchor = buildDateAnchor();
 
-  return `你是一个待办/目标提取器。从用户输入中提取 intend 类型的内容（可执行的待办、目标、项目）。
+  return `你是一个待办提取器。从用户输入中提取单步可执行的待办事项（action）。
 
 ## 核心原则
-你只提取用户明确表达的行动意图，不提取感想、感受、判断或事实陈述。
-如果没有任何待办/目标内容，返回空 intends 数组。
+你只提取用户明确表达的、一次能做完的行动意图，不提取感想、感受、判断或事实陈述。
+多步骤、长周期的目标（如"今年减重10kg""通过四级考试"）不要提取，它们由其他流程处理。
+如果没有任何待办内容，返回空 intends 数组。
 
 ${dateAnchor}
 
@@ -32,10 +33,8 @@ ${dateAnchor}
   ✅ "本周内完成供应商比价"
   ❌ "用户打算找张总确认报价"
   ❌ "需要进行供应商比价工作"
-- granularity: "action" | "goal" | "project"
-  - action: 单步可执行，有明确动作（"明天给张总打电话"）
-  - goal: 多步、长期、可衡量（"今年把身体搞好"）
-  - project: 复合方向（"做一个供应链管理系统"）
+  ❌ "今年把身体搞好"（多步骤目标，不提取）
+  ❌ "做一个供应链管理系统"（项目级，不提取）
 - scheduled_start?: ISO 时间 — 优先用户原话精确到分钟，参照锚点表解析
 - deadline?: ISO 日期 — "这周之内""月底前"
 - person?: string — 提及的相关人名
@@ -48,7 +47,6 @@ ${dateAnchor}
   "intends": [
     {
       "text": "明天下午3点找张总确认报价",
-      "granularity": "action",
       "scheduled_start": "2026-04-10T15:00:00",
       "person": "张总",
       "priority": "high"
@@ -56,7 +54,7 @@ ${dateAnchor}
   ]
 }
 
-如果没有待办/目标内容，返回 {"intends": []}`;
+如果没有待办内容，返回 {"intends": []}`;
 }
 
 /**

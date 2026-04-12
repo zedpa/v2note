@@ -1,24 +1,16 @@
 /**
- * Todo-Strike 数据桥梁 + 智能待办投影
- * intend Strike → todo/goal 投影、粒度判断、时间/优先级提取、重复检测
- * 回补关联、goal-cluster 关联、双向一致性、archive 保护
+ * 智能待办投影
+ * intend 输入 → todo 创建、时间/优先级提取、重复检测
  */
 
 import * as todoRepo from "../db/repositories/todo.js";
-import * as strikeRepo from "../db/repositories/strike.js";
 import * as goalRepo from "../db/repositories/goal.js";
 import * as recordRepo from "../db/repositories/record.js";
-import { query, queryOne } from "../db/pool.js";
-import { chatCompletion } from "../ai/provider.js";
+import { queryOne } from "../db/pool.js";
 import { eventBus, type TodoCreatedEvent } from "../lib/event-bus.js";
-import type { StrikeEntry } from "../db/repositories/strike.js";
 import type { Todo } from "../db/repositories/todo.js";
-import type { Goal } from "../db/repositories/goal.js";
 import { writeTodoEmbedding } from "./embed-writer.js";
 
-const MIN_SALIENCE = 0.1;
-const COMPLETED_SALIENCE_FACTOR = 0.3;
-const BACKFILL_SIMILARITY_THRESHOLD = 0.7;
 const DUPLICATE_KEYWORD_THRESHOLD = 0.5; // 关键词重叠 > 50% 视为重复
 
 // ── 优先级映射 ────────────────────────────────────────────────────────
@@ -29,10 +21,20 @@ const PRIORITY_MAP: Record<string, number> = {
   low: 1,
 };
 
-// ── parseIntendField: 从 Strike.field 提取结构化信息 ──────────────────
+// ── IntendInput: digest 传入的意图数据 ──────────────────────────────────
+
+/** digest 传入的意图结构（替代原 StrikeEntry） */
+export interface IntendInput {
+  nucleus: string;
+  polarity: string;
+  source_id?: string | null;
+  user_id: string;
+  field?: Record<string, any> | null;
+}
+
+// ── parseIntendField: 从 field 提取结构化信息 ──────────────────────────
 
 export interface ParsedIntendField {
-  granularity: "action" | "goal" | "project";
   scheduled_start?: string;
   scheduled_end?: string;
   person?: string;
@@ -40,11 +42,11 @@ export interface ParsedIntendField {
 }
 
 /**
- * 解析 intend Strike 的 field 对象，提取时间/人物/优先级/粒度。
+ * 解析 intend 的 field 对象，提取时间/人物/优先级。
+ * Phase 14.2: granularity 字段已移除，digest 只提取 action 粒度。
  */
 export function parseIntendField(field: Record<string, any>): ParsedIntendField {
   return {
-    granularity: field.granularity ?? "action",
     scheduled_start: field.scheduled_start ?? undefined,
     scheduled_end: field.deadline ?? field.scheduled_end ?? undefined,
     person: field.person ?? undefined,
@@ -88,7 +90,6 @@ export async function checkDuplicate(
 /** 提取中文关键词（去掉常见停用词，按字符分词） */
 function extractKeywords(text: string): Set<string> {
   const stopWords = new Set(["的", "了", "在", "是", "我", "有", "和", "就", "不", "人", "都", "一", "一个", "上", "也", "很", "到", "说", "要", "去", "你", "会", "着", "没有", "看", "好", "自己", "这", "他", "她", "它", "把", "那", "给", "让", "被", "从", "对", "这个", "那个", "什么", "怎么", "可以", "还", "吗", "呢", "吧", "啊", "哦"]);
-  // 按 2-4 字 ngram 提取 + 按人名/实体词保留
   const keywords = new Set<string>();
   const cleaned = text.replace(/[，。！？、；：""''（）\s]/g, "");
   // 2-gram
@@ -104,82 +105,35 @@ function extractKeywords(text: string): Set<string> {
   return keywords;
 }
 
-// ── intend Strike 投影（支持粒度判断） ────────────────────────────────
+// ── intend 投影 ──────────────────────────────────────────────────────
 
 /**
- * 将 intend Strike 投影为 todo 或 goal。
- * - action → 创建 todo
- * - goal → 创建 goal + 自动关联 cluster/todo（B2 快路径）
- * - project → 创建 goal + AI 生成子目标建议（B3 快路径）
+ * 将 intend 投影为 action todo。
+ * Phase 14.2: goal/project 提取已废弃，统一创建 action todo（level=0）。
+ * Goal 由 wiki compile 的 goal_sync 创建。
  */
 export async function projectIntendStrike(
-  strike: StrikeEntry,
+  input: IntendInput,
   userId?: string,
-): Promise<Todo | Goal | null> {
+): Promise<Todo | null> {
   const tp0 = Date.now();
-  if (strike.polarity !== "intend") return null;
-  if (!strike.source_id) return null;
+  if (input.polarity !== "intend") return null;
+  if (!input.source_id) return null;
 
-  const parsed = parseIntendField(strike.field ?? {});
-  const uid = userId ?? strike.user_id;
+  const parsed = parseIntendField(input.field ?? {});
+  const uid = userId ?? input.user_id;
 
   // 获取真实 device_id（从 record 或 device 表）
   let deviceId = uid;
-  if (strike.source_id) {
-    const rec = await recordRepo.findById(strike.source_id);
+  if (input.source_id) {
+    const rec = await recordRepo.findById(input.source_id);
     if (rec?.device_id) deviceId = rec.device_id;
   }
 
-  if (parsed.granularity === "goal" || parsed.granularity === "project") {
-    // B2/B3: 检查同方向是否已有 active goal（关键词重叠检测）
-    const existingGoals = await goalRepo.findActiveByUser(uid);
-    const duplicate = findDuplicateGoal(strike.nucleus, existingGoals);
-    if (duplicate) {
-      // 不新建，返回已有 goal
-      return duplicate;
-    }
-
-    // 创建 goal (source=explicit 因为来自用户明确表达)
-    const goal = await goalRepo.create({
-      device_id: deviceId,
-      user_id: uid,
-      title: strike.nucleus,
-      source: "explicit",
-    });
-
-    // 异步写入 goal embedding
-    void writeTodoEmbedding(goal.id, strike.nucleus, 1);
-
-    // 通知前端：目标已创建
-    eventBus.emit("todo.created", {
-      deviceId,
-      userId: uid,
-      todoText: strike.nucleus,
-      todoId: goal.id,
-      recordId: strike.source_id ?? undefined,
-    } satisfies TodoCreatedEvent);
-
-    // 自动关联 cluster（通过 embedding 匹配）
-    await linkNewGoalToCluster(goal.id, uid);
-
-    // B3: 项目级 → AI 生成子目标建议（异步，不阻塞主流程）
-    if (parsed.granularity === "project") {
-      generateSubGoalSuggestions(goal, uid).catch((e) =>
-        console.warn("[todo-projector] Async sub-goal generation failed:", e),
-      );
-    }
-
-    console.log(`[todo-projector][⏱] ${Date.now() - tp0}ms — created goal "${strike.nucleus.slice(0, 30)}" → event emitted`);
-    return goal;
-  }
-
-  // action（默认）→ 创建 todo
-  // 如果统一 prompt 已匹配到目标（field.matched_goal_id），用作 parent_id 关联
-  const matchedGoalId = (strike.field as any)?.matched_goal_id ?? undefined;
+  const matchedGoalId = (input.field as any)?.matched_goal_id ?? undefined;
   const createFields: Parameters<typeof todoRepo.create>[0] = {
-    record_id: strike.source_id,
-    text: strike.nucleus,
-    strike_id: strike.id || undefined,
+    record_id: input.source_id,
+    text: input.nucleus,
     user_id: uid,
     device_id: deviceId,
     parent_id: matchedGoalId,
@@ -188,12 +142,12 @@ export async function projectIntendStrike(
   const { todo, action: dedupAction } = await todoRepo.dedupCreate(createFields);
 
   if (dedupAction === "matched") {
-    console.log(`[todo-projector] Dedup: "${strike.nucleus.slice(0, 30)}" matched existing todo ${todo.id}`);
+    console.log(`[todo-projector] Dedup: "${input.nucleus.slice(0, 30)}" matched existing todo ${todo.id}`);
     return todo;
   }
 
   // 异步写入 embedding
-  void writeTodoEmbedding(todo.id, strike.nucleus, 0);
+  void writeTodoEmbedding(todo.id, input.nucleus, 0);
 
   // 写入时间/优先级等结构化字段
   const updateFields: Parameters<typeof todoRepo.update>[1] = {};
@@ -209,232 +163,27 @@ export async function projectIntendStrike(
   eventBus.emit("todo.created", {
     deviceId,
     userId: uid,
-    todoText: strike.nucleus,
+    todoText: input.nucleus,
     todoId: todo.id,
-    recordId: strike.source_id ?? undefined,
+    recordId: input.source_id ?? undefined,
   } satisfies TodoCreatedEvent);
 
-  console.log(`[todo-projector][⏱] ${Date.now() - tp0}ms — created todo "${strike.nucleus.slice(0, 30)}" → event emitted`);
+  console.log(`[todo-projector][⏱] ${Date.now() - tp0}ms — created todo "${input.nucleus.slice(0, 30)}" → event emitted`);
   return todo;
 }
 
-// ── 同方向 goal 重复检测 ──────────────────────────────────────────────
-
-function findDuplicateGoal(nucleus: string, goals: Goal[]): Goal | null {
-  if (goals.length === 0) return null;
-  const newKeywords = extractKeywords(nucleus);
-  if (newKeywords.size === 0) return null;
-
-  for (const goal of goals) {
-    const goalKeywords = extractKeywords(goal.title);
-    if (goalKeywords.size === 0) continue;
-    const intersection = new Set([...newKeywords].filter((k) => goalKeywords.has(k)));
-    const overlap = intersection.size / Math.min(newKeywords.size, goalKeywords.size);
-    if (overlap >= DUPLICATE_KEYWORD_THRESHOLD) return goal;
-  }
-  return null;
-}
-
-// ── 新 goal 自动关联 cluster ──────────────────────────────────────────
-
-async function linkNewGoalToCluster(goalId: string, userId: string): Promise<void> {
-  try {
-    const matches = await query<{ id: string; similarity: number }>(
-      `SELECT s.id,
-              1 - (s.embedding <=> ge.embedding) as similarity
-       FROM strike s, goal_embedding ge
-       WHERE ge.goal_id = $1
-         AND s.user_id = $2 AND s.is_cluster = true AND s.status = 'active'
-         AND s.embedding IS NOT NULL AND ge.embedding IS NOT NULL
-       ORDER BY similarity DESC
-       LIMIT 1`,
-      [goalId, userId],
-    );
-
-    if (matches.length > 0 && matches[0].similarity >= BACKFILL_SIMILARITY_THRESHOLD) {
-      await goalRepo.update(goalId, { cluster_id: matches[0].id });
-      console.log(`[todo-projector] Linked goal ${goalId} → cluster ${matches[0].id} (sim=${matches[0].similarity.toFixed(3)})`);
-    }
-  } catch {
-    // embedding 不可用时静默跳过
-  }
-}
-
-// ── B3: AI 生成子目标建议 ─────────────────────────────────────────────
-
-async function generateSubGoalSuggestions(parentGoal: Goal, userId: string): Promise<void> {
-  try {
-    const resp = await chatCompletion(
-      [
-        {
-          role: "system",
-          content: `用户表达了一个项目级目标。请分析并建议 2-4 个子目标，帮助用户拆解这个大方向。
-
-返回 JSON：
-{"sub_goals": [{"title": "子目标标题", "reason": "为什么需要这个子目标"}]}
-
-要求：
-- 每个子目标应该是可独立追踪的
-- 按逻辑顺序排列
-- 标题简洁明确`,
-        },
-        { role: "user", content: `项目目标：${parentGoal.title}` },
-      ],
-      { json: true, temperature: 0.3, tier: "fast" },
-    );
-
-    const parsed = JSON.parse(resp.content);
-    const subGoals = parsed.sub_goals ?? [];
-
-    for (const sub of subGoals) {
-      if (!sub.title) continue;
-      await goalRepo.create({
-        device_id: parentGoal.device_id,
-        user_id: userId,
-        title: sub.title,
-        parent_id: parentGoal.id,
-        source: "explicit",
-        status: "suggested",
-      });
-    }
-  } catch (err) {
-    console.error("[todo-projector] Sub-goal generation failed:", err);
-    // 项目 goal 已创建，子目标生成失败不影响主流程
-  }
-}
-
-// ── 回补关联 ──────────────────────────────────────────────────────────
-
-/**
- * 批量回补：对无 strike_id 的 todo，用 embedding 匹配最相关的 intend Strike。
- */
-export async function backfillTodoStrikes(
-  userId: string,
-): Promise<{ linked: number; skipped: number }> {
-  const allTodos = await todoRepo.findPendingByUser(userId);
-  const todosWithoutStrike = allTodos.filter((t: any) => !t.strike_id);
-
-  if (todosWithoutStrike.length === 0) return { linked: 0, skipped: 0 };
-
-  let linked = 0;
-  let skipped = 0;
-
-  for (const todo of todosWithoutStrike) {
-    try {
-      const matches = await query<{ strike_id: string; similarity: number }>(
-        `SELECT s.id as strike_id,
-                1 - (s.embedding <=> (SELECT embedding FROM todo_embedding WHERE todo_id = $1)) as similarity
-         FROM strike s
-         WHERE s.user_id = $2 AND s.polarity = 'intend' AND s.status = 'active'
-         ORDER BY similarity DESC
-         LIMIT 1`,
-        [todo.id, userId],
-      );
-
-      if (matches.length > 0 && matches[0].similarity >= BACKFILL_SIMILARITY_THRESHOLD) {
-        await todoRepo.update(todo.id, { strike_id: matches[0].strike_id });
-        linked++;
-      } else {
-        skipped++;
-      }
-    } catch {
-      skipped++;
-    }
-  }
-
-  return { linked, skipped };
-}
-
-// ── goal 关联 Cluster ─────────────────────────────────────────────────
-
-/**
- * 回填：扫描所有无 cluster_id 的活跃目标，用 embedding 匹配最近的活跃集群。
- * batch-analyze 后调用，确保新建集群能吸收已有孤立目标。
- */
-export async function linkGoalsToClusters(
-  userId: string,
-): Promise<{ linked: number }> {
-  const goals = await goalRepo.findActiveByUser(userId);
-  const goalsWithoutCluster = goals.filter((g: any) => !g.cluster_id);
-
-  if (goalsWithoutCluster.length === 0) return { linked: 0 };
-
-  let linked = 0;
-
-  for (const goal of goalsWithoutCluster) {
-    try {
-      const matches = await query<{ id: string; similarity: number }>(
-        `SELECT s.id,
-                1 - (s.embedding <=> ge.embedding) as similarity
-         FROM strike s, goal_embedding ge
-         WHERE ge.goal_id = $1
-           AND s.user_id = $2 AND s.is_cluster = true AND s.status = 'active'
-           AND s.embedding IS NOT NULL AND ge.embedding IS NOT NULL
-         ORDER BY similarity DESC
-         LIMIT 1`,
-        [goal.id, userId],
-      );
-
-      if (matches.length > 0 && matches[0].similarity >= BACKFILL_SIMILARITY_THRESHOLD) {
-        await goalRepo.update(goal.id, { cluster_id: matches[0].id });
-        linked++;
-        console.log(`[cluster-backfill] Linked goal "${goal.title}" → cluster ${matches[0].id} (sim=${matches[0].similarity.toFixed(3)})`);
-      }
-    } catch {
-      // embedding 表可能不存在，跳过
-    }
-  }
-
-  return { linked };
-}
-
-// ── 双向一致性 ────────────────────────────────────────────────────────
+// ── 完成回调 ────────────────────────────────────────────────────────
 
 export async function onTodoComplete(todoId: string): Promise<void> {
   const todo = await queryOne<{
     id: string;
-    strike_id: string | null;
     goal_id: string | null;
     done: boolean;
-  }>(`SELECT id, strike_id, goal_id, done FROM todo WHERE id = $1`, [todoId]);
+  }>(`SELECT id, goal_id, done FROM todo WHERE id = $1`, [todoId]);
 
-  if (!todo || !todo.strike_id) return;
-
-  const strike = await strikeRepo.findById(todo.strike_id);
-  if (strike) {
-    const newSalience = Math.max(
-      MIN_SALIENCE,
-      strike.salience * COMPLETED_SALIENCE_FACTOR,
-    );
-    await strikeRepo.update(strike.id, { salience: newSalience });
-  }
+  if (!todo) return;
 
   if (todo.goal_id) {
     await goalRepo.findWithTodos(todo.goal_id);
-  }
-}
-
-// ── Strike 删除保护 ──────────────────────────────────────────────────
-
-export async function guardStrikeArchive(strikeId: string): Promise<boolean> {
-  const activeTodos = await query<{ id: string; done: boolean }>(
-    `SELECT id, done FROM todo WHERE strike_id = $1 AND done = false`,
-    [strikeId],
-  );
-
-  return activeTodos.length === 0;
-}
-
-export async function enforceMinSalience(strikeId: string): Promise<void> {
-  const activeTodos = await query<{ id: string }>(
-    `SELECT id FROM todo WHERE strike_id = $1 AND done = false LIMIT 1`,
-    [strikeId],
-  );
-
-  if (activeTodos.length === 0) return;
-
-  const strike = await strikeRepo.findById(strikeId);
-  if (strike && strike.salience < MIN_SALIENCE) {
-    await strikeRepo.update(strikeId, { salience: MIN_SALIENCE });
   }
 }

@@ -201,3 +201,35 @@ export async function findRoots(userId: string): Promise<WikiPage[]> {
     [userId],
   );
 }
+
+/** 查找用户的所有 active page（含层级信息，用于轻量分类） */
+export async function findAllActive(userId: string): Promise<WikiPage[]> {
+  return query<WikiPage>(
+    `SELECT * FROM wiki_page WHERE user_id = $1 AND status = 'active'
+     ORDER BY level DESC, updated_at DESC`,
+    [userId],
+  );
+}
+
+/** 原子递增 token_count，返回更新后的值 */
+export async function incrementTokenCount(
+  pageId: string,
+  delta: number,
+): Promise<number> {
+  const row = await queryOne<{ token_count: number }>(
+    `UPDATE wiki_page SET token_count = token_count + $1, updated_at = now() WHERE id = $2 RETURNING token_count`,
+    [delta, pageId],
+  );
+  return row?.token_count ?? 0;
+}
+
+/** 原子递减 token_count（不低于 0，用于编译后扣除已编译的 token 而非直接归零） */
+export async function decrementTokenCount(
+  pageId: string,
+  delta: number,
+): Promise<void> {
+  await execute(
+    `UPDATE wiki_page SET token_count = GREATEST(0, token_count - $1), updated_at = now() WHERE id = $2`,
+    [delta, pageId],
+  );
+}

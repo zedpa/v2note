@@ -19,6 +19,32 @@
 
 （按时间倒序，新条目添加在此处下方）
 
+### [2026-04-12] [流程改进] UI/UX 审查 Round 1 移动端精修
+
+- **现象**：移动端存在多项 WCAG/HIG 不达标问题（对比度、触控目标、ARIA 语义），首屏加载 51 个组件无懒加载，FAB 与弹窗层级冲突
+- **根因**：UI 组件逐步累积未经系统性审查，shadcn/ui 基础组件合规但业务组件未跟进
+- **修复**：
+  - 对比度: --muted-foreground 52%→58%, --card 11%→13%
+  - 触控: Header 按钮 min 44px, gap-1→gap-2, Tab min-h 48px
+  - ARIA: tablist/tab 角色 + aria-selected + 关闭按钮 aria-label
+  - 性能: 14 个 overlay 改为 dynamic import, 简报骨架屏(300ms 延迟防闪)
+  - 视觉: 日记卡片 source_type 左边框, 待办时段指示条, 头像渐变 token 化
+  - 层级: FAB 在任意弹窗/侧边栏打开时隐藏
+- **回归测试**: `features/workspace/components/ui-ux-audit-r1.test.ts` — 26 个单元测试
+- **教训**:
+  - Tailwind transition 类冲突: 同一元素不能有 `transition-all` 和 `transition-[specific]`，后者会覆盖前者。应统一为一个 transition 声明覆盖所有属性。
+  - FAB visible 逻辑需覆盖所有浮层（overlay + sidebar + suggestions），遗漏任何一个都会导致视觉遮挡
+- **已提炼**: ❌ Tailwind transition 冲突为首次遇到，暂不提炼
+
+### [2026-04-12] [bug] 早晚报待办过时 + 数据范围修正
+
+- **现象**：早报展示大量与今天无关的古早待办（两周前创建无排期的），用户看到积压而非"今天要做什么"。晚报缺少日记亮点提取。
+- **根因**：早报 `prioritizedTodos` 在今日排期和逾期之外，还用全量 pending 待办填充（`pendingTodos.filter(...)` fallback），导致古早待办占满列表。逾期判断用时间戳级比较，多日任务被错误标记为逾期。晚报 user message 只传日记 transcript 原文和条数，AI 无法提取结构化亮点。
+- **修复**：(1) 早报移除全量 pending fallback，只展示 todayScheduled + overdue；(2) overdue 改为日期级比较，增加 `endDate >= today` 排除多日任务；(3) 晚报增加 diaryEntrySummaries（每条 HH:mm + 前100字），insight prompt 改为"今日亮点"引导
+- **回归测试**：`gateway/src/handlers/daily-loop.test.ts` — 标注 `regression: fix-briefing-stale-todos`（11 个测试用例）
+- **教训**：传给 AI 的数据范围应精确匹配报告意图，全量数据 + "让 AI 自己挑" ≠ 精确过滤 + "AI 只处理相关的"
+- **已提炼**：❌ 仅此例
+
 ### [2026-04-11] [bug] Wiki 编译管线多层 AI 幻觉导致 FK 违约
 
 - **现象**：Wiki compile API 反复返回 500，每次修一个又冒出新的 FK violation。先后出现 6 种不同的失败模式，编译无法完成

@@ -111,12 +111,26 @@
     --shadow-ambient-lg: rgba(28, 28, 24, 0.08);
     /* Shimmer accent (deer) */
     --shimmer-accent: #C8845C;
+
+    /* Time slot tags (light) */
+    --tag-anytime: 25 8% 44% / 0.12;
+    --tag-anytime-text: 25 8% 44%;
+    --tag-morning: 18 90% 48% / 0.15;
+    --tag-morning-text: 18 90% 48%;
+    --tag-afternoon: 210 50% 45% / 0.12;
+    --tag-afternoon-text: 210 50% 45%;
+    --tag-evening: 130 30% 36% / 0.12;
+    --tag-evening-text: 130 30% 36%;
+
+    /* Avatar gradient */
+    --avatar-gradient-from: #89502C;
+    --avatar-gradient-to: #C8845C;
   }
 
   .dark {
     --background: 25 10% 7%;
     --foreground: 30 10% 93%;
-    --card: 25 8% 11%;
+    --card: 25 8% 13%;
     --card-foreground: 30 10% 93%;
     --popover: 25 8% 11%;
     --popover-foreground: 30 10% 93%;
@@ -125,7 +139,7 @@
     --secondary: 25 6% 15%;
     --secondary-foreground: 30 8% 85%;
     --muted: 25 6% 15%;
-    --muted-foreground: 25 5% 52%;
+    --muted-foreground: 25 5% 58%;
     --accent: 175 55% 42%;
     --accent-foreground: 0 0% 100%;
     --destructive: 0 62% 35%;
@@ -206,6 +220,10 @@
     /* Shadows */
     --shadow-ambient: rgba(0, 0, 0, 0.25);
     --shadow-ambient-lg: rgba(0, 0, 0, 0.35);
+
+    /* Avatar gradient */
+    --avatar-gradient-from: #89502C;
+    --avatar-gradient-to: #C8845C;
   }
 }
 

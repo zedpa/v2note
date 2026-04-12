@@ -6,6 +6,7 @@
  */
 
 import { compileWikiForUser, type CompileResult } from "./wiki-compiler.js";
+import { runFullCompileMaintenance, type FullMaintenanceResult } from "./full-compile-maintenance.js";
 import { generateCognitiveReport, type CognitiveReport } from "./report.js";
 import { appendToDiary } from "../diary/manager.js";
 import * as todoRepo from "../db/repositories/todo.js";
@@ -13,6 +14,7 @@ import { today as tzToday, now as tzNow } from "../lib/tz.js";
 
 export interface CognitiveCycleResult {
   wikiCompile: CompileResult | null;
+  fullMaintenance: FullMaintenanceResult | null;
   report: CognitiveReport | null;
   recurringInstances: number;
 }
@@ -24,6 +26,7 @@ export async function runDailyCognitiveCycle(
   console.log("[cognitive] Starting daily cycle for user", userId);
 
   let wikiCompile: CompileResult | null = null;
+  let fullMaintenance: FullMaintenanceResult | null = null;
   let report: CognitiveReport | null = null;
 
   // Step 0: 生成今日的周期任务实例
@@ -37,12 +40,17 @@ export async function runDailyCognitiveCycle(
     console.error("[cognitive] Recurring instance generation failed:", err);
   }
 
-  // Step 1: Wiki 编译（替代原 batch-analyze + emergence + maintenance）
+  // Step 1: 全量编译维护（替代原简单 compileWikiForUser）
+  // 执行 5 阶段维护：日记编译 → Todo 同步 → AI 素材 → 结构优化 → Link 发现
   try {
-    wikiCompile = await compileWikiForUser(userId);
-    console.log("[cognitive] Wiki compile:", wikiCompile);
+    fullMaintenance = await runFullCompileMaintenance(userId);
+    wikiCompile = fullMaintenance.compileResult;
+    console.log("[cognitive] Full maintenance:", fullMaintenance.stages);
+    if (fullMaintenance.errors.length > 0) {
+      console.warn("[cognitive] Maintenance errors:", fullMaintenance.errors);
+    }
   } catch (err) {
-    console.error("[cognitive] Wiki compile failed:", err);
+    console.error("[cognitive] Full maintenance failed:", err);
   }
 
   // Step 2: 认知报告
@@ -77,7 +85,7 @@ export async function runDailyCognitiveCycle(
     console.error("[cognitive] Failed to save cognitive digest:", err);
   }
 
-  return { wikiCompile, report, recurringInstances };
+  return { wikiCompile, fullMaintenance, report, recurringInstances };
 }
 
 // ── 周期任务实例生成 ──────────────────────────────────────────────

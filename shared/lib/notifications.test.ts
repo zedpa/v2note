@@ -1,8 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import type { Platform } from "./platform";
 
 // ── Mock 设置 ──
-// 默认 Web 环境（非原生）
-let mockIsNative = false;
+// 默认 Web 环境
+let mockPlatform: Platform = "web";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const mockSchedule = vi.fn((_opts?: any) => Promise.resolve());
@@ -16,9 +17,17 @@ const mockRequestPermissions = vi.fn(() =>
   Promise.resolve({ display: "granted" as string }),
 );
 
+vi.mock("./platform", () => ({
+  getPlatform: () => mockPlatform,
+}));
+
+vi.mock("./harmony-bridge", () => ({
+  getHarmonyBridge: () => null,
+}));
+
 vi.mock("@capacitor/core", () => ({
   Capacitor: {
-    isNativePlatform: () => mockIsNative,
+    isNativePlatform: () => mockPlatform === "capacitor",
   },
 }));
 
@@ -31,11 +40,11 @@ vi.mock("@capacitor/local-notifications", () => ({
   },
 }));
 
-// 每次测试前重置模块缓存（因为 _isNative 是模块级缓存）
+// 每次测试前重置模块缓存
 beforeEach(() => {
   vi.resetModules();
   vi.clearAllMocks();
-  mockIsNative = false;
+  mockPlatform = "web";
 });
 
 // ===================================================================
@@ -88,7 +97,7 @@ describe("todoNotificationId", () => {
 // ===================================================================
 describe("scheduleTodoReminder", () => {
   it("should_schedule_notification_when_native_platform", async () => {
-    mockIsNative = true;
+    mockPlatform = "capacitor";
     const { scheduleTodoReminder } = await import("./notifications");
 
     await scheduleTodoReminder({
@@ -126,7 +135,7 @@ describe("scheduleTodoReminder", () => {
   });
 
   it("should_cancel_before_schedule_when_called_for_same_todo", async () => {
-    mockIsNative = true;
+    mockPlatform = "capacitor";
     const { scheduleTodoReminder, todoNotificationId } = await import(
       "./notifications"
     );
@@ -150,7 +159,7 @@ describe("scheduleTodoReminder", () => {
   });
 
   it("should_request_permission_before_scheduling_when_native", async () => {
-    mockIsNative = true;
+    mockPlatform = "capacitor";
     const { scheduleTodoReminder } = await import("./notifications");
 
     await scheduleTodoReminder({
@@ -163,7 +172,7 @@ describe("scheduleTodoReminder", () => {
   });
 
   it("should_skip_schedule_when_permission_denied", async () => {
-    mockIsNative = true;
+    mockPlatform = "capacitor";
     mockRequestPermissions.mockResolvedValueOnce({ display: "denied" });
     const { scheduleTodoReminder } = await import("./notifications");
 
@@ -178,7 +187,7 @@ describe("scheduleTodoReminder", () => {
   });
 
   it("should_noop_when_web_platform", async () => {
-    mockIsNative = false;
+    mockPlatform = "web";
     const { scheduleTodoReminder } = await import("./notifications");
 
     await scheduleTodoReminder({
@@ -192,7 +201,7 @@ describe("scheduleTodoReminder", () => {
   });
 
   it("should_not_throw_when_schedule_fails", async () => {
-    mockIsNative = true;
+    mockPlatform = "capacitor";
     mockSchedule.mockRejectedValueOnce(new Error("Native error"));
     const { scheduleTodoReminder } = await import("./notifications");
 
@@ -207,7 +216,7 @@ describe("scheduleTodoReminder", () => {
   });
 
   it("should_use_notification_id_from_todoNotificationId", async () => {
-    mockIsNative = true;
+    mockPlatform = "capacitor";
     const { scheduleTodoReminder, todoNotificationId } = await import(
       "./notifications"
     );
@@ -233,7 +242,7 @@ describe("scheduleTodoReminder", () => {
 // ===================================================================
 describe("cancelTodoReminder", () => {
   it("should_cancel_notification_with_correct_id_when_native", async () => {
-    mockIsNative = true;
+    mockPlatform = "capacitor";
     const { cancelTodoReminder, todoNotificationId } = await import(
       "./notifications"
     );
@@ -248,7 +257,7 @@ describe("cancelTodoReminder", () => {
   });
 
   it("should_noop_when_web_platform", async () => {
-    mockIsNative = false;
+    mockPlatform = "web";
     const { cancelTodoReminder } = await import("./notifications");
 
     await cancelTodoReminder("550e8400-e29b-41d4-a716-446655440000");
@@ -257,7 +266,7 @@ describe("cancelTodoReminder", () => {
   });
 
   it("should_not_throw_when_cancel_fails", async () => {
-    mockIsNative = true;
+    mockPlatform = "capacitor";
     mockCancel.mockRejectedValueOnce(new Error("Cancel error"));
     const { cancelTodoReminder } = await import("./notifications");
 
@@ -275,7 +284,7 @@ describe("syncTodoReminders", () => {
   const pastDate = "2020-01-01T00:00:00.000Z";
 
   it("should_schedule_pending_todos_with_future_reminder_at_when_native", async () => {
-    mockIsNative = true;
+    mockPlatform = "capacitor";
     const { syncTodoReminders } = await import("./notifications");
 
     await syncTodoReminders([
@@ -289,7 +298,7 @@ describe("syncTodoReminders", () => {
   });
 
   it("should_skip_done_todos_when_syncing", async () => {
-    mockIsNative = true;
+    mockPlatform = "capacitor";
     const { syncTodoReminders } = await import("./notifications");
 
     await syncTodoReminders([
@@ -301,7 +310,7 @@ describe("syncTodoReminders", () => {
   });
 
   it("should_cancel_notification_for_todo_with_null_reminder_at_when_syncing", async () => {
-    mockIsNative = true;
+    mockPlatform = "capacitor";
     const { syncTodoReminders, todoNotificationId } = await import("./notifications");
 
     await syncTodoReminders([
@@ -317,7 +326,7 @@ describe("syncTodoReminders", () => {
   });
 
   it("should_skip_todos_with_past_reminder_at_when_syncing", async () => {
-    mockIsNative = true;
+    mockPlatform = "capacitor";
     const { syncTodoReminders } = await import("./notifications");
 
     await syncTodoReminders([
@@ -329,7 +338,7 @@ describe("syncTodoReminders", () => {
   });
 
   it("should_cancel_done_todos_that_had_reminder_when_syncing", async () => {
-    mockIsNative = true;
+    mockPlatform = "capacitor";
     const { syncTodoReminders, todoNotificationId } = await import(
       "./notifications"
     );
@@ -346,7 +355,7 @@ describe("syncTodoReminders", () => {
   });
 
   it("should_handle_mixed_todos_correctly_when_syncing", async () => {
-    mockIsNative = true;
+    mockPlatform = "capacitor";
     const { syncTodoReminders } = await import("./notifications");
 
     await syncTodoReminders([
@@ -361,7 +370,7 @@ describe("syncTodoReminders", () => {
   });
 
   it("should_noop_when_web_platform", async () => {
-    mockIsNative = false;
+    mockPlatform = "web";
     const { syncTodoReminders } = await import("./notifications");
 
     await syncTodoReminders([
@@ -373,7 +382,7 @@ describe("syncTodoReminders", () => {
   });
 
   it("should_handle_empty_array_when_syncing", async () => {
-    mockIsNative = true;
+    mockPlatform = "capacitor";
     const { syncTodoReminders } = await import("./notifications");
 
     await syncTodoReminders([]);
@@ -387,7 +396,7 @@ describe("syncTodoReminders", () => {
 // ===================================================================
 describe("addForegroundNotificationSuppressor", () => {
   it("should_register_localNotificationReceived_listener_when_native", async () => {
-    mockIsNative = true;
+    mockPlatform = "capacitor";
     const { addForegroundNotificationSuppressor } = await import(
       "./notifications"
     );
@@ -402,7 +411,7 @@ describe("addForegroundNotificationSuppressor", () => {
   });
 
   it("should_return_noop_cleanup_when_web_platform", async () => {
-    mockIsNative = false;
+    mockPlatform = "web";
     const { addForegroundNotificationSuppressor } = await import(
       "./notifications"
     );
@@ -416,7 +425,7 @@ describe("addForegroundNotificationSuppressor", () => {
   });
 
   it("should_return_working_cleanup_function_when_native", async () => {
-    mockIsNative = true;
+    mockPlatform = "capacitor";
     const mockRemove = vi.fn();
     mockAddListener.mockResolvedValueOnce({ remove: mockRemove });
     const { addForegroundNotificationSuppressor } = await import(
@@ -435,7 +444,7 @@ describe("addForegroundNotificationSuppressor", () => {
 // ===================================================================
 describe("Web 平台降级 — 所有待办通知操作 no-op", () => {
   it("should_not_call_any_capacitor_api_when_web_platform", async () => {
-    mockIsNative = false;
+    mockPlatform = "web";
     const {
       scheduleTodoReminder,
       cancelTodoReminder,

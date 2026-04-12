@@ -1,9 +1,10 @@
 /**
  * 系统 Intent 封装 — 调起系统日历/闹钟 App
- * Native: 通过 Capacitor 自定义插件 SystemIntentPlugin.kt 发送 Android Intent
+ * Native (Capacitor): 通过自定义插件 SystemIntentPlugin.kt 发送 Android Intent
+ * Native (Harmony): 通过 JSBridge 调用系统能力（暂 no-op，后续实现）
  * Web: 静默跳过（no-op）
  */
-import { Capacitor, registerPlugin } from "@capacitor/core";
+import { getPlatform } from "./platform";
 
 export interface SystemIntentPlugin {
   /** 调起系统日历新建事件页面 */
@@ -22,14 +23,43 @@ export interface SystemIntentPlugin {
   }): Promise<void>;
 }
 
-// Web no-op: 非原生平台静默跳过
+// Web/Harmony no-op: 非 Capacitor 平台静默跳过
 const noopPlugin: SystemIntentPlugin = {
   insertCalendarEvent: async () => {},
   setAlarm: async () => {},
 };
 
-const SystemIntent: SystemIntentPlugin = Capacitor.isNativePlatform()
-  ? registerPlugin<SystemIntentPlugin>("SystemIntent")
-  : noopPlugin;
+let _plugin: SystemIntentPlugin | null = null;
+
+async function getPlugin(): Promise<SystemIntentPlugin> {
+  if (_plugin) return _plugin;
+
+  const platform = getPlatform();
+
+  if (platform === "capacitor") {
+    try {
+      const { registerPlugin } = await import("@capacitor/core");
+      _plugin = registerPlugin<SystemIntentPlugin>("SystemIntent");
+    } catch {
+      _plugin = noopPlugin;
+    }
+  } else {
+    // harmony / web / electron — no-op
+    _plugin = noopPlugin;
+  }
+
+  return _plugin;
+}
+
+const SystemIntent: SystemIntentPlugin = {
+  async insertCalendarEvent(options) {
+    const plugin = await getPlugin();
+    return plugin.insertCalendarEvent(options);
+  },
+  async setAlarm(options) {
+    const plugin = await getPlugin();
+    return plugin.setAlarm(options);
+  },
+};
 
 export default SystemIntent;

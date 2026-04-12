@@ -10,10 +10,15 @@ vi.mock("../db/repositories/wiki-page.js", () => ({
   findRoots: vi.fn(),
   findByParent: vi.fn(),
   create: vi.fn(),
+  incrementTokenCount: vi.fn(),
 }));
 
 vi.mock("../db/repositories/wiki-page-record.js", () => ({
   link: vi.fn(),
+}));
+
+vi.mock("./compile-trigger.js", () => ({
+  checkAndTriggerCompile: vi.fn().mockResolvedValue(undefined),
 }));
 
 import { parseAtRoute, ensurePagePath, processAtRoute } from "./at-route-parser.js";

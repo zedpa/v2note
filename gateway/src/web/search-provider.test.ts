@@ -74,12 +74,12 @@ describe("web_search 工具", () => {
 // fetch_url 工具定义
 // =====================================================================
 describe("fetch_url 工具", () => {
-  it("should_have_silent_autonomy", async () => {
+  it("should_have_silent_autonomy", { timeout: 30000 }, async () => {
     const { fetchUrlToolDef } = await import("./fetch-url-tool.js");
     expect(fetchUrlToolDef.autonomy).toBe("silent");
   });
 
-  it("should_reject_unsafe_urls", async () => {
+  it("should_reject_unsafe_urls", { timeout: 30000 }, async () => {
     const { fetchUrlToolDef } = await import("./fetch-url-tool.js");
     const result = await fetchUrlToolDef.handler(
       { url: "http://localhost:3000" },

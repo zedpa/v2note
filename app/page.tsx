@@ -13,21 +13,27 @@ import { emit } from "@/features/recording/lib/events";
 import { api } from "@/shared/lib/api";
 import { getLocalToday, toLocalDateStr } from "@/features/todos/lib/date-utils";
 import { SidebarDrawer } from "@/features/sidebar/components/sidebar-drawer";
-import { SearchView } from "@/features/search/components/search-view";
-import { ChatView } from "@/features/chat/components/chat-view";
+import { SuggestionList } from "@/features/sidebar/components/suggestion-list";
+import { useSuggestions } from "@/features/sidebar/hooks/use-suggestions";
+import dynamic from 'next/dynamic';
 import { OfflineBanner } from "@/shared/components/offline-banner";
-import { ReviewOverlay } from "@/features/reviews/components/review-overlay";
-import { ProfileEditor } from "@/features/profile/components/profile-editor";
-import { SettingsEditor } from "@/features/settings/components/settings-editor";
-import { NotebookList } from "@/features/diary/components/notebook-list";
-import { MorningBriefing } from "@/features/daily/components/morning-briefing";
-import { EveningSummary } from "@/features/daily/components/evening-summary";
-import { SmartDailyReport } from "@/features/daily/components/smart-daily-report";
-import { OnboardingSeed } from "@/features/cognitive/components/onboarding-seed";
-import { GoalDetailOverlay } from "@/features/goals/components/goal-detail-overlay";
-import { ProjectDetailOverlay } from "@/features/goals/components/project-detail-overlay";
-import { GoalList } from "@/features/goals/components/goal-list";
 import { fabNotify } from "@/shared/lib/fab-notify";
+
+// Overlay 组件懒加载 — 非首屏可见，按需加载减少首屏 bundle
+const SearchView = dynamic(() => import('@/features/search/components/search-view').then(m => ({ default: m.SearchView })));
+const ChatView = dynamic(() => import('@/features/chat/components/chat-view').then(m => ({ default: m.ChatView })));
+const ReviewOverlay = dynamic(() => import('@/features/reviews/components/review-overlay').then(m => ({ default: m.ReviewOverlay })));
+const ProfileEditor = dynamic(() => import('@/features/profile/components/profile-editor').then(m => ({ default: m.ProfileEditor })));
+const SettingsEditor = dynamic(() => import('@/features/settings/components/settings-editor').then(m => ({ default: m.SettingsEditor })));
+const NotebookList = dynamic(() => import('@/features/diary/components/notebook-list').then(m => ({ default: m.NotebookList })));
+const MorningBriefing = dynamic(() => import('@/features/daily/components/morning-briefing').then(m => ({ default: m.MorningBriefing })));
+const EveningSummary = dynamic(() => import('@/features/daily/components/evening-summary').then(m => ({ default: m.EveningSummary })));
+const SmartDailyReport = dynamic(() => import('@/features/daily/components/smart-daily-report').then(m => ({ default: m.SmartDailyReport })));
+const OnboardingSeed = dynamic(() => import('@/features/cognitive/components/onboarding-seed').then(m => ({ default: m.OnboardingSeed })));
+const GoalDetailOverlay = dynamic(() => import('@/features/goals/components/goal-detail-overlay').then(m => ({ default: m.GoalDetailOverlay })));
+const ProjectDetailOverlay = dynamic(() => import('@/features/goals/components/project-detail-overlay').then(m => ({ default: m.ProjectDetailOverlay })));
+const GoalList = dynamic(() => import('@/features/goals/components/goal-list').then(m => ({ default: m.GoalList })));
+const NotificationCenter = dynamic(() => import('@/features/notifications/components/notification-center').then(m => ({ default: m.NotificationCenter })));
 import { getGatewayClient, type GatewayResponse } from "@/features/chat/lib/gateway-client";
 import { createTodo, updateTodo, deleteTodo } from "@/shared/lib/api/todos";
 import { getSettings, setCurrentUserId } from "@/shared/lib/local-config";
@@ -51,7 +57,6 @@ import { ForgotPassword } from "@/features/auth/components/forgot-password";
 import { UserSettings } from "@/features/auth/components/user-settings";
 import { useUpdateCheck } from "@/shared/hooks/use-update-check";
 import { UpdateDialog } from "@/shared/components/update-dialog";
-import { NotificationCenter } from "@/features/notifications/components/notification-center";
 import type { AppNotification } from "@/features/notifications/hooks/use-notifications";
 import { AnimatePresence } from "framer-motion";
 import { OverlayTransition } from "@/shared/components/overlay-transition";
@@ -100,17 +105,22 @@ export default function Page() {
     level: number;
     parentId: string | null;
     createdBy: string;
+    pageType: string;
     recordCount: number;
     activeGoals: { id: string; title: string }[];
     updatedAt: string;
   }
   const [sidebarPages, setSidebarPages] = useState<SidebarPage[]>([]);
   const [inboxCount, setInboxCount] = useState(0);
+  const [pendingSuggestionCount, setPendingSuggestionCount] = useState(0);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const { suggestions, accept: acceptSuggestion, reject: rejectSuggestion, refresh: refreshSuggestions } = useSuggestions();
   const fetchSidebar = useCallback(() => {
-    api.get<{ pages: SidebarPage[]; inboxCount: number }>("/api/v1/wiki/sidebar")
+    api.get<{ pages: SidebarPage[]; inboxCount: number; pendingSuggestionCount: number }>("/api/v1/wiki/sidebar")
       .then((res) => {
         setSidebarPages(res.pages ?? []);
         setInboxCount(res.inboxCount ?? 0);
+        setPendingSuggestionCount(res.pendingSuggestionCount ?? 0);
       })
       .catch(() => {});
   }, []);
@@ -784,6 +794,11 @@ export default function Page() {
         onViewSearch={() => setActiveOverlay("search")}
         wikiPages={sidebarPages}
         inboxCount={inboxCount}
+        pendingSuggestionCount={pendingSuggestionCount}
+        onOpenSuggestions={() => {
+          refreshSuggestions();
+          setShowSuggestions(true);
+        }}
         onSelectPage={(pageId) => {
           setWikiPageFilter(pageId);
           setActiveTab("diary");
@@ -792,6 +807,20 @@ export default function Page() {
         userName={user?.displayName}
         userPhone={user?.phone}
       />
+      {showSuggestions && (
+        <SuggestionList
+          suggestions={suggestions}
+          onAccept={(id) => {
+            acceptSuggestion(id);
+            setPendingSuggestionCount((c) => Math.max(0, c - 1));
+          }}
+          onReject={(id) => {
+            rejectSuggestion(id);
+            setPendingSuggestionCount((c) => Math.max(0, c - 1));
+          }}
+          onClose={() => setShowSuggestions(false)}
+        />
+      )}
       <OfflineBanner />
       <UpdateDialog update={update} onDismiss={dismiss} applying={applying} />
 
@@ -840,8 +869,9 @@ export default function Page() {
         </div>
       </main>
 
-      {/* FAB 录音按钮 — 常驻底部 */}
+      {/* FAB 录音按钮 — 弹窗打开时隐藏 */}
       <FAB
+        visible={!activeOverlay && !showSidebar && !showSuggestions}
         activeNotebook={activeNotebook}
         sourceContext={activeOverlay === "chat" ? "chat" : activeOverlay === "review" ? "review" : activeTab === "todo" ? "todo" : "timeline"}
         onStartReview={(range) => {

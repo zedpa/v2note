@@ -3,49 +3,21 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 // Mock dependencies
 const mockGetEmbedding = vi.fn();
 const mockExecute = vi.fn();
-const mockQuery = vi.fn();
 
 vi.mock("../memory/embeddings.js", () => ({
   getEmbedding: (...args: any[]) => mockGetEmbedding(...args),
 }));
 vi.mock("../db/pool.js", () => ({
   execute: (...args: any[]) => mockExecute(...args),
-  query: (...args: any[]) => mockQuery(...args),
 }));
 
-import { writeStrikeEmbedding, writeTodoEmbedding, backfillStrikeEmbeddings } from "./embed-writer.js";
+import { writeTodoEmbedding, writeRecordEmbedding } from "./embed-writer.js";
 
 describe("embed-writer", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockGetEmbedding.mockResolvedValue([0.1, 0.2, 0.3]);
     mockExecute.mockResolvedValue(undefined);
-  });
-
-  describe("writeStrikeEmbedding", () => {
-    it("should_write_embedding_when_api_succeeds", async () => {
-      await writeStrikeEmbedding("strike-1", "铝价涨了15%");
-
-      expect(mockGetEmbedding).toHaveBeenCalledWith("铝价涨了15%");
-      expect(mockExecute).toHaveBeenCalledWith(
-        expect.stringContaining("UPDATE strike SET embedding"),
-        ["[0.1,0.2,0.3]", "strike-1"],
-      );
-    });
-
-    it("should_not_throw_when_embedding_api_fails", async () => {
-      mockGetEmbedding.mockRejectedValue(new Error("API timeout"));
-
-      // 不应抛出异常
-      await expect(writeStrikeEmbedding("strike-1", "test")).resolves.toBeUndefined();
-      expect(mockExecute).not.toHaveBeenCalled();
-    });
-
-    it("should_not_throw_when_db_write_fails", async () => {
-      mockExecute.mockRejectedValue(new Error("DB connection lost"));
-
-      await expect(writeStrikeEmbedding("strike-1", "test")).resolves.toBeUndefined();
-    });
   });
 
   describe("writeTodoEmbedding", () => {
@@ -92,45 +64,21 @@ describe("embed-writer", () => {
     });
   });
 
-  describe("backfillStrikeEmbeddings", () => {
-    it("should_backfill_strikes_without_embedding", async () => {
-      mockQuery.mockResolvedValue([
-        { id: "s1", nucleus: "text1" },
-        { id: "s2", nucleus: "text2" },
-      ]);
+  describe("writeRecordEmbedding", () => {
+    it("should_write_embedding_to_record", async () => {
+      await writeRecordEmbedding("rec-1", "some text");
 
-      const count = await backfillStrikeEmbeddings("user-1", 10);
-
-      expect(count).toBe(2);
-      expect(mockQuery).toHaveBeenCalledWith(
-        expect.stringContaining("embedding IS NULL"),
-        ["user-1", 10],
+      expect(mockGetEmbedding).toHaveBeenCalledWith("some text");
+      expect(mockExecute).toHaveBeenCalledWith(
+        expect.stringContaining("UPDATE record SET embedding"),
+        ["[0.1,0.2,0.3]", "rec-1"],
       );
-      expect(mockExecute).toHaveBeenCalledTimes(2);
     });
 
-    it("should_skip_failed_strikes_and_continue", async () => {
-      mockQuery.mockResolvedValue([
-        { id: "s1", nucleus: "text1" },
-        { id: "s2", nucleus: "text2" },
-        { id: "s3", nucleus: "text3" },
-      ]);
-      mockGetEmbedding
-        .mockResolvedValueOnce([0.1])
-        .mockRejectedValueOnce(new Error("fail"))
-        .mockResolvedValueOnce([0.3]);
+    it("should_not_throw_when_api_fails", async () => {
+      mockGetEmbedding.mockRejectedValue(new Error("API timeout"));
 
-      const count = await backfillStrikeEmbeddings("user-1");
-
-      expect(count).toBe(2); // s1 和 s3 成功，s2 失败
-    });
-
-    it("should_return_0_when_no_strikes_need_backfill", async () => {
-      mockQuery.mockResolvedValue([]);
-
-      const count = await backfillStrikeEmbeddings("user-1");
-
-      expect(count).toBe(0);
+      await expect(writeRecordEmbedding("rec-1", "test")).resolves.toBeUndefined();
     });
   });
 });

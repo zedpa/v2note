@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import {
   Zap, Settings, LogOut, Search, BookOpen, ChevronDown, ChevronRight,
-  Inbox, Plus, Target,
+  Inbox, Plus, Target, Lightbulb,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -13,6 +13,7 @@ interface WikiPageEntry {
   level: number;
   parentId: string | null;
   createdBy: string;
+  pageType: string;
   recordCount: number;
   activeGoals: { id: string; title: string }[];
   updatedAt: string;
@@ -32,6 +33,8 @@ interface SidebarDrawerProps {
   onSelectPage?: (pageId: string | null) => void;
   wikiPages?: WikiPageEntry[];
   inboxCount?: number;
+  pendingSuggestionCount?: number;
+  onOpenSuggestions?: () => void;
 }
 
 export function SidebarDrawer({
@@ -47,6 +50,8 @@ export function SidebarDrawer({
   onSelectPage,
   wikiPages = [],
   inboxCount = 0,
+  pendingSuggestionCount = 0,
+  onOpenSuggestions,
 }: SidebarDrawerProps) {
   const [expandedPages, setExpandedPages] = useState<Set<string>>(new Set());
 
@@ -120,7 +125,7 @@ export function SidebarDrawer({
           >
             <div
               className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-medium text-white shrink-0"
-              style={{ background: "linear-gradient(135deg, #89502C, #C8845C)" }}
+              style={{ background: "linear-gradient(135deg, var(--avatar-gradient-from), var(--avatar-gradient-to))" }}
             >
               {initial}
             </div>
@@ -227,7 +232,10 @@ export function SidebarDrawer({
                             : <BookOpen size={16} />}
                         </span>
                         <div className="flex-1 min-w-0">
-                          <span className="text-sm text-on-surface truncate block">{page.title}</span>
+                          <span className="text-sm text-on-surface truncate block">
+                            {page.pageType === "goal" && <span className="text-amber-500 mr-1">⭐</span>}
+                            {page.title}
+                          </span>
                           {page.activeGoals.length > 0 && (
                             <span className="text-[10px] text-muted-accessible truncate block flex items-center gap-1">
                               <Target size={10} className="shrink-0" />
@@ -261,7 +269,10 @@ export function SidebarDrawer({
                             >
                               <span className="text-muted-accessible shrink-0"><BookOpen size={14} /></span>
                               <div className="flex-1 min-w-0">
-                                <span className="text-sm text-on-surface truncate block">{child.title}</span>
+                                <span className="text-sm text-on-surface truncate block">
+                                  {child.pageType === "goal" && <span className="text-amber-500 mr-1">⭐</span>}
+                                  {child.title}
+                                </span>
                                 {child.activeGoals.length > 0 && (
                                   <span className="text-[10px] text-muted-accessible truncate block flex items-center gap-1">
                                     <Target size={10} className="shrink-0" />
@@ -277,6 +288,24 @@ export function SidebarDrawer({
                     </div>
                   );
                 })}
+              </nav>
+            </>
+          )}
+
+          {/* ── 建议通知 ── */}
+          {pendingSuggestionCount > 0 && (
+            <>
+              <div className="my-5 h-px bg-border/40" />
+              <nav className="space-y-0.5">
+                <SidebarItem
+                  icon={<Lightbulb size={18} />}
+                  label="AI 建议"
+                  badge={String(pendingSuggestionCount)}
+                  onClick={() => {
+                    onClose();
+                    onOpenSuggestions?.();
+                  }}
+                />
               </nav>
             </>
           )}

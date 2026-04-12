@@ -2,7 +2,7 @@
  * Wiki 编译引擎主入口 — 每日/手动触发的知识编译
  *
  * 三阶段流程：
- *   A. 路由（轻量，不调 AI）— embedding 匹配 record→page
+ *   A. 路由（轻量，不调 AI）— wiki_page_record 关联 + page 树检索
  *   B. 编译（1 次 AI 调用）— 生成编译指令
  *   C. 执行指令（单个 DB 事务）— 原子写入
  */
@@ -12,10 +12,9 @@ import * as recordRepo from "../db/repositories/record.js";
 import * as wikiPageRepo from "../db/repositories/wiki-page.js";
 import * as goalRepo from "../db/repositories/goal.js";
 import { chatCompletion } from "../ai/provider.js";
-import { getEmbedding } from "../memory/embeddings.js";
 import { buildCompilePrompt } from "./wiki-compile-prompt.js";
-import { today as tzToday } from "../lib/tz.js";
-import type { PoolClient } from "pg";
+import { findPagesByRecords } from "../db/repositories/wiki-page-record.js";
+import { canAiModifyStructure, createSuggestion } from "./page-authorization.js";
 
 // ── 类型定义 ──
 
@@ -67,6 +66,12 @@ export interface CompileInstructions {
     wiki_page_id?: string;
     progress?: number;
   }>;
+  links?: Array<{
+    source_page_id: string;
+    target_page_id: string;
+    link_type: "reference" | "related" | "contradicts";
+    context_text: string;
+  }>;
 }
 
 /** Record 加载后的文本信息 */
@@ -75,7 +80,6 @@ interface RecordWithText {
   text: string;
   source_type: string;
   created_at: string;
-  embedding: number[] | null;
 }
 
 /** Page 的索引信息（不含 content） */
@@ -85,7 +89,6 @@ interface PageIndex {
   summary: string | null;
   level: number;
   domain: string | null;
-  embedding: number[] | null;
 }
 
 /** 命中的 page（含完整 content） */
@@ -106,11 +109,6 @@ const compileLocks = new Set<string>();
 /** 命中 page content 总量上限（字符数），1 token ≈ 1.5 中文字符 → 30000 tokens ≈ 45000 字符 */
 const MAX_CONTENT_CHARS = 45000;
 
-/** 相似度阈值 */
-const SIMILARITY_THRESHOLD = 0.5;
-
-/** 每条 record 最多匹配的 page 数 */
-const MAX_MATCHED_PAGES = 10;
 
 /** AI 调用超时（5分钟） */
 const AI_TIMEOUT_MS = 5 * 60 * 1000;
@@ -190,16 +188,21 @@ export async function compileWikiForUser(
       // 加载 record 文本
       const tLoadText = T(`batch-${batch + 1}/load-text`);
       const recordsWithText = await loadRecordTexts(pendingRecords);
-      const withEmbedding = recordsWithText.filter((r) => r.embedding).length;
       const withText = recordsWithText.filter((r) => r.text.length > 0).length;
-      tLoadText(`${withText} have text, ${withEmbedding} have embedding`);
+      tLoadText(`${withText} have text`);
 
-      // 加载所有 active page 索引
+      // 通过 wiki_page_record 表查询 record→page 关联（替代 embedding 路由）
+      const tRoute = T(`batch-${batch + 1}/route`);
+      const recordIds = pendingRecords.map((r) => r.id);
+      const pageRecordLinks = await findPagesByRecords(recordIds);
+      const matchedPageIds = new Set(pageRecordLinks.map((pr) => pr.wiki_page_id));
+      tRoute(`${matchedPageIds.size} pages matched via wiki_page_record`);
+
+      // 加载所有 active page 索引（用于 AI prompt）
       const tLoadPages = T(`batch-${batch + 1}/load-pages`);
       const allPages = await wikiPageRepo.findByUser(userId, { status: "active" });
       const isColdStart = allPages.length === 0;
-      const pagesWithEmb = allPages.filter((p) => p.embedding).length;
-      tLoadPages(`${allPages.length} pages (${pagesWithEmb} with embedding), coldStart=${isColdStart}`);
+      tLoadPages(`${allPages.length} pages, coldStart=${isColdStart}`);
 
       const allPageIndex: PageIndex[] = allPages.map((p) => ({
         id: p.id,
@@ -207,17 +210,11 @@ export async function compileWikiForUser(
         summary: p.summary,
         level: p.level,
         domain: p.domain,
-        embedding: p.embedding,
       }));
 
-      // embedding 路由
-      const tRoute = T(`batch-${batch + 1}/route`);
-      const matchedPageMap = await routeRecordsToPages(recordsWithText, allPageIndex);
-      tRoute(`${matchedPageMap.size} pages matched`);
-
-      // 加载命中 page 完整 content
+      // 加载关联 page 的完整 content
       const tLoadMatched = T(`batch-${batch + 1}/load-matched`);
-      const matchedPages = await loadMatchedPages(matchedPageMap, allPages);
+      const matchedPages = await loadMatchedPages(matchedPageIds, allPages);
       const totalContentChars = matchedPages.reduce((s, p) => s + p.content.length, 0);
       tLoadMatched(`${matchedPages.length} pages loaded, ${totalContentChars} chars content`);
 
@@ -281,11 +278,6 @@ export async function compileWikiForUser(
       emptyResult.pages_merged += batchResult.pages_merged;
       emptyResult.records_compiled += batchResult.records_compiled;
 
-      // 更新被修改 page 的 embedding（异步，不阻塞）
-      void updatePageEmbeddings(instructions, userId).catch((err) =>
-        console.warn(`[wiki-compiler] embedding 更新失败: ${err.message}`),
-      );
-
       tBatch(`done`);
       // 本轮处理的 record 少于 maxRecords，说明已全部处理完
       if (pendingRecords.length < maxRecords) break;
@@ -313,7 +305,7 @@ export async function compileWikiForUser(
 
 // ── 阶段 A 辅助函数 ──
 
-/** 加载 record 的 transcript/summary 文本 + embedding */
+/** 加载 record 的 transcript/summary 文本 */
 async function loadRecordTexts(
   records: recordRepo.Record[],
 ): Promise<RecordWithText[]> {
@@ -334,14 +326,7 @@ async function loadRecordTexts(
     ids,
   );
 
-  // 查询 embedding
-  const embeddings = await query<{ id: string; embedding: any }>(
-    `SELECT id, embedding FROM record WHERE id IN (${placeholders}) AND embedding IS NOT NULL`,
-    ids,
-  );
-
   const textMap = new Map<string, string>();
-  const embeddingMap = new Map<string, number[]>();
 
   for (const t of transcripts) {
     textMap.set(t.record_id, t.text);
@@ -351,92 +336,33 @@ async function loadRecordTexts(
       textMap.set(s.record_id, s.short_summary);
     }
   }
-  for (const e of embeddings) {
-    if (e.embedding) {
-      embeddingMap.set(e.id, parseEmbedding(e.embedding));
-    }
-  }
 
   return records.map((r) => ({
     id: r.id,
     text: textMap.get(r.id) ?? "",
     source_type: r.source_type,
     created_at: r.created_at,
-    embedding: embeddingMap.get(r.id) ?? null,
   }));
 }
 
-/** 解析 pgvector 的 embedding 值 */
-function parseEmbedding(raw: any): number[] {
-  if (Array.isArray(raw)) return raw;
-  if (typeof raw === "string") {
-    // pgvector 返回 "[0.1,0.2,0.3]" 格式
-    try {
-      return JSON.parse(raw);
-    } catch {
-      return [];
-    }
-  }
-  return [];
-}
-
-/** 余弦相似度计算 */
-export function cosineSimilarity(a: number[], b: number[]): number {
-  if (a.length !== b.length || a.length === 0) return 0;
-  let dot = 0, na = 0, nb = 0;
-  for (let i = 0; i < a.length; i++) {
-    dot += a[i] * b[i];
-    na += a[i] * a[i];
-    nb += b[i] * b[i];
-  }
-  const denom = Math.sqrt(na) * Math.sqrt(nb);
-  return denom === 0 ? 0 : dot / denom;
-}
-
-/** 将 record 路由到相关 page（基于 embedding 相似度），返回 pageId → 最高相似度 */
-async function routeRecordsToPages(
-  records: RecordWithText[],
-  pages: PageIndex[],
-): Promise<Map<string, number>> {
-  const matchedMap = new Map<string, number>();
-
-  for (const record of records) {
-    if (!record.embedding || pages.length === 0) continue;
-
-    const scored: Array<{ pageId: string; similarity: number }> = [];
-    for (const page of pages) {
-      if (!page.embedding) continue;
-      const sim = cosineSimilarity(record.embedding, page.embedding);
-      if (sim > SIMILARITY_THRESHOLD) {
-        scored.push({ pageId: page.id, similarity: sim });
-      }
-    }
-
-    scored.sort((a, b) => b.similarity - a.similarity);
-    for (const s of scored.slice(0, MAX_MATCHED_PAGES)) {
-      const existing = matchedMap.get(s.pageId) ?? 0;
-      if (s.similarity > existing) matchedMap.set(s.pageId, s.similarity);
-    }
-  }
-
-  return matchedMap;
-}
-
-/** 加载命中 page 的完整 content，按相似度排序，受 token 预算限制 */
+/** 加载关联 page 的完整 content，按最近更新优先，受 token 预算限制 */
 async function loadMatchedPages(
-  matchedMap: Map<string, number>,
+  matchedPageIds: Set<string>,
   allPages: wikiPageRepo.WikiPage[],
 ): Promise<MatchedPage[]> {
-  // 按相似度降序排序后截断（spec 3.1 要求）
-  const sorted = [...matchedMap.entries()].sort((a, b) => b[1] - a[1]);
+  // 预建索引避免 O(N*M) 查找
+  const pageMap = new Map(allPages.map(p => [p.id, p]));
+
+  // 按 updated_at 降序排列，优先加载最近活跃的 page
+  const sorted = [...matchedPageIds]
+    .map(id => pageMap.get(id))
+    .filter((p): p is wikiPageRepo.WikiPage => !!p)
+    .sort((a, b) => (b.updated_at ?? "").localeCompare(a.updated_at ?? ""));
 
   const pages: MatchedPage[] = [];
   let totalChars = 0;
 
-  for (const [pageId] of sorted) {
-    const page = allPages.find((p) => p.id === pageId);
-    if (!page) continue;
-
+  for (const page of sorted) {
     const contentLen = (page.content ?? "").length;
     if (totalChars + contentLen > MAX_CONTENT_CHARS) break;
 
@@ -530,6 +456,7 @@ export function parseCompileResponse(raw: string): CompileInstructions {
     merge_pages: Array.isArray(parsed.merge_pages) ? parsed.merge_pages : [],
     split_page: Array.isArray(parsed.split_page) ? parsed.split_page : [],
     goal_sync: Array.isArray(parsed.goal_sync) ? parsed.goal_sync : [],
+    links: Array.isArray(parsed.links) ? parsed.links : [],
   };
 }
 
@@ -623,7 +550,8 @@ export async function executeInstructions(
       result.pages_created++;
     }
 
-    // 3. split_page
+    // 3. split_page（含分级授权检查）
+    // TODO Phase 14.7: 当 AI 指令集支持 rename/archive 操作时，需同样加 canAiModifyStructure 检查
     for (const sp of instructions.split_page) {
       if (!isValidUuid(sp.source_id)) {
         console.warn(`[wiki-compiler] 跳过 split_page: 无效 source_id "${sp.source_id}"`);
@@ -634,6 +562,24 @@ export async function executeInstructions(
         console.warn(`[wiki-compiler] 跳过 split_page: page 不存在 "${sp.source_id}"`);
         continue;
       }
+
+      // Phase 14.7: 分级授权 — 检查 page 的 created_by
+      const spPageRow = await client.query(
+        `SELECT created_by FROM wiki_page WHERE id = $1`,
+        [sp.source_id],
+      );
+      const spPage = spPageRow.rows[0];
+      if (spPage && !canAiModifyStructure(spPage as any)) {
+        // 用户创建的 page → 不执行拆分，创建建议
+        console.log(`[wiki-compiler] split_page: page "${sp.source_id}" 由用户创建，创建建议`);
+        await createSuggestion(userId, "split", {
+          source_id: sp.source_id,
+          new_parent_content: sp.new_parent_content,
+          children: sp.children,
+        });
+        continue;
+      }
+
       // 更新原 page 的 content
       await client.query(
         `UPDATE wiki_page SET content = $1, compiled_at = now(), updated_at = now() WHERE id = $2`,
@@ -670,7 +616,7 @@ export async function executeInstructions(
       result.pages_split++;
     }
 
-    // 4. merge_pages
+    // 4. merge_pages（含分级授权检查）
     for (const mp of instructions.merge_pages) {
       if (!isValidUuid(mp.source_id) || !isValidUuid(mp.target_id)) {
         console.warn(`[wiki-compiler] 跳过 merge_pages: 无效 UUID source="${mp.source_id}" target="${mp.target_id}"`);
@@ -682,6 +628,23 @@ export async function executeInstructions(
         console.warn(`[wiki-compiler] 跳过 merge_pages: source/target 不存在`);
         continue;
       }
+
+      // Phase 14.7: 分级授权 — 检查 source page 的 created_by
+      const mpSrcRow = await client.query(
+        `SELECT created_by FROM wiki_page WHERE id = $1`,
+        [mp.source_id],
+      );
+      const mpSrcPage = mpSrcRow.rows[0];
+      if (mpSrcPage && !canAiModifyStructure(mpSrcPage as any)) {
+        console.log(`[wiki-compiler] merge_pages: source "${mp.source_id}" 由用户创建，创建建议`);
+        await createSuggestion(userId, "merge", {
+          source_id: mp.source_id,
+          target_id: mp.target_id,
+          reason: mp.reason,
+        });
+        continue;
+      }
+
       // source 标记为 merged
       await client.query(
         `UPDATE wiki_page SET status = 'merged', merged_into = $1, updated_at = now() WHERE id = $2`,
@@ -716,7 +679,7 @@ export async function executeInstructions(
         continue;
       }
       if (gs.action === "create" && gs.title) {
-        // 验证 wiki_page_id 存在
+        // Phase 14.6: goal_sync create 同时创建 goal page
         let goalPageId = gs.wiki_page_id ?? null;
         if (goalPageId) {
           const gpExists = await client.query(`SELECT 1 FROM wiki_page WHERE id = $1`, [goalPageId]);
@@ -725,6 +688,20 @@ export async function executeInstructions(
             goalPageId = null;
           }
         }
+
+        // 如果没有已有的 goal page，创建一个新的
+        if (!goalPageId) {
+          const newPageResult = await client.query(
+            `INSERT INTO wiki_page (user_id, title, content, summary, parent_id, level, domain, page_type, created_by, metadata)
+             VALUES ($1, $2, '', $3, NULL, 3, NULL, 'goal', 'ai', '{}') RETURNING id`,
+            [userId, gs.title, gs.title],
+          );
+          goalPageId = newPageResult.rows[0]?.id ?? null;
+          if (goalPageId) {
+            result.pages_created++;
+          }
+        }
+
         const deviceRow = await client.query(
           `SELECT device_id FROM record WHERE user_id = $1 LIMIT 1`,
           [userId],
@@ -765,7 +742,37 @@ export async function executeInstructions(
       }
     }
 
-    // 6. 所有 Record 标记为 compiled
+    // 6. links — 创建跨页链接（Phase 14.11，AI 幻觉 ID 防护）
+    if (instructions.links && instructions.links.length > 0) {
+      for (const link of instructions.links) {
+        if (!isValidUuid(link.source_page_id) || !isValidUuid(link.target_page_id)) {
+          console.warn(`[wiki-compiler] 跳过 link: 无效 UUID source="${link.source_page_id}" target="${link.target_page_id}"`);
+          continue;
+        }
+        // 存在性校验（AI 可能编造不存在的 page_id）
+        const srcExists = await client.query(`SELECT 1 FROM wiki_page WHERE id = $1`, [link.source_page_id]);
+        const tgtExists = await client.query(`SELECT 1 FROM wiki_page WHERE id = $1`, [link.target_page_id]);
+        if (srcExists.rowCount === 0 || tgtExists.rowCount === 0) {
+          console.warn(`[wiki-compiler] 跳过 link: page 不存在 source="${link.source_page_id}" target="${link.target_page_id}"`);
+          continue;
+        }
+        // link_type 校验
+        const validTypes = ["reference", "related", "contradicts"];
+        if (!validTypes.includes(link.link_type)) {
+          console.warn(`[wiki-compiler] 跳过 link: 无效 link_type "${link.link_type}"`);
+          continue;
+        }
+        await client.query(
+          `INSERT INTO wiki_page_link (source_page_id, target_page_id, link_type, context_text)
+           VALUES ($1, $2, $3, $4)
+           ON CONFLICT (source_page_id, target_page_id, link_type)
+           DO UPDATE SET context_text = EXCLUDED.context_text`,
+          [link.source_page_id, link.target_page_id, link.link_type, link.context_text ?? null],
+        );
+      }
+    }
+
+    // 7. 所有 Record 标记为 compiled
     if (recordIds.length > 0) {
       await client.query(
         `UPDATE record SET compile_status = 'compiled', updated_at = now() WHERE id = ANY($1)`,
@@ -803,34 +810,3 @@ export async function executeInstructions(
   }
 }
 
-// ── 后处理 ──
-
-/** 更新被修改 page 的 embedding */
-async function updatePageEmbeddings(
-  instructions: CompileInstructions,
-  _userId: string,
-): Promise<void> {
-  const pageIdsToUpdate = new Set<string>();
-
-  for (const upd of instructions.update_pages) {
-    pageIdsToUpdate.add(upd.page_id);
-  }
-  // 新建的 page 也需要 embedding，但我们需要获取新建 page 的 ID
-  // 由于新建 page 的 ID 在事务中生成，这里需要重新查询
-  // 暂时只更新已有 page 的 embedding
-
-  for (const pageId of pageIdsToUpdate) {
-    try {
-      const page = await wikiPageRepo.findById(pageId);
-      if (!page || !page.summary) continue;
-
-      const embedding = await getEmbedding(page.summary);
-      await wikiPageRepo.update(pageId, {
-        embedding,
-        compiled_at: new Date().toISOString(),
-      });
-    } catch (err: any) {
-      console.warn(`[wiki-compiler] page ${pageId} embedding 更新失败: ${err.message}`);
-    }
-  }
-}

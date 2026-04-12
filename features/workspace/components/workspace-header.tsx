@@ -59,19 +59,25 @@ export function WorkspaceHeader({
         {/* 左侧: 头像按钮 */}
         <button
           onClick={onAvatarClick}
-          className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium text-white shrink-0"
-          style={{ background: "linear-gradient(135deg, #89502C, #C8845C)" }}
+          className="min-w-[44px] min-h-[44px] flex items-center justify-center shrink-0"
           aria-label="打开侧边栏"
         >
-          {initial}
+          <span
+            className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium text-white"
+            style={{ background: "linear-gradient(135deg, var(--avatar-gradient-from), var(--avatar-gradient-to))" }}
+          >
+            {initial}
+          </span>
         </button>
 
         {/* 中间: Segment 切换器 */}
-        <div className="flex items-center bg-surface-high rounded-full h-8 p-0.5 w-[160px]">
+        <div role="tablist" aria-label="主视图切换" className="flex items-center bg-surface-high rounded-full min-h-[48px] p-0.5 w-[160px]">
           <button
+            role="tab"
+            aria-selected={activeTab === "diary"}
             onClick={() => onTabChange("diary")}
             className={cn(
-              "flex-1 h-full rounded-full text-sm font-medium transition-all duration-200",
+              "flex-1 h-full rounded-full text-sm font-medium transition-all duration-200 py-2 px-4",
               activeTab === "diary"
                 ? "bg-surface-lowest text-on-surface shadow-sm"
                 : "text-muted-accessible",
@@ -81,6 +87,8 @@ export function WorkspaceHeader({
           </button>
           <div className="flex-1 h-full relative" ref={menuRef}>
             <button
+              role="tab"
+              aria-selected={activeTab === "todo"}
               onClick={() => {
                 if (activeTab === "todo") {
                   setShowViewMenu((v) => !v);
@@ -89,7 +97,7 @@ export function WorkspaceHeader({
                 }
               }}
               className={cn(
-                "w-full h-full rounded-full text-sm font-medium transition-all duration-200 flex items-center justify-center gap-0.5",
+                "w-full h-full rounded-full text-sm font-medium transition-all duration-200 flex items-center justify-center gap-0.5 py-2 px-4",
                 activeTab === "todo"
                   ? "bg-surface-lowest text-on-surface shadow-sm"
                   : "text-muted-accessible",
@@ -129,11 +137,11 @@ export function WorkspaceHeader({
         </div>
 
         {/* 右侧: AI聊天 + 搜索 */}
-        <div className="flex items-center gap-1 shrink-0">
+        <div className="flex items-center gap-2 shrink-0">
           {onChatClick && (
             <button
               onClick={onChatClick}
-              className="w-9 h-9 flex items-center justify-center rounded-full text-deer hover:text-deer/80 transition-colors"
+              className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full text-deer hover:text-deer/80 transition-colors"
               aria-label="AI 聊天"
             >
               <MessageCircle size={18} />
@@ -141,7 +149,7 @@ export function WorkspaceHeader({
           )}
           <button
             onClick={onSearchClick}
-            className="w-9 h-9 flex items-center justify-center rounded-full text-muted-accessible hover:text-on-surface transition-colors"
+            className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full text-muted-accessible hover:text-on-surface transition-colors"
             aria-label="搜索"
           >
             <Search size={18} />

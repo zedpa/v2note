@@ -15,7 +15,6 @@ import { updateRecordTool } from "./update-record.js";
 import { deleteRecordTool } from "./delete-record.js";
 import { deleteTodoTool } from "./delete-todo.js";
 import { createProjectTool } from "./create-project.js";
-import { createLinkTool } from "./create-link.js";
 import { searchTool } from "./search.js";
 import { confirmTool } from "./confirm.js";
 import { getCurrentTimeTool } from "./get-current-time.js";
@@ -45,8 +44,6 @@ export const ALL_TOOL_DEFINITIONS = [
   deleteRecordTool,
   deleteTodoTool,
   createProjectTool,
-  // 链接
-  createLinkTool,
   // 搜索
   searchTool,
   // 统一查看

@@ -46,3 +46,9 @@ CREATE TABLE IF NOT EXISTS wiki_page_link (
 
 CREATE INDEX IF NOT EXISTS idx_wiki_page_link_source ON wiki_page_link(source_page_id);
 CREATE INDEX IF NOT EXISTS idx_wiki_page_link_target ON wiki_page_link(target_page_id);
+
+-- ── wiki_page 并发保护：同用户同级同名 page 不可重复 ──
+-- parent_id 为 NULL 的 L3 page 用 COALESCE 处理（NULL 在 UNIQUE 中不等于 NULL）
+CREATE UNIQUE INDEX IF NOT EXISTS idx_wiki_page_unique_title
+  ON wiki_page (user_id, COALESCE(parent_id, '00000000-0000-0000-0000-000000000000'), title, level)
+  WHERE status = 'active';

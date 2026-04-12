@@ -80,6 +80,8 @@ vi.mock("../db/repositories/index.js", () => ({
     findPendingByDevice: vi.fn().mockResolvedValue([]),
     findByUser: vi.fn().mockResolvedValue([]),
     findByDevice: vi.fn().mockResolvedValue([]),
+    findCompletedByUserInRange: vi.fn().mockResolvedValue([]),
+    findCompletedByDeviceInRange: vi.fn().mockResolvedValue([]),
     countByUserDateRange: vi.fn().mockResolvedValue({ done: 0, total: 0 }),
     countByDateRange: vi.fn().mockResolvedValue({ done: 0, total: 0 }),
     findByGoalId: vi.fn().mockResolvedValue([]),
@@ -1000,6 +1002,461 @@ describe("场景 3.1: briefing agent 激活", () => {
         agent: "briefing",
       }),
     );
+  });
+});
+
+// ── regression: fix-briefing-stale-todos — 早报只传今日相关待办 ──
+
+describe("regression: fix-briefing-stale-todos — 场景 1.1: 早报只展示今日排期", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useFakeTimers();
+    // 北京时间 2026-04-08 08:00
+    vi.setSystemTime(new Date("2026-04-08T00:00:00Z"));
+    process.env.TZ = "Asia/Shanghai";
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("should_only_include_today_scheduled_todos_when_user_has_stale_pending_todos", async () => {
+    // 3 个今日排期 + 5 个无排期古早待办
+    const pendingTodos = [
+      { id: "t1", text: "今日任务1", scheduled_start: new Date("2026-04-07T17:00:00Z"), scheduled_end: null, created_at: "2026-03-20T00:00:00Z", done: false },
+      { id: "t2", text: "今日任务2", scheduled_start: new Date("2026-04-07T18:00:00Z"), scheduled_end: null, created_at: "2026-03-20T00:00:00Z", done: false },
+      { id: "t3", text: "今日任务3", scheduled_start: "2026-04-08T09:00:00+08:00", scheduled_end: null, created_at: "2026-03-20T00:00:00Z", done: false },
+      // 5 个无排期古早待办
+      { id: "t4", text: "古早待办1", scheduled_start: null, scheduled_end: null, created_at: "2026-03-15T00:00:00Z", done: false },
+      { id: "t5", text: "古早待办2", scheduled_start: null, scheduled_end: null, created_at: "2026-03-16T00:00:00Z", done: false },
+      { id: "t6", text: "古早待办3", scheduled_start: null, scheduled_end: null, created_at: "2026-03-17T00:00:00Z", done: false },
+      { id: "t7", text: "古早待办4", scheduled_start: null, scheduled_end: null, created_at: "2026-03-18T00:00:00Z", done: false },
+      { id: "t8", text: "古早待办5", scheduled_start: null, scheduled_end: null, created_at: "2026-03-19T00:00:00Z", done: false },
+    ];
+    vi.mocked(todoRepo.findPendingByUser).mockResolvedValue(pendingTodos as any);
+
+    mockedChatCompletion.mockResolvedValue({
+      content: JSON.stringify({
+        greeting: "早上好",
+        today_focus: ["今日任务1", "今日任务2", "今日任务3"],
+        carry_over: [],
+        goal_pulse: [],
+        stats: { yesterday_done: 0, yesterday_total: 0 },
+      }),
+      usage: { input: 100, output: 50 },
+    } as any);
+
+    await generateMorningBriefing("device-1", "user-1");
+
+    // 检查 user message 中只有今日排期，不包含古早待办
+    const userMsg = mockedChatCompletion.mock.calls[0][0].find((m: any) => m.role === "user");
+    expect(userMsg!.content).toContain("今日任务1");
+    expect(userMsg!.content).toContain("今日任务2");
+    expect(userMsg!.content).toContain("今日任务3");
+    expect(userMsg!.content).not.toContain("古早待办1");
+    expect(userMsg!.content).not.toContain("古早待办2");
+    // user message 应使用"今日待办"而非"待办"全量计数
+    expect(userMsg!.content).toContain("今日待办(3)");
+    expect(userMsg!.content).not.toMatch(/待办\(8\)/);
+  });
+});
+
+describe("regression: fix-briefing-stale-todos — 场景 1.2: carry_over 展示逾期待办", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-04-08T00:00:00Z"));
+    process.env.TZ = "Asia/Shanghai";
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("should_include_overdue_todos_in_carry_over_when_scheduled_end_before_today", async () => {
+    const pendingTodos = [
+      // 逾期：scheduled_end 日期 < today
+      { id: "t1", text: "逾期任务1", scheduled_start: "2026-04-05T09:00:00+08:00", scheduled_end: new Date("2026-04-06T16:00:00Z"), created_at: "2026-04-05T00:00:00Z", done: false },
+      { id: "t2", text: "逾期任务2", scheduled_start: null, scheduled_end: "2026-04-06T23:59:00+08:00", created_at: "2026-04-05T00:00:00Z", done: false },
+      // 正常今日排期
+      { id: "t3", text: "今日任务", scheduled_start: new Date("2026-04-07T17:00:00Z"), scheduled_end: null, created_at: "2026-04-08T00:00:00Z", done: false },
+    ];
+    vi.mocked(todoRepo.findPendingByUser).mockResolvedValue(pendingTodos as any);
+
+    mockedChatCompletion.mockResolvedValue({
+      content: JSON.stringify({
+        greeting: "早上好",
+        today_focus: ["今日任务"],
+        carry_over: ["逾期任务1", "逾期任务2"],
+        goal_pulse: [],
+        stats: { yesterday_done: 0, yesterday_total: 0 },
+      }),
+      usage: { input: 100, output: 50 },
+    } as any);
+
+    await generateMorningBriefing("device-1", "user-1");
+
+    const userMsg = mockedChatCompletion.mock.calls[0][0].find((m: any) => m.role === "user");
+    // 逾期任务应出现在消息中
+    expect(userMsg!.content).toContain("逾期任务1");
+    expect(userMsg!.content).toContain("逾期任务2");
+    // 逾期数量正确
+    expect(userMsg!.content).toContain("逾期(2)");
+  });
+});
+
+describe("regression: fix-briefing-stale-todos — 场景 1.3: 过去排期未完成归入 carry_over", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-04-08T00:00:00Z"));
+    process.env.TZ = "Asia/Shanghai";
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("should_include_past_scheduled_start_todo_in_carry_over_when_not_completed", async () => {
+    const pendingTodos = [
+      // scheduled_start = 3天前，无 scheduled_end，未完成 → carry_over
+      { id: "t1", text: "过期排期任务", scheduled_start: "2026-04-05T09:00:00+08:00", scheduled_end: null, created_at: "2026-04-05T00:00:00Z", done: false },
+      // 今日排期
+      { id: "t2", text: "今日任务", scheduled_start: new Date("2026-04-07T17:00:00Z"), scheduled_end: null, created_at: "2026-04-08T00:00:00Z", done: false },
+    ];
+    vi.mocked(todoRepo.findPendingByUser).mockResolvedValue(pendingTodos as any);
+
+    mockedChatCompletion.mockResolvedValue({
+      content: JSON.stringify({
+        greeting: "早上好",
+        today_focus: ["今日任务"],
+        carry_over: ["过期排期任务"],
+        goal_pulse: [],
+        stats: { yesterday_done: 0, yesterday_total: 0 },
+      }),
+      usage: { input: 100, output: 50 },
+    } as any);
+
+    await generateMorningBriefing("device-1", "user-1");
+
+    const userMsg = mockedChatCompletion.mock.calls[0][0].find((m: any) => m.role === "user");
+    // 过期排期任务应在逾期列表中
+    expect(userMsg!.content).toContain("过期排期任务");
+    // 不应在今日待办列表中（今日待办只有1个）
+    expect(userMsg!.content).toContain("今日待办(1)");
+  });
+});
+
+describe("regression: fix-briefing-stale-todos — 场景 1.4: 无排期无逾期时空列表", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-04-08T00:00:00Z"));
+    process.env.TZ = "Asia/Shanghai";
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("should_show_empty_todo_list_when_user_only_has_unscheduled_pending_todos", async () => {
+    const pendingTodos = [
+      { id: "t1", text: "无排期1", scheduled_start: null, scheduled_end: null, created_at: "2026-03-15T00:00:00Z", done: false },
+      { id: "t2", text: "无排期2", scheduled_start: null, scheduled_end: null, created_at: "2026-03-16T00:00:00Z", done: false },
+    ];
+    vi.mocked(todoRepo.findPendingByUser).mockResolvedValue(pendingTodos as any);
+
+    mockedChatCompletion.mockResolvedValue({
+      content: JSON.stringify({
+        greeting: "早上好",
+        today_focus: [],
+        carry_over: [],
+        goal_pulse: [],
+        stats: { yesterday_done: 0, yesterday_total: 0 },
+      }),
+      usage: { input: 100, output: 50 },
+    } as any);
+
+    await generateMorningBriefing("device-1", "user-1");
+
+    const userMsg = mockedChatCompletion.mock.calls[0][0].find((m: any) => m.role === "user");
+    // 今日待办数量为 0
+    expect(userMsg!.content).toContain("今日待办(0)");
+    // 不应包含无排期待办
+    expect(userMsg!.content).not.toContain("无排期1");
+    expect(userMsg!.content).not.toContain("无排期2");
+    // 应提示"今天没有排期的待办"
+    expect(userMsg!.content).toContain("今天没有排期的待办");
+  });
+});
+
+describe("regression: fix-briefing-stale-todos — 边界: 排期+逾期超过10条截断", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-04-08T00:00:00Z"));
+    process.env.TZ = "Asia/Shanghai";
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("should_truncate_to_10_when_today_scheduled_plus_overdue_exceeds_10", async () => {
+    const pendingTodos = [
+      // 7 个今日排期
+      ...Array.from({ length: 7 }, (_, i) => ({
+        id: `ts${i}`, text: `今日${i}`, scheduled_start: "2026-04-08T09:00:00+08:00", scheduled_end: null, created_at: "2026-04-08T00:00:00Z", done: false,
+      })),
+      // 5 个逾期
+      ...Array.from({ length: 5 }, (_, i) => ({
+        id: `ov${i}`, text: `逾期${i}`, scheduled_start: "2026-04-05T09:00:00+08:00", scheduled_end: "2026-04-06T23:59:00+08:00", created_at: "2026-04-05T00:00:00Z", done: false,
+      })),
+    ];
+    vi.mocked(todoRepo.findPendingByUser).mockResolvedValue(pendingTodos as any);
+
+    mockedChatCompletion.mockResolvedValue({
+      content: JSON.stringify({
+        greeting: "早上好",
+        today_focus: [],
+        carry_over: [],
+        goal_pulse: [],
+        stats: { yesterday_done: 0, yesterday_total: 0 },
+      }),
+      usage: { input: 100, output: 50 },
+    } as any);
+
+    await generateMorningBriefing("device-1", "user-1");
+
+    const userMsg = mockedChatCompletion.mock.calls[0][0].find((m: any) => m.role === "user");
+    // 今日排期全部 7 个应该在（7 < 10）
+    expect(userMsg!.content).toContain("今日待办(7)");
+    const todayTodoLines = (userMsg!.content as string).split("\n").filter((l: string) => /^- 今日\d/.test(l));
+    expect(todayTodoLines.length).toBe(7);
+    // 逾期有 5 个但总共截断到 10，剩余 10-7=3 个 slot 给逾期
+    expect(userMsg!.content).toContain("逾期(3)");
+    // 今日 7 + 逾期 3 = 10，不超过上限
+    const overdueMatch = (userMsg!.content as string).match(/逾期\((\d+)\)/);
+    const totalShown = todayTodoLines.length + Number(overdueMatch?.[1] ?? 0);
+    expect(totalShown).toBeLessThanOrEqual(10);
+  });
+});
+
+describe("regression: fix-briefing-stale-todos — 边界: 多日任务跨越今天不算逾期", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-04-08T00:00:00Z"));
+    process.env.TZ = "Asia/Shanghai";
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("should_not_mark_multi_day_task_as_overdue_when_end_date_is_today_or_later", async () => {
+    const pendingTodos = [
+      // 多日任务：start=昨天, end=明天 → 仍在进行中，不算逾期
+      { id: "t1", text: "跨天任务", scheduled_start: "2026-04-07T09:00:00+08:00", scheduled_end: "2026-04-09T18:00:00+08:00", created_at: "2026-04-07T00:00:00Z", done: false },
+      // 多日任务：start=昨天, end=今天 → scheduled_end === today，仍在进行中
+      { id: "t2", text: "今天截止", scheduled_start: "2026-04-07T09:00:00+08:00", scheduled_end: "2026-04-08T18:00:00+08:00", created_at: "2026-04-07T00:00:00Z", done: false },
+      // 真正逾期：start=前天, end=昨天
+      { id: "t3", text: "真逾期", scheduled_start: "2026-04-06T09:00:00+08:00", scheduled_end: "2026-04-07T18:00:00+08:00", created_at: "2026-04-06T00:00:00Z", done: false },
+    ];
+    vi.mocked(todoRepo.findPendingByUser).mockResolvedValue(pendingTodos as any);
+
+    mockedChatCompletion.mockResolvedValue({
+      content: JSON.stringify({
+        greeting: "早上好",
+        today_focus: [],
+        carry_over: ["真逾期"],
+        goal_pulse: [],
+        stats: { yesterday_done: 0, yesterday_total: 0 },
+      }),
+      usage: { input: 100, output: 50 },
+    } as any);
+
+    await generateMorningBriefing("device-1", "user-1");
+
+    const userMsg = mockedChatCompletion.mock.calls[0][0].find((m: any) => m.role === "user");
+    // 跨天任务和今天截止的不应在逾期列表中
+    expect(userMsg!.content).not.toContain("跨天任务");
+    expect(userMsg!.content).not.toContain("今天截止");
+    // 真逾期应在
+    expect(userMsg!.content).toContain("真逾期");
+    expect(userMsg!.content).toContain("逾期(1)");
+  });
+});
+
+// ── regression: fix-briefing-stale-todos — 晚报日记条目摘要 ──
+
+describe("regression: fix-briefing-stale-todos — 场景 2.1: 晚报含日记条目摘要", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-04-08T12:00:00Z"));
+    process.env.TZ = "Asia/Shanghai";
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("should_include_diary_entry_summaries_with_time_in_user_message", async () => {
+    // 准备今日完成的待办
+    vi.mocked(todoRepo.findCompletedByUserInRange).mockResolvedValue([
+      { id: "d1", text: "完成任务A", done: true, completed_at: new Date("2026-04-08T02:00:00Z"), created_at: "2026-04-08T00:00:00Z" },
+      { id: "d2", text: "完成任务B", done: true, completed_at: new Date("2026-04-08T05:00:00Z"), created_at: "2026-04-08T00:00:00Z" },
+      { id: "d3", text: "完成任务C", done: true, completed_at: new Date("2026-04-08T08:00:00Z"), created_at: "2026-04-08T00:00:00Z" },
+    ] as any);
+
+    // 准备今日记录 + 日记
+    vi.mocked(recordRepo.findByUser).mockResolvedValue([
+      { id: "r1", created_at: new Date("2026-04-08T02:00:00Z") },
+      { id: "r2", created_at: new Date("2026-04-08T06:00:00Z") },
+    ] as any);
+    vi.mocked(recordRepo.findByUserAndDateRange).mockResolvedValue([
+      { id: "r1", device_id: "d", user_id: "u", created_at: "2026-04-08T02:00:00Z", source: "speech", archived: false },
+      { id: "r2", device_id: "d", user_id: "u", created_at: "2026-04-08T06:00:00Z", source: "speech", archived: false },
+    ] as any);
+    vi.mocked(transcriptRepo.findByRecordIds).mockResolvedValue([
+      { id: "t1", record_id: "r1", text: "上午开了产品会议讨论了新功能方向", language: "zh", created_at: "2026-04-08T02:00:00Z" },
+      { id: "t2", record_id: "r2", text: "下午写了两小时代码重构了登录模块", language: "zh", created_at: "2026-04-08T06:00:00Z" },
+    ]);
+
+    mockedChatCompletion.mockResolvedValue({
+      content: JSON.stringify({
+        headline: "充实的一天",
+        accomplishments: ["完成任务A", "完成任务B", "完成任务C"],
+        insight: "今天在产品思考和技术实现之间切换",
+        affirmation: "保持这种节奏",
+        tomorrow_preview: [],
+        stats: { done: 3, new_records: 2 },
+      }),
+      usage: { input: 100, output: 50 },
+    } as any);
+
+    const result = await generateEveningSummary("device-1", "user-1");
+
+    const userMsg = mockedChatCompletion.mock.calls[0][0].find((m: any) => m.role === "user");
+    // 应包含日记条目的时间标记（HH:mm 格式，北京时间）
+    // r1: 2026-04-08T02:00:00Z = 北京 10:00
+    // r2: 2026-04-08T06:00:00Z = 北京 14:00
+    expect(userMsg!.content).toContain("10:00");
+    expect(userMsg!.content).toContain("14:00");
+    // 应包含日记文本摘要
+    expect(userMsg!.content).toContain("上午开了产品会议");
+    expect(userMsg!.content).toContain("下午写了两小时代码");
+
+    // 结果验证
+    expect(result!.stats.done).toBe(3);
+    expect(result!.stats.new_records).toBe(2);
+    expect(result!.insight).toBeTruthy();
+  });
+});
+
+describe("regression: fix-briefing-stale-todos — 场景 2.2: 晚报只完成待办没写日记", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-04-08T12:00:00Z"));
+    process.env.TZ = "Asia/Shanghai";
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("should_return_empty_insight_when_no_diary_entries", async () => {
+    vi.mocked(todoRepo.findCompletedByUserInRange).mockResolvedValue([
+      { id: "d1", text: "完成任务A", done: true, completed_at: new Date("2026-04-08T02:00:00Z"), created_at: "2026-04-08T00:00:00Z" },
+      { id: "d2", text: "完成任务B", done: true, completed_at: new Date("2026-04-08T05:00:00Z"), created_at: "2026-04-08T00:00:00Z" },
+    ] as any);
+    vi.mocked(recordRepo.findByUser).mockResolvedValue([] as any);
+    vi.mocked(recordRepo.findByUserAndDateRange).mockResolvedValue([]);
+
+    mockedChatCompletion.mockResolvedValue({
+      content: JSON.stringify({
+        headline: "今天搞定了两件事",
+        accomplishments: ["完成任务A", "完成任务B"],
+        insight: "",
+        affirmation: "不错",
+        tomorrow_preview: [],
+        stats: { done: 2, new_records: 0 },
+      }),
+      usage: { input: 100, output: 50 },
+    } as any);
+
+    const result = await generateEveningSummary("device-1", "user-1");
+
+    expect(result!.accomplishments).toHaveLength(2);
+    expect(result!.insight).toBe("");
+  });
+});
+
+describe("regression: fix-briefing-stale-todos — 场景 2.3: 用户今天什么都没做", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-04-08T12:00:00Z"));
+    process.env.TZ = "Asia/Shanghai";
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("should_return_warm_empty_report_when_nothing_done_today", async () => {
+    vi.mocked(todoRepo.findCompletedByUserInRange).mockResolvedValue([] as any);
+    vi.mocked(recordRepo.findByUser).mockResolvedValue([] as any);
+    vi.mocked(recordRepo.findByUserAndDateRange).mockResolvedValue([]);
+
+    mockedChatCompletion.mockResolvedValue({
+      content: JSON.stringify({
+        headline: "今天就这样了，也挺好的",
+        accomplishments: [],
+        insight: "",
+        affirmation: "休息也是一种选择",
+        tomorrow_preview: [],
+        stats: { done: 0, new_records: 0 },
+      }),
+      usage: { input: 100, output: 50 },
+    } as any);
+
+    const result = await generateEveningSummary("device-1", "user-1");
+
+    expect(result!.accomplishments).toEqual([]);
+    expect(result!.headline).toBeTruthy();
+    // headline 不应是公文腔
+    expect(result!.headline).not.toContain("无事项完成");
+  });
+});
+
+describe("regression: fix-briefing-stale-todos — 早报 fallback 也使用过滤逻辑", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-04-08T00:00:00Z"));
+    process.env.TZ = "Asia/Shanghai";
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("should_use_filtered_todos_in_fallback_when_ai_fails", async () => {
+    const pendingTodos = [
+      { id: "t1", text: "今日任务", scheduled_start: "2026-04-08T09:00:00+08:00", scheduled_end: null, created_at: "2026-04-08T00:00:00Z", done: false },
+      { id: "t2", text: "古早待办", scheduled_start: null, scheduled_end: null, created_at: "2026-03-15T00:00:00Z", done: false },
+    ];
+    vi.mocked(todoRepo.findPendingByUser).mockResolvedValue(pendingTodos as any);
+    mockedChatCompletion.mockRejectedValue(new Error("AI down"));
+
+    const result = await generateMorningBriefing("device-1", "user-1");
+
+    // fallback 的 today_focus 只应包含今日排期
+    expect(result!.today_focus).toContain("今日任务");
+    expect(result!.today_focus).not.toContain("古早待办");
   });
 });
 

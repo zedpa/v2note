@@ -1,13 +1,13 @@
 ---
 id: "119"
 title: "认知 Wiki — 从原子拆解到知识编译"
-status: active
+status: completed
 domain: cognitive
 risk: high
 dependencies: ["todo-core.md", "topic-lifecycle.md"]
 superseded_by: null
 created: 2026-04-08
-updated: 2026-04-11
+updated: 2026-04-12
 ---
 
 # 认知 Wiki — 从原子拆解到知识编译
@@ -1407,8 +1407,8 @@ GET /api/v1/records?cluster_id=xxx
 ```
 假设 (Given)  用户的知识分布在多个 page 中
 当   (When)   AI 编译时发现跨 page 的语义关联
-那么 (Then)   在 content 中插入跨页链接：
-  - 格式：[→ page:UUID "页面标题"] — 指向相关 page
+那么 (Then)   发现并存储跨页链接（结构化存储，非 content 内联标记）：
+  - 存储方式：wiki_page_link 表（结构化 + 可查询，优于 content 内联文本标记）
   - 产生条件：
     a. 编译时 AI 看到全量 page 索引，发现"这条日记提到了另一个 page 的内容"
     b. 用户日记中 @引用了多个 page → 这些 page 之间形成关联

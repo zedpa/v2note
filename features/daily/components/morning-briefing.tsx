@@ -1,7 +1,9 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { SwipeBack } from "@/shared/components/swipe-back";
-import { Loader2, RefreshCw, Clock } from "lucide-react";
+import { RefreshCw, Clock, Target } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useDailyBriefing } from "../hooks/use-daily-briefing";
 import { cn } from "@/lib/utils";
 
@@ -11,6 +13,16 @@ interface MorningBriefingProps {
 
 export function MorningBriefing({ onClose }: MorningBriefingProps) {
   const { briefing, loading, error, refresh } = useDailyBriefing();
+
+  // 骨架屏延迟 300ms 显示，避免快速响应时闪烁
+  const [showSkeleton, setShowSkeleton] = useState(false);
+  useEffect(() => {
+    if (loading && !briefing) {
+      const timer = setTimeout(() => setShowSkeleton(true), 300);
+      return () => clearTimeout(timer);
+    }
+    setShowSkeleton(false);
+  }, [loading, briefing]);
 
   const now = new Date();
   const dayOfWeek = ["日", "一", "二", "三", "四", "五", "六"][now.getDay()];
@@ -36,17 +48,30 @@ export function MorningBriefing({ onClose }: MorningBriefingProps) {
               type="button"
               onClick={onClose}
               className="p-2 rounded-full hover:bg-secondary/60 transition-colors"
+              aria-label="关闭今日简报"
             >
-              <span className="text-muted-foreground text-lg">&times;</span>
+              <span className="text-muted-foreground text-lg" aria-hidden="true">&times;</span>
             </button>
           </div>
         </div>
 
-        {/* Loading / Error */}
-        {loading && !briefing && (
-          <div className="flex-1 flex items-center justify-center">
-            <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-            <span className="ml-2 text-muted-foreground text-sm">正在生成简报...</span>
+        {/* Loading — 骨架屏（延迟 300ms 显示，避免快速响应时闪烁） */}
+        {loading && !briefing && showSkeleton && (
+          <div className="flex-1 px-5 py-4">
+            <div className="space-y-6">
+              <Skeleton className="h-8 w-48" />
+              <div className="space-y-3">
+                <Skeleton className="h-5 w-full" />
+                <Skeleton className="h-5 w-3/4" />
+                <Skeleton className="h-5 w-5/6" />
+              </div>
+              <div className="space-y-2">
+                <Skeleton className="h-4 w-32" />
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+              </div>
+              <Skeleton className="h-12 w-full rounded-xl" />
+            </div>
           </div>
         )}
 
@@ -88,6 +113,21 @@ export function MorningBriefing({ onClose }: MorningBriefingProps) {
                   <div key={i} className="flex items-start gap-2 py-1">
                     <Clock className="w-3.5 h-3.5 text-orange-400 mt-0.5 shrink-0" />
                     <span className="text-sm text-on-surface">{item}</span>
+                  </div>
+                ))}
+              </Section>
+            )}
+
+            {/* 目标脉搏 */}
+            {briefing.goal_pulse && briefing.goal_pulse.length > 0 && (
+              <Section title="目标进展">
+                {briefing.goal_pulse.map((goal, i) => (
+                  <div key={i} className="flex items-center justify-between py-1.5">
+                    <div className="flex items-center gap-2">
+                      <Target className="w-3.5 h-3.5 text-primary shrink-0" />
+                      <span className="text-sm text-on-surface">{goal.title}</span>
+                    </div>
+                    <span className="text-xs text-muted-foreground">{goal.progress}</span>
                   </div>
                 ))}
               </Section>

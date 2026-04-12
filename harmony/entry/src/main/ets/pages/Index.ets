@@ -28,6 +28,16 @@ struct Index {
           // 注入 JSBridge
           this.bridgeManager.inject(this.webController);
         })
+        .onPrompt((event) => {
+          // JSBridge 核心通道：拦截 prompt() 调用，转发到原生处理
+          if (event?.message?.startsWith('__harmony_bridge__:')) {
+            const payload = event.message.substring('__harmony_bridge__:'.length);
+            this.bridgeManager.handleNativeCall(this.webController, payload);
+            event.result.handlePromptConfirm('');
+            return true; // 已处理，不弹出 prompt 对话框
+          }
+          return false; // 非桥接调用，使用默认 prompt 行为
+        })
         .onErrorReceive((event) => {
           if (event) {
             hilog.error(DOMAIN, TAG, 'WebView error: %{public}s', event.error.getErrorInfo());

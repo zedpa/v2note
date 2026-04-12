@@ -543,8 +543,15 @@ function TimelineCard({
     );
   }
 
-  // 判断来源类型
+  // 判断来源类型 & 左边框颜色（spec 110 场景 9.6.1）
   const isVoice = !!(note.audio_path || (note.duration_seconds != null && note.duration_seconds > 0));
+  const sourceBorderColor = isVoice
+    ? "hsl(var(--domain-health-fg))"
+    : note.source_type === "ai_diary"
+      ? "hsl(var(--primary))"
+      : note.source_type === "material"
+        ? "hsl(var(--muted-foreground))"
+        : null;
   const isImage = note.source === "image" || (note.file_url != null && (
     note.file_url.startsWith("data:image/") ||
     /\.(jpg|jpeg|png|gif|webp|bmp|svg)(\?|$)/i.test(note.file_url)
@@ -570,7 +577,9 @@ function TimelineCard({
         "bg-card shadow-sm",
         "animate-card-enter",
         selected && "ring-2 ring-primary bg-primary/5",
+        sourceBorderColor && "border-l-[3px]",
       )}
+      style={sourceBorderColor ? { borderLeftColor: sourceBorderColor } : undefined}
       style={{ animationDelay: `${index * 60}ms` }}
     >
       <div className="flex gap-3">

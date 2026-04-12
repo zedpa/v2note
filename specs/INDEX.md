@@ -10,7 +10,7 @@
 6. superseded 状态的 spec 已被合并，永远不要引用它们，使用 superseded_by 指向的文件
 -->
 
-> 最后更新：2026-04-11 | 共 103 个 spec（24 active / 6 draft / 43 completed / 29 superseded / 2 deprecated）
+> 最后更新：2026-04-12 | 共 103 个 spec（23 active / 6 draft / 44 completed / 29 superseded / 2 deprecated）
 
 ## 🔵 Active（当前有效，可直接引用和修改）
 
@@ -35,7 +35,6 @@
 | 112 | Recording Resilience — 录音防丢 | voice | recording-resilience.md | 本地缓存+断线重试+连接保护 |
 | 114 | 录音入口统一 | voice | voice-input-unify.md | 删InputBar死代码 + ChatView接gateway ASR + useVoiceToText hook |
 | 117 | 工具生态增强 | agent | tool-ecosystem-enhance.md | 读取工具+时间感知+认知层查询+描述优化 |
-| 119 | 认知 Wiki — 从原子拆解到知识编译 | cognitive | cognitive-wiki.md | Wiki编译替代Strike拆解+Cluster聚类，自顶向下拆分 |
 | 120 | 原生体验深度优化 — 路线A | ui | native-experience-deep.md | Phase 0-D 分阶段 |
 | 123 | 提示词架构 v2 — SharedAgent/UserAgent 分层 | agent | prompt-architecture-v2.md | 五层存储互斥+AI自主维护+wiki注入 |
 | 125 | 待办写入系统日历 & 闹钟 | todo | todo-calendar-alarm.md | Intent方案+SystemIntentPlugin |
@@ -53,6 +52,8 @@
 
 | id | title | domain | file |
 |----|-------|--------|------|
+| 119 | 认知 Wiki — 从原子拆解到知识编译 | cognitive | cognitive-wiki.md |
+| fix-briefing-stale-todos | Fix: 早晚报待办过时+数据范围修正 | report | fix-briefing-stale-todos.md |
 | fix-command-sheet-stuck | Fix: 上滑指令 CommandSheet 堵塞 | voice | fix-command-sheet-stuck.md |
 | fix-recording-notify-stale | Fix: 录音处理通知状态滞后 | voice | fix-recording-notify-stale.md |
 | fix-recording-hint-style | Fix: 录音模式方向提示改为小按钮样式 | voice | fix-recording-hint-style.md |

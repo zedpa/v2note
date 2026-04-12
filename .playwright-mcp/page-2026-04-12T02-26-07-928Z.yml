@@ -1,0 +1,23 @@
+- generic [active] [ref=e1]:
+  - generic:
+    - generic:
+      - img "路路 Logo"
+      - generic: 念念有路
+      - generic:
+        - button "写作"
+        - button "时间线"
+        - button "地图"
+        - button "目标"
+    - generic:
+      - button "🔍"
+      - button "🎙"
+      - button "⚡️行动"
+      - button "📋回顾"
+      - button "⚙️"
+  - generic [ref=e2]:
+    - heading "目标看板" [level=1] [ref=e4]
+    - paragraph [ref=e5]: 加载中…
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=e11] [cursor=pointer]:
+    - img [ref=e12]
+  - alert [ref=e15]

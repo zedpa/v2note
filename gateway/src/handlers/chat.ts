@@ -20,9 +20,6 @@ import type { ToolContext } from "../tools/types.js";
 // mayProfileUpdate 已改为 AI 工具自主调用
 import { buildDateAnchor, fmt, formatDateWithRelative } from "../lib/date-anchor.js";
 import { today, daysAgo, now as tzNow, toLocalDateTime } from "../lib/tz.js";
-// shouldUpdateSoulStrict 已不再需要，AI 自主判断更新时机
-import { gatherDecisionContext, buildDecisionPrompt } from "../cognitive/decision.js";
-import { generateAlerts } from "../cognitive/alerts.js";
 import { detectCognitiveQuery, loadChatCognitive, buildGoalDiscussionContext, buildInsightDiscussionContext } from "../cognitive/advisor-context.js";
 import type { ModelTier } from "../ai/provider.js";
 

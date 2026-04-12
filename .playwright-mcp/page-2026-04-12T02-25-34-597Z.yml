@@ -1,0 +1,124 @@
+- generic [ref=e1]:
+  - generic [ref=e128]:
+    - generic [ref=e516]:
+      - generic [ref=e517]:
+        - button "E E2E���� 13874917509" [ref=e518] [cursor=pointer]:
+          - generic [ref=e519]: E
+          - generic [ref=e520]:
+            - paragraph [ref=e521]: E2E����
+            - paragraph [ref=e522]: "13874917509"
+        - button "用户设置" [ref=e523] [cursor=pointer]:
+          - img [ref=e524]
+      - generic [ref=e526]:
+        - navigation [ref=e527]:
+          - button "今日简报" [ref=e528] [cursor=pointer]:
+            - img [ref=e530]
+            - generic [ref=e533]: 今日简报
+          - button "搜索" [ref=e534] [cursor=pointer]:
+            - img [ref=e536]
+            - generic [ref=e540]: 搜索
+        - generic [ref=e543]: 收件箱
+        - navigation [ref=e545]:
+          - button "未整理 1" [ref=e546] [cursor=pointer]:
+            - img [ref=e548]
+            - generic [ref=e552]: 未整理
+            - generic [ref=e553]: "1"
+        - generic [ref=e556]: 主题
+        - navigation [ref=e558]:
+          - button "工作事务 4" [ref=e560] [cursor=pointer]:
+            - img [ref=e562]
+            - generic [ref=e565]: 工作事务
+            - generic [ref=e566]: "4"
+          - button "生活记录 5" [ref=e568] [cursor=pointer]:
+            - img [ref=e570]
+            - generic [ref=e573]: 生活记录
+            - generic [ref=e574]: "5"
+        - navigation [ref=e576]:
+          - button "设置" [ref=e577] [cursor=pointer]:
+            - img [ref=e579]
+            - generic [ref=e583]: 设置
+        - button "退出登录" [ref=e585] [cursor=pointer]:
+          - img [ref=e586]
+          - text: 退出登录
+    - banner [ref=e129]:
+      - generic [ref=e130]:
+        - button "打开侧边栏" [active] [ref=e131] [cursor=pointer]: E
+        - generic [ref=e132]:
+          - button "日记" [ref=e133] [cursor=pointer]
+          - button "待办" [ref=e135] [cursor=pointer]:
+            - text: 待办
+            - img [ref=e429]
+        - generic [ref=e136]:
+          - button "AI 聊天" [ref=e137] [cursor=pointer]:
+            - img [ref=e138]
+          - button "搜索" [ref=e140] [cursor=pointer]:
+            - img [ref=e141]
+    - main [ref=e144]:
+      - generic [ref=e433]:
+        - generic [ref=e434]:
+          - generic [ref=e435]: 星期日
+          - generic [ref=e436]:
+            - generic [ref=e437]: 4月 2026
+            - button [ref=e438] [cursor=pointer]:
+              - img [ref=e439]
+        - generic [ref=e441]:
+          - button "一 6" [ref=e442] [cursor=pointer]:
+            - generic [ref=e443]: 一
+            - generic [ref=e444]: "6"
+          - button "二 7" [ref=e447] [cursor=pointer]:
+            - generic [ref=e448]: 二
+            - generic [ref=e449]: "7"
+          - button "三 8" [ref=e450] [cursor=pointer]:
+            - generic [ref=e451]: 三
+            - generic [ref=e452]: "8"
+          - button "四 9" [ref=e453] [cursor=pointer]:
+            - generic [ref=e454]: 四
+            - generic [ref=e455]: "9"
+          - button "五 10" [ref=e456] [cursor=pointer]:
+            - generic [ref=e457]: 五
+            - generic [ref=e458]: "10"
+          - button "六 11" [ref=e459] [cursor=pointer]:
+            - generic [ref=e460]: 六
+            - generic [ref=e461]: "11"
+          - button "日 12" [ref=e462] [cursor=pointer]:
+            - generic [ref=e463]: 日
+            - generic [ref=e464]: "12"
+        - generic [ref=e465]:
+          - button "随时 (0)" [ref=e466] [cursor=pointer]:
+            - img [ref=e467]
+            - text: 随时 (0)
+            - img [ref=e470]
+          - button "今天随时可做的事" [ref=e472] [cursor=pointer]:
+            - generic [ref=e473]: 今天随时可做的事
+            - img [ref=e475]
+        - generic [ref=e476]:
+          - button "上午 (0)" [ref=e477] [cursor=pointer]:
+            - img [ref=e478]
+            - text: 上午 (0)
+            - img [ref=e484]
+          - button "上午要做什么？" [ref=e486] [cursor=pointer]:
+            - generic [ref=e487]: 上午要做什么？
+            - img [ref=e489]
+        - generic [ref=e490]:
+          - button "下午 (0)" [ref=e491] [cursor=pointer]:
+            - img [ref=e492]
+            - text: 下午 (0)
+            - img [ref=e498]
+          - button "下午的安排" [ref=e500] [cursor=pointer]:
+            - generic [ref=e501]: 下午的安排
+            - img [ref=e503]
+        - generic [ref=e504]:
+          - button "晚上 (0)" [ref=e505] [cursor=pointer]:
+            - img [ref=e506]
+            - text: 晚上 (0)
+            - img [ref=e508]
+          - button "晚上收尾" [ref=e510] [cursor=pointer]:
+            - generic [ref=e511]: 晚上收尾
+            - img [ref=e513]
+    - button [ref=e348] [cursor=pointer]:
+      - img [ref=e349]
+    - button "Choose File" [ref=e352]
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=e65] [cursor=pointer]:
+    - img [ref=e66]
+  - alert [ref=e69]

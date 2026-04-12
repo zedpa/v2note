@@ -45,6 +45,8 @@ interface FABProps {
   sourceContext?: "todo" | "timeline" | "chat" | "review";
   /** 录音状态变化回调（recording/locked 时为 true） */
   onRecordingChange?: (isRecording: boolean) => void;
+  /** 控制 FAB 可见性 — 弹窗打开时隐藏 */
+  visible?: boolean;
 }
 
 export function FAB({
@@ -56,6 +58,7 @@ export function FAB({
   activeNotebook,
   sourceContext = "timeline",
   onRecordingChange,
+  visible = true,
 }: FABProps) {
   const [showTextSheet, setShowTextSheet] = useState(false);
   const [displayDuration, setDisplayDuration] = useState(0);
@@ -670,6 +673,9 @@ export function FAB({
     );
   }
 
+  // 弹窗打开时隐藏 FAB（仅在 idle 状态隐藏，避免录音中途消失）
+  if (!visible && phase === "idle") return null;
+
   return (
     <>
       {/* ─── RECORDING: Full-screen immersive backdrop ─── */}
@@ -857,6 +863,7 @@ export function FAB({
 
       {/* ─── FAB Button ─── */}
       <div
+        data-testid="fab-button"
         className="fixed left-1/2 z-40"
         style={{
           bottom: "calc(54px + var(--kb-offset, 0px))",

@@ -13,7 +13,7 @@ import { chatCompletion, type ChatMessage } from "../ai/provider.js";
 import { todoRepo, recordRepo, goalRepo, transcriptRepo, userAgentRepo } from "../db/repositories/index.js";
 import { generateChatDiary } from "./chat-daily-diary.js";
 import { fmt } from "../lib/date-anchor.js";
-import { dayRange, now as tzNow, toLocalDate } from "../lib/tz.js";
+import { dayRange, now as tzNow, toLocalDate, toLocalDateTime } from "../lib/tz.js";
 import { addDays as dfAddDays } from "date-fns";
 
 /** pg 驱动对 timestamp 列返回 Date 对象，安全转为本地日期字符串（Asia/Shanghai） */
@@ -119,9 +119,22 @@ export async function generateMorningBriefing(
   const todayScheduled = pendingTodos.filter((t) =>
     toLocalDateStr(t.scheduled_start) === today,
   );
-  const overdue = pendingTodos.filter((t) =>
-    t.scheduled_end ? new Date(t.scheduled_end) < now : false,
-  );
+  const todayScheduledIds = new Set(todayScheduled.map((t) => t.id));
+  // 逾期判断：日期级比较（toLocalDateStr），不用时间戳级比较
+  // carry_over 包含：
+  //   1. 有 scheduled_end 且 toLocalDateStr(scheduled_end) < today 的
+  //   2. 有 scheduled_start < today 但不在 todayScheduled 中的（排了过去日期但没完成）
+  const overdue = pendingTodos.filter((t) => {
+    // 已在今日排期中的不重复计入（用 ID 比较，避免引用比较脆弱性）
+    if (todayScheduledIds.has(t.id)) return false;
+    const endDate = toLocalDateStr(t.scheduled_end);
+    // 如果 scheduled_end >= today，任务仍在进行中，不算逾期
+    if (endDate && endDate >= today) return false;
+    if (endDate && endDate < today) return true;
+    const startDate = toLocalDateStr(t.scheduled_start);
+    if (startDate && startDate < today) return true;
+    return false;
+  });
 
   // 3. 昨日统计
   const yesterdayStats = await (async () => {
@@ -163,17 +176,16 @@ export async function generateMorningBriefing(
   const dayOfWeek = ["日", "一", "二", "三", "四", "五", "六"][now.getDay()];
   const dateStr = `${now.getMonth() + 1}月${now.getDate()}日 周${dayOfWeek}`;
 
-  // 优先展示：今日排期 > 逾期 > 最近创建的待办（避免古早待办占满列表）
-  const prioritizedTodos = [
-    ...todayScheduled,
-    ...overdue.filter((t) => !todayScheduled.includes(t)),
-    ...pendingTodos.filter((t) => !todayScheduled.includes(t) && !overdue.includes(t))
-      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()),
-  ].slice(0, 10);
+  // 只展示今日排期 + 逾期，移除全量 pending fallback（无排期的不出现在早报中）
+  // 截断优先级：今日排期优先，逾期其次，总计不超过 10 条
+  const maxTodos = 10;
+  const shownTodayScheduled = todayScheduled.slice(0, maxTodos);
+  const remainingSlots = maxTodos - shownTodayScheduled.length;
+  const shownOverdue = overdue.slice(0, Math.max(0, remainingSlots));
 
-  const todosText = prioritizedTodos.length > 0
-    ? prioritizedTodos.map((t) => `- ${t.text}`).join("\n")
-    : "暂无待办";
+  const todosText = shownTodayScheduled.length > 0
+    ? shownTodayScheduled.map((t) => `- ${t.text}`).join("\n")
+    : "今天没有排期的待办";
 
   const goalPulseText = goalPulseData.length > 0
     ? goalPulseData.map((g) => `- ${g.title}: ${g.done}/${g.total}`).join("\n")
@@ -199,9 +211,9 @@ export async function generateMorningBriefing(
     {
       role: "user",
       content: `今天: ${dateStr}
-待办(${pendingTodos.length}):
+今日待办(${shownTodayScheduled.length}):
 ${todosText}
-逾期(${overdue.length}): ${overdue.map((t) => t.text).join("、") || "无"}
+逾期(${shownOverdue.length}): ${shownOverdue.map((t) => t.text).join("、") || "无"}
 昨日: ${yesterdayStats.done}/${yesterdayStats.total} 完成
 目标脉搏:
 ${goalPulseText}`,
@@ -239,8 +251,8 @@ ${goalPulseText}`,
 
     const fallback: BriefingResult = {
       greeting: `早上好！今天是${dateStr}`,
-      today_focus: prioritizedTodos.slice(0, 5).map((t) => t.text),
-      carry_over: overdue.map((t) => t.text),
+      today_focus: shownTodayScheduled.map((t) => t.text),
+      carry_over: shownOverdue.map((t) => t.text),
       goal_pulse: [],
       stats: { yesterday_done: yesterdayStats.done, yesterday_total: yesterdayStats.total },
     };
@@ -294,13 +306,11 @@ export async function generateEveningSummary(
     console.warn(`[daily-loop] loadWarmContext failed, using defaults: ${err.message}`);
   }
 
-  // 2. 今日完成的待办
-  const allTodos = userId
-    ? await todoRepo.findByUser(userId)
-    : await todoRepo.findByDevice(deviceId);
-  const todayDone = allTodos.filter(
-    (t) => t.done && t.completed_at && toLocalDateStr(t.completed_at) === today,
-  );
+  // 2. 今日完成的待办（DB 层按 completed_at 范围过滤，避免全量查询）
+  const todayRng = dayRange(today);
+  const todayDone = userId
+    ? await todoRepo.findCompletedByUserInRange(userId, todayRng.start, todayRng.end)
+    : await todoRepo.findCompletedByDeviceInRange(deviceId, todayRng.start, todayRng.end);
 
   // 3. 今日新记录数
   let newRecordCount = 0;
@@ -323,11 +333,11 @@ export async function generateEveningSummary(
     toLocalDateStr(t.scheduled_start) === tomorrow,
   );
 
-  // 5. 加载今日日记（record + transcript）
+  // 5. 加载今日日记（record + transcript）— 含条目级摘要
   let diaryText = "";
+  let diaryEntrySummaries: string[] = [];  // 每条日记的 HH:mm + 前100字
   if (userId) {
     try {
-      const todayRng = dayRange(today);
       const records = await recordRepo.findByUserAndDateRange(userId, todayRng.start, todayRng.end);
       if (records.length > 0) {
         const transcripts = await transcriptRepo.findByRecordIds(records.map((r: any) => r.id));
@@ -338,6 +348,14 @@ export async function generateEveningSummary(
           if (parts.length > 0 && charCount + t.text.length > 2000) break;
           parts.push(charCount + t.text.length > 2000 ? t.text.slice(0, 2000) : t.text);
           charCount += parts[parts.length - 1].length;
+
+          // 构建条目级摘要：本地时间 HH:mm + 前100字
+          const record = records.find((r: any) => r.id === t.record_id);
+          const timeStr = record?.created_at
+            ? toLocalDateTime(record.created_at).split(" ")[1] ?? ""
+            : "";
+          const snippet = t.text.length > 100 ? t.text.slice(0, 100) + "..." : t.text;
+          diaryEntrySummaries.push(`${timeStr} ${snippet}`.trim());
         }
         diaryText = parts.join("\n\n");
       }
@@ -358,8 +376,9 @@ export async function generateEveningSummary(
   });
 
   const diaryInstruction = diaryText
-    ? `\n对日记进行洞察：
+    ? `\n从今日活动（完成的待办 + 日记内容）中提取"今日亮点"：
 - 准确描述用户今天的感受和状态（不是泛泛总结）
+- 从完成的事项和日记中提炼出最值得记住的亮点
 - 抽象出更高层级的模式/趋势
 - 如果有矛盾或有趣的点，指出来`
     : "";
@@ -370,7 +389,7 @@ export async function generateEveningSummary(
 {
   "headline": "≤30字，基于用户画像的温暖晚间回顾，语气俏皮自然。做了很多→跟他一起开心；什么都没做→'今天就这样了'比'无事项完成'真诚一万倍。绝对不要说'无事项完成''亦无待办遗留'这种公文腔。",
   "accomplishments": ["完成的事，具体到事项名"],
-  "insight": "日记洞察 — 准确描述+高阶抽象，2-4句话。无日记时返回空字符串。",
+  "insight": "今日亮点 — 从完成的事项和日记中提炼亮点，准确描述+高阶抽象，2-4句话。无日记时返回空字符串。",
   "affirmation": "一句真诚的每日肯定：基于今天实际做的事，不空洞。什么都没做→'今天休息也是一种选择'类型的接纳。语气匹配灵魂人格。",
   "tomorrow_preview": ["明日排期/待处理，最多3条"],
   "stats": {"done": 数字, "new_records": 数字}
@@ -378,6 +397,9 @@ export async function generateEveningSummary(
 完成为空时 accomplishments 返回空数组。无明日安排时 tomorrow_preview 返回空数组。${diaryInstruction}`;
 
   const diaryBlock = diaryText ? `\n今日日记:\n${diaryText}` : "";
+  const diaryEntryBlock = diaryEntrySummaries.length > 0
+    ? `\n日记条目:\n${diaryEntrySummaries.map((s) => `- ${s}`).join("\n")}`
+    : "";
 
   const messages: ChatMessage[] = [
     {
@@ -388,7 +410,7 @@ export async function generateEveningSummary(
       role: "user",
       content: `今日完成(${todayDone.length}): ${todayDone.map((t) => t.text).join("、") || "无"}
 今日记录: ${newRecordCount} 条
-明日排期(${tomorrowScheduled.length}): ${tomorrowScheduled.slice(0, 5).map((t) => t.text).join("、") || "无"}${diaryBlock}`,
+明日排期(${tomorrowScheduled.length}): ${tomorrowScheduled.slice(0, 5).map((t) => t.text).join("、") || "无"}${diaryEntryBlock}${diaryBlock}`,
     },
   ];
 

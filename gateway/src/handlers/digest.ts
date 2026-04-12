@@ -3,7 +3,6 @@
  *
  * 简化后的 digest 流程：
  * - 1 次 AI 调用提取 intend（待办/目标），不再拆解 Strike/Bond
- * - 生成 record-level embedding（整条文本向量化）
  * - 生成 content_hash（SHA256）
  * - Record 标记为 pending_compile（等待每日 Wiki 编译）
  * - 保留 Memory/Soul/Profile 更新
@@ -17,21 +16,19 @@ import {
   summaryRepo,
 } from "../db/repositories/index.js";
 import { buildIngestPrompt } from "./digest-prompt.js";
-import { projectIntendStrike } from "../cognitive/todo-projector.js";
-import { writeRecordEmbedding } from "../cognitive/embed-writer.js";
+import { projectIntendStrike, type IntendInput } from "../cognitive/todo-projector.js";
 import { getSession } from "../session/manager.js";
 import { updateSoul } from "../soul/manager.js";
 import { updateProfile } from "../profile/manager.js";
 import { mayProfileUpdate, safeParseJson } from "../lib/text-utils.js";
 import { shouldUpdateSoulStrict } from "../cognitive/self-evolution.js";
 import { today as tzToday, now as tzNow } from "../lib/tz.js";
-import type { StrikeEntry } from "../db/repositories/strike.js";
 import { processAtRoute } from "../cognitive/at-route-parser.js";
+import { classifyRecord } from "../cognitive/lightweight-classifier.js";
 
-/** AI 返回的 intend 数据结构 */
+/** AI 返回的 intend 数据结构（Phase 14.2: granularity 已移除，只提取 action） */
 interface RawIntend {
   text: string;
-  granularity?: "action" | "goal" | "project";
   scheduled_start?: string;
   deadline?: string;
   person?: string;
@@ -146,6 +143,19 @@ export async function digestRecords(
       }
     }
 
+    // ── Step 1.6: 轻量分类（无 @路由的 Record 异步 AI 分类）───
+    // Fire-and-forget：不阻塞主流程，失败静默忽略
+    for (const id of validIds) {
+      if (!atRouteResults.get(id)) {
+        const text = summaryByRecord.get(id) ?? transcriptByRecord.get(id);
+        if (text) {
+          classifyRecord(id, text, userId!).catch((e) =>
+            console.warn(`[digest] 轻量分类失败 for record ${id}:`, e),
+          );
+        }
+      }
+    }
+
     // ── Step 2: AI 调用 — 只提取 intend（1 次调用）─────────────
     const ingestMessages: ChatMessage[] = [
       { role: "system", content: buildIngestPrompt() },
@@ -174,37 +184,20 @@ export async function digestRecords(
       const dtProj = Date.now();
       await Promise.all(
         intends.map((intend) => {
-          // 构造 fake StrikeEntry 传给 projectIntendStrike（最小改动）
-          // id 为空：fake strike 不存在于 DB，todo-projector 中 strike_id 会跳过
-          const fakeStrike: StrikeEntry = {
-            id: "",
+          const input: IntendInput = {
             user_id: userId!,
             nucleus: intend.text,
             polarity: "intend",
+            source_id: validIds[0],
             field: {
-              granularity: intend.granularity ?? "action",
               scheduled_start: intend.scheduled_start,
               deadline: intend.deadline,
               person: intend.person,
               priority: intend.priority,
             },
-            confidence: 0.9,
-            source_id: validIds[0],
-            source_span: null,
-            source_type: "think",
-            salience: 1.0,
-            status: "active",
-            superseded_by: null,
-            is_cluster: false,
-            level: null,
-            origin: null,
-            domain: null,
-            embedding: null,
-            created_at: tzNow().toISOString(),
-            digested_at: null,
           };
 
-          return projectIntendStrike(fakeStrike, userId!).catch((e) =>
+          return projectIntendStrike(input, userId!).catch((e) =>
             console.error(`[digest] Failed to project intend "${intend.text.slice(0, 30)}" to todo:`, e),
           );
         }),
@@ -212,16 +205,7 @@ export async function digestRecords(
       console.log(`[digest][⏱ project-intend] ${Date.now() - dtProj}ms — ${intends.length} items`);
     }
 
-    // ── Step 5: 生成 record-level embedding ──────────────────────
-    // 对每条 record 的文本异步写入 embedding（火后不管）
-    for (const id of validIds) {
-      const text = summaryByRecord.get(id) ?? transcriptByRecord.get(id);
-      if (text) {
-        void writeRecordEmbedding(id, text);
-      }
-    }
-
-    // ── Step 6: 生成 content_hash + 标记 pending_compile ────────
+    // ── Step 5: 生成 content_hash + 标记 pending_compile ─────────
     for (const id of validIds) {
       const text = summaryByRecord.get(id) ?? transcriptByRecord.get(id) ?? "";
       const contentHash = crypto.createHash("sha256").update(text).digest("hex");
@@ -230,7 +214,7 @@ export async function digestRecords(
       );
     }
 
-    // ── Step 7: 记忆/Soul/Profile 更新 ──────────────────────────
+    // ── Step 6: 记忆/Soul/Profile 更新 ──────────────────────────
     try {
       const today = tzToday();
       const session = getSession(context.deviceId);

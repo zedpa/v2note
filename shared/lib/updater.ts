@@ -1,9 +1,14 @@
 /**
  * App update checker + OTA hot-update service.
- * All Capacitor imports are lazy to support web fallback.
+ * Capacitor: APK + OTA (@capgo/capacitor-updater)
+ * Harmony: AppGallery 商店更新（Phase 1）
+ * Web: no-op
+ * All Capacitor imports are lazy to support web/harmony fallback.
  */
 
 import { getGatewayHttpUrl } from "./gateway-url";
+import { getPlatform } from "./platform";
+import { getHarmonyBridge } from "./harmony-bridge";
 
 export interface UpdateInfo {
   type: "apk" | "ota";
@@ -40,24 +45,39 @@ function mapRelease(raw: any, type: "apk" | "ota"): UpdateInfo | null {
  * Returns null if no updates or not on native platform.
  */
 export async function checkForUpdate(): Promise<CheckResult | null> {
+  const currentPlatform = getPlatform();
+
+  // Web / Electron 不检查更新
+  if (currentPlatform !== "capacitor" && currentPlatform !== "harmony") return null;
+
   let platform = "android";
   let versionCode = 0;
   let versionName = "1.0.0";
 
-  try {
-    const { Capacitor } = await import("@capacitor/core");
-    if (!Capacitor.isNativePlatform()) return null;
-
-    const { App } = await import("@capacitor/app");
-    const info = await App.getInfo();
-    versionName = info.version; // e.g. "1.2.0"
-    versionCode = parseInt(info.build, 10) || 0; // e.g. "3" -> 3
-    const { Device } = await import("@capacitor/device");
-    const devInfo = await Device.getInfo();
-    platform = devInfo.platform;
-  } catch {
-    // Not on native — skip update check
-    return null;
+  // 鸿蒙分支：通过 JSBridge 获取版本号
+  if (currentPlatform === "harmony") {
+    try {
+      const bridge = getHarmonyBridge();
+      if (bridge?.system?.getVersion) {
+        versionName = await bridge.system.getVersion() || "1.0.0";
+      }
+      platform = "harmony";
+    } catch {
+      return null;
+    }
+  } else {
+    // Capacitor 分支（原有逻辑不变）
+    try {
+      const { App } = await import("@capacitor/app");
+      const info = await App.getInfo();
+      versionName = info.version;
+      versionCode = parseInt(info.build, 10) || 0;
+      const { Device } = await import("@capacitor/device");
+      const devInfo = await Device.getInfo();
+      platform = devInfo.platform;
+    } catch {
+      return null;
+    }
   }
 
   try {

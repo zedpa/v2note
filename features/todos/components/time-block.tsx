@@ -35,10 +35,12 @@ export function TimeBlock({ config, group, onToggle, onPress, onAdd, onPostpone,
       {/* Block Header */}
       <button
         onClick={() => setCollapsed(!collapsed)}
-        className="flex w-fit items-center gap-1.5 rounded-2xl px-3 py-1.5 text-[11px] font-semibold tracking-wider"
+        className="flex w-fit items-center gap-1.5 rounded-2xl border-l-[3px] px-3 py-1.5 text-[11px] font-semibold tracking-wider"
+        data-testid="time-slot-header"
         style={{
           background: `var(${config.colorVar})`,
           color: `var(${config.textColorVar})`,
+          borderLeftColor: `var(${config.textColorVar})`,
         }}
       >
         <Icon className="h-3.5 w-3.5" />

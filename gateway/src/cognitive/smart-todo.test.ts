@@ -1,35 +1,21 @@
 /**
  * smart-todo spec 测试
- * 覆盖场景 1,5,6,7: 自然语言创建、粒度判断、时间/优先级提取、重复检测
+ * 覆盖场景 1,5,6,7: 自然语言创建待办、粒度判断、时间/优先级提取、重复检测
  * 场景 2,3,4 依赖 Agent 工具层，在 agent-tool-layer 测试中覆盖
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import type { StrikeEntry } from "../db/repositories/strike.js";
+import type { IntendInput } from "./todo-projector.js";
 import type { Todo } from "../db/repositories/todo.js";
 
 // ── Mock helpers ──────────────────────────────────────────────────────
 
-function makeStrike(overrides: Partial<StrikeEntry> = {}): StrikeEntry {
+function makeIntend(overrides: Partial<IntendInput> = {}): IntendInput {
   return {
-    id: overrides.id ?? crypto.randomUUID(),
     user_id: "user-1",
     nucleus: "下季度降成本20%",
     polarity: "intend",
-    field: {},
     source_id: "record-1",
-    source_span: null,
-    source_type: "think",
-    confidence: 0.8,
-    salience: 1.0,
-    status: "active",
-    superseded_by: null,
-    is_cluster: false,
-    level: 1,
-    origin: null,
-    domain: null,
-    embedding: null,
-    created_at: new Date().toISOString(),
-    digested_at: null,
+    field: {},
     ...overrides,
   };
 }
@@ -49,18 +35,6 @@ vi.mock("../db/repositories/todo.js", () => ({
   update: (...args: any[]) => mockTodoUpdate(...args),
   findPendingByUser: (...args: any[]) => mockTodoFindPendingByUser(...args),
   findByUser: vi.fn().mockResolvedValue([]),
-}));
-
-const mockStrikeUpdate = vi.fn();
-const mockStrikeFindById = vi.fn();
-const mockStrikeUpdateStatus = vi.fn();
-const mockStrikeFindByUser = vi.fn().mockResolvedValue([]);
-
-vi.mock("../db/repositories/strike.js", () => ({
-  update: (...args: any[]) => mockStrikeUpdate(...args),
-  findById: (...args: any[]) => mockStrikeFindById(...args),
-  updateStatus: (...args: any[]) => mockStrikeUpdateStatus(...args),
-  findByUser: (...args: any[]) => mockStrikeFindByUser(...args),
 }));
 
 const mockGoalCreate = vi.fn();
@@ -99,13 +73,11 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
-describe("场景 1: 自然语言创建待办 — intend Strike 结构化投影", () => {
-  it("should_extract_scheduled_start_from_strike_field", async () => {
-    const strike = makeStrike({
-      id: "s1",
+describe("场景 1: 自然语言创建待办 — intend 结构化投影", () => {
+  it("should_extract_scheduled_start_from_intend_field", async () => {
+    const input = makeIntend({
       nucleus: "明天下午3点找张总确认报价",
       field: {
-        granularity: "action",
         scheduled_start: "2026-03-26T15:00:00",
         person: "张总",
         priority: "high",
@@ -115,7 +87,7 @@ describe("场景 1: 自然语言创建待办 — intend Strike 结构化投影",
     const createdTodo: Todo = {
       id: "todo-1",
       record_id: "record-1",
-      text: strike.nucleus,
+      text: input.nucleus,
       done: false,
       estimated_minutes: null,
       scheduled_start: "2026-03-26T15:00:00",
@@ -123,38 +95,31 @@ describe("场景 1: 自然语言创建待办 — intend Strike 结构化投影",
       priority: 5,
       completed_at: null,
       created_at: new Date().toISOString(),
-      strike_id: "s1",
+      strike_id: null,
     };
     mockTodoCreate.mockResolvedValue(createdTodo);
     mockTodoFindPendingByUser.mockResolvedValue([]); // 无重复
 
-    const result = await projectIntendStrike(strike, "user-1");
+    const result = await projectIntendStrike(input, "user-1");
 
     expect(mockTodoCreate).toHaveBeenCalledTimes(1);
     const arg = mockTodoCreate.mock.calls[0][0];
-    expect(arg.strike_id).toBe("s1");
     expect(arg.text).toBe("明天下午3点找张总确认报价");
     expect(result).not.toBeNull();
   });
 
   it("should_set_high_priority_when_field_indicates_urgent", async () => {
-    const strike = makeStrike({
-      id: "s2",
+    const input = makeIntend({
       nucleus: "找张总确认报价，挺急的",
-      field: {
-        granularity: "action",
-        priority: "high",
-      },
+      field: { priority: "high" },
     });
 
     mockTodoCreate.mockResolvedValue({ id: "t1" } as any);
     mockTodoFindPendingByUser.mockResolvedValue([]);
 
-    await projectIntendStrike(strike, "user-1");
+    await projectIntendStrike(input, "user-1");
 
-    const arg = mockTodoCreate.mock.calls[0][0];
-    // 从 field.priority 解析
-    const parsed = parseIntendField(strike.field);
+    const parsed = parseIntendField(input.field!);
     expect(parsed.priority).toBe(5);
   });
 
@@ -171,8 +136,7 @@ describe("场景 1: 自然语言创建待办 — intend Strike 结构化投影",
 
 describe("场景 5: 粒度自动判断", () => {
   it("should_create_todo_when_granularity_is_action", async () => {
-    const strike = makeStrike({
-      id: "s-action",
+    const input = makeIntend({
       nucleus: "明天打个电话给张总",
       field: { granularity: "action" },
     });
@@ -180,52 +144,45 @@ describe("场景 5: 粒度自动判断", () => {
     mockTodoCreate.mockResolvedValue({ id: "t1" } as any);
     mockTodoFindPendingByUser.mockResolvedValue([]);
 
-    const result = await projectIntendStrike(strike, "user-1");
+    const result = await projectIntendStrike(input, "user-1");
 
     expect(mockTodoCreate).toHaveBeenCalledTimes(1);
-    // action 粒度 → 创建 todo，不创建 goal
     expect(mockGoalCreate).not.toHaveBeenCalled();
     expect(result).not.toBeNull();
   });
 
-  it("should_create_goal_when_granularity_is_goal", async () => {
-    const strike = makeStrike({
-      id: "s-goal",
+  it("should_create_action_todo_when_granularity_is_goal_phase14_2", async () => {
+    const input = makeIntend({
       nucleus: "今年要把身体搞好",
       field: { granularity: "goal" },
     });
 
-    mockGoalCreate.mockResolvedValue({ id: "g1" } as any);
+    mockTodoCreate.mockResolvedValue({ id: "t-goal" } as any);
     mockTodoFindPendingByUser.mockResolvedValue([]);
 
-    const result = await projectIntendStrike(strike, "user-1");
+    const result = await projectIntendStrike(input, "user-1");
 
-    // goal 粒度 → 创建 goal，不创建 todo
-    expect(mockGoalCreate).toHaveBeenCalledTimes(1);
-    const goalArg = mockGoalCreate.mock.calls[0][0];
-    expect(goalArg.title).toBe("今年要把身体搞好");
-    expect(mockTodoCreate).not.toHaveBeenCalled();
+    expect(mockGoalCreate).not.toHaveBeenCalled();
+    expect(mockTodoCreate).toHaveBeenCalledTimes(1);
   });
 
-  it("should_create_goal_when_granularity_is_project", async () => {
-    const strike = makeStrike({
-      id: "s-proj",
+  it("should_create_action_todo_when_granularity_is_project_phase14_2", async () => {
+    const input = makeIntend({
       nucleus: "做一个供应链管理系统",
       field: { granularity: "project" },
     });
 
-    mockGoalCreate.mockResolvedValue({ id: "g2" } as any);
+    mockTodoCreate.mockResolvedValue({ id: "t-proj" } as any);
     mockTodoFindPendingByUser.mockResolvedValue([]);
 
-    const result = await projectIntendStrike(strike, "user-1");
+    const result = await projectIntendStrike(input, "user-1");
 
-    expect(mockGoalCreate).toHaveBeenCalledTimes(1);
-    expect(mockTodoCreate).not.toHaveBeenCalled();
+    expect(mockGoalCreate).not.toHaveBeenCalled();
+    expect(mockTodoCreate).toHaveBeenCalledTimes(1);
   });
 
   it("should_default_to_action_when_no_granularity", async () => {
-    const strike = makeStrike({
-      id: "s-default",
+    const input = makeIntend({
       nucleus: "买菜",
       field: {},
     });
@@ -233,7 +190,7 @@ describe("场景 5: 粒度自动判断", () => {
     mockTodoCreate.mockResolvedValue({ id: "t2" } as any);
     mockTodoFindPendingByUser.mockResolvedValue([]);
 
-    await projectIntendStrike(strike, "user-1");
+    await projectIntendStrike(input, "user-1");
 
     expect(mockTodoCreate).toHaveBeenCalledTimes(1);
     expect(mockGoalCreate).not.toHaveBeenCalled();

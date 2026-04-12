@@ -7,6 +7,8 @@
 import * as wikiPageRepo from "../db/repositories/wiki-page.js";
 import * as wikiPageRecordRepo from "../db/repositories/wiki-page-record.js";
 import type { WikiPage } from "../db/repositories/wiki-page.js";
+import { estimateTokens } from "./lightweight-classifier.js";
+import { checkAndTriggerCompile } from "./compile-trigger.js";
 
 /** @路由正则 — 匹配中文/英文/数字/下划线/斜杠 */
 const AT_ROUTE_REGEX = /@([\u4e00-\u9fa5a-zA-Z0-9_/]+)/g;
@@ -109,6 +111,14 @@ export async function processAtRoute(
 
   // 立即建立关联（不等编译）
   await wikiPageRecordRepo.link(page.id, recordId);
+
+  // 更新 token_count（返回新值）并检查编译阈值（Phase 14.5）
+  const tokenCount = estimateTokens(text);
+  const newTokenCount = await wikiPageRepo.incrementTokenCount(page.id, tokenCount);
+  // fire-and-forget: 异步检查是否触发编译（传入已知 token_count 省一次查询）
+  void checkAndTriggerCompile(page.id, userId, newTokenCount).catch((e) =>
+    console.warn(`[at-route] 编译触发检查失败:`, e),
+  );
 
   return {
     targetPath,

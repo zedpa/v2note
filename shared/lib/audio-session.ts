@@ -1,8 +1,11 @@
 /**
- * Capacitor 音频会话管理封装。
- * 原生环境: 通过自定义 Capacitor 插件控制 AVAudioSession (iOS) / AudioFocus (Android)
- * Web 环境: 静默降级（no-op）
+ * 音频会话管理封装。
+ * Capacitor: 通过自定义插件控制 AVAudioSession (iOS) / AudioFocus (Android)
+ * Harmony: no-op（鸿蒙 OHAudio 自动管理音频焦点）
+ * Web: 静默降级（no-op）
  */
+
+import { getPlatform } from "./platform";
 
 interface AudioSessionPlugin {
   /** 激活录音会话，打断其他音频 */
@@ -11,7 +14,7 @@ interface AudioSessionPlugin {
   deactivate(): Promise<void>;
 }
 
-/** Web 降级实现 — 所有方法均为 no-op */
+/** Web/Harmony 降级实现 — 所有方法均为 no-op */
 const noopPlugin: AudioSessionPlugin = {
   activate: () => Promise.resolve(),
   deactivate: () => Promise.resolve(),
@@ -19,23 +22,26 @@ const noopPlugin: AudioSessionPlugin = {
 
 /**
  * 延迟初始化：首次调用时检测平台，
- * 原生环境通过 registerPlugin 获取桥接对象，
- * Web 环境使用 no-op。
+ * Capacitor 环境通过 registerPlugin 获取桥接对象，
+ * 其他环境使用 no-op。
  */
 let _plugin: AudioSessionPlugin | null = null;
 
 async function getPlugin(): Promise<AudioSessionPlugin> {
   if (_plugin) return _plugin;
 
+  const platform = getPlatform();
+
+  // 鸿蒙：OHAudio API 自动管理音频焦点，不需要手动控制会话
+  if (platform !== "capacitor") {
+    _plugin = noopPlugin;
+    return _plugin;
+  }
+
   try {
-    const { Capacitor, registerPlugin } = await import("@capacitor/core");
-    if (Capacitor.isNativePlatform()) {
-      _plugin = registerPlugin<AudioSessionPlugin>("AudioSession");
-    } else {
-      _plugin = noopPlugin;
-    }
+    const { registerPlugin } = await import("@capacitor/core");
+    _plugin = registerPlugin<AudioSessionPlugin>("AudioSession");
   } catch {
-    // Capacitor 不可用（纯 Web 环境），使用 no-op
     _plugin = noopPlugin;
   }
 

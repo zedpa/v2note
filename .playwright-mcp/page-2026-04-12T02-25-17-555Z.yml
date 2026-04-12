@@ -1,0 +1,119 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e128]:
+    - banner [ref=e129]:
+      - generic [ref=e130]:
+        - button "打开侧边栏" [ref=e131] [cursor=pointer]: E
+        - generic [ref=e132]:
+          - button "日记" [ref=e133] [cursor=pointer]
+          - button "待办" [ref=e135] [cursor=pointer]
+        - generic [ref=e136]:
+          - button "AI 聊天" [ref=e137] [cursor=pointer]:
+            - img [ref=e138]
+          - button "搜索" [ref=e140] [cursor=pointer]:
+            - img [ref=e141]
+    - main [ref=e144]:
+      - generic [ref=e146]:
+        - generic [ref=e147]:
+          - generic [ref=e148]:
+            - generic [ref=e149]: "4"
+            - generic [ref=e150]: 4月 周六
+          - generic [ref=e151]:
+            - button "11:14 后天下午两点去银行办信用卡" [ref=e152] [cursor=pointer]:
+              - generic [ref=e154]:
+                - generic [ref=e155]:
+                  - generic [ref=e157]: 11:14
+                  - button [ref=e158]:
+                    - img [ref=e159]
+                - paragraph [ref=e166]: 后天下午两点去银行办信用卡
+            - button "11:12 开会讨论了项目延期的问题老板不太高兴，提醒我明天上午给客户发邮件解释一下" [ref=e167] [cursor=pointer]:
+              - generic [ref=e169]:
+                - generic [ref=e170]:
+                  - generic [ref=e172]: 11:12
+                  - button [ref=e173]:
+                    - img [ref=e174]
+                - paragraph [ref=e181]: 开会讨论了项目延期的问题老板不太高兴，提醒我明天上午给客户发邮件解释一下
+            - button "11:11 明天下午三点一刻和李总开会" [ref=e182] [cursor=pointer]:
+              - generic [ref=e184]:
+                - generic [ref=e185]:
+                  - generic [ref=e187]: 11:11
+                  - button [ref=e188]:
+                    - img [ref=e189]
+                - paragraph [ref=e196]: 明天下午三点一刻和李总开会
+            - button "11:09 今天晚上八点半提醒我吃药" [ref=e197] [cursor=pointer]:
+              - generic [ref=e199]:
+                - generic [ref=e200]:
+                  - generic [ref=e202]: 11:09
+                  - button [ref=e203]:
+                    - img [ref=e204]
+                - paragraph [ref=e211]: 今天晚上八点半提醒我吃药
+            - button "11:08 我觉得这个方案不太靠谱，风险太大了" [ref=e212] [cursor=pointer]:
+              - generic [ref=e214]:
+                - generic [ref=e215]:
+                  - generic [ref=e217]: 11:08
+                  - button [ref=e218]:
+                    - img [ref=e219]
+                - paragraph [ref=e226]: 我觉得这个方案不太靠谱，风险太大了
+            - button "11:07 好累啊今天加班到十点" [ref=e227] [cursor=pointer]:
+              - generic [ref=e229]:
+                - generic [ref=e230]:
+                  - generic [ref=e232]: 11:07
+                  - button [ref=e233]:
+                    - img [ref=e234]
+                - paragraph [ref=e241]: 好累啊今天加班到十点
+            - button "11:05 铝价又涨了百分之五" [ref=e242] [cursor=pointer]:
+              - generic [ref=e244]:
+                - generic [ref=e245]:
+                  - generic [ref=e247]: 11:05
+                  - button [ref=e248]:
+                    - img [ref=e249]
+                - paragraph [ref=e256]: 铝价又涨了百分之五
+        - generic [ref=e257]:
+          - generic [ref=e258]:
+            - generic [ref=e259]: "31"
+            - generic [ref=e260]: 3月 周二
+          - generic [ref=e261]:
+            - button "12:44 · 重庆 出行 创建3点去重庆的待办" [ref=e262] [cursor=pointer]:
+              - generic [ref=e264]:
+                - generic [ref=e265]:
+                  - generic [ref=e266]:
+                    - generic [ref=e267]: 12:44
+                    - generic [ref=e268]: ·
+                    - generic [ref=e269]: 重庆
+                    - generic [ref=e270]: 出行
+                  - button [ref=e271]:
+                    - img [ref=e272]
+                - paragraph [ref=e279]: 创建3点去重庆的待办
+            - button "09:32 · 0:13 输了让他了，直接了，把个了，1 2 3 4 5 6 7 8 9 10，明天上山打老虎。 0:00 原文" [ref=e280] [cursor=pointer]:
+              - generic [ref=e282]:
+                - generic [ref=e283]:
+                  - generic [ref=e284]:
+                    - generic [ref=e285]: 09:32
+                    - generic [ref=e286]: ·
+                    - img [ref=e287]
+                    - generic [ref=e290]: 0:13
+                  - button [ref=e291]:
+                    - img [ref=e292]
+                - generic [ref=e296]:
+                  - paragraph [ref=e299]: 输了让他了，直接了，把个了，1 2 3 4 5 6 7 8 9 10，明天上山打老虎。
+                  - generic [ref=e301]:
+                    - generic [ref=e303]:
+                      - button [ref=e304]:
+                        - img [ref=e305]
+                      - generic [ref=e328]: 0:00
+                    - button "原文" [ref=e329]:
+                      - text: 原文
+                      - img [ref=e330]
+            - button "09:24 测试创建日记" [ref=e332] [cursor=pointer]:
+              - generic [ref=e334]:
+                - generic [ref=e335]:
+                  - generic [ref=e337]: 09:24
+                  - button [ref=e338]:
+                    - img [ref=e339]
+                - paragraph [ref=e346]: 测试创建日记
+    - button [ref=e348] [cursor=pointer]:
+      - img [ref=e349]
+    - button "Choose File" [ref=e352]
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=e65] [cursor=pointer]:
+    - img [ref=e66]
+  - alert [ref=e69]

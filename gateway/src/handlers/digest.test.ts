@@ -3,7 +3,6 @@
  *
  * 核心变更：
  * - 去掉 Strike/Bond 拆解，只保留 intend 抽取
- * - 生成 record-level embedding
  * - 生成 content_hash（SHA256）
  * - Record 标记为 pending_compile
  */
@@ -32,9 +31,6 @@ vi.mock("../db/repositories/index.js", () => ({
   summaryRepo: {
     findByRecordId: vi.fn().mockResolvedValue(null),
   },
-  strikeRepo: {},
-  bondRepo: {},
-  snapshotRepo: {},
 }));
 
 vi.mock("./digest-prompt.js", () => ({
@@ -45,9 +41,7 @@ vi.mock("../cognitive/todo-projector.js", () => ({
   projectIntendStrike: vi.fn().mockResolvedValue(null),
 }));
 
-vi.mock("../cognitive/embed-writer.js", () => ({
-  writeRecordEmbedding: vi.fn().mockResolvedValue(undefined),
-}));
+// Phase 14.12: writeRecordEmbedding 已移除，Record 入库不再生成 embedding
 
 vi.mock("../session/manager.js", () => ({
   getSession: vi.fn().mockReturnValue({
@@ -91,7 +85,6 @@ import {
   summaryRepo,
 } from "../db/repositories/index.js";
 import { projectIntendStrike } from "../cognitive/todo-projector.js";
-import { writeRecordEmbedding } from "../cognitive/embed-writer.js";
 
 const mockChatCompletion = vi.mocked(chatCompletion);
 const mockClaimForDigest = vi.mocked(recordRepo.claimForDigest);
@@ -101,7 +94,6 @@ const mockFindSummary = vi.mocked(summaryRepo.findByRecordId);
 const mockUpdateDomain = vi.mocked(recordRepo.updateDomain);
 const mockUpdateCompileStatus = vi.mocked(recordRepo.updateCompileStatus);
 const mockProjectIntendStrike = vi.mocked(projectIntendStrike);
-const mockWriteRecordEmbedding = vi.mocked(writeRecordEmbedding);
 
 // ── 辅助工厂 ──────────────────────────────────────────────────────────
 
@@ -166,11 +158,6 @@ describe("digestRecords (Phase 2 — Ingest 改造)", () => {
     );
     // Phase 11: domain 分配已移除，不应调用 updateDomain
     expect(mockUpdateDomain).not.toHaveBeenCalled();
-    // 应生成 record embedding
-    expect(mockWriteRecordEmbedding).toHaveBeenCalledWith(
-      recordId,
-      expect.any(String), // text content
-    );
   });
 
   it("should_create_todo_and_mark_pending_compile_when_intend_extracted", async () => {
@@ -199,16 +186,15 @@ describe("digestRecords (Phase 2 — Ingest 改造)", () => {
 
     await digestRecords([recordId], { deviceId: "dev-1", userId: "user-1" });
 
-    // 应调用 projectIntendStrike（构造 fake StrikeEntry）
+    // 应调用 projectIntendStrike（构造 IntendInput）
     expect(mockProjectIntendStrike).toHaveBeenCalledTimes(1);
-    const fakeStrike = mockProjectIntendStrike.mock.calls[0][0];
-    expect(fakeStrike.nucleus).toBe("明天下午3点找张总确认报价");
-    expect(fakeStrike.polarity).toBe("intend");
-    expect(fakeStrike.source_id).toBe(recordId);
-    expect(fakeStrike.field.granularity).toBe("action");
-    expect(fakeStrike.field.scheduled_start).toBe("2026-04-10T15:00:00");
-    expect(fakeStrike.field.person).toBe("张总");
-    expect(fakeStrike.field.priority).toBe("high");
+    const input = mockProjectIntendStrike.mock.calls[0][0];
+    expect(input.nucleus).toBe("明天下午3点找张总确认报价");
+    expect(input.polarity).toBe("intend");
+    expect(input.source_id).toBe(recordId);
+    expect(input.field!.scheduled_start).toBe("2026-04-10T15:00:00");
+    expect(input.field!.person).toBe("张总");
+    expect(input.field!.priority).toBe("high");
 
     // 应标记 pending_compile
     expect(mockUpdateCompileStatus).toHaveBeenCalledWith(
@@ -217,11 +203,6 @@ describe("digestRecords (Phase 2 — Ingest 改造)", () => {
       expect.any(String),
     );
 
-    // 应生成 record embedding
-    expect(mockWriteRecordEmbedding).toHaveBeenCalledWith(
-      recordId,
-      expect.stringContaining("明天下午3点找张总确认报价"),
-    );
   });
 
   it("should_generate_correct_content_hash_sha256", async () => {
@@ -271,7 +252,6 @@ describe("digestRecords (Phase 2 — Ingest 改造)", () => {
       "pending",
       expect.any(String),
     );
-    expect(mockWriteRecordEmbedding).toHaveBeenCalled();
   });
 
   it("should_not_create_strike_or_bond_in_new_digest_flow", async () => {
@@ -379,7 +359,8 @@ describe("digestRecords (Phase 2 — Ingest 改造)", () => {
     ).resolves.toBeUndefined();
   });
 
-  it("should_project_goal_intend_with_correct_fake_strike", async () => {
+  it("should_project_intend_without_granularity_in_fake_strike_field", async () => {
+    // Phase 14.2: AI 不再返回 granularity，digest 不再传递 granularity 到 field
     const recordId = "rec-goal-1";
     mockClaimForDigest.mockResolvedValue([recordId]);
     mockFindById.mockResolvedValue(makeRecord(recordId) as any);
@@ -392,7 +373,7 @@ describe("digestRecords (Phase 2 — Ingest 改造)", () => {
       content: JSON.stringify({
         domain: "健康",
         intends: [
-          { text: "今年把身体搞好", granularity: "goal" },
+          { text: "今年把身体搞好" },
         ],
       }),
     } as any);
@@ -400,15 +381,34 @@ describe("digestRecords (Phase 2 — Ingest 改造)", () => {
     await digestRecords([recordId], { deviceId: "dev-1", userId: "user-1" });
 
     expect(mockProjectIntendStrike).toHaveBeenCalledTimes(1);
-    const fakeStrike = mockProjectIntendStrike.mock.calls[0][0];
-    expect(fakeStrike.polarity).toBe("intend");
-    expect(fakeStrike.field.granularity).toBe("goal");
-    expect(fakeStrike.source_id).toBe(recordId);
-    expect(fakeStrike.user_id).toBe("user-1");
-    expect(fakeStrike.confidence).toBe(0.9);
-    expect(fakeStrike.salience).toBe(1.0);
-    // fake strike should have a valid UUID id
-    expect(fakeStrike.id).toBeDefined();
-    expect(typeof fakeStrike.id).toBe("string");
+    const input = mockProjectIntendStrike.mock.calls[0][0];
+    expect(input.polarity).toBe("intend");
+    expect(input.source_id).toBe(recordId);
+    expect(input.user_id).toBe("user-1");
+  });
+
+  // Phase 14.12: 验证不再生成 record embedding
+  it("should_not_call_writeRecordEmbedding_after_phase14_12", async () => {
+    const recordId = "rec-no-embed";
+    mockClaimForDigest.mockResolvedValue([recordId]);
+    mockFindById.mockResolvedValue(makeRecord(recordId) as any);
+    mockFindByRecordIds.mockResolvedValue([
+      makeTranscript(recordId, "测试不生成 embedding"),
+    ] as any);
+    mockFindSummary.mockResolvedValue(null);
+
+    mockChatCompletion.mockResolvedValue({
+      content: JSON.stringify({ intends: [] }),
+    } as any);
+
+    await digestRecords([recordId], { deviceId: "dev-1", userId: "user-1" });
+
+    // writeRecordEmbedding 模块已被移除，不应有任何 embedding 写入
+    // 验证 pending_compile 正常标记
+    expect(mockUpdateCompileStatus).toHaveBeenCalledWith(
+      recordId,
+      "pending",
+      expect.any(String),
+    );
   });
 });

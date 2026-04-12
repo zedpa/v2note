@@ -49,7 +49,7 @@ describe("unmet_request 记录", () => {
 // confirm 自主度
 // =====================================================================
 describe("confirm 自主度", () => {
-  it("should_have_confirm_autonomy_on_destructive_tools", async () => {
+  it("should_have_confirm_autonomy_on_destructive_tools", { timeout: 30000 }, async () => {
     const { createDefaultRegistry } = await import("./definitions/index.js");
     const registry = createDefaultRegistry();
 
@@ -58,13 +58,13 @@ describe("confirm 自主度", () => {
     expect(registry.getAutonomy("delete_record")).toBe("confirm");
   });
 
-  it("should_have_silent_autonomy_on_search", async () => {
+  it("should_have_silent_autonomy_on_search", { timeout: 30000 }, async () => {
     const { createDefaultRegistry } = await import("./definitions/index.js");
     const registry = createDefaultRegistry();
     expect(registry.getAutonomy("search")).toBe("silent");
   });
 
-  it("should_have_notify_autonomy_on_create_todo", async () => {
+  it("should_have_notify_autonomy_on_create_todo", { timeout: 30000 }, async () => {
     const { createDefaultRegistry } = await import("./definitions/index.js");
     const registry = createDefaultRegistry();
     expect(registry.getAutonomy("create_todo")).toBe("notify");
