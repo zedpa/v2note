@@ -76,7 +76,7 @@ describe("page-authorization", () => {
     it("should_update_status_to_accepted_when_suggestion_exists", async () => {
       mockExecute.mockResolvedValue(undefined);
 
-      await acceptSuggestion(SUGGESTION_ID);
+      await acceptSuggestion(SUGGESTION_ID, "test-user-id");
 
       expect(mockExecute).toHaveBeenCalledWith(
         expect.stringContaining("status = 'accepted'"),
@@ -91,7 +91,7 @@ describe("page-authorization", () => {
     it("should_update_status_to_rejected_when_suggestion_exists", async () => {
       mockExecute.mockResolvedValue(undefined);
 
-      await rejectSuggestion(SUGGESTION_ID);
+      await rejectSuggestion(SUGGESTION_ID, "test-user-id");
 
       expect(mockExecute).toHaveBeenCalledWith(
         expect.stringContaining("status = 'rejected'"),

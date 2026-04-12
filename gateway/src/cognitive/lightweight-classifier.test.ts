@@ -87,7 +87,7 @@ function makePage(overrides: Partial<{
 describe("lightweight-classifier", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockIncrementTokenCount.mockResolvedValue(undefined);
+    mockIncrementTokenCount.mockResolvedValue(0);
     mockLink.mockResolvedValue(undefined);
     mockMergeMetadata.mockResolvedValue(undefined);
   });

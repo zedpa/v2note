@@ -489,7 +489,7 @@ async function issueTokens(userId: string, deviceId?: string) {
   await refreshTokenRepo.create({
     user_id: userId,
     token_hash: tokenHash,
-    device_id: deviceId ?? null,
+    device_id: deviceId ?? undefined,
     expires_at: expiresAt,
   });
 
