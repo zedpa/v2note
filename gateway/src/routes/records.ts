@@ -1,5 +1,5 @@
 import type { Router } from "../router.js";
-import { readBody, sendJson, getDeviceId, getUserId } from "../lib/http-helpers.js";
+import { readBody, sendJson, sendError, getUserId } from "../lib/http-helpers.js";
 import {
   recordRepo,
   transcriptRepo,
@@ -34,20 +34,14 @@ export function registerRecordRoutes(router: Router) {
 
   // List records (with summary + tags)
   router.get("/api/v1/records", async (req, res, _params, query) => {
-    const deviceId = getDeviceId(req);
     const userId = getUserId(req);
+    if (!userId) { sendError(res, "Unauthorized", 401); return; }
     const limit = parseInt(query.limit ?? "100", 10);
     const offset = parseInt(query.offset ?? "0", 10);
     const notebook = query.notebook;
     const wikiPageId = query.wiki_page_id;
 
     let records;
-
-    // wiki_page_id 过滤需要 userId（通过 JWT 认证），无 userId 时返回 401
-    if (wikiPageId && !userId) {
-      sendJson(res, { error: "Unauthorized" }, 401);
-      return;
-    }
 
     if (wikiPageId === "__inbox__" && userId) {
       // 收件箱：未关联任何 wiki page 的 records
@@ -71,19 +65,12 @@ export function registerRecordRoutes(router: Router) {
         [userId, wikiPageId, limit, offset],
       );
     } else {
-      records = userId
-        ? await recordRepo.findByUser(userId, {
-            archived: false,
-            limit,
-            offset,
-            notebook: notebook !== undefined ? notebook : undefined,
-          })
-        : await recordRepo.findByDevice(deviceId, {
-            archived: false,
-            limit,
-            offset,
-            notebook: notebook !== undefined ? notebook : undefined,
-          });
+      records = await recordRepo.findByUser(userId, {
+        archived: false,
+        limit,
+        offset,
+        notebook: notebook !== undefined ? notebook : undefined,
+      });
     }
 
     // 批量加载关联数据（3 次查询，替代 N+1）
@@ -132,16 +119,14 @@ export function registerRecordRoutes(router: Router) {
 
   // Search records (must be before :id to avoid "search" being captured as an id)
   router.get("/api/v1/records/search", async (req, res, _params, query) => {
-    const deviceId = getDeviceId(req);
     const userId = getUserId(req);
+    if (!userId) { sendError(res, "Unauthorized", 401); return; }
     const q = query.q ?? "";
     if (!q) {
       sendJson(res, []);
       return;
     }
-    const records = userId
-      ? await recordRepo.searchByUser(userId, q)
-      : await recordRepo.search(deviceId, q);
+    const records = await recordRepo.searchByUser(userId, q);
 
     // Batch load summaries and tags (same as list route)
     const ids = records.map((r) => r.id);
@@ -200,8 +185,8 @@ export function registerRecordRoutes(router: Router) {
 
   // Create record
   router.post("/api/v1/records", async (req, res) => {
-    const deviceId = getDeviceId(req);
     const userId = getUserId(req);
+    if (!userId) { sendError(res, "Unauthorized", 401); return; }
     const body = await readBody<{
       status?: string;
       source?: string;
@@ -209,14 +194,14 @@ export function registerRecordRoutes(router: Router) {
       duration_seconds?: number;
       notebook?: string;
     }>(req);
-    const record = await recordRepo.create({ device_id: deviceId, user_id: userId ?? undefined, ...body });
+    const record = await recordRepo.create({ device_id: undefined, user_id: userId, ...body });
     sendJson(res, { id: record.id }, 201);
   });
 
   // Retry audio: receive WAV, transcribe, process
   router.post("/api/v1/records/:id/retry-audio", async (req, res, params) => {
-    const deviceId = getDeviceId(req);
     const userId = getUserId(req);
+    if (!userId) { sendError(res, "Unauthorized", 401); return; }
 
     const record = await recordRepo.findById(params.id);
     if (!record) {
@@ -246,7 +231,7 @@ export function registerRecordRoutes(router: Router) {
 
       // 查询热词
       const { getVocabularyIdForDevice } = await import("../cognitive/vocabulary-sync.js");
-      const vocabularyId = await getVocabularyIdForDevice(deviceId);
+      const vocabularyId = await getVocabularyIdForDevice(userId);
 
       // 转写
       const { transcribeAudioFile } = await import("../handlers/asr.js");
@@ -271,7 +256,7 @@ export function registerRecordRoutes(router: Router) {
         if (isOssConfigured()) {
           // WAV 去掉 44 字节 header 得到 PCM
           const pcmData = wavBuffer.subarray(44);
-          const audioUrl = await uploadPCM(deviceId, [pcmData]);
+          const audioUrl = await uploadPCM(userId, [pcmData]);
           await recordRepo.updateFields(record.id, { audio_path: audioUrl });
         }
       } catch (err) {
@@ -281,8 +266,8 @@ export function registerRecordRoutes(router: Router) {
       // 触发 AI 处理（后台）
       processEntry({
         text: transcript,
-        deviceId,
-        userId: userId ?? undefined,
+        deviceId: userId,
+        userId,
         recordId: record.id,
         notebook: record.notebook ?? undefined,
         forceCommand: false,
@@ -301,8 +286,8 @@ export function registerRecordRoutes(router: Router) {
 
   // Create manual note (content + optional AI processing)
   router.post("/api/v1/records/manual", async (req, res) => {
-    const deviceId = getDeviceId(req);
-    const userId = getUserId(req) ?? undefined;
+    const userId = getUserId(req);
+    if (!userId) { sendError(res, "Unauthorized", 401); return; }
     const { content, tags, useAi, notebook } = await readBody<{
       content: string;
       tags?: string[];
@@ -311,7 +296,7 @@ export function registerRecordRoutes(router: Router) {
     }>(req);
 
     const record = await recordRepo.create({
-      device_id: deviceId,
+      device_id: undefined,
       user_id: userId,
       status: useAi ? "processing" : "completed",
       source: "manual",
@@ -336,7 +321,7 @@ export function registerRecordRoutes(router: Router) {
     if (useAi) {
       processEntry({
         text: content,
-        deviceId,
+        deviceId: userId,
         userId,
         recordId: record.id,
         notebook: notebook || undefined,

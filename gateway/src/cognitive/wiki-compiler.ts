@@ -10,11 +10,15 @@
 import { getPool } from "../db/pool.js";
 import * as recordRepo from "../db/repositories/record.js";
 import * as wikiPageRepo from "../db/repositories/wiki-page.js";
+import * as wikiPageRecordRepo from "../db/repositories/wiki-page-record.js";
+import * as wikiPageLinkRepo from "../db/repositories/wiki-page-link.js";
+import * as todoRepo from "../db/repositories/todo.js";
 import * as goalRepo from "../db/repositories/goal.js";
 import { chatCompletion } from "../ai/provider.js";
 import { buildCompilePrompt } from "./wiki-compile-prompt.js";
 import { findPagesByRecords } from "../db/repositories/wiki-page-record.js";
 import { canAiModifyStructure, createSuggestion } from "./page-authorization.js";
+import { now as tzNow } from "../lib/tz.js";
 
 // ── 类型定义 ──
 
@@ -41,7 +45,6 @@ export interface CompileInstructions {
     summary: string;
     parent_id: string | null;
     level: number;
-    domain: string | null;
     record_ids: string[];
   }>;
   merge_pages: Array<{
@@ -64,6 +67,7 @@ export interface CompileInstructions {
     title?: string;
     status?: string;
     wiki_page_id?: string;
+    parent_page_id?: string;
     progress?: number;
   }>;
   links?: Array<{
@@ -88,7 +92,7 @@ interface PageIndex {
   title: string;
   summary: string | null;
   level: number;
-  domain: string | null;
+  page_type: "topic" | "goal";
 }
 
 /** 命中的 page（含完整 content） */
@@ -98,7 +102,6 @@ interface MatchedPage {
   content: string;
   summary: string;
   level: number;
-  domain: string | null;
 }
 
 // ── 内存级并发锁（替代 advisory lock，避免 pooler 长连接超时） ──
@@ -209,7 +212,7 @@ export async function compileWikiForUser(
         title: p.title,
         summary: p.summary,
         level: p.level,
-        domain: p.domain,
+        page_type: p.page_type,
       }));
 
       // 加载关联 page 的完整 content
@@ -218,7 +221,8 @@ export async function compileWikiForUser(
       const totalContentChars = matchedPages.reduce((s, p) => s + p.content.length, 0);
       tLoadMatched(`${matchedPages.length} pages loaded, ${totalContentChars} chars content`);
 
-      const existingDomains = [...new Set(allPages.map((p) => p.domain).filter(Boolean) as string[])];
+      // 加载已有 goals（用于 AI prompt 去重参照）
+      const existingGoals = await todoRepo.findActiveGoalsByUser(userId);
 
       // ── 阶段 B: 编译（AI 调用）──
       const promptInput = {
@@ -234,16 +238,20 @@ export async function compileWikiForUser(
           content: p.content,
           summary: p.summary,
           level: p.level,
-          domain: p.domain,
         })),
         allPageIndex: allPageIndex.map((p) => ({
           id: p.id,
           title: p.title,
           summary: p.summary,
           level: p.level,
-          domain: p.domain,
+          page_type: p.page_type,
         })),
-        existingDomains,
+        existingGoals: existingGoals.slice(0, 20).map((g) => ({
+          id: g.id,
+          title: g.text,
+          status: g.status ?? "active",
+          wiki_page_id: g.wiki_page_id ?? null,
+        })),
         isColdStart,
       };
 
@@ -373,7 +381,6 @@ async function loadMatchedPages(
       content: page.content,
       summary: page.summary ?? "",
       level: page.level,
-      domain: page.domain,
     });
   }
 
@@ -496,17 +503,18 @@ export async function executeInstructions(
         continue;
       }
       // 验证 page 存在
-      const pageExists = await client.query(`SELECT 1 FROM wiki_page WHERE id = $1`, [upd.page_id]);
-      if (pageExists.rowCount === 0) {
+      if (!(await wikiPageRepo.exists(upd.page_id, client))) {
         console.warn(`[wiki-compiler] 跳过 update_pages: page 不存在 "${upd.page_id}"`);
         continue;
       }
-      await client.query(
-        `UPDATE wiki_page SET content = $1, summary = $2, compiled_at = now(), updated_at = now() WHERE id = $3`,
-        [upd.new_content, upd.new_summary, upd.page_id],
-      );
+      await wikiPageRepo.update(upd.page_id, {
+        content: upd.new_content,
+        summary: upd.new_summary,
+        compiled_at: tzNow().toISOString(),
+      }, client);
       for (const recId of upd.add_record_ids) {
         if (!isValidUuid(recId)) continue;
+        // 保留 raw SQL：link 没有 WHERE EXISTS(record) 防护
         await client.query(
           `INSERT INTO wiki_page_record (wiki_page_id, record_id)
            SELECT $1, $2 WHERE EXISTS (SELECT 1 FROM record WHERE id = $2)
@@ -523,23 +531,18 @@ export async function executeInstructions(
         console.warn(`[wiki-compiler] create_pages: 无效 parent_id "${cp.parent_id}"，置为 null`);
         cp.parent_id = null;
       }
-      const createResult = await client.query(
-        `INSERT INTO wiki_page (user_id, title, content, summary, parent_id, level, domain, metadata)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
-        [
-          userId,
-          cp.title,
-          cp.content,
-          cp.summary,
-          cp.parent_id ?? null,
-          cp.level ?? 3,
-          cp.domain ?? null,
-          JSON.stringify({}),
-        ],
-      );
-      const newPageId = createResult.rows[0].id;
+      const newPage = await wikiPageRepo.create({
+        user_id: userId,
+        title: cp.title,
+        content: cp.content,
+        summary: cp.summary,
+        parent_id: cp.parent_id ?? undefined,
+        level: cp.level ?? 3,
+      }, client);
+      const newPageId = newPage.id;
       for (const recId of cp.record_ids) {
         if (!isValidUuid(recId)) continue;
+        // 保留 raw SQL：link 没有 WHERE EXISTS(record) 防护
         await client.query(
           `INSERT INTO wiki_page_record (wiki_page_id, record_id)
            SELECT $1, $2 WHERE EXISTS (SELECT 1 FROM record WHERE id = $2)
@@ -557,18 +560,13 @@ export async function executeInstructions(
         console.warn(`[wiki-compiler] 跳过 split_page: 无效 source_id "${sp.source_id}"`);
         continue;
       }
-      const spExists = await client.query(`SELECT 1 FROM wiki_page WHERE id = $1`, [sp.source_id]);
-      if (spExists.rowCount === 0) {
+      if (!(await wikiPageRepo.exists(sp.source_id, client))) {
         console.warn(`[wiki-compiler] 跳过 split_page: page 不存在 "${sp.source_id}"`);
         continue;
       }
 
       // Phase 14.7: 分级授权 — 检查 page 的 created_by
-      const spPageRow = await client.query(
-        `SELECT created_by FROM wiki_page WHERE id = $1`,
-        [sp.source_id],
-      );
-      const spPage = spPageRow.rows[0];
+      const spPage = await wikiPageRepo.findById(sp.source_id, client);
       if (spPage && !canAiModifyStructure(spPage as any)) {
         // 用户创建的 page → 不执行拆分，创建建议
         console.log(`[wiki-compiler] split_page: page "${sp.source_id}" 由用户创建，创建建议`);
@@ -581,36 +579,25 @@ export async function executeInstructions(
       }
 
       // 更新原 page 的 content
-      await client.query(
-        `UPDATE wiki_page SET content = $1, compiled_at = now(), updated_at = now() WHERE id = $2`,
-        [sp.new_parent_content, sp.source_id],
-      );
+      await wikiPageRepo.update(sp.source_id, {
+        content: sp.new_parent_content,
+        compiled_at: tzNow().toISOString(),
+      }, client);
       // 创建子 page
+      const parentPage = spPage;
+      const childLevel = Math.max((parentPage?.level ?? 3) - 1, 1);
       for (const child of sp.children) {
-        const childResult = await client.query(
-          `INSERT INTO wiki_page (user_id, title, content, summary, parent_id, level, domain, metadata)
-           VALUES ($1, $2, $3, $4, $5,
-                   (SELECT GREATEST(level - 1, 1) FROM wiki_page WHERE id = $5),
-                   (SELECT domain FROM wiki_page WHERE id = $5),
-                   $6) RETURNING id`,
-          [
-            userId,
-            child.title,
-            child.content,
-            child.summary,
-            sp.source_id,
-            JSON.stringify({}),
-          ],
-        );
+        const childPage = await wikiPageRepo.create({
+          user_id: userId,
+          title: child.title,
+          content: child.content,
+          summary: child.summary,
+          parent_id: sp.source_id,
+          level: childLevel,
+        }, client);
         // 子 page 继承原 page 的 record 关联（spec 3.3 要求）
-        const childId = childResult.rows[0]?.id;
-        if (childId) {
-          await client.query(
-            `INSERT INTO wiki_page_record (wiki_page_id, record_id)
-             SELECT $1, record_id FROM wiki_page_record WHERE wiki_page_id = $2
-             ON CONFLICT DO NOTHING`,
-            [childId, sp.source_id],
-          );
+        if (childPage.id) {
+          await wikiPageRecordRepo.inheritAll(sp.source_id, childPage.id, client);
         }
       }
       result.pages_split++;
@@ -622,19 +609,15 @@ export async function executeInstructions(
         console.warn(`[wiki-compiler] 跳过 merge_pages: 无效 UUID source="${mp.source_id}" target="${mp.target_id}"`);
         continue;
       }
-      const mpSrcExists = await client.query(`SELECT 1 FROM wiki_page WHERE id = $1`, [mp.source_id]);
-      const mpTgtExists = await client.query(`SELECT 1 FROM wiki_page WHERE id = $1`, [mp.target_id]);
-      if (mpSrcExists.rowCount === 0 || mpTgtExists.rowCount === 0) {
+      const mpSrcExists = await wikiPageRepo.exists(mp.source_id, client);
+      const mpTgtExists = await wikiPageRepo.exists(mp.target_id, client);
+      if (!mpSrcExists || !mpTgtExists) {
         console.warn(`[wiki-compiler] 跳过 merge_pages: source/target 不存在`);
         continue;
       }
 
       // Phase 14.7: 分级授权 — 检查 source page 的 created_by
-      const mpSrcRow = await client.query(
-        `SELECT created_by FROM wiki_page WHERE id = $1`,
-        [mp.source_id],
-      );
-      const mpSrcPage = mpSrcRow.rows[0];
+      const mpSrcPage = await wikiPageRepo.findById(mp.source_id, client);
       if (mpSrcPage && !canAiModifyStructure(mpSrcPage as any)) {
         console.log(`[wiki-compiler] merge_pages: source "${mp.source_id}" 由用户创建，创建建议`);
         await createSuggestion(userId, "merge", {
@@ -646,25 +629,14 @@ export async function executeInstructions(
       }
 
       // source 标记为 merged
-      await client.query(
-        `UPDATE wiki_page SET status = 'merged', merged_into = $1, updated_at = now() WHERE id = $2`,
-        [mp.target_id, mp.source_id],
-      );
-      // 迁移 record 关联（先删除重复再迁移，避免 PK 冲突）
-      await client.query(
-        `DELETE FROM wiki_page_record WHERE wiki_page_id = $1
-         AND record_id IN (SELECT record_id FROM wiki_page_record WHERE wiki_page_id = $2)`,
-        [mp.source_id, mp.target_id],
-      );
-      await client.query(
-        `UPDATE wiki_page_record SET wiki_page_id = $1 WHERE wiki_page_id = $2`,
-        [mp.target_id, mp.source_id],
-      );
+      await wikiPageRepo.update(mp.source_id, {
+        status: "merged",
+        merged_into: mp.target_id,
+      }, client);
+      // 迁移 record 关联（CTE: DELETE source + INSERT target，语义等价）
+      await wikiPageRecordRepo.transferAll(mp.source_id, mp.target_id, client);
       // 迁移 goal 关联
-      await client.query(
-        `UPDATE todo SET wiki_page_id = $1 WHERE wiki_page_id = $2 AND level >= 1`,
-        [mp.target_id, mp.source_id],
-      );
+      await todoRepo.transferWikiPageRef(mp.source_id, mp.target_id, client);
       result.pages_merged++;
     }
 
@@ -674,46 +646,94 @@ export async function executeInstructions(
         console.warn(`[wiki-compiler] goal_sync: 无效 wiki_page_id "${gs.wiki_page_id}"，置为 null`);
         gs.wiki_page_id = undefined;
       }
+      if (gs.parent_page_id && !isValidUuid(gs.parent_page_id)) {
+        console.warn(`[wiki-compiler] goal_sync: 无效 parent_page_id "${gs.parent_page_id}"，置为 null`);
+        gs.parent_page_id = undefined;
+      }
       if (gs.goal_id && !isValidUuid(gs.goal_id)) {
         console.warn(`[wiki-compiler] 跳过 goal_sync update: 无效 goal_id "${gs.goal_id}"`);
         continue;
       }
       if (gs.action === "create" && gs.title) {
+        // DB 兜底去重：精确文本匹配
+        const dupTodo = await client.query(
+          `SELECT id FROM todo WHERE user_id = $1 AND level >= 1 AND LOWER(TRIM(text)) = LOWER(TRIM($2)) AND done = false`,
+          [userId, gs.title],
+        );
+        if (dupTodo.rows.length > 0) {
+          console.warn(`[wiki-compiler] goal_sync create skipped: duplicate title "${gs.title}" (existing id: ${dupTodo.rows[0].id})`);
+          continue;
+        }
+
         // Phase 14.6: goal_sync create 同时创建 goal page
         let goalPageId = gs.wiki_page_id ?? null;
         if (goalPageId) {
-          const gpExists = await client.query(`SELECT 1 FROM wiki_page WHERE id = $1`, [goalPageId]);
-          if (gpExists.rowCount === 0) {
+          if (!(await wikiPageRepo.exists(goalPageId, client))) {
             console.warn(`[wiki-compiler] goal_sync create: wiki_page_id 不存在 "${goalPageId}"，置为 null`);
             goalPageId = null;
           }
         }
 
-        // 如果没有已有的 goal page，创建一个新的
+        // goal page 标题查重：复用已有同标题 goal page
         if (!goalPageId) {
-          const newPageResult = await client.query(
-            `INSERT INTO wiki_page (user_id, title, content, summary, parent_id, level, domain, page_type, created_by, metadata)
-             VALUES ($1, $2, '', $3, NULL, 3, NULL, 'goal', 'ai', '{}') RETURNING id`,
-            [userId, gs.title, gs.title],
+          const dupPage = await client.query(
+            `SELECT id FROM wiki_page WHERE user_id = $1 AND page_type = 'goal' AND LOWER(TRIM(title)) = LOWER(TRIM($2)) AND status = 'active'`,
+            [userId, gs.title],
           );
-          goalPageId = newPageResult.rows[0]?.id ?? null;
+          if (dupPage.rows.length > 0) {
+            goalPageId = dupPage.rows[0].id;
+          }
+        }
+
+        // 如果没有已有的 goal page，创建一个新的（支持 parent_page_id 挂载）
+        if (!goalPageId) {
+          // 处理 parent_page_id：推导 parent_id 和 level
+          let parentId: string | null = null;
+          let goalLevel = 3;
+          if (gs.parent_page_id) {
+            const parentExists = await wikiPageRepo.exists(gs.parent_page_id, client);
+            if (parentExists) {
+              const parentPage = await wikiPageRepo.findById(gs.parent_page_id, client);
+              parentId = gs.parent_page_id;
+              goalLevel = Math.max(1, (parentPage?.level ?? 3) - 1);
+            }
+          }
+
+          const newGoalPage = await wikiPageRepo.create({
+            user_id: userId,
+            title: gs.title,
+            content: "",
+            summary: gs.title,
+            parent_id: parentId ?? undefined,
+            level: goalLevel,
+            page_type: "goal",
+            created_by: "ai",
+          }, client);
+          goalPageId = newGoalPage.id ?? null;
           if (goalPageId) {
             result.pages_created++;
           }
         }
 
+        // 保留 raw SQL：recordRepo 没有按 user_id 查 device_id 的方法
         const deviceRow = await client.query(
           `SELECT device_id FROM record WHERE user_id = $1 LIMIT 1`,
           [userId],
         );
         const deviceId = deviceRow.rows[0]?.device_id ?? userId;
 
-        await client.query(
-          `INSERT INTO todo (device_id, user_id, text, status, level, done, category, wiki_page_id)
-           VALUES ($1, $2, $3, $4, 1, false, 'emerged', $5)`,
-          [deviceId, userId, gs.title, gs.status ?? "active", goalPageId],
-        );
+        await todoRepo.create({
+          device_id: deviceId,
+          user_id: userId,
+          text: gs.title,
+          status: gs.status ?? "active",
+          level: 1,
+          done: false,
+          category: "emerged",
+          wiki_page_id: goalPageId ?? undefined,
+        }, client);
       } else if (gs.action === "update" && gs.goal_id) {
+        // 保留 raw SQL：动态 SET 构造 + AND level >= 1 条件，repo update 不支持
         const sets: string[] = ["updated_at = now()"];
         const params: any[] = [];
         let i = 1;
@@ -724,8 +744,7 @@ export async function executeInstructions(
           params.push(gs.status === "completed");
         }
         if (gs.wiki_page_id) {
-          const guExists = await client.query(`SELECT 1 FROM wiki_page WHERE id = $1`, [gs.wiki_page_id]);
-          if (guExists.rowCount === 0) {
+          if (!(await wikiPageRepo.exists(gs.wiki_page_id, client))) {
             console.warn(`[wiki-compiler] goal_sync update: wiki_page_id 不存在，跳过`);
           } else {
             sets.push(`wiki_page_id = $${i++}`);
@@ -750,9 +769,9 @@ export async function executeInstructions(
           continue;
         }
         // 存在性校验（AI 可能编造不存在的 page_id）
-        const srcExists = await client.query(`SELECT 1 FROM wiki_page WHERE id = $1`, [link.source_page_id]);
-        const tgtExists = await client.query(`SELECT 1 FROM wiki_page WHERE id = $1`, [link.target_page_id]);
-        if (srcExists.rowCount === 0 || tgtExists.rowCount === 0) {
+        const srcExists = await wikiPageRepo.exists(link.source_page_id, client);
+        const tgtExists = await wikiPageRepo.exists(link.target_page_id, client);
+        if (!srcExists || !tgtExists) {
           console.warn(`[wiki-compiler] 跳过 link: page 不存在 source="${link.source_page_id}" target="${link.target_page_id}"`);
           continue;
         }
@@ -762,18 +781,18 @@ export async function executeInstructions(
           console.warn(`[wiki-compiler] 跳过 link: 无效 link_type "${link.link_type}"`);
           continue;
         }
-        await client.query(
-          `INSERT INTO wiki_page_link (source_page_id, target_page_id, link_type, context_text)
-           VALUES ($1, $2, $3, $4)
-           ON CONFLICT (source_page_id, target_page_id, link_type)
-           DO UPDATE SET context_text = EXCLUDED.context_text`,
-          [link.source_page_id, link.target_page_id, link.link_type, link.context_text ?? null],
-        );
+        await wikiPageLinkRepo.createLink({
+          source_page_id: link.source_page_id,
+          target_page_id: link.target_page_id,
+          link_type: link.link_type,
+          context_text: link.context_text ?? undefined,
+        }, client);
       }
     }
 
     // 7. 所有 Record 标记为 compiled
     if (recordIds.length > 0) {
+      // 批量更新使用 ANY($1) 语法，recordRepo.updateCompileStatus 只支持单条，保留 raw SQL
       await client.query(
         `UPDATE record SET compile_status = 'compiled', updated_at = now() WHERE id = ANY($1)`,
         [recordIds],

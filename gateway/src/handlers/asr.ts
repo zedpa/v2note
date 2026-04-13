@@ -10,7 +10,7 @@ import { transcriptRepo } from "../db/repositories/index.js";
 import { getVocabularyIdForDevice } from "../cognitive/vocabulary-sync.js";
 import { processEntry } from "./process.js";
 import { matchVoiceCommand } from "./voice-commands.js";
-import { generateReflection } from "./reflect.js";
+
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -655,21 +655,6 @@ async function createRecordAndProcess(
         payload: result,
       });
 
-      // Generate reflection question in background
-      try {
-        const question = await generateReflection(
-          transcript,
-          session.userId,
-        );
-        if (question) {
-          sendToClient(clientWs, {
-            type: "reflect.question",
-            payload: { question },
-          });
-        }
-      } catch (err: any) {
-        console.warn("[asr] Reflect failed:", err.message);
-      }
     })
     .catch((err) => {
       console.error("[asr] Process error:", err);

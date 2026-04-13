@@ -27,7 +27,6 @@ const mockPage = {
   level: 3,
   status: "active",
   merged_into: null,
-  domain: "工作",
   embedding: null,
   metadata: {},
   compiled_at: null,
@@ -51,7 +50,6 @@ describe("wiki-page repository", () => {
         title: "供应链管理",
         content: "## 核心认知\n...",
         summary: "关于供应链的知识",
-        domain: "工作",
       });
 
       expect(result.id).toBe("wp-1");
@@ -74,7 +72,7 @@ describe("wiki-page repository", () => {
 
       const sql = vi.mocked(queryOne).mock.calls[0][0];
       expect(sql).toContain("::vector");
-      expect(sql).toContain("$12::vector");
+      expect(sql).toContain("$11::vector");
       const params = vi.mocked(queryOne).mock.calls[0][1]!;
       // embedding 参数是最后一个（第 12 个，索引 11），格式为 "[0.1,0.2,0.3]"
       expect(params[params.length - 1]).toBe("[0.1,0.2,0.3]");
@@ -106,8 +104,8 @@ describe("wiki-page repository", () => {
       await create({ user_id: "u-1", title: "测试" });
 
       const params = vi.mocked(queryOne).mock.calls[0][1]!;
-      // page_type 是第 8 个参数（索引 7）
-      expect(params[7]).toBe("topic");
+      // page_type 是第 7 个参数（索引 6）— domain 已移除
+      expect(params[6]).toBe("topic");
     });
 
     it("should_default_token_count_to_0_when_not_specified", async () => {
@@ -116,8 +114,8 @@ describe("wiki-page repository", () => {
       await create({ user_id: "u-1", title: "测试" });
 
       const params = vi.mocked(queryOne).mock.calls[0][1]!;
-      // token_count 是第 9 个参数（索引 8）
-      expect(params[8]).toBe(0);
+      // token_count 是第 8 个参数（索引 7）— domain 已移除
+      expect(params[7]).toBe(0);
     });
 
     it("should_serialize_metadata_as_json_when_provided", async () => {
@@ -130,8 +128,8 @@ describe("wiki-page repository", () => {
       });
 
       const params = vi.mocked(queryOne).mock.calls[0][1]!;
-      // metadata 是第 11 个参数（索引 10）
-      expect(params[10]).toBe(JSON.stringify({ contradictions: 2 }));
+      // metadata 是第 10 个参数（索引 9）— domain 已移除
+      expect(params[9]).toBe(JSON.stringify({ contradictions: 2 }));
     });
   });
 
@@ -141,10 +139,10 @@ describe("wiki-page repository", () => {
 
       const result = await findById("wp-1");
       expect(result).toEqual(mockPage);
-      expect(queryOne).toHaveBeenCalledWith(
-        expect.stringContaining("SELECT * FROM wiki_page WHERE id = $1"),
-        ["wp-1"],
-      );
+      const sql = vi.mocked(queryOne).mock.calls[0][0];
+      const params = vi.mocked(queryOne).mock.calls[0][1];
+      expect(sql).toContain("SELECT * FROM wiki_page WHERE id = $1");
+      expect(params).toEqual(["wp-1"]);
     });
 
     it("should_return_null_when_not_found", async () => {
@@ -215,7 +213,6 @@ describe("wiki-page repository", () => {
         content: "新内容",
         summary: "新摘要",
         level: 2,
-        domain: "学习",
         compiled_at: "2026-04-09T12:00:00Z",
       });
 
@@ -224,10 +221,10 @@ describe("wiki-page repository", () => {
       expect(sql).toContain("content = $2");
       expect(sql).toContain("summary = $3");
       expect(sql).toContain("level = $4");
-      expect(sql).toContain("domain = $5");
-      expect(sql).toContain("compiled_at = $6");
+      expect(sql).not.toContain("domain =");
+      expect(sql).toContain("compiled_at = $5");
       expect(sql).toContain("updated_at = now()");
-      expect(sql).toContain("WHERE id = $7");
+      expect(sql).toContain("WHERE id = $6");
     });
 
     it("should_noop_when_no_fields_specified", async () => {
@@ -259,11 +256,10 @@ describe("wiki-page repository", () => {
       vi.mocked(execute).mockResolvedValue(1);
 
       await updateStatus("wp-1", "archived");
-      expect(execute).toHaveBeenCalledWith(
-        expect.stringContaining("status = $1"),
-        ["archived", "wp-1"],
-      );
       const sql = vi.mocked(execute).mock.calls[0][0];
+      const params = vi.mocked(execute).mock.calls[0][1];
+      expect(sql).toContain("status = $1");
+      expect(params).toEqual(["archived", "wp-1"]);
       expect(sql).toContain("updated_at = now()");
       expect(sql).not.toContain("merged_into");
     });

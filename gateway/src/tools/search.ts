@@ -134,8 +134,7 @@ async function searchRecords(
         if (dateTo && createdDate && createdDate > dateTo) continue;
       }
 
-      // domain 过滤（兼容旧数据，record.domain 列仍存在但不再写入）
-      if (filters.domain && r.domain !== filters.domain) continue;
+      // domain 过滤已废弃（record.domain 不再写入），此处不再过滤
 
       const summary = summaryMap.get(r.id);
       results.push({
@@ -240,10 +239,14 @@ async function searchTodos(
       params.push(filters.goal_id);
     }
 
-    // domain 过滤
+    // domain 过滤 → 改为按 wiki_page.title 匹配（精确优先，ILIKE 回退）
     if (filters.domain) {
-      conditions.push(`t.domain = $${paramIdx++}`);
-      params.push(filters.domain);
+      // 转义 LIKE 通配符，防止 AI 输出的 % _ 干扰匹配
+      const escapedDomain = filters.domain.replace(/[%_\\]/g, "\\$&");
+      conditions.push(`EXISTS (SELECT 1 FROM wiki_page wp WHERE wp.id = t.wiki_page_id AND (wp.title = $${paramIdx} OR wp.title ILIKE '%' || $${paramIdx + 1} || '%'))`);
+      params.push(filters.domain);     // 精确匹配用原值
+      params.push(escapedDomain);       // ILIKE 用转义值
+      paramIdx += 2;
     }
 
     // date 快捷键（今天/明天/昨天）解析为 date_from + date_to 精确匹配
@@ -270,7 +273,7 @@ async function searchTodos(
       }
     }
 
-    const sql = `SELECT t.id, t.text, t.done, t.scheduled_start, t.domain, t.parent_id, t.created_at
+    const sql = `SELECT t.id, t.text, t.done, t.scheduled_start, t.parent_id, t.created_at
                  FROM todo t
                  WHERE ${conditions.join(" AND ")}
                  ORDER BY t.created_at DESC
@@ -281,7 +284,6 @@ async function searchTodos(
       text: string;
       done: boolean;
       scheduled_start?: string;
-      domain?: string;
       parent_id?: string;
       created_at: string;
     }>(sql, params);

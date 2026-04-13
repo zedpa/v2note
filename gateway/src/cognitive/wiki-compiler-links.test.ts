@@ -88,10 +88,10 @@ describe("wiki-compiler links (Phase 14.11)", () => {
         newRecords: [{ id: "r1", text: "test", source_type: "think", created_at: "2026-04-11T10:00:00Z" }],
         matchedPages: [],
         allPageIndex: [
-          { id: "wp-1", title: "Page A", summary: "摘要A", level: 3, domain: null },
-          { id: "wp-2", title: "Page B", summary: "摘要B", level: 3, domain: null },
+          { id: "wp-1", title: "Page A", summary: "摘要A", level: 3 },
+          { id: "wp-2", title: "Page B", summary: "摘要B", level: 3 },
         ],
-        existingDomains: [],
+        existingGoals: [],
         isColdStart: false,
       });
 
@@ -107,7 +107,7 @@ describe("wiki-compiler links (Phase 14.11)", () => {
         newRecords: [{ id: "r1", text: "test", source_type: "think", created_at: "2026-04-11T10:00:00Z" }],
         matchedPages: [],
         allPageIndex: [],
-        existingDomains: [],
+        existingGoals: [],
         isColdStart: false,
       });
 

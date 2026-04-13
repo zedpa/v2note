@@ -29,7 +29,10 @@ export function sendError(res: ServerResponse, message: string, status = 400): v
   res.end(JSON.stringify({ error: message }));
 }
 
-/** Extract device ID — prefers JWT auth context, falls back to X-Device-Id header */
+/**
+ * @deprecated 使用 getUserId(req) 替代。deviceId 身份体系已废弃，JWT 不再包含 deviceId。
+ * 仅保留用于 devices.ts 等极少数确实需要设备 ID 的场景。
+ */
 export function getDeviceId(req: IncomingMessage): string {
   // Try JWT auth first
   const authHeader = req.headers["authorization"];

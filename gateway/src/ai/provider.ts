@@ -374,7 +374,7 @@ const TOOL_LABELS: Record<string, string> = {
 export async function* streamWithTools(
   messages: ChatMessage[],
   tools: Record<string, any>,
-  opts?: { temperature?: number; maxSteps?: number; tier?: ModelTier },
+  opts?: { temperature?: number; maxSteps?: number; tier?: ModelTier; toolChoice?: any },
 ): AsyncGenerator<string, void, undefined> {
   const { provider, config } = getTier(opts?.tier ?? "chat");
   const maxSteps = opts?.maxSteps ?? 5;
@@ -417,6 +417,7 @@ export async function* streamWithTools(
       temperature: opts?.temperature ?? 0.7,
       maxRetries: 1,
       abortSignal: AbortSignal.timeout(config.timeout),
+      ...(opts?.toolChoice ? { toolChoice: opts.toolChoice } : {}),
     } as any);
 
     const toolInputBuffers = new Map<string, { name: string; args: string }>();

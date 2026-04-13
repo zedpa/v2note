@@ -1,32 +1,16 @@
 import type { Router } from "../router.js";
-import { readBody, sendJson, getDeviceId, getUserId } from "../lib/http-helpers.js";
+import { readBody, sendJson, sendError, getUserId } from "../lib/http-helpers.js";
 import { todoRepo, pendingIntentRepo } from "../db/repositories/index.js";
-import { queryOne, query as dbQuery } from "../db/pool.js";
+import { query as dbQuery } from "../db/pool.js";
 import { computeGoalHealth, createActionEvent, updateGoalStatus, getGoalTimeline } from "../cognitive/goal-linker.js";
 import { goalAutoLink, getProjectProgress } from "../cognitive/goal-auto-link.js";
-
-/** 获取 user_id（JWT 优先，device 表兜底） */
-async function resolveUserId(req: any): Promise<string | null> {
-  const uid = getUserId(req);
-  if (uid) return uid;
-  // 兼容：无 JWT 时从 device 表反查（仅用于读操作）
-  const deviceId = getDeviceId(req);
-  if (!deviceId) return null;
-  const row = await queryOne<{ user_id: string | null }>(
-    "SELECT user_id FROM device WHERE id = $1",
-    [deviceId],
-  );
-  return row?.user_id ?? null;
-}
 
 export function registerGoalRoutes(router: Router) {
   // List active goals（统一模型：todo.level>=1）
   router.get("/api/v1/goals", async (req, res) => {
-    const userId = await resolveUserId(req);
-    const deviceId = getDeviceId(req);
-    const goals = userId
-      ? await todoRepo.findActiveGoalsByUser(userId)
-      : await todoRepo.findActiveGoalsByDevice(deviceId);
+    const userId = getUserId(req);
+    if (!userId) { sendError(res, "Unauthorized", 401); return; }
+    const goals = await todoRepo.findActiveGoalsByUser(userId);
     // 批量查询 wiki page titles
     const wikiPageIds = [...new Set(goals.map((g) => g.wiki_page_id).filter(Boolean))] as string[];
     const wikiTitleMap = new Map<string, string>();
@@ -49,22 +33,21 @@ export function registerGoalRoutes(router: Router) {
 
   // Create goal（统一模型：创建 level=1 的 todo）
   router.post("/api/v1/goals", async (req, res) => {
-    const deviceId = getDeviceId(req);
     const userId = getUserId(req);
+    if (!userId) {
+      sendError(res, "Unauthorized", 401);
+      return;
+    }
     const { title, parent_id, cluster_id, source } = await readBody<{
       title: string;
       parent_id?: string;
       cluster_id?: string;
       source?: string;
     }>(req);
-    if (!userId) {
-      sendJson(res, { error: "user_id required" }, 400);
-      return;
-    }
     // parent_id → level=0 行动；cluster_id 或无父级 → level=1 目标
     const level: 0 | 1 = parent_id ? 0 : 1;
     const goal = await todoRepo.createGoalAsTodo({
-      device_id: deviceId,
+      device_id: userId,
       user_id: userId,
       text: title,
       level,
@@ -143,7 +126,7 @@ export function registerGoalRoutes(router: Router) {
 
   // Goal auto-link (创建后全量关联)
   router.post("/api/v1/goals/:id/auto-link", async (req, res, params) => {
-    const userId = await resolveUserId(req);
+    const userId = getUserId(req);
     if (!userId) { sendJson(res, { error: "user_id required" }, 401); return; }
     const result = await goalAutoLink(params.id, userId);
     sendJson(res, result);
@@ -151,7 +134,7 @@ export function registerGoalRoutes(router: Router) {
 
   // Project progress (项目级子目标进度汇总)
   router.get("/api/v1/goals/:id/progress", async (req, res, params) => {
-    const userId = await resolveUserId(req);
+    const userId = getUserId(req);
     if (!userId) { sendJson(res, { error: "user_id required" }, 401); return; }
     const progress = await getProjectProgress(params.id, userId);
     sendJson(res, progress);
@@ -160,9 +143,9 @@ export function registerGoalRoutes(router: Router) {
   // Dimension summary（侧边栏 L3 维度统计）
   // @deprecated 保留兼容，新代码使用 /api/v1/sidebar/my-world
   router.get("/api/v1/dimensions", async (req, res) => {
-    const userId = await resolveUserId(req);
-    const deviceId = getDeviceId(req);
-    const summary = await todoRepo.getDimensionSummary(userId, deviceId);
+    const userId = getUserId(req);
+    if (!userId) { sendError(res, "Unauthorized", 401); return; }
+    const summary = await todoRepo.getDimensionSummary(userId, undefined);
     sendJson(res, summary);
   });
 
@@ -170,7 +153,7 @@ export function registerGoalRoutes(router: Router) {
 
   // 侧边栏"我的世界"树结构
   router.get("/api/v1/sidebar/my-world", async (req, res) => {
-    const userId = await resolveUserId(req);
+    const userId = getUserId(req);
     if (!userId) {
       sendJson(res, { nodes: [] });
       return;
@@ -182,10 +165,8 @@ export function registerGoalRoutes(router: Router) {
   // List pending intents
   router.get("/api/v1/intents/pending", async (req, res) => {
     const userId = getUserId(req);
-    const deviceId = getDeviceId(req);
-    const intents = userId
-      ? await pendingIntentRepo.findPendingByUser(userId)
-      : await pendingIntentRepo.findPendingByDevice(deviceId);
+    if (!userId) { sendError(res, "Unauthorized", 401); return; }
+    const intents = await pendingIntentRepo.findPendingByUser(userId);
     sendJson(res, intents);
   });
 }

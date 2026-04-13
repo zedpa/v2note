@@ -1,5 +1,5 @@
 import type { Router } from "../router.js";
-import { readBody, sendJson, sendError, getDeviceId, getUserId } from "../lib/http-helpers.js";
+import { readBody, sendJson, sendError, getUserId } from "../lib/http-helpers.js";
 import * as vocabRepo from "../db/repositories/vocabulary.js";
 import { invalidateCache } from "../cognitive/vocabulary.js";
 import { syncVocabularyToDashScope } from "../cognitive/vocabulary-sync.js";
@@ -103,11 +103,9 @@ export function registerVocabularyRoutes(router: Router) {
   // 返回用户词汇，按 domain 分组（userId 优先，跨设备共享）
   router.get("/api/v1/vocabulary", async (req, res) => {
     try {
-      const deviceId = getDeviceId(req);
       const userId = getUserId(req);
-      const entries = userId
-        ? await vocabRepo.findByUser(userId)
-        : await vocabRepo.findByDevice(deviceId);
+      if (!userId) { sendError(res, "Unauthorized", 401); return; }
+      const entries = await vocabRepo.findByUser(userId);
 
       // 按 domain 分组
       const grouped: Record<string, typeof entries> = {};
@@ -126,8 +124,8 @@ export function registerVocabularyRoutes(router: Router) {
   // 添加词汇 { term, domain, aliases? }
   router.post("/api/v1/vocabulary", async (req, res) => {
     try {
-      const deviceId = getDeviceId(req);
       const userId = getUserId(req);
+      if (!userId) { sendError(res, "Unauthorized", 401); return; }
       const body = await readBody<{ term: string; domain: string; aliases?: string[] }>(req);
 
       if (!body.term || !body.domain) {
@@ -136,7 +134,7 @@ export function registerVocabularyRoutes(router: Router) {
       }
 
       const entry = await vocabRepo.create({
-        deviceId,
+        deviceId: userId,
         userId,
         term: body.term,
         domain: body.domain,
@@ -144,9 +142,9 @@ export function registerVocabularyRoutes(router: Router) {
         source: "user",
       });
 
-      invalidateCache(deviceId);
+      invalidateCache(userId);
       // 异步同步到 DashScope（不阻断响应）
-      syncVocabularyToDashScope(deviceId).catch(() => {});
+      syncVocabularyToDashScope(userId).catch(() => {});
       sendJson(res, entry, 201);
     } catch (err: any) {
       sendError(res, err.message ?? "Internal error", err.status ?? 500);
@@ -156,20 +154,20 @@ export function registerVocabularyRoutes(router: Router) {
   // ── DELETE /api/v1/vocabulary/:id ──
   router.delete("/api/v1/vocabulary/:id", async (req, res, params) => {
     try {
-      const deviceId = getDeviceId(req);
       const userId = getUserId(req);
+      if (!userId) { sendError(res, "Unauthorized", 401); return; }
       const id = params.id;
 
-      // 校验所有权：只能删除属于自己设备或账号的词汇
-      const affected = await vocabRepo.deleteByIdOwned(id, deviceId, userId);
+      // 校验所有权：只能删除属于自己账号的词汇
+      const affected = await vocabRepo.deleteByIdOwned(id, userId, userId);
       if (affected === 0) {
         sendError(res, "Vocabulary entry not found", 404);
         return;
       }
 
-      invalidateCache(deviceId);
+      invalidateCache(userId);
       // 异步同步到 DashScope（不阻断响应）
-      syncVocabularyToDashScope(deviceId).catch(() => {});
+      syncVocabularyToDashScope(userId).catch(() => {});
       sendJson(res, { deleted: true });
     } catch (err: any) {
       sendError(res, err.message ?? "Internal error", err.status ?? 500);
@@ -180,8 +178,8 @@ export function registerVocabularyRoutes(router: Router) {
   // 导入预设领域词汇 { domain }
   router.post("/api/v1/vocabulary/import-domain", async (req, res) => {
     try {
-      const deviceId = getDeviceId(req);
       const userId = getUserId(req);
+      if (!userId) { sendError(res, "Unauthorized", 401); return; }
       const body = await readBody<{ domain: string }>(req);
 
       if (!body.domain) {
@@ -199,7 +197,7 @@ export function registerVocabularyRoutes(router: Router) {
       const created: vocabRepo.VocabularyEntry[] = [];
       for (const preset of presetTerms) {
         const entry = await vocabRepo.create({
-          deviceId,
+          deviceId: userId,
           userId,
           term: preset.term,
           aliases: preset.aliases,
@@ -209,9 +207,9 @@ export function registerVocabularyRoutes(router: Router) {
         created.push(entry);
       }
 
-      invalidateCache(deviceId);
+      invalidateCache(userId);
       // 异步同步到 DashScope（不阻断响应）
-      syncVocabularyToDashScope(deviceId).catch(() => {});
+      syncVocabularyToDashScope(userId).catch(() => {});
       sendJson(res, { domain: body.domain, imported: created.length, entries: created }, 201);
     } catch (err: any) {
       sendError(res, err.message ?? "Internal error", err.status ?? 500);
@@ -222,8 +220,9 @@ export function registerVocabularyRoutes(router: Router) {
   // 手动触发同步到 DashScope（通常由增删自动触发）
   router.post("/api/v1/vocabulary/sync", async (req, res) => {
     try {
-      const deviceId = getDeviceId(req);
-      const vocabularyId = await syncVocabularyToDashScope(deviceId);
+      const userId = getUserId(req);
+      if (!userId) { sendError(res, "Unauthorized", 401); return; }
+      const vocabularyId = await syncVocabularyToDashScope(userId);
       sendJson(res, { vocabulary_id: vocabularyId, synced: !!vocabularyId });
     } catch (err: any) {
       sendError(res, err.message ?? "Internal error", err.status ?? 500);
@@ -234,8 +233,8 @@ export function registerVocabularyRoutes(router: Router) {
   // AI 生成自定义领域词库 { domain_name }
   router.post("/api/v1/vocabulary/generate", async (req, res) => {
     try {
-      const deviceId = getDeviceId(req);
       const userId = getUserId(req);
+      if (!userId) { sendError(res, "Unauthorized", 401); return; }
       const body = await readBody<{ domain_name: string }>(req);
 
       if (!body.domain_name) {
@@ -277,7 +276,7 @@ export function registerVocabularyRoutes(router: Router) {
         if (!t.term) continue;
         try {
           const entry = await vocabRepo.create({
-            deviceId,
+            deviceId: userId,
             userId,
             term: t.term,
             aliases: t.aliases ?? [],
@@ -290,8 +289,8 @@ export function registerVocabularyRoutes(router: Router) {
         }
       }
 
-      invalidateCache(deviceId);
-      syncVocabularyToDashScope(deviceId).catch(() => {});
+      invalidateCache(userId);
+      syncVocabularyToDashScope(userId).catch(() => {});
       sendJson(res, { domain: body.domain_name, generated: created.length, entries: created }, 201);
     } catch (err: any) {
       sendError(res, err.message ?? "Internal error", err.status ?? 500);

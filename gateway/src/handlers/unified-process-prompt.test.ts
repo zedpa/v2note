@@ -4,7 +4,7 @@ import { buildUnifiedProcessPrompt } from "./unified-process-prompt.js";
 const ctx = {
   activeGoals: [],
   pendingTodos: [],
-  existingDomains: [],
+  existingPages: [],
 };
 
 describe("buildUnifiedProcessPrompt", () => {
@@ -37,5 +37,46 @@ describe("buildUnifiedProcessPrompt", () => {
   it("should_require_action_only_for_pure_commands", () => {
     expect(prompt).toContain("完全**在下直接操作指令");
     expect(prompt).toContain("有叙述就是 record");
+  });
+
+  // fix-process-domain-to-page 新增测试
+  it("should_contain_page_title_not_domain_in_section3", () => {
+    expect(prompt).toContain("自动归类 → page_title");
+    expect(prompt).not.toContain("自动归类 → domain");
+  });
+
+  it("should_not_contain_domain_field_in_output_example", () => {
+    expect(prompt).not.toContain('"domain"');
+    expect(prompt).toContain('"page_title"');
+  });
+
+  it("should_contain_page_title_based_tags_logic", () => {
+    expect(prompt).toContain("第一个标签为 page_title");
+    expect(prompt).not.toContain("domain 路径各段");
+    expect(prompt).not.toContain("domain 的每层路径");
+  });
+
+  it("should_show_existing_pages_when_provided", () => {
+    const ctxWithPages = {
+      activeGoals: [],
+      pendingTodos: [],
+      existingPages: [
+        { id: "p1", title: "采购管理" },
+        { id: "p2", title: "Rust 学习" },
+      ],
+    };
+    const p = buildUnifiedProcessPrompt(ctxWithPages);
+    expect(p).toContain("用户已有知识页面");
+    expect(p).toContain("- 采购管理");
+    expect(p).toContain("- Rust 学习");
+  });
+
+  it("should_not_show_page_list_section_when_no_pages", () => {
+    // 动态注入的 page 列表区域（带有"优先从中选择"提示）不应出现
+    expect(prompt).not.toContain("优先从中选择语义最匹配的标题原样返回，不确定时建议新标题");
+  });
+
+  it("should_contain_page_title_in_comment", () => {
+    expect(prompt).not.toContain("summary + domain + tags");
   });
 });

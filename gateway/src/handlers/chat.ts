@@ -288,14 +288,21 @@ export async function initChat(
     }
   }
 
-  // 构建 system prompt: SharedAgent + Soul + UserAgent + Profile + Memory + Wiki
+  // 构建 system prompt: SharedAgent + Soul + UserAgent + Profile + 数据摘要提示
+  // Memory/Wiki 不再注入完整内容，改为数量提示，逼 AI 通过工具查询最新数据
+  const memoryHint = memories.length > 0
+    ? [`（有 ${memories.length} 条相关记忆，涉及用户历史时请用 search 工具查询最新数据）`]
+    : [];
+  const wikiHint = loaded.wikiContext && loaded.wikiContext.length > 0
+    ? [`（有 ${loaded.wikiContext.length} 个相关知识主题，涉及具体内容时请用 search 工具查询）`]
+    : [];
   const systemPrompt = buildSystemPrompt({
     skills: activeSkills,
     soul: loaded.soul,
     userAgent: loaded.userAgent,
     userProfile: loaded.userProfile,
-    memory: memories,
-    wikiContext: loaded.wikiContext,
+    memory: memoryHint,
+    wikiContext: wikiHint,
     mode: "chat",
     // chat 不再传 agent（Soul 已替代 chat.md），briefing/onboarding 保留
     pendingIntentContext,
@@ -304,6 +311,12 @@ export async function initChat(
 
   // Set up session context
   session.context.setSystemPrompt(systemPrompt);
+
+  // 保存初始化参数，压缩时用于重建 system prompt
+  session.chatInitOpts = {
+    activeSkills: activeSkills.map(s => ({ name: s.name, prompt: s.prompt })),
+    dateRange: payload.dateRange,
+  };
 
   // ── 上下文恢复：从 DB 加载历史摘要 + 最近消息（command 模式） ──
   if (payload.mode === "command" && userId) {
@@ -344,6 +357,52 @@ export async function initChat(
   }
 
   // Session 初始化完成，等待 chat.message
+}
+
+/**
+ * 重建 system prompt：用最新的 soul/memory/wiki/profile 重新组装。
+ * 在压缩后调用，确保长会话中 system prompt 不过期。
+ */
+export async function rebuildSystemPrompt(userId: string): Promise<void> {
+  const session = getSession(userId);
+  if (session.mode !== "chat" || !session.chatInitOpts) return;
+
+  try {
+    const loaded = await session.memoryManager.loadRelevantContext(userId, {
+      mode: "chat",
+      dateRange: session.chatInitOpts.dateRange,
+      userId,
+    });
+
+    // 认知上下文
+    let cognitiveContext: string | undefined;
+    try {
+      const cognitive = await loadChatCognitive(userId);
+      if (cognitive.contextString) cognitiveContext = cognitive.contextString;
+    } catch { /* non-critical */ }
+
+    const memoryHint = loaded.memories.length > 0
+      ? [`（有 ${loaded.memories.length} 条相关记忆，涉及用户历史时请用 search 工具查询最新数据）`]
+      : [];
+    const wikiHint = loaded.wikiContext && loaded.wikiContext.length > 0
+      ? [`（有 ${loaded.wikiContext.length} 个相关知识主题，涉及具体内容时请用 search 工具查询）`]
+      : [];
+    const newPrompt = buildSystemPrompt({
+      skills: session.chatInitOpts.activeSkills as Skill[],
+      soul: loaded.soul,
+      userAgent: loaded.userAgent,
+      userProfile: loaded.userProfile,
+      memory: memoryHint,
+      wikiContext: wikiHint,
+      mode: "chat",
+      cognitiveContext,
+    });
+
+    session.context.setSystemPrompt(newPrompt);
+    console.log(`[chat] System prompt rebuilt for user ${userId} (${newPrompt.length} chars)`);
+  } catch (err: any) {
+    console.warn(`[chat] Failed to rebuild system prompt: ${err.message}`);
+  }
 }
 
 // ── Deep Skill 上下文预取 + 无工具流式生成 ──────────────────────────
@@ -514,14 +573,15 @@ export async function sendChatMessage(
       }
       yield "正在压缩对话上下文…\n";
       try {
-        // 先保存 system prompt，压缩后需要恢复
-        const sysPrompt = session.context.getMessages().find(m => m.role === "system")?.content;
         await compressMessages(session.userId);
-        // 压缩后重建 session context（加载新摘要 + 最近消息）
+        // 压缩后重建 system prompt（加载最新 soul/memory/wiki）+ 恢复消息
+        await rebuildSystemPrompt(session.userId);
         const summaries = await chatMessageRepo.getContextSummaries(session.userId);
         const recentMessages = await chatMessageRepo.getUncompressedMessages(session.userId, 20);
+        // 清空旧消息，保留刚刷新的 system prompt
+        const freshPrompt = session.context.getMessages().find(m => m.role === "system")?.content;
         session.context.clear();
-        if (sysPrompt) session.context.setSystemPrompt(sysPrompt);
+        if (freshPrompt) session.context.setSystemPrompt(freshPrompt);
         // 注入压缩摘要
         if (summaries.length > 0) {
           session.context.addMessage({
@@ -535,7 +595,7 @@ export async function sendChatMessage(
             session.context.addMessage({ role: msg.role, content: msg.content });
           }
         }
-        yield `✅ 压缩完成。保留 ${summaries.length} 条摘要 + ${recentMessages.length} 条最近消息。`;
+        yield `✅ 压缩完成。保留 ${summaries.length} 条摘要 + ${recentMessages.length} 条最近消息，系统上下文已刷新。`;
       } catch (err: any) {
         yield `压缩失败: ${err.message}`;
       }
@@ -630,6 +690,16 @@ function isDataQuery(text: string): boolean {
   return DATA_QUERY_PATTERNS.some(p => p.test(text));
 }
 
+/** 时间查询模式 — 强制调用 get_current_time */
+const TIME_QUERY_PATTERNS = [
+  /现在几点/, /(?:今天|现在).*(?:星期|周)几/, /今天.*(?:几号|日期|什么日子)/,
+  /(?:当前|目前|现在).*时间/, /几点了/,
+];
+
+function isTimeQuery(text: string): boolean {
+  return TIME_QUERY_PATTERNS.some(p => p.test(text));
+}
+
 /** 明确简单的模式（工具调用、简短指令） */
 const SIMPLE_PATTERNS = [
   /^(?:帮我|请)?(?:创建|新建|添加|记录|搜索|查找|删除|更新|修改|标记|完成)/,
@@ -691,22 +761,29 @@ async function* streamWithNativeTools(
     console.log(`[chat] Using ${tier} tier for: "${lastUserMsg?.content.slice(0, 50)}..."`);
   }
 
-  // 数据查询检测：当用户问数据类问题时，注入强制工具调用提示
-  // 防止模型根据上下文中旧的回答直接复读
+  // 数据/时间查询检测：动态设置 toolChoice + 注入提示
   let messagesForModel = messages;
-  if (lastUserMsg && isDataQuery(lastUserMsg.content)) {
-    console.log(`[chat] Data query detected, injecting tool-call reminder`);
-    messagesForModel = [
-      ...messages.slice(0, -1),
-      { role: "system" as const, content: "[系统提示] 用户正在询问实际数据。你必须调用 search 工具查询真实数据后再回答。禁止根据对话历史推测，数据可能已更新。" },
-      messages[messages.length - 1],
-    ];
+  let toolChoice: any = undefined; // 默认 auto
+
+  if (lastUserMsg) {
+    if (isTimeQuery(lastUserMsg.content)) {
+      toolChoice = { type: "tool", toolName: "get_current_time" };
+      console.log(`[chat] Time query detected, forcing get_current_time`);
+    } else if (isDataQuery(lastUserMsg.content)) {
+      toolChoice = "required";
+      console.log(`[chat] Data query detected, toolChoice=required`);
+      messagesForModel = [
+        ...messages.slice(0, -1),
+        { role: "system" as const, content: "[系统提示] 用户正在询问实际数据。你必须调用工具查询真实数据后再回答。禁止根据对话历史或上下文推测，数据可能已更新。" },
+        messages[messages.length - 1],
+      ];
+    }
   }
 
   const stream = streamWithTools(
     messagesForModel,
     aiTools,
-    { temperature: 0.7, maxSteps: 5, tier },
+    { temperature: 0.7, maxSteps: 5, tier, toolChoice },
   );
 
   let fullResponse = "";

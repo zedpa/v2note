@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 import type { ProjectGroup, TodoDTO } from "../lib/todo-types";
 import { getProjectColor } from "../lib/project-colors";
 import { ProjectCard } from "./project-card";
@@ -40,6 +40,7 @@ export function ProjectView({
   const [createParentId, setCreateParentId] = useState<string | undefined>();
   const [detailGroup, setDetailGroup] = useState<ProjectGroup | null>(null);
   const [detailColorIndex, setDetailColorIndex] = useState(0);
+
 
   const handleAdd = useCallback((parentId?: string) => {
     setCreateParentId(parentId);

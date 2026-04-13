@@ -1,5 +1,5 @@
 import type { Router } from "../router.js";
-import { sendJson, getDeviceId, getUserId } from "../lib/http-helpers.js";
+import { sendJson, sendError, getUserId } from "../lib/http-helpers.js";
 import { recordRepo, todoRepo, subscriptionRepo } from "../db/repositories/index.js";
 import { query } from "../db/pool.js";
 import { weekRange, dayRange } from "../lib/tz.js";
@@ -7,23 +7,18 @@ import { weekRange, dayRange } from "../lib/tz.js";
 export function registerStatsRoutes(router: Router) {
   // Week stats
   router.get("/api/v1/stats/week", async (req, res) => {
-    const deviceId = getDeviceId(req);
     const userId = getUserId(req);
+    if (!userId) { sendError(res, "Unauthorized", 401); return; }
     const week = weekRange();
     const mondayRange = dayRange(week.start);
     const sundayRange = dayRange(week.end);
     const weekStart = mondayRange.start; // UTC ISO: Monday 00:00 Asia/Shanghai
     const weekEnd = sundayRange.end;     // UTC ISO: Sunday 23:59 Asia/Shanghai
 
-    const [recordCount, todoStats] = userId
-      ? await Promise.all([
-          recordRepo.countByUserDateRange(userId, weekStart, weekEnd),
-          todoRepo.countByUserDateRange(userId, weekStart, weekEnd),
-        ])
-      : await Promise.all([
-          recordRepo.countByDateRange(deviceId, weekStart, weekEnd),
-          todoRepo.countByDateRange(deviceId, weekStart, weekEnd),
-        ]);
+    const [recordCount, todoStats] = await Promise.all([
+      recordRepo.countByUserDateRange(userId, weekStart, weekEnd),
+      todoRepo.countByUserDateRange(userId, weekStart, weekEnd),
+    ]);
 
     sendJson(res, {
       recordCount,
@@ -34,11 +29,9 @@ export function registerStatsRoutes(router: Router) {
 
   // Usage stats
   router.get("/api/v1/stats/usage", async (req, res) => {
-    const deviceId = getDeviceId(req);
     const userId = getUserId(req);
-    const stats = userId
-      ? await subscriptionRepo.getUsageStatsByUser(userId)
-      : await subscriptionRepo.getUsageStats(deviceId);
+    if (!userId) { sendError(res, "Unauthorized", 401); return; }
+    const stats = await subscriptionRepo.getUsageStatsByUser(userId);
     sendJson(res, {
       monthlyCount: stats.monthly_count,
       limit: stats.limit,
@@ -47,10 +40,10 @@ export function registerStatsRoutes(router: Router) {
 
   // Daily trend: last 30 days record counts
   router.get("/api/v1/stats/daily-trend", async (req, res) => {
-    const deviceId = getDeviceId(req);
     const userId = getUserId(req);
-    const idCol = userId ? "user_id" : "device_id";
-    const idVal = userId ?? deviceId;
+    if (!userId) { sendError(res, "Unauthorized", 401); return; }
+    const idCol = "user_id";
+    const idVal = userId;
     const rows = await query<{ date: string; count: string }>(
       `SELECT DATE(created_at)::text AS date, COUNT(*)::text AS count
        FROM record
@@ -64,10 +57,10 @@ export function registerStatsRoutes(router: Router) {
 
   // Tag distribution: top tags by usage
   router.get("/api/v1/stats/tag-distribution", async (req, res) => {
-    const deviceId = getDeviceId(req);
     const userId = getUserId(req);
-    const idCol = userId ? "r.user_id" : "r.device_id";
-    const idVal = userId ?? deviceId;
+    if (!userId) { sendError(res, "Unauthorized", 401); return; }
+    const idCol = "r.user_id";
+    const idVal = userId;
     const rows = await query<{ name: string; count: string }>(
       `SELECT t.name, COUNT(*)::text AS count
        FROM record_tag rt
@@ -84,10 +77,10 @@ export function registerStatsRoutes(router: Router) {
 
   // Todo trend: last 30 days created vs completed
   router.get("/api/v1/stats/todo-trend", async (req, res) => {
-    const deviceId = getDeviceId(req);
     const userId = getUserId(req);
-    const idCol = userId ? "r.user_id" : "r.device_id";
-    const idVal = userId ?? deviceId;
+    if (!userId) { sendError(res, "Unauthorized", 401); return; }
+    const idCol = "r.user_id";
+    const idVal = userId;
     const rows = await query<{ date: string; created: string; completed: string }>(
       `SELECT d.date::text,
               COALESCE(c.created, 0)::text AS created,

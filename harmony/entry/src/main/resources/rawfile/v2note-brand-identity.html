@@ -1,0 +1,721 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>念念有路 Brand Identity</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700;900&family=Noto+Sans+SC:wght@300;400;500;600;700&display=swap');
+
+  :root {
+    --warm-cream: #FAF6F0;
+    --warm-sand: #F0E8DB;
+    --brand-bark: #3D3228;
+    --brand-deer: #C8845C;
+    --brand-antler: #A06B42;
+    --brand-forest: #5C7A5E;
+    --brand-moss: #8BA seventeen78;
+    --brand-sky: #7BA3C4;
+    --brand-dawn: #E8A87C;
+    --text-primary: #2C2520;
+    --text-secondary: #6B5E52;
+    --text-muted: #9B8E82;
+    --border: #E0D5C8;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--warm-cream);
+    color: var(--text-primary);
+    font-family: 'Noto Sans SC', sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ═══ HERO ═══ */
+  .hero {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 60px 40px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .hero::before {
+    content: '';
+    position: absolute;
+    top: -20%;
+    right: -10%;
+    width: 600px;
+    height: 600px;
+    background: radial-gradient(circle, rgba(200,132,92,0.08) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  .hero::after {
+    content: '';
+    position: absolute;
+    bottom: -10%;
+    left: -5%;
+    width: 400px;
+    height: 400px;
+    background: radial-gradient(circle, rgba(92,122,94,0.06) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  .logo-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 32px;
+    position: relative;
+    z-index: 1;
+  }
+
+  .deer-logo {
+    width: 180px;
+    height: 180px;
+    animation: breathe 4s ease-in-out infinite;
+    object-fit: contain;
+  }
+
+  @keyframes breathe {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-6px); }
+  }
+
+  .brand-name {
+    font-family: 'Noto Serif SC', serif;
+    font-size: 52px;
+    font-weight: 900;
+    color: var(--brand-bark);
+    letter-spacing: 12px;
+    text-indent: 12px;
+  }
+
+  .brand-name-en {
+    font-family: 'Noto Sans SC', sans-serif;
+    font-size: 14px;
+    font-weight: 300;
+    color: var(--text-muted);
+    letter-spacing: 6px;
+    text-transform: uppercase;
+    margin-top: -8px;
+  }
+
+  .slogan {
+    font-family: 'Noto Serif SC', serif;
+    font-size: 18px;
+    color: var(--text-secondary);
+    letter-spacing: 2px;
+    margin-top: 16px;
+    font-weight: 400;
+  }
+
+  .divider {
+    width: 40px;
+    height: 2px;
+    background: var(--brand-deer);
+    margin: 60px auto;
+    border-radius: 1px;
+  }
+
+  /* ═══ SECTIONS ═══ */
+  .section {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 80px 40px;
+  }
+
+  .section-label {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--text-muted);
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+
+  .section-title {
+    font-family: 'Noto Serif SC', serif;
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--brand-bark);
+    margin-bottom: 40px;
+  }
+
+  /* ═══ LOGO SPECS ═══ */
+  .logo-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 32px;
+    margin-bottom: 48px;
+  }
+
+  .logo-card {
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 48px 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 240px;
+    position: relative;
+    transition: box-shadow 0.2s ease;
+  }
+
+  .logo-card:hover { box-shadow: 0 4px 20px rgba(61,50,40,0.06); }
+
+  .logo-card.light { background: #FFFFFF; }
+  .logo-card.dark { background: var(--brand-bark); }
+  .logo-card.color { background: var(--brand-deer); }
+
+  .logo-card .label {
+    position: absolute;
+    bottom: 16px;
+    left: 0;
+    right: 0;
+    text-align: center;
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+
+  .logo-card.dark .label { color: rgba(255,255,255,0.4); }
+  .logo-card.color .label { color: rgba(255,255,255,0.6); }
+
+  .logo-lockup {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .logo-lockup svg { width: 48px; height: 48px; }
+
+  .logo-lockup .text {
+    font-family: 'Noto Serif SC', serif;
+    font-weight: 700;
+    font-size: 24px;
+    letter-spacing: 4px;
+  }
+
+  .logo-lockup.on-dark .text { color: var(--warm-cream); }
+  .logo-lockup.on-color .text { color: white; }
+
+  /* ═══ MASCOT ═══ */
+  .mascot-section {
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    gap: 64px;
+    align-items: start;
+    padding: 64px 0;
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    margin: 48px 0;
+  }
+
+  .mascot-display {
+    background: white;
+    border-radius: 20px;
+    padding: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--border);
+  }
+
+  .mascot-info h3 {
+    font-family: 'Noto Serif SC', serif;
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--brand-bark);
+    margin-bottom: 8px;
+  }
+
+  .mascot-info .subtitle {
+    font-size: 13px;
+    color: var(--text-muted);
+    margin-bottom: 24px;
+  }
+
+  .mascot-info p {
+    font-size: 14px;
+    color: var(--text-secondary);
+    line-height: 2;
+    margin-bottom: 16px;
+  }
+
+  .trait-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 20px;
+  }
+
+  .trait {
+    padding: 4px 14px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 500;
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+    background: white;
+  }
+
+  /* ═══ COLORS ═══ */
+  .color-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 20px;
+    margin-bottom: 32px;
+  }
+
+  .color-card {
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    background: white;
+  }
+
+  .color-swatch {
+    height: 100px;
+    width: 100%;
+  }
+
+  .color-info {
+    padding: 14px 16px;
+  }
+
+  .color-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+  }
+
+  .color-hex {
+    font-size: 12px;
+    color: var(--text-muted);
+    font-family: 'SF Mono', 'Fira Code', monospace;
+  }
+
+  .color-use {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 6px;
+    line-height: 1.5;
+  }
+
+  /* ═══ TYPOGRAPHY ═══ */
+  .type-specimen {
+    padding: 40px;
+    background: white;
+    border-radius: 16px;
+    border: 1px solid var(--border);
+    margin-bottom: 24px;
+  }
+
+  .type-label {
+    font-size: 11px;
+    color: var(--text-muted);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 16px;
+    font-weight: 500;
+  }
+
+  .type-serif {
+    font-family: 'Noto Serif SC', serif;
+    font-size: 36px;
+    font-weight: 700;
+    color: var(--brand-bark);
+    line-height: 1.4;
+    margin-bottom: 12px;
+  }
+
+  .type-sans {
+    font-family: 'Noto Sans SC', sans-serif;
+    font-size: 15px;
+    color: var(--text-secondary);
+    line-height: 2;
+  }
+
+  .type-mono {
+    font-family: 'SF Mono', 'Fira Code', 'JetBrains Mono', monospace;
+    font-size: 14px;
+    color: var(--text-secondary);
+    background: var(--warm-sand);
+    padding: 20px 24px;
+    border-radius: 8px;
+    line-height: 2;
+  }
+
+  /* ═══ SLOGAN DISPLAY ═══ */
+  .slogan-display {
+    text-align: center;
+    padding: 100px 40px;
+    position: relative;
+  }
+
+  .slogan-display .big {
+    font-family: 'Noto Serif SC', serif;
+    font-size: 32px;
+    font-weight: 700;
+    color: var(--brand-bark);
+    letter-spacing: 4px;
+    line-height: 1.8;
+  }
+
+  .slogan-display .sub {
+    font-size: 14px;
+    color: var(--text-muted);
+    margin-top: 20px;
+    letter-spacing: 2px;
+  }
+
+  /* ═══ APP PREVIEW ═══ */
+  .app-preview-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    margin-top: 40px;
+  }
+
+  .app-card {
+    background: white;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .app-card-header {
+    height: 36px;
+    background: var(--warm-sand);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 14px;
+    gap: 6px;
+  }
+
+  .app-card-header .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--border);
+  }
+
+  .app-card-body {
+    padding: 24px;
+    min-height: 180px;
+    font-size: 13px;
+    color: var(--text-secondary);
+    line-height: 1.8;
+  }
+
+  .app-card-body .caption {
+    font-size: 11px;
+    color: var(--text-muted);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    font-weight: 600;
+    margin-bottom: 12px;
+  }
+
+  .app-card-body .mock-input {
+    width: 100%;
+    padding: 10px 14px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text-muted);
+    font-family: 'SF Mono', monospace;
+    font-size: 13px;
+    background: var(--warm-cream);
+  }
+
+  .tag-row {
+    display: flex;
+    gap: 6px;
+    margin-top: 12px;
+  }
+
+  .tag-row .tag {
+    font-size: 10px;
+    padding: 2px 10px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+  }
+
+  /* ═══ FOOTER ═══ */
+  .footer {
+    text-align: center;
+    padding: 60px 40px;
+    border-top: 1px solid var(--border);
+  }
+
+  .footer svg, .footer img.footer-logo { width: 36px; height: 36px; opacity: 0.3; object-fit: contain; }
+  .footer p { font-size: 12px; color: var(--text-muted); margin-top: 16px; letter-spacing: 1px; }
+</style>
+</head>
+<body>
+
+<!-- ═══════ HERO ═══════ -->
+<section class="hero">
+  <div class="logo-container">
+    <!-- DEER LOGO: 路路 -->
+    <img class="deer-logo" src="lulu-logo.png" alt="路路 - 念念有路品牌吉祥物" />
+
+    <div style="text-align: center;">
+      <div class="brand-name">念念有路</div>
+      <div class="brand-name-en">v2note · niàn niàn yǒu lù</div>
+    </div>
+
+    <div class="slogan">你说的每一句话，都会变为行动</div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- ═══════ LOGO SYSTEM ═══════ -->
+<section class="section">
+  <div class="section-label">01 / Logo System</div>
+  <div class="section-title">标志系统</div>
+
+  <div class="logo-grid">
+    <!-- Light background -->
+    <div class="logo-card light">
+      <div class="logo-lockup">
+        <img src="lulu-logo.png" alt="路路" width="52" height="52" style="object-fit: contain;" />
+        <span class="text" style="color: #3D3228;">念念有路</span>
+      </div>
+      <div class="label">浅色背景</div>
+    </div>
+
+    <!-- Dark background -->
+    <div class="logo-card dark">
+      <div class="logo-lockup on-dark">
+        <img src="lulu-logo.png" alt="路路" width="52" height="52" style="object-fit: contain;" />
+        <span class="text">念念有路</span>
+      </div>
+      <div class="label">深色背景</div>
+    </div>
+
+    <!-- Color background -->
+    <div class="logo-card color">
+      <div class="logo-lockup on-color">
+        <img src="lulu-logo.png" alt="路路" width="52" height="52" style="object-fit: contain;" />
+        <span class="text">念念有路</span>
+      </div>
+      <div class="label">品牌色背景</div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════ MASCOT ═══════ -->
+<section class="section" style="padding-top: 0;">
+  <div class="section-label">02 / Mascot</div>
+  <div class="section-title">品牌吉祥物</div>
+
+  <div class="mascot-section">
+    <div class="mascot-display">
+      <img src="lulu-logo.png" alt="路路 Lùlù" width="200" height="200" style="object-fit: contain;" />
+    </div>
+
+    <div class="mascot-info">
+      <h3>路路 Lùlù</h3>
+      <div class="subtitle">念念有路品牌吉祥物</div>
+      <p>路路是一只温暖的小鹿。它安静、细心、从不急躁。它不会催你做任何事，但当你迷路的时候，它会轻轻地站在路口，用眼神告诉你："别急，路在这里。"</p>
+      <p>鹿角代表思维的分叉与生长——每一个想法都可以分出新的枝桠。脚下隐约的小径代表从想法到行动的路。路路的名字是"路"的叠词——念念有"路"，每一个念头都有通往行动的道路。</p>
+
+      <div class="trait-list">
+        <span class="trait">温暖不打扰</span>
+        <span class="trait">安静但在场</span>
+        <span class="trait">越陪越懂你</span>
+        <span class="trait">从不评判</span>
+        <span class="trait">指路不催路</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════ COLORS ═══════ -->
+<section class="section">
+  <div class="section-label">03 / Color Palette</div>
+  <div class="section-title">色彩系统</div>
+
+  <p style="font-size: 14px; color: var(--text-secondary); line-height: 1.8; margin-bottom: 32px; max-width: 600px;">
+    取自鹿的自然色系——树皮、鹿毛、苔藓、晨光。温暖但不甜腻，沉稳但不沉闷。核心色用于品牌标识，产品界面以白底为主，色彩仅在关键信息处克制使用。
+  </p>
+
+  <h3 style="font-size: 13px; font-weight: 600; color: var(--text-secondary); margin-bottom: 16px; letter-spacing: 1px;">核心色</h3>
+  <div class="color-grid">
+    <div class="color-card">
+      <div class="color-swatch" style="background: #3D3228;"></div>
+      <div class="color-info">
+        <div class="color-name">树皮 Bark</div>
+        <div class="color-hex">#3D3228</div>
+        <div class="color-use">品牌主色、标题、按钮</div>
+      </div>
+    </div>
+    <div class="color-card">
+      <div class="color-swatch" style="background: #C8845C;"></div>
+      <div class="color-info">
+        <div class="color-name">鹿毛 Deer</div>
+        <div class="color-hex">#C8845C</div>
+        <div class="color-use">品牌辅色、Logo、强调</div>
+      </div>
+    </div>
+    <div class="color-card">
+      <div class="color-swatch" style="background: #A06B42;"></div>
+      <div class="color-info">
+        <div class="color-name">鹿角 Antler</div>
+        <div class="color-hex">#A06B42</div>
+        <div class="color-use">活跃状态、链接</div>
+      </div>
+    </div>
+    <div class="color-card">
+      <div class="color-swatch" style="background: #FAF6F0;"></div>
+      <div class="color-info">
+        <div class="color-name">暖奶 Cream</div>
+        <div class="color-hex">#FAF6F0</div>
+        <div class="color-use">页面背景</div>
+      </div>
+    </div>
+  </div>
+
+  <h3 style="font-size: 13px; font-weight: 600; color: var(--text-secondary); margin-bottom: 16px; letter-spacing: 1px; margin-top: 32px;">语义色</h3>
+  <div class="color-grid">
+    <div class="color-card">
+      <div class="color-swatch" style="background: #5C7A5E;"></div>
+      <div class="color-info">
+        <div class="color-name">森林 Forest</div>
+        <div class="color-hex">#5C7A5E</div>
+        <div class="color-use">完成、健康、正面</div>
+      </div>
+    </div>
+    <div class="color-card">
+      <div class="color-swatch" style="background: #7BA3C4;"></div>
+      <div class="color-info">
+        <div class="color-name">天空 Sky</div>
+        <div class="color-hex">#7BA3C4</div>
+        <div class="color-use">关联、链接、信息</div>
+      </div>
+    </div>
+    <div class="color-card">
+      <div class="color-swatch" style="background: #E8A87C;"></div>
+      <div class="color-info">
+        <div class="color-name">晨光 Dawn</div>
+        <div class="color-hex">#E8A87C</div>
+        <div class="color-use">提醒、注意、系统观察</div>
+      </div>
+    </div>
+    <div class="color-card">
+      <div class="color-swatch" style="background: #C45C5C;"></div>
+      <div class="color-info">
+        <div class="color-name">枫红 Maple</div>
+        <div class="color-hex">#C45C5C</div>
+        <div class="color-use">风险、阻力、录音</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════ TYPOGRAPHY ═══════ -->
+<section class="section">
+  <div class="section-label">04 / Typography</div>
+  <div class="section-title">字体规范</div>
+
+  <div class="type-specimen">
+    <div class="type-label">品牌标题 · Noto Serif SC Bold</div>
+    <div class="type-serif">念念有路，每一个想法都值得被认真对待</div>
+    <div style="margin-top: 16px; font-family: 'Noto Serif SC', serif; font-size: 14px; color: var(--text-muted);">
+      适用于：品牌名称、页面大标题、Slogan、每日回顾标题
+    </div>
+  </div>
+
+  <div class="type-specimen">
+    <div class="type-label">界面正文 · Noto Sans SC Regular</div>
+    <div class="type-sans">今天和张总开会，他说原材料涨了15%，我觉得我们应该换供应商，但老王反对，他觉得风险太大质量不好保证。回头让小李做个成本对比。这件事需要尽快推进，不能再拖了。</div>
+    <div style="margin-top: 16px; font-size: 12px; color: var(--text-muted);">
+      适用于：日记内容、时间线卡片、系统观察正文、对话内容
+    </div>
+  </div>
+
+  <div class="type-specimen">
+    <div class="type-label">写作面板 · Monospace</div>
+    <div class="type-mono">
+      开始记录你的想法...<br><br>
+      /&nbsp;&nbsp;唤出命令菜单<br>
+      @&nbsp;&nbsp;链接到主题或目标<br>
+      #&nbsp;&nbsp;添加标签
+    </div>
+    <div style="margin-top: 16px; font-size: 12px; color: var(--text-muted);">
+      适用于：写作面板编辑区（SF Mono → Fira Code → JetBrains Mono 回退）
+    </div>
+  </div>
+</section>
+
+<!-- ═══════ SLOGAN ═══════ -->
+<section class="slogan-display">
+  <div class="big">
+    你说的每一句话<br>都会变为行动
+  </div>
+  <div class="sub">Every word you speak becomes a path forward.</div>
+</section>
+
+<div class="divider"></div>
+
+<!-- ═══════ APP PREVIEW ═══════ -->
+<section class="section">
+  <div class="section-label">05 / Application</div>
+  <div class="section-title">产品中的品牌体现</div>
+
+  <div class="app-preview-row">
+    <div class="app-card">
+      <div class="app-card-header">
+        <div class="dot"></div><div class="dot"></div><div class="dot"></div>
+      </div>
+      <div class="app-card-body">
+        <div class="caption">写作面板</div>
+        <div class="mock-input">今天和张总开会，他说原材料涨了15%...|</div>
+        <div class="tag-row">
+          <span class="tag">供应链</span>
+          <span class="tag">成本控制</span>
+        </div>
+        <div style="margin-top: 20px; font-size: 11px; color: var(--text-muted);">
+          纯净的输入体验。路路在后台安静工作，<br>自动为你的文字找到归属和关联。
+        </div>
+      </div>
+    </div>
+
+    <div class="app-card">
+      <div class="app-card-header">
+        <div class="dot"></div><div class="dot"></div><div class="dot"></div>
+      </div>
+      <div class="app-card-body">
+        <div class="caption">每日回顾</div>
+        <div style="padding: 12px 16px; background: var(--warm-cream); border-radius: 8px; border-left: 3px solid var(--brand-deer); margin-bottom: 12px;">
+          <div style="font-size: 11px; color: var(--brand-antler); font-weight: 600; margin-bottom: 4px;">✦ 路路发现</div>
+          <div style="font-size: 13px; color: var(--text-secondary); line-height: 1.7;">你最近关于供应链的思考密度是平时的两倍。方向在收敛。</div>
+        </div>
+        <div style="font-size: 11px; color: var(--text-muted);">
+          路路每天给你写两封信：<br>早上帮你规划，晚上帮你回顾。
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════ FOOTER ═══════ -->
+<div class="footer">
+  <img class="footer-logo" src="lulu-logo.png" alt="路路" />
+  <p>念念有路 · 你说的每一句话，都会变为行动</p>
+  <p style="margin-top: 8px; font-size: 11px;">© 2026 v2note. All rights reserved.</p>
+  <p style="margin-top: 8px; font-size: 11px;"><a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer" style="color: var(--text-muted); text-decoration: none;">陇ICP备2026001728号</a></p>
+</div>
+
+</body>
+</html>

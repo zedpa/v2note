@@ -94,7 +94,6 @@ describe("at-route-parser", () => {
       level: 3,
       status: "active" as const,
       merged_into: null,
-      domain: "工作",
       created_by: "user" as const,
       page_type: "topic" as const,
       token_count: 0,
@@ -111,7 +110,6 @@ describe("at-route-parser", () => {
       title: "采购",
       parent_id: "wp-l3",
       level: 2,
-      domain: "工作",
     };
 
     it("should_return_existing_l3_page_when_domain_exists", async () => {
@@ -132,10 +130,11 @@ describe("at-route-parser", () => {
           user_id: "u-1",
           title: "工作",
           level: 3,
-          domain: "工作",
           created_by: "user",
         }),
       );
+      // domain 已废弃，不应传入
+      expect(vi.mocked(wikiPageRepo.create).mock.calls[0][0]).not.toHaveProperty("domain");
       expect(result.id).toBe("wp-l3");
     });
 
@@ -163,14 +162,14 @@ describe("at-route-parser", () => {
         level: 3,
         created_by: "user",
       });
-      // 第二次创建 L2
+      // 第二次创建 L2（不再传 domain）
       expect(vi.mocked(wikiPageRepo.create).mock.calls[1][0]).toMatchObject({
         title: "采购",
         level: 2,
         parent_id: "wp-l3",
-        domain: "工作",
         created_by: "user",
       });
+      expect(vi.mocked(wikiPageRepo.create).mock.calls[1][0]).not.toHaveProperty("domain");
       expect(result.id).toBe("wp-l2");
     });
 
@@ -185,9 +184,9 @@ describe("at-route-parser", () => {
         title: "采购",
         level: 2,
         parent_id: "wp-l3",
-        domain: "工作",
         created_by: "user",
       });
+      expect(vi.mocked(wikiPageRepo.create).mock.calls[0][0]).not.toHaveProperty("domain");
       expect(result.id).toBe("wp-l2");
     });
   });

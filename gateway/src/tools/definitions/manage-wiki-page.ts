@@ -9,6 +9,7 @@ import { z } from "zod";
 import * as wikiPageRepo from "../../db/repositories/wiki-page.js";
 import * as wikiPageRecordRepo from "../../db/repositories/wiki-page-record.js";
 import { query, execute, getPool } from "../../db/pool.js";
+import { createGoalPageWithTodo } from "../../db/repositories/goal-page-factory.js";
 import type { ToolDefinition } from "../types.js";
 
 /** 检查同 parent 下是否有同名 active page（excludeId 排除自身，用于 rename） */
@@ -80,18 +81,7 @@ export const manageWikiPageTool: ToolDefinition = {
           const client = await getPool().connect();
           try {
             await client.query("BEGIN");
-            const { rows } = await client.query(
-              `INSERT INTO wiki_page (user_id, title, parent_id, level, page_type, created_by)
-               VALUES ($1, $2, $3, $4, 'goal', 'user')
-               RETURNING id, title, level`,
-              [ctx.userId, trimmedTitle, parentId, parentId ? 2 : 3],
-            );
-            const page = rows[0];
-            await client.query(
-              `INSERT INTO todo (device_id, user_id, text, status, level, done, category, wiki_page_id)
-               VALUES ($1, $2, $3, 'active', 1, false, 'manual', $4)`,
-              [ctx.userId, ctx.userId, trimmedTitle, page.id],
-            );
+            const page = await createGoalPageWithTodo(ctx.userId, trimmedTitle, parentId, client);
             await client.query("COMMIT");
             return {
               success: true,

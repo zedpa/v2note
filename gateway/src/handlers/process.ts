@@ -7,6 +7,7 @@ import { safeParseJson } from "../lib/text-utils.js";
 import { toLocalDateTime } from "../lib/tz.js";
 import { buildTodoExtractPrompt, buildTodoRefinePrompt, type TodoModeContext } from "./todo-extract-prompt.js";
 import { buildUnifiedProcessPrompt, type UnifiedProcessContext } from "./unified-process-prompt.js";
+import * as wikiPageRecordRepo from "../db/repositories/wiki-page-record.js";
 import { commandFullMode } from "./command-full-mode.js";
 
 export interface LocalConfigPayload {
@@ -168,7 +169,7 @@ export async function processEntry(payload: ProcessPayload): Promise<ProcessResu
     console.log(`[process] Layer 3: Unified AI processing (v3 no-strike)`);
 
     // 1. 加载上下文
-    const [pendingTodosL3, activeGoalsL3, existingDomains] = await Promise.all([
+    const [pendingTodosL3, activeGoalsL3, existingPages] = await Promise.all([
       payload.userId
         ? todoRepo.findPendingByUser(payload.userId)
         : todoRepo.findPendingByDevice(payload.deviceId),
@@ -176,8 +177,10 @@ export async function processEntry(payload: ProcessPayload): Promise<ProcessResu
         ? todoRepo.findActiveGoalsByUser(payload.userId)
         : todoRepo.findActiveGoalsByDevice(payload.deviceId),
       payload.userId
-        ? wikiPageRepo.findAllActive(payload.userId).then(pages => pages.map(p => p.title))
-        : Promise.resolve([] as string[]),
+        ? wikiPageRepo.findAllActive(payload.userId).then(pages =>
+            pages.slice(0, 50).map(p => ({ id: p.id, title: p.title }))
+          )
+        : Promise.resolve([] as Array<{ id: string; title: string }>),
     ]);
 
     const unifiedCtx: UnifiedProcessContext = {
@@ -187,7 +190,7 @@ export async function processEntry(payload: ProcessPayload): Promise<ProcessResu
         text: t.text,
         scheduled_start: t.scheduled_start ?? undefined,
       })),
-      existingDomains,
+      existingPages,
     };
 
     // 2. 单次 AI 调用
@@ -215,7 +218,7 @@ export async function processEntry(payload: ProcessPayload): Promise<ProcessResu
     interface UnifiedResult {
       intent_type?: string;
       summary?: string;
-      domain?: string | null;
+      page_title?: string | null;
       tags?: string[];
       todos?: Array<{
         text: string;
@@ -241,7 +244,7 @@ export async function processEntry(payload: ProcessPayload): Promise<ProcessResu
     result.voice_intent_type = intentType as ProcessResult["voice_intent_type"];
     result.summary = parsed.summary;
     result.tags = parsed.tags;
-    console.log(`[process] Result: intent=${intentType}, domain=${parsed.domain ?? "null"}, todos=${parsed.todos?.length ?? 0}, commands=${parsed.commands?.length ?? 0}, tags=${parsed.tags?.length ?? 0}`);
+    console.log(`[process] Result: intent=${intentType}, page_title=${parsed.page_title ?? "null"}, todos=${parsed.todos?.length ?? 0}, commands=${parsed.commands?.length ?? 0}, tags=${parsed.tags?.length ?? 0}`);
 
     // 4. 保存 summary
     if (result.summary && payload.recordId) {
@@ -261,7 +264,14 @@ export async function processEntry(payload: ProcessPayload): Promise<ProcessResu
       }
     }
 
-    // 5. domain 分配已移除（Phase 11: Wiki Page 统一组织层）
+    // 5. page_title 即时归类（替代废弃的 domain）
+    await classifyByPageTitle({
+      pageTitle: parsed.page_title ?? null,
+      recordId: payload.recordId,
+      userId: payload.userId,
+      textLength: payload.text.length,
+      existingPages,
+    });
 
     // 6. 保存 tags → record_tag（最多5个）
     if (parsed.tags && parsed.tags.length > 0 && payload.recordId) {
@@ -364,6 +374,67 @@ export async function processEntry(payload: ProcessPayload): Promise<ProcessResu
   }
 
   return result;
+}
+
+// ── page_title 即时归类 ──────────────────────────────────────────
+
+export interface ClassifyByPageTitleParams {
+  pageTitle: string | null;
+  recordId?: string;
+  userId?: string;
+  textLength: number;
+  existingPages: Array<{ id: string; title: string }>;
+}
+
+/**
+ * 根据 AI 返回的 page_title 即时归类 record 到 wiki page。
+ * - 匹配已有 page → 直接关联
+ * - 未匹配 → 创建新 page 并关联
+ * - page_title 为 null/空 或缺少 recordId/userId → 跳过
+ */
+export async function classifyByPageTitle(params: ClassifyByPageTitleParams): Promise<void> {
+  const { pageTitle, recordId, userId, textLength, existingPages } = params;
+
+  if (!pageTitle || pageTitle.trim() === "" || !recordId || !userId) {
+    return;
+  }
+
+  // 截断超长标题，防止 AI 返回异常长文本污染 page 列表
+  const sanitizedTitle = pageTitle.trim().slice(0, 50);
+
+  try {
+    // 在已有 pages 中精确匹配
+    const matchedPage = existingPages.find(p => p.title === sanitizedTitle);
+    let pageId: string;
+
+    if (matchedPage) {
+      pageId = matchedPage.id;
+    } else {
+      // 创建新 page
+      const newPage = await wikiPageRepo.create({
+        user_id: userId,
+        title: sanitizedTitle,
+        level: 3,
+        created_by: "ai",
+        page_type: "topic",
+      });
+      pageId = newPage.id;
+    }
+
+    // 关联 record 到 page
+    await wikiPageRecordRepo.link(pageId, recordId);
+
+    // 更新 token_count 触发编译检查
+    const tokenDelta = Math.ceil(textLength * 2); // 粗略估算
+    const newTokenCount = await wikiPageRepo.incrementTokenCount(pageId, tokenDelta);
+
+    // fire-and-forget 编译触发
+    import("../cognitive/compile-trigger.js").then(({ checkAndTriggerCompile }) =>
+      checkAndTriggerCompile(pageId, userId, newTokenCount).catch(() => {})
+    );
+  } catch (err: any) {
+    console.warn(`[process] page_title 即时归类失败: ${err.message}`);
+  }
 }
 
 // ── Layer 1: 待办全能模式 ─────────────────────────────────────────

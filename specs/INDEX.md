@@ -10,7 +10,7 @@
 6. superseded 状态的 spec 已被合并，永远不要引用它们，使用 superseded_by 指向的文件
 -->
 
-> 最后更新：2026-04-12 | 共 103 个 spec（23 active / 6 draft / 44 completed / 29 superseded / 2 deprecated）
+> 最后更新：2026-04-13 | 共 105 个 spec（23 active / 6 draft / 46 completed / 29 superseded / 2 deprecated）
 
 ## 🔵 Active（当前有效，可直接引用和修改）
 
@@ -39,7 +39,8 @@
 | 123 | 提示词架构 v2 — SharedAgent/UserAgent 分层 | agent | prompt-architecture-v2.md | 五层存储互斥+AI自主维护+wiki注入 |
 | 125 | 待办写入系统日历 & 闹钟 | todo | todo-calendar-alarm.md | Intent方案+SystemIntentPlugin |
 | 087 | 鸿蒙 HarmonyOS NEXT 适配 | infra | harmony-support.md | WebView壳+JSBridge+前端适配层 |
-| fix-sidebar-wiki-mgmt | Fix: 侧边栏 Wiki 页面管理 | ui | fix-sidebar-wiki-mgmt.md | 数据对齐+CRUD UI+Agent工具 |
+| fix-sidebar-wiki-mgmt | Fix: 侧边栏 Wiki 页面管理 | ui | fix-sidebar-wiki-mgmt.md | Phase1-4✅+Phase5显示优化✅ |
+| fix-device-id-cleanup | Fix: deviceId 残留清理 — 路由层全面切 userId | infra | fix-device-id-cleanup.md | ✅ completed |
 ## 🟡 Draft（规划中，尚未开始实施）
 
 | id | title | domain | file |
@@ -53,6 +54,11 @@
 
 | id | title | domain | file |
 |----|-------|--------|------|
+| fix-domain-deprecation | Fix: domain 字段全面废弃 | infra | fix-domain-deprecation.md |
+| fix-goal-wiki-data-cleanup | Fix: Goal/Wiki Page 数据清洗 | cognitive | fix-goal-wiki-data-cleanup.md |
+| repo-transaction-support | Repo 层事务支持 — 消除 raw SQL 绕过 repo | infra | repo-transaction-support.md |
+| fix-process-domain-to-page | Fix: Layer 3 domain → page_title 即时归类 | cognitive | fix-process-domain-to-page.md |
+| fix-goal-quality | Fix: goal_sync 目标去重 + 层级组织 | cognitive | fix-goal-quality.md |
 | fix-recording-audio-focus | Fix: 录音按钮无法中断系统音频播放 | voice | fix-recording-audio-focus.md |
 | fix-onboarding-step2-guide | Fix: 冷启动第二步改为聚焦操作引导 | onboarding | fix-onboarding-step2-guide.md |
 | fix-remove-device-id | Fix: 全面清除 deviceId 概念 | infra | fix-remove-device-id.md |

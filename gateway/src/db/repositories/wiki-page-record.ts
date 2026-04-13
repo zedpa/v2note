@@ -4,6 +4,7 @@
  * 替代原来的 UUID[] 字段，避免无界增长。
  */
 import { query, execute } from "../pool.js";
+import type { Queryable } from "../pool.js";
 
 export interface WikiPageRecord {
   wiki_page_id: string;
@@ -15,12 +16,14 @@ export interface WikiPageRecord {
 export async function link(
   wikiPageId: string,
   recordId: string,
+  client?: Queryable,
 ): Promise<void> {
   await execute(
     `INSERT INTO wiki_page_record (wiki_page_id, record_id)
      VALUES ($1, $2)
      ON CONFLICT (wiki_page_id, record_id) DO NOTHING`,
     [wikiPageId, recordId],
+    client,
   );
 }
 
@@ -87,7 +90,7 @@ export async function unlinkAllByRecord(recordId: string): Promise<void> {
 }
 
 /** 批量转移：将 source page 的所有关联转移到 target page */
-export async function transferAll(sourcePageId: string, targetPageId: string): Promise<number> {
+export async function transferAll(sourcePageId: string, targetPageId: string, client?: Queryable): Promise<number> {
   // 先删除 source 的关联，再插入到 target（忽略重复）
   const rows = await query<{ record_id: string }>(
     `WITH moved AS (
@@ -98,8 +101,20 @@ export async function transferAll(sourcePageId: string, targetPageId: string): P
      ON CONFLICT (wiki_page_id, record_id) DO NOTHING
      RETURNING record_id`,
     [sourcePageId, targetPageId],
+    client,
   );
   return rows.length;
+}
+
+/** 继承关联：将 source page 的所有 record 关联复制到新 page（不删除原关联） */
+export async function inheritAll(sourcePageId: string, newPageId: string, client?: Queryable): Promise<number> {
+  return execute(
+    `INSERT INTO wiki_page_record (wiki_page_id, record_id)
+     SELECT $1, record_id FROM wiki_page_record WHERE wiki_page_id = $2
+     ON CONFLICT (wiki_page_id, record_id) DO NOTHING`,
+    [newPageId, sourcePageId],
+    client,
+  );
 }
 
 /** 统计某个 wiki page 关联的 record 数量 */

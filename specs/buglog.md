@@ -19,6 +19,30 @@
 
 （按时间倒序，新条目添加在此处下方）
 
+### 2026-04-13 [bug] goal_sync 目标重复生成 + 缺少层级组织
+- **现象**：侧边栏和待办项目页中目标杂乱——重复的 goal（"学英语"+"英语学习"）、全部 L3 顶层平铺
+- **根因**：(1) AI 编译时无已有 goal 列表上下文，无法去重；(2) allPageIndex 无 page_type，AI 不能区分 topic/goal；(3) goal page 硬编码 level=3 parent_id=NULL
+- **修复**：prompt 注入 existingGoals + page_type 列 + 去重指令；DB 兜底 LOWER(TRIM(text)) 去重；goal page 按 parent_page_id 挂载（level=parent.level-1）；parent_page_id UUID 校验
+- **回归测试**：`wiki-compiler.test.ts` 6 个 + `wiki-compile-prompt.test.ts` 6 个
+- **教训**：AI 输出去重需双层防护——prompt 引导语义去重 + DB 层精确匹配兜底（加 LOWER+TRIM 归一化）
+- **已提炼**：❌ 仅此例
+
+### 2026-04-13 [bug] Layer 3 domain 废弃残留 → page_title 即时归类
+- **现象**：AI prompt 仍指导生成 domain 字段但结果被丢弃，浪费 token；record 归类依赖异步 wiki-compiler，无即时反馈
+- **根因**：Phase 11 废弃 domain 时只注释了 process.ts 的写入逻辑，prompt 和接口未同步清理
+- **修复**：prompt §3 domain → page_title（AI 从已有 page 列表语义匹配）；process.ts 即时归类（精确匹配→link / 未匹配→create+link）；lightweight-classifier 跳过已归类 record
+- **回归测试**：`process-classify.test.ts` — 9 个测试；`lightweight-classifier.test.ts` 更新跳过逻辑断言
+- **教训**：废弃字段必须全链路清理（prompt→接口→解析→log），否则残留会持续浪费资源；token_count 增量操作跨模块时需防重复计数
+- **已提炼**：❌ 仅此例
+
+### 2026-04-13 [重构] Repo 层事务支持 — 消除 raw SQL 绕过 repo 的技术债
+- **现象**：wiki-compiler executeInstructions 中 33 处 raw SQL 绕过 repo 层，知识图谱显示 8 个关键模块完全断裂
+- **根因**：pool.ts 的 query/execute 不支持传入 pg.PoolClient，repo 方法无法在事务中使用
+- **修复**：pool.ts 加可选 client 参数 → 5 个 repo 透传 → wiki-compiler 30 处 raw SQL 替换为 repo 调用 → manage-wiki-page + wiki.ts goal 创建提取共享函数
+- **回归测试**：`gateway/src/db/pool.test.ts` — 19 个测试
+- **教训**：事务内操作应通过 repo 层 + 可选 client 参数，而非直接 raw SQL。新增 repo 方法时应预留 client 参数
+- **已提炼**：❌ 可考虑写入 CLAUDE.md 已知陷阱
+
 ### 2026-04-12 [bug] 录音按钮无法中断系统音频播放
 - **现象**：用户按住录音按钮时，后台音乐不会暂停
 - **根因**：(1) Pre-capture 阶段（120ms 后）打开麦克风但不请求音频焦点，音频焦点在 startRecording（长按确认后）才请求，存在时间窗口；(2) Android 使用 AUDIOFOCUS_GAIN_TRANSIENT，部分播放器只降低音量不暂停；(3) Android WebView getUserMedia 不会自动请求音频焦点（Chromium 已知行为）
@@ -101,6 +125,21 @@
 - **回归测试**：无（需真实数据库+长时间运行环境）
 - **教训**：Supabase Transaction Pooler 不适合持有长事务（>60s）。advisory lock 包在事务中，事务被 pooler 杀死后锁丢失但编译也中断。对于单实例服务，内存锁比 DB 锁更可靠
 - **已提炼**：✅ 已写入 CLAUDE.md（[数据库锁] 长事务规则）
+
+### [2026-04-13] [bug] deviceId 残留导致录音失败+登录闪退+路由401
+
+- **现象**：(1) 松开录音总是提示"录音已保存，待网络恢复后重试"但上滑正常 (2) 登录后立即退回登录界面 (3) 部分 API 返回 401
+- **根因**：`fix-remove-device-id`（3c39ed9）清理了 JWT/WS/Session 层的 deviceId，但遗漏了三个层面：
+  1. **数据库 schema**：`record.device_id` 仍是 NOT NULL，新代码不传 deviceId → INSERT 失败 → `asr.done` 无法发出 → 前端 15 秒超时
+  2. **gateway 未重新编译**：`pnpm build` 有 TS 错误未修复，服务器运行的是旧编译产物，旧代码要求 login 必传 deviceId
+  3. **路由层 `getDeviceId(req)`**：50+ 处调用，JWT 无 deviceId 时抛 401
+- **修复**：
+  1. 迁移 066：`ALTER TABLE record ALTER COLUMN device_id DROP NOT NULL`
+  2. 修复 4 个 TS 编译错误，重新 build + 部署
+  3. `getDeviceId` fallback 到 userId（临时），然后全面清理 18 个路由文件改用 `getUserId`
+- **回归测试**：60 个（`device-id-cleanup.test.ts`），验证所有路由文件不再 import/调用 getDeviceId
+- **教训**：身份体系迁移（deviceId→userId）必须一次性覆盖 JWT→WS→Session→HTTP路由→DB Schema→编译部署 全链路。遗漏任一层都会在不同时机爆炸：Schema NOT NULL → 录音失败；路由层 getDeviceId → API 401；未编译 → 旧代码阻止登录
+- **已提炼**：✅
 
 ### [2026-04-11] [bug] Node.js HTTP 服务器默认超时截断编译响应
 
@@ -284,4 +323,27 @@
 - **修复**：(1) create_todo/update_todo schema 添加 reminder_before + reminder_types，handler 添加 reminder_at 计算和 recalc 逻辑（含 scheduled_start=null 时清除 reminder_at）；(2) todo-edit-sheet 添加提醒选项（不提醒/5分/15分/30分/1小时前），清除 date 时自动重置 reminderBefore；(3) 对抗审查发现的3个边界问题均已修复
 - **回归测试**：`gateway/src/tools/definitions/create-todo.test.ts`（5个）+ `gateway/src/tools/definitions/update-todo.test.ts`（6个）+ `features/todos/components/todo-edit-sheet.test.tsx`（5个）— 标注 `regression: fix-reminder-not-working`
 - **教训**：Agent 工具 schema 必须与 REST API 参数保持同步。当 REST 路由支持某个参数但工具不支持时，AI 等于缺了一只手。新增 DB 字段时应同时检查所有写入路径（REST + 工具 + 前端）
+- **已提炼**：❌ 首次出现
+
+### [2026-04-13] [bug] domain 字段全面废弃 — 双重分类体系清理
+- **现象**：侧边栏杂乱，wiki page 和 domain 双体系并存，AI prompt 同时收到 domain 和 page title 造成分类混乱
+- **根因**：domain 字段是旧分类体系残留。fix-sidebar-wiki-mgmt 废弃了 domain 工具但未清理 domain 字段的读写路径（6处写入+12处读取+2个废弃函数）。wiki-compiler prompt 同时传 existingDomains 和 allPageIndex，AI 在两套分类间摇摆
+- **修复**：(1) 停止全部 6 处 domain 写入（lightweight-classifier、at-route-parser、wiki-compiler、routes/todos）；(2) 清理 prompt 中的 existingDomains 和 domainHint；(3) getDimensionSummary 重写为 JOIN wiki_page.title 分组；(4) search 工具 domain 过滤改为 wiki_page.title 匹配（精确优先+ILIKE 回退+通配符转义）；(5) 类型定义移除 domain 字段
+- **回归测试**：wiki-compile-prompt.test.ts + wiki-compiler-links.test.ts + lightweight-classifier.test.ts + at-route-parser.test.ts + wiki-page.test.ts — 全部同步更新
+- **教训**：废弃一个字段必须彻底——停工具不够，必须同时停字段读写路径。残留的读取路径会让 AI 和用户产生"这个字段还有效"的错觉
+- **已提炼**：❌ 首次出现
+
+### [2026-04-13] [bug] Goal/Wiki Page 数据清洗 — 存量脏数据一次性迁移
+- **现象**：侧边栏充斥重复目标、空壳页面、孤儿 goal，所有 goal page 平铺在 L3 顶层不分层级
+- **根因**：旧 goal_sync 无去重（fix-goal-quality 已修复增量逻辑）；goal page 硬编码 level=3 parent_id=NULL；domain 工具创建的 page 与 classifier 创建的重复
+- **修复**：SQL 迁移 067_goal_wiki_data_cleanup.sql，7 步：(1)重复 goal todo 合并 (2)重复 goal page 合并 (3)孤儿 todo 修复 (4)孤儿 page 修复 (5)空壳清理 (6)过期 suggested 清理 (7)embedding/pg_trgm 匹配重挂载
+- **回归测试**：goal-cleanup-logic.test.ts（55 个测试）
+- **教训**：数据迁移 PL/pgSQL 中 SELECT INTO 的变量类型必须与查询结果匹配——SELECT 多列 INTO 单个变量时必须用 RECORD 类型，不能用 UUID
+- **已提炼**：❌ 首次出现
+
+### [2026-04-13] [流程改进] 侧边栏显示优化 — Topic/Goal 分区
+- **现象**：侧边栏 topic page 和 goal page 混排，空 page 占位，goal 全在顶层不分层
+- **根因**：侧边栏渲染逻辑未按 page_type 分区，排序仅用 level+updatedAt 不考虑活跃度
+- **修复**：(1) 前端分为「主题」区和「目标」区；(2) 空 page opacity 弱化+快捷归档；(3) 排序改为 recordCount DESC；(4) goal 在 topic 子树中带 ⭐ 标记
+- **教训**：排序优化时注意前端是否有 hardcoded 的分组判断文本（如"其他"），后端改动后端的 fallback 文本要保持一致
 - **已提炼**：❌ 首次出现

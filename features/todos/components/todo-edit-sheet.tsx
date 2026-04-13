@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useRef } from "react";
+import { createPortal } from "react-dom";
 import {
   Calendar, Clock, Trash2, Sparkles,
 } from "lucide-react";
@@ -117,7 +118,7 @@ export function TodoEditSheet({ todo, open, onClose, onUpdated, onAskAI }: TodoE
 
   if (!open || !todo) return null;
 
-  return (
+  return createPortal(
     <>
       <div className="fixed inset-0 z-40 bg-black/50" onClick={onClose} />
 
@@ -264,7 +265,8 @@ export function TodoEditSheet({ todo, open, onClose, onUpdated, onAskAI }: TodoE
           </button>
         </div>
       </div>
-    </>
+    </>,
+    document.body,
   );
 }
 

@@ -1,5 +1,5 @@
 import type { Router } from "../router.js";
-import { readBody, sendJson, sendError, getDeviceId } from "../lib/http-helpers.js";
+import { readBody, sendJson, sendError } from "../lib/http-helpers.js";
 import { hashPassword, verifyPassword } from "../auth/passwords.js";
 import { signAccessToken, signRefreshToken, verifyRefreshToken, signEmailVerificationToken, verifyEmailVerificationToken } from "../auth/jwt.js";
 import { getAuthContext } from "../auth/middleware.js";

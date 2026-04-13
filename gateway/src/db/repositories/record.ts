@@ -1,4 +1,5 @@
 import { query, queryOne, execute } from "../pool.js";
+import type { Queryable } from "../pool.js";
 
 export interface Record {
   id: string;
@@ -16,7 +17,6 @@ export interface Record {
   digested_at: string | null;
   file_url: string | null;
   file_name: string | null;
-  domain?: string | null;
   hierarchy_tags?: Array<{ label: string; level: number }>;
   metadata: { [key: string]: any } | null;
   compile_status: string;
@@ -383,16 +383,19 @@ export async function updateCompileStatus(
   recordId: string,
   status: CompileStatus,
   contentHash?: string,
+  client?: Queryable,
 ): Promise<void> {
   if (contentHash !== undefined) {
     await execute(
       `UPDATE record SET compile_status = $1, content_hash = $2, updated_at = now() WHERE id = $3`,
       [status, contentHash, recordId],
+      client,
     );
   } else {
     await execute(
       `UPDATE record SET compile_status = $1, updated_at = now() WHERE id = $2`,
       [status, recordId],
+      client,
     );
   }
 }

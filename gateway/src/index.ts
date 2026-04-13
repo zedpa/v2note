@@ -5,14 +5,14 @@ import { WebSocketServer, WebSocket } from "ws";
 import { config } from "dotenv";
 import { processEntry, refineTodoCommands, type ProcessPayload, type ProcessResult } from "./handlers/process.js";
 import { todoRepo } from "./db/repositories/index.js";
-import { initChat, sendChatMessage, endChat, type ChatStartPayload } from "./handlers/chat.js";
+import { initChat, sendChatMessage, endChat, rebuildSystemPrompt, type ChatStartPayload } from "./handlers/chat.js";
 import { chatMessageRepo } from "./db/repositories/index.js";
 import { maybeCompress } from "./handlers/chat-compression.js";
 import { shouldTriggerMemory } from "./handlers/chat-memory-trigger.js";
 import { aggregateTodos } from "./handlers/todo.js";
 import { startASR, sendAudioChunk, stopASR, cancelASR, type ASRMode } from "./handlers/asr.js";
 import { getSession } from "./session/manager.js";
-import { today as tzToday, now as tzNow } from "./lib/tz.js";
+import { today as tzToday, now as tzNow, toLocalDateTime } from "./lib/tz.js";
 import { Router } from "./router.js";
 import { sendJson, sendError } from "./lib/http-helpers.js";
 import { iterateStreamWithTimeout, StreamTimeoutError } from "./lib/stream-utils.js";
@@ -47,7 +47,7 @@ import { registerChatRoutes } from "./routes/chat.js";
 import { registerWikiRoutes } from "./routes/wiki.js";
 import { getProactiveEngine } from "./proactive/engine.js";
 import { verifyAccessToken } from "./auth/jwt.js";
-import { generateAiStatus } from "./handlers/reflect.js";
+
 import { eventBus, type TodoCreatedEvent } from "./lib/event-bus.js";
 import { checkRateLimit, checkWsRateLimit } from "./middleware/rate-limit.js";
 
@@ -110,8 +110,6 @@ type GatewayResponse =
   | { type: "proactive.morning_briefing"; payload: { text: string } }
   | { type: "proactive.relay_reminder"; payload: { text: string; count: number } }
   | { type: "proactive.evening_summary"; payload: { text: string } }
-  | { type: "reflect.question"; payload: { question: string } }
-  | { type: "ai.status"; payload: { text: string } }
   | { type: "tool.status"; payload: { toolName: string; label: string; callId: string } }
   | { type: "tool.done"; payload: { toolName: string; callId: string; success: boolean; message: string; durationMs: number } }
   | { type: "auth.ok"; payload: { userId: string } }
@@ -281,13 +279,6 @@ wss.on("connection", (ws) => {
 
           proactiveEngine.registerUser(payload.userId, ws);
 
-          generateAiStatus(payload.userId, payload.userId)
-            .then((text) => {
-              send(ws, { type: "ai.status", payload: { text } });
-            })
-            .catch((err) => {
-              console.warn("[gateway] AI status generation failed:", err.message);
-            });
         } catch {
           send(ws, { type: "error", payload: { message: "Authentication failed" } });
         }
@@ -370,9 +361,12 @@ wss.on("connection", (ws) => {
           const chatUserId = authedUserId;
           let fullText = "";
           try {
+            // 给 AI 看的消息附带时间戳，便于区分消息时序（DB 存原文，不污染持久化）
+            const userTime = toLocalDateTime(tzNow());
+            const textForAI = `[${userTime}] ${msg.payload.text}`;
             const stream = await sendChatMessage(
               chatUserId,
-              msg.payload.text,
+              textForAI,
             );
             // 使用 sendToUser 替代 send(ws)：断连重连后自动切换到新连接
             await iterateStreamWithTimeout(stream, (chunk) => {
@@ -406,7 +400,9 @@ wss.on("connection", (ws) => {
               console.warn(`[chat] Failed to persist assistant msg: ${e.message}`),
             );
             // 异步检查并执行压缩（不阻塞响应）
-            maybeCompress(authedUserId).catch(() => {});
+            maybeCompress(authedUserId)
+              .then(() => rebuildSystemPrompt(authedUserId))
+              .catch(() => {});
           }
           break;
         }

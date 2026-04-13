@@ -16,6 +16,10 @@
       "command": "D:\\program files\\pencil\\resources\\app.asar.unpacked\\out\\mcp-server-windows-x64.exe",
       "args": ["--app", "desktop"],
       "env": {}
+    },
+    "graphify": {
+      "command": "D:\\pack\\python\\python.exe",
+      "args": ["-m", "graphify.serve", "E:/AI/workspace-coding/v2note/graphify-out/graph.json"]
     }
   }
 }

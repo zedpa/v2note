@@ -302,11 +302,69 @@ Error:    404 if not found, 401 if unauthorized
 - `gateway/src/cognitive/lightweight-classifier.ts` — 已经在用 wiki_page，不变
 - `gateway/src/cognitive/at-route-parser.ts` — 已经在用 wiki_page，不变
 
+## 5. 侧边栏显示优化 — Topic/Goal 分区 + 空壳治理
+
+### 场景 5.1: Topic 和 Goal 视觉分区
+```
+假设 (Given)  侧边栏有 topic page 和 goal page 混排显示
+当   (When)   加载侧边栏
+那么 (Then)   分为两个区域展示：
+             「主题」区 — 只显示 page_type='topic' 的页面（含其子页面树）
+             「目标」区 — 只显示 page_type='goal' 且 parent_id=NULL 的独立 goal page
+并且 (And)    挂载到 topic 下的 goal page 显示在其父 topic 的子树中（不在「目标」区重复）
+并且 (And)    「目标」区标题旁显示 goal 数量 badge
+并且 (And)    「目标」区默认折叠（如果 goal 都已挂载到 topic 下则隐藏此区）
+```
+
+### 场景 5.2: 空 page 视觉弱化
+```
+假设 (Given)  某 wiki page 的 recordCount=0
+当   (When)   显示在侧边栏
+那么 (Then)   标题以浅灰色展示（opacity: 0.5）
+并且 (And)    不显示 recordCount badge（避免显示 "0"）
+并且 (And)    长按菜单新增「归档」选项（直接归档，不需确认对话框）
+```
+
+### 场景 5.3: Goal page 在 topic 子树中的显示
+```
+假设 (Given)  goal page "Q2 业绩目标" 的 parent_id 指向 topic page "工作"
+当   (When)   用户展开"工作"的子页面
+那么 (Then)   "Q2 业绩目标" 显示在子页面列表中，带 ⭐ 图标标记
+并且 (And)    显示该 goal 的 status（active/progressing/completed）
+并且 (And)    点击跳转到 goal 详情（与待办项目页相同）
+```
+
+### 场景 5.4: 侧边栏排序优化
+```
+假设 (Given)  侧边栏有多个 topic page
+当   (When)   排序
+那么 (Then)   有 record 关联的 page 排在前面（recordCount DESC）
+并且 (And)    同 recordCount 时按 updatedAt DESC
+并且 (And)    空 page（recordCount=0）沉底显示
+说明 (Note)   当前排序是 level DESC + updatedAt DESC，
+             改为 recordCount DESC + updatedAt DESC 更符合"活跃度"直觉
+```
+
+## 验收行为（E2E 锚点）— Phase 5 追加
+
+### 行为 6: Topic/Goal 分区
+1. 用户有 topic page "工作" 和独立 goal page "学英语"
+2. 打开侧边栏
+3. "工作" 显示在「主题」区
+4. "学英语" 显示在「目标」区（折叠状态）
+
+### 行为 7: Goal 挂载到 topic 后的侧边栏变化
+1. AI 将 goal page "Q2 业绩" 挂载到 topic "工作" 下（parent_id 设置）
+2. 刷新侧边栏
+3. "Q2 业绩" 显示在"工作"的子页面中（带 ⭐）
+4. 「目标」区不再显示 "Q2 业绩"
+
 ## Implementation Phases
 - [x] Phase 1: manage_wiki_page 工具 + DELETE API 路由（后端核心）
 - [x] Phase 2: 删除旧 domain 工具 + 更新引用（后端清理）
 - [x] Phase 3: 侧边栏 CRUD UI（前端）
 - [x] Phase 4: 一次性数据迁移脚本（domain 孤儿记录补链）— 065_domain_orphan_backfill.sql
+- [ ] Phase 5: 侧边栏显示优化 — Topic/Goal 分区 + 排序 + 空壳弱化（场景 5.1-5.4）
 
 ## 备注
 - 删除操作使用 soft delete（status='archived'），符合 CLAUDE.md 约束
@@ -314,3 +372,9 @@ Error:    404 if not found, 401 if unauthorized
 - 工具 handler 直接调用 repository，不经过 REST API（与所有现有工具一致）
 - 侧边栏 UI 变更后 refetch `/api/v1/wiki/sidebar`（由父组件 page.tsx 控制）
 - `record.domain` 字段暂不删除（历史兼容），但不再有工具写入它
+- Phase 5 依赖 `fix-goal-wiki-data-cleanup.md` 清洗数据后效果最佳（否则垃圾 goal 仍会显示在「目标」区）
+- Phase 5 的 Topic/Goal 分区是**过渡方案**：当前侧边栏尚未接入 Cluster 活跃度分区
+  （topic-lifecycle.md 场景 1 的后端 GET /topics 已完成，但侧边栏 UI 仍用 wiki page 树）。
+  本 Phase 按 page_type 做基础分区，当 topic-lifecycle 侧边栏 UI 上线后，
+  本 Phase 的分区逻辑会被 Cluster 活跃度分区替代（活跃方向/沉默区模式）。
+  届时 page_type 仍有用——在 Cluster 分区内部区分 topic 子页面和 goal 子页面

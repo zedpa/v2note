@@ -45,6 +45,11 @@ vi.mock("../db/pool.js", () => ({
   getPool: () => ({ connect: mockPoolConnect }),
 }));
 
+const mockCreateGoalPageWithTodo = vi.fn();
+vi.mock("../db/repositories/goal-page-factory.js", () => ({
+  createGoalPageWithTodo: (...args: any[]) => mockCreateGoalPageWithTodo(...args),
+}));
+
 vi.mock("../cognitive/wiki-compiler.js", () => ({
   compileWikiForUser: vi.fn(),
 }));
@@ -121,16 +126,19 @@ describe("wiki routes Phase 14.6 & 14.7", () => {
 
   describe("POST /api/v1/wiki/pages — goal page", () => {
     it("should_create_goal_page_and_goal_todo_when_page_type_is_goal", async () => {
-      // 事务模式：connect → BEGIN → INSERT page → INSERT todo → COMMIT
+      // 事务模式：connect → BEGIN → createGoalPageWithTodo → COMMIT
       const mockClient = {
         query: vi.fn()
           .mockResolvedValueOnce(undefined) // BEGIN
-          .mockResolvedValueOnce({ rows: [{ id: PAGE_ID, title: "通过四级考试", level: 3 }] }) // INSERT page
-          .mockResolvedValueOnce(undefined) // INSERT todo
           .mockResolvedValueOnce(undefined), // COMMIT
         release: vi.fn(),
       };
       mockPoolConnect.mockResolvedValue(mockClient);
+
+      // createGoalPageWithTodo 通过 repo 创建 page + todo
+      mockCreateGoalPageWithTodo.mockResolvedValue({
+        id: PAGE_ID, title: "通过四级考试", level: 3, page_type: "goal", created_by: "user",
+      });
 
       const req = mockReq("POST", "/api/v1/wiki/pages", {
         title: "通过四级考试",
@@ -139,12 +147,11 @@ describe("wiki routes Phase 14.6 & 14.7", () => {
       const res = mockRes();
       await router.handle(req, res);
 
-      // 验证事务中创建了 page 和 todo
+      // 验证事务中调用了 createGoalPageWithTodo
       const calls = mockClient.query.mock.calls;
       expect(calls[0][0]).toBe("BEGIN");
-      expect(calls[1][0]).toContain("INSERT INTO wiki_page");
-      expect(calls[2][0]).toContain("INSERT INTO todo");
-      expect(calls[3][0]).toBe("COMMIT");
+      expect(calls[1][0]).toBe("COMMIT");
+      expect(mockCreateGoalPageWithTodo).toHaveBeenCalledWith("user-123", "通过四级考试", null, mockClient);
 
       const body = res.getBody();
       expect(body.id).toBe(PAGE_ID);

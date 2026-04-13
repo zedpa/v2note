@@ -187,12 +187,36 @@ export default function Page() {
   useEffect(() => {
     if (!loggedIn || !user?.id) return;
     const key = `v2note:onboarded:${user.id}`;
-    if (localStorage.getItem(key) !== "true") {
-      setIsFirstTime(true);
-    } else if (localStorage.getItem(`v2note:guide-done:${user.id}`) !== "true") {
-      // 已完成 onboarding 但引导被中断（如强制关闭 app），重新触发引导
-      setShowGuide(true);
+
+    // 1. 新格式 key 已标记 → 跳过
+    if (localStorage.getItem(key) === "true") {
+      if (localStorage.getItem(`v2note:guide-done:${user.id}`) !== "true") {
+        setShowGuide(true);
+      }
+      return;
     }
+
+    // 2. 旧格式 key 兼容（代码升级前的标记）→ 迁移并跳过
+    if (localStorage.getItem("v2note:onboarded") === "true") {
+      localStorage.setItem(key, "true");
+      return;
+    }
+
+    // 3. localStorage 无记录 → 后端兜底：检查是否有历史数据
+    api.get<{ records: any[] }>("/api/v1/records?limit=1")
+      .then((res) => {
+        if (res?.records?.length > 0) {
+          // 老用户有数据，标记为已引导
+          localStorage.setItem(key, "true");
+        } else {
+          // 真正的新用户
+          setIsFirstTime(true);
+        }
+      })
+      .catch(() => {
+        // 网络失败 → 安全 fallback: 显示引导（不会伤害新用户体验）
+        setIsFirstTime(true);
+      });
   }, [loggedIn, user?.id]);
 
   useEffect(() => {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { Calendar, Clock, FolderOpen } from "lucide-react";
 import { getDefaultHourForSlot, localTzOffset, type TimeSlot } from "../lib/time-slots";
 import { PrioritySelector } from "./priority-selector";
@@ -106,7 +107,7 @@ export function TodoCreateSheet({
 
   const selectedProject = projects?.find((p) => p.id === parentId);
 
-  return (
+  return createPortal(
     <>
       <div className="fixed inset-0 z-40 bg-black/50" onClick={onClose} />
 
@@ -241,7 +242,8 @@ export function TodoCreateSheet({
           </button>
         </div>
       </div>
-    </>
+    </>,
+    document.body,
   );
 }
 

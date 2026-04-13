@@ -1,6 +1,5 @@
 import type { Router } from "../router.js";
-import { sendJson, sendError, getUserId, getDeviceId } from "../lib/http-helpers.js";
-import { readBody } from "../lib/http-helpers.js";
+import { sendJson, sendError, getUserId, readBody } from "../lib/http-helpers.js";
 import { handleOnboardingChat } from "../handlers/onboarding.js";
 
 export function registerOnboardingRoutes(router: Router) {
@@ -10,7 +9,6 @@ export function registerOnboardingRoutes(router: Router) {
    */
   router.post("/api/v1/onboarding/chat", async (req, res) => {
     const userId = getUserId(req);
-    const deviceId = getDeviceId(req);
 
     if (!userId) {
       sendError(res, "Unauthorized", 401);
@@ -30,7 +28,7 @@ export function registerOnboardingRoutes(router: Router) {
     try {
       const result = await handleOnboardingChat({
         userId,
-        deviceId,
+        deviceId: userId,
         step: body.step,
         answer: body.answer ?? "",
       });

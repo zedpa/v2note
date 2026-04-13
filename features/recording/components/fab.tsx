@@ -870,7 +870,7 @@ export function FAB({
         data-guide="fab"
         className="fixed left-1/2 z-40"
         style={{
-          bottom: "calc(54px + var(--kb-offset, 0px))",
+          bottom: showTextSheet ? "54px" : "calc(54px + var(--kb-offset, 0px))",
           transform: `translateX(-50%) translateX(${fabOffsetX}px) translateY(${fabOffsetY}px)`,
           transition: phase === "recording" ? "none" : "transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), bottom 150ms ease-out",
         }}

@@ -13,6 +13,7 @@ import * as goalRepo from "../db/repositories/goal.js";
 import { wikiUnifiedSearch } from "../tools/wiki-search.js";
 import { getPendingSuggestions, acceptSuggestion, rejectSuggestion } from "../cognitive/page-authorization.js";
 import { query, getPool } from "../db/pool.js";
+import { createGoalPageWithTodo } from "../db/repositories/goal-page-factory.js";
 
 export function registerWikiRoutes(router: Router) {
   // POST /api/v1/wiki/compile — 手动触发编译
@@ -55,7 +56,6 @@ export function registerWikiRoutes(router: Router) {
         summary: p.summary,
         level: p.level,
         parent_id: p.parent_id,
-        domain: p.domain,
         updated_at: p.updated_at,
       }));
       sendJson(res, result);
@@ -200,9 +200,9 @@ export function registerWikiRoutes(router: Router) {
         updatedAt: p.updated_at,
       }));
 
-      // 按 level DESC (L3 first), 再按 updatedAt DESC
+      // 按 recordCount DESC（活跃度优先），再按 updatedAt DESC，空 page 沉底
       tree.sort((a, b) => {
-        if (a.level !== b.level) return b.level - a.level;
+        if (a.recordCount !== b.recordCount) return b.recordCount - a.recordCount;
         return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
       });
 
@@ -240,18 +240,7 @@ export function registerWikiRoutes(router: Router) {
         const client = await getPool().connect();
         try {
           await client.query("BEGIN");
-          const { rows } = await client.query(
-            `INSERT INTO wiki_page (user_id, title, parent_id, level, page_type, created_by)
-             VALUES ($1, $2, $3, $4, 'goal', 'user')
-             RETURNING id, title, level`,
-            [userId, trimmedTitle, body.parentId ?? null, body.parentId ? 2 : 3],
-          );
-          const page = rows[0];
-          await client.query(
-            `INSERT INTO todo (device_id, user_id, text, status, level, done, category, wiki_page_id)
-             VALUES ($1, $2, $3, 'active', 1, false, 'manual', $4)`,
-            [userId, userId, trimmedTitle, page.id],
-          );
+          const page = await createGoalPageWithTodo(userId, trimmedTitle, body.parentId ?? null, client);
           await client.query("COMMIT");
           sendJson(res, { id: page.id, title: page.title, level: page.level, page_type: "goal", created_by: "user" });
         } catch (txErr) {

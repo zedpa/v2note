@@ -78,6 +78,13 @@ export async function classifyRecord(
   text: string,
   userId: string,
 ): Promise<void> {
+  // 0. 如果 record 已有 wiki_page_record 关联（由 process.ts 即时归类），跳过分类
+  // process.ts 已完成 incrementTokenCount + checkAndTriggerCompile，这里直接返回
+  const existingLinks = await wikiPageRecordRepo.findPagesByRecord(recordId);
+  if (existingLinks.length > 0) {
+    return;
+  }
+
   // 1. 获取所有现有 page
   const allPages = await wikiPageRepo.findAllActive(userId);
 
@@ -163,7 +170,6 @@ export async function resolvePageFromClassification(
     l3Page = await findOrCreatePage(userId, {
       title: domain_title,
       level: 3,
-      domain: domain_title,
       created_by: "ai",
     });
   }
@@ -181,7 +187,6 @@ export async function resolvePageFromClassification(
       title: page_title,
       level: 2,
       parent_id: l3Page.id,
-      domain: domain_title,
       created_by: "ai",
     });
     return createdL2.id;
@@ -199,7 +204,6 @@ async function findOrCreatePage(
   fields: {
     title: string;
     level: number;
-    domain?: string;
     parent_id?: string;
     created_by: "ai" | "user";
   },

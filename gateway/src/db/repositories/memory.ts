@@ -10,6 +10,7 @@ export interface MemoryEntry {
   created_at: string;
 }
 
+/** @deprecated 使用 findByUser 替代。deviceId 身份体系已废弃。 */
 export async function findByDevice(
   deviceId: string,
   dateRange?: { start: string; end: string },

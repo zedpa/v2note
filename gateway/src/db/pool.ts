@@ -2,6 +2,9 @@ import pg from "pg";
 
 const { Pool, types } = pg;
 
+/** 可选的事务客户端类型 — 传入 PoolClient 则用该连接，undefined 走默认 pool */
+export type Queryable = pg.PoolClient | undefined;
+
 // Return DATE (OID 1082) as plain string "YYYY-MM-DD" instead of JS Date object
 types.setTypeParser(1082, (val: string) => val);
 
@@ -46,8 +49,10 @@ export function getPool(): pg.Pool {
 export async function query<T extends Record<string, any>>(
   sql: string,
   params?: any[],
+  client?: Queryable,
 ): Promise<T[]> {
-  const { rows } = await getPool().query<T>(sql, params);
+  const executor = client ?? getPool();
+  const { rows } = await executor.query<T>(sql, params);
   return rows;
 }
 
@@ -55,13 +60,15 @@ export async function query<T extends Record<string, any>>(
 export async function queryOne<T extends Record<string, any>>(
   sql: string,
   params?: any[],
+  client?: Queryable,
 ): Promise<T | null> {
-  const rows = await query<T>(sql, params);
+  const rows = await query<T>(sql, params, client);
   return rows[0] ?? null;
 }
 
 /** Run an INSERT/UPDATE/DELETE and return affected row count */
-export async function execute(sql: string, params?: any[]): Promise<number> {
-  const { rowCount } = await getPool().query(sql, params);
+export async function execute(sql: string, params?: any[], client?: Queryable): Promise<number> {
+  const executor = client ?? getPool();
+  const { rowCount } = await executor.query(sql, params);
   return rowCount ?? 0;
 }

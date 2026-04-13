@@ -5,6 +5,7 @@
  * level: L3(顶层) / L2(拆分后) / L1(叶子)
  */
 import { query, queryOne, execute } from "../pool.js";
+import type { Queryable } from "../pool.js";
 
 export interface WikiPage {
   id: string;
@@ -16,7 +17,6 @@ export interface WikiPage {
   level: number;
   status: "active" | "archived" | "merged";
   merged_into: string | null;
-  domain: string | null;
   page_type: "topic" | "goal";
   token_count: number;
   created_by: "ai" | "user";
@@ -35,20 +35,19 @@ export async function create(fields: {
   summary?: string;
   parent_id?: string;
   level?: number;
-  domain?: string;
   page_type?: "topic" | "goal";
   token_count?: number;
   created_by?: "ai" | "user";
   embedding?: number[];
   metadata?: Record<string, any>;
-}): Promise<WikiPage> {
+}, client?: Queryable): Promise<WikiPage> {
   const hasEmbedding = fields.embedding && fields.embedding.length > 0;
   const cols =
-    "user_id, title, content, summary, parent_id, level, domain, page_type, token_count, created_by, metadata" +
+    "user_id, title, content, summary, parent_id, level, page_type, token_count, created_by, metadata" +
     (hasEmbedding ? ", embedding" : "");
   const placeholders =
-    "$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11" +
-    (hasEmbedding ? ", $12::vector" : "");
+    "$1, $2, $3, $4, $5, $6, $7, $8, $9, $10" +
+    (hasEmbedding ? ", $11::vector" : "");
   const params: any[] = [
     fields.user_id,
     fields.title,
@@ -56,7 +55,6 @@ export async function create(fields: {
     fields.summary ?? null,
     fields.parent_id ?? null,
     fields.level ?? 3,
-    fields.domain ?? null,
     fields.page_type ?? "topic",
     fields.token_count ?? 0,
     fields.created_by ?? "ai",
@@ -68,13 +66,20 @@ export async function create(fields: {
   const row = await queryOne<WikiPage>(
     `INSERT INTO wiki_page (${cols}) VALUES (${placeholders}) RETURNING *`,
     params,
+    client,
   );
   return row!;
 }
 
 /** 按 ID 查找 */
-export async function findById(id: string): Promise<WikiPage | null> {
-  return queryOne<WikiPage>(`SELECT * FROM wiki_page WHERE id = $1`, [id]);
+export async function findById(id: string, client?: Queryable): Promise<WikiPage | null> {
+  return queryOne<WikiPage>(`SELECT * FROM wiki_page WHERE id = $1`, [id], client);
+}
+
+/** 检查 page 是否存在 */
+export async function exists(id: string, client?: Queryable): Promise<boolean> {
+  const row = await queryOne<{ "1": number }>(`SELECT 1 FROM wiki_page WHERE id = $1`, [id], client);
+  return row !== null;
 }
 
 /** 按用户查找，可过滤 status */
@@ -105,13 +110,15 @@ export async function update(
     content?: string;
     summary?: string;
     level?: number;
-    domain?: string;
     page_type?: "topic" | "goal";
     token_count?: number;
     embedding?: number[];
     metadata?: Record<string, any>;
     compiled_at?: string;
+    status?: WikiPage["status"];
+    merged_into?: string;
   },
+  client?: Queryable,
 ): Promise<void> {
   const sets: string[] = [];
   const params: any[] = [];
@@ -131,10 +138,6 @@ export async function update(
   if (fields.level !== undefined) {
     sets.push(`level = $${i++}`);
     params.push(fields.level);
-  }
-  if (fields.domain !== undefined) {
-    sets.push(`domain = $${i++}`);
-    params.push(fields.domain);
   }
   if (fields.page_type !== undefined) {
     sets.push(`page_type = $${i++}`);
@@ -156,12 +159,21 @@ export async function update(
     sets.push(`compiled_at = $${i++}`);
     params.push(fields.compiled_at);
   }
+  if (fields.status !== undefined) {
+    sets.push(`status = $${i++}`);
+    params.push(fields.status);
+  }
+  if (fields.merged_into !== undefined) {
+    sets.push(`merged_into = $${i++}`);
+    params.push(fields.merged_into);
+  }
   if (sets.length === 0) return;
   sets.push(`updated_at = now()`);
   params.push(id);
   await execute(
     `UPDATE wiki_page SET ${sets.join(", ")} WHERE id = $${i}`,
     params,
+    client,
   );
 }
 
@@ -170,16 +182,19 @@ export async function updateStatus(
   id: string,
   status: WikiPage["status"],
   mergedInto?: string,
+  client?: Queryable,
 ): Promise<void> {
   if (mergedInto) {
     await execute(
       `UPDATE wiki_page SET status = $1, merged_into = $2, updated_at = now() WHERE id = $3`,
       [status, mergedInto, id],
+      client,
     );
   } else {
     await execute(
       `UPDATE wiki_page SET status = $1, updated_at = now() WHERE id = $2`,
       [status, id],
+      client,
     );
   }
 }

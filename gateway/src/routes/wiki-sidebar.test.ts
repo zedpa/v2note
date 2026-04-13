@@ -177,3 +177,91 @@ describe("wiki sidebar — Phase 15.2", () => {
     expect(body.pendingSuggestionCount).toBe(0);
   });
 });
+
+describe("wiki sidebar — Phase 5 排序优化 (场景 5.4)", () => {
+  let router: Router;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    router = new Router();
+    registerWikiRoutes(router);
+  });
+
+  it("should_sort_by_recordCount_desc_then_updatedAt_desc", async () => {
+    // 3 个 page：recordCount 分别为 0, 10, 5
+    mockWikiPageFindByUser.mockResolvedValue([
+      { id: "p-empty", title: "空主题", level: 3, parent_id: null, created_by: "ai", page_type: "topic", updated_at: "2026-04-12T12:00:00Z" },
+      { id: "p-many", title: "活跃主题", level: 3, parent_id: null, created_by: "ai", page_type: "topic", updated_at: "2026-04-10T00:00:00Z" },
+      { id: "p-some", title: "中等主题", level: 3, parent_id: null, created_by: "ai", page_type: "topic", updated_at: "2026-04-11T00:00:00Z" },
+    ]);
+
+    mockPoolQuery
+      .mockResolvedValueOnce([
+        { wiki_page_id: "p-many", cnt: "10" },
+        { wiki_page_id: "p-some", cnt: "5" },
+        // p-empty 不在 recordCounts 中 → recordCount=0
+      ])
+      .mockResolvedValueOnce([]) // activeGoals
+      .mockResolvedValueOnce([{ count: "0" }]) // inboxCount
+      .mockResolvedValueOnce([{ count: "0" }]); // pendingSuggestionCount
+
+    const req = mockReq("GET", "/api/v1/wiki/sidebar");
+    const res = mockRes();
+    await router.handle(req, res);
+
+    const body = res.getBody();
+    // 排序预期：recordCount DESC → p-many(10), p-some(5), p-empty(0)
+    expect(body.pages[0].id).toBe("p-many");
+    expect(body.pages[1].id).toBe("p-some");
+    expect(body.pages[2].id).toBe("p-empty");
+  });
+
+  it("should_sort_by_updatedAt_desc_when_recordCount_is_equal", async () => {
+    mockWikiPageFindByUser.mockResolvedValue([
+      { id: "p-old", title: "旧", level: 3, parent_id: null, created_by: "ai", page_type: "topic", updated_at: "2026-04-01T00:00:00Z" },
+      { id: "p-new", title: "新", level: 3, parent_id: null, created_by: "ai", page_type: "topic", updated_at: "2026-04-12T00:00:00Z" },
+    ]);
+
+    mockPoolQuery
+      .mockResolvedValueOnce([
+        { wiki_page_id: "p-old", cnt: "3" },
+        { wiki_page_id: "p-new", cnt: "3" },
+      ])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ count: "0" }])
+      .mockResolvedValueOnce([{ count: "0" }]);
+
+    const req = mockReq("GET", "/api/v1/wiki/sidebar");
+    const res = mockRes();
+    await router.handle(req, res);
+
+    const body = res.getBody();
+    // 同 recordCount=3, updatedAt DESC → p-new 在前
+    expect(body.pages[0].id).toBe("p-new");
+    expect(body.pages[1].id).toBe("p-old");
+  });
+
+  it("should_put_empty_pages_at_bottom", async () => {
+    mockWikiPageFindByUser.mockResolvedValue([
+      { id: "p-empty1", title: "空1", level: 3, parent_id: null, created_by: "ai", page_type: "topic", updated_at: "2026-04-12T00:00:00Z" },
+      { id: "p-has", title: "有内容", level: 3, parent_id: null, created_by: "ai", page_type: "topic", updated_at: "2026-04-01T00:00:00Z" },
+      { id: "p-empty2", title: "空2", level: 3, parent_id: null, created_by: "ai", page_type: "topic", updated_at: "2026-04-11T00:00:00Z" },
+    ]);
+
+    mockPoolQuery
+      .mockResolvedValueOnce([{ wiki_page_id: "p-has", cnt: "1" }])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ count: "0" }])
+      .mockResolvedValueOnce([{ count: "0" }]);
+
+    const req = mockReq("GET", "/api/v1/wiki/sidebar");
+    const res = mockRes();
+    await router.handle(req, res);
+
+    const body = res.getBody();
+    // 有记录的排第一，两个空的沉底（按 updatedAt DESC 排列）
+    expect(body.pages[0].id).toBe("p-has");
+    expect(body.pages[1].id).toBe("p-empty1");
+    expect(body.pages[2].id).toBe("p-empty2");
+  });
+});

@@ -55,7 +55,6 @@ export async function ensurePagePath(
       user_id: userId,
       title: domainTitle,
       level: 3,
-      domain: domainTitle,
       created_by: "user",
     });
   }
@@ -76,7 +75,6 @@ export async function ensurePagePath(
       title: subTitle,
       level: 2,
       parent_id: l3Page.id,
-      domain: domainTitle,
       created_by: "user",
     });
   }

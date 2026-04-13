@@ -24,14 +24,13 @@ describe("wiki-compile-prompt", () => {
         content: "## 核心认知\n铝价近期波动较大 [→ rec:old-1]",
         summary: "铝价和供应链相关",
         level: 2,
-        domain: "工作",
       },
     ],
     allPageIndex: [
-      { id: "page-1", title: "供应链管理", summary: "铝价和供应链相关", level: 2, domain: "工作" },
-      { id: "page-2", title: "健康管理", summary: "运动和饮食", level: 3, domain: "生活" },
+      { id: "page-1", title: "供应链管理", summary: "铝价和供应链相关", level: 2, page_type: "topic" },
+      { id: "page-2", title: "健康管理", summary: "运动和饮食", level: 3, page_type: "topic" },
     ],
-    existingDomains: ["工作", "生活"],
+    existingGoals: [],
     isColdStart: false,
   };
 
@@ -82,12 +81,11 @@ describe("wiki-compile-prompt", () => {
     expect(system).toContain("goal_sync");
   });
 
-  it("should_contain_existing_domains_when_provided", () => {
+  it("should_not_contain_domain_classification_rules_when_domain_deprecated", () => {
     const { system } = buildCompilePrompt(baseInput);
 
-    expect(system).toContain("工作");
-    expect(system).toContain("生活");
-    expect(system).toContain("优先复用已有 domain");
+    expect(system).not.toContain("优先复用已有 domain");
+    expect(system).not.toContain("domain 是简短中文一级分类");
   });
 
   it("should_contain_cold_start_hint_when_is_cold_start", () => {
@@ -95,7 +93,6 @@ describe("wiki-compile-prompt", () => {
       ...baseInput,
       matchedPages: [],
       allPageIndex: [],
-      existingDomains: [],
       isColdStart: true,
     };
 
@@ -192,6 +189,76 @@ describe("wiki-compile-prompt", () => {
     it("should_not_contain_old_title_format_in_json_example_when_prompt_built", () => {
       const { system } = buildCompilePrompt(baseInput);
       expect(system).not.toContain("新主题名称（2-8个中文字符）");
+    });
+  });
+
+  // ── fix-goal-quality: 去重 + 层级组织 ──
+
+  describe("goal_quality_dedup (fix-goal-quality)", () => {
+    it("should_contain_existing_goals_in_user_message_when_goals_provided", () => {
+      const input: CompilePromptInput = {
+        ...baseInput,
+        existingGoals: [
+          { id: "goal-1", title: "学英语", status: "active", wiki_page_id: "wp-1" },
+          { id: "goal-2", title: "减重10kg", status: "progressing", wiki_page_id: null },
+        ],
+      };
+
+      const { user } = buildCompilePrompt(input);
+
+      expect(user).toContain("已有目标");
+      expect(user).toContain("goal-1");
+      expect(user).toContain("学英语");
+      expect(user).toContain("active");
+      expect(user).toContain("wp-1");
+      expect(user).toContain("goal-2");
+      expect(user).toContain("减重10kg");
+      expect(user).toContain("progressing");
+    });
+
+    it("should_not_contain_existing_goals_section_when_no_goals", () => {
+      const { user } = buildCompilePrompt(baseInput);
+
+      expect(user).not.toContain("已有目标");
+    });
+
+    it("should_contain_page_type_column_in_page_index_when_pages_have_type", () => {
+      const input: CompilePromptInput = {
+        ...baseInput,
+        allPageIndex: [
+          { id: "page-1", title: "工作", summary: "工作相关", level: 3, page_type: "topic" },
+          { id: "page-goal", title: "学英语", summary: "英语学习", level: 2, page_type: "goal" },
+        ],
+      };
+
+      const { user } = buildCompilePrompt(input);
+
+      expect(user).toContain("类型");
+      expect(user).toContain("topic");
+      expect(user).toContain("goal");
+    });
+
+    it("should_contain_goal_dedup_instruction_in_system_prompt", () => {
+      const { system } = buildCompilePrompt(baseInput);
+
+      expect(system).toContain("已有目标");
+      expect(system).toContain("update 而非 create");
+      expect(system).toContain("反例");
+    });
+
+    it("should_contain_parent_page_id_in_goal_sync_json_example", () => {
+      const { system } = buildCompilePrompt(baseInput);
+
+      expect(system).toContain("parent_page_id");
+      expect(system).toContain("挂载到哪个 topic page 下");
+    });
+
+    it("should_contain_goal_sync_update_example_in_system_prompt", () => {
+      const { system } = buildCompilePrompt(baseInput);
+
+      // 新增的 update 示例
+      expect(system).toContain('"action": "update"');
+      expect(system).toContain("goal_id");
     });
   });
 });

@@ -22,7 +22,7 @@ export const searchTool: ToolDefinition = {
       date_from: z.string().optional().describe("时间范围起始（ISO 日期）"),
       date_to: z.string().optional().describe("时间范围结束（ISO 日期）"),
       goal_id: z.string().optional().describe("过滤属于指定目标（parent_id）的待办"),
-      domain: z.string().optional().describe("按领域过滤（工作/生活/学习等）"),
+      domain: z.string().optional().describe("按主题过滤（匹配 wiki page 标题，如工作/生活/学习等）"),
       include_ai_diary: z.boolean().optional()
         .describe("是否包含 AI 日报摘要（仅 scope=records 且有日期过滤时生效）"),
     }).optional().describe("可选：结构化过滤条件"),

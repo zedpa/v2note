@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import {
   Zap, Settings, LogOut, Search, BookOpen, ChevronDown, ChevronRight,
-  Inbox, Plus, Target, Lightbulb, MoreVertical, Pencil, Trash2,
+  Inbox, Plus, Target, Lightbulb, MoreVertical, Pencil, Trash2, Archive,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -68,23 +68,32 @@ export function SidebarDrawer({
   const createInputRef = useRef<HTMLInputElement>(null);
   const renameInputRef = useRef<HTMLInputElement>(null);
 
-  // 构建树结构：顶层 page (parentId=null) + 子 page
-  const { roots, childrenMap } = useMemo(() => {
+  // 构建树结构：按 pageType 分区
+  // topicRoots: pageType='topic' 且 parentId=null 的顶层 topic
+  // orphanGoals: pageType='goal' 且 parentId=null 的独立 goal（未挂到 topic 下）
+  // childrenMap: parentId → children（topic 的子 page，含挂载的 goal）
+  const { topicRoots, orphanGoals, childrenMap } = useMemo(() => {
     const cMap = new Map<string, WikiPageEntry[]>();
-    const rootPages: WikiPageEntry[] = [];
+    const topics: WikiPageEntry[] = [];
+    const goals: WikiPageEntry[] = [];
 
     for (const page of wikiPages) {
       if (page.parentId) {
         const list = cMap.get(page.parentId) ?? [];
         list.push(page);
         cMap.set(page.parentId, list);
+      } else if (page.pageType === "goal") {
+        goals.push(page);
       } else {
-        rootPages.push(page);
+        topics.push(page);
       }
     }
 
-    return { roots: rootPages, childrenMap: cMap };
+    return { topicRoots: topics, orphanGoals: goals, childrenMap: cMap };
   }, [wikiPages]);
+
+  // 「目标」区折叠状态
+  const [goalSectionExpanded, setGoalSectionExpanded] = useState(false);
 
   // 自动聚焦创建输入框
   useEffect(() => {
@@ -123,6 +132,13 @@ export function SidebarDrawer({
     setContextMenu(null);
   };
 
+  // 归档：空 page 快捷归档，不弹确认框
+  const handleArchive = () => {
+    if (!contextMenu) return;
+    onDeletePage?.(contextMenu.pageId, contextMenu.recordCount);
+    setContextMenu(null);
+  };
+
   const handleConfirmDelete = () => {
     if (!confirmDelete) return;
     onDeletePage?.(confirmDelete.pageId, confirmDelete.recordCount);
@@ -149,6 +165,109 @@ export function SidebarDrawer({
   }, [open]);
 
   const initial = userName?.charAt(0)?.toUpperCase() || "U";
+
+  // 渲染单个 page 项（root 或子 page 共用）
+  const renderPageItem = (page: WikiPageEntry, isChild: boolean) => {
+    const children = childrenMap.get(page.id) ?? [];
+    const hasChildren = children.length > 0;
+    const isExpanded = expandedPages.has(page.id);
+    const totalRecords = isChild ? page.recordCount : page.recordCount + children.reduce((s, c) => s + c.recordCount, 0);
+    const isRenaming = renaming?.pageId === page.id;
+    const isEmpty = page.recordCount === 0;
+
+    return (
+      <div
+        key={page.id}
+        data-testid={`sidebar-page-item-${page.id}`}
+        data-page-type={page.pageType}
+        style={isEmpty ? { opacity: 0.5 } : undefined}
+      >
+        <div className="group flex items-center">
+          <button
+            type="button"
+            onClick={() => {
+              if (hasChildren && !isChild) {
+                setExpandedPages(prev => {
+                  const next = new Set(prev);
+                  next.has(page.id) ? next.delete(page.id) : next.add(page.id);
+                  return next;
+                });
+              } else {
+                onClose();
+                onSelectPage?.(page.id);
+              }
+            }}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              setContextMenu({ pageId: page.id, title: page.title, recordCount: totalRecords });
+            }}
+            className={cn(
+              "flex items-center gap-3 flex-1 min-w-0 rounded-xl text-left hover:bg-surface/60 active:bg-surface/80 transition-colors select-none",
+              isChild ? "px-3 py-2" : "px-3 py-2.5",
+            )}
+          >
+            <span className="text-muted-accessible shrink-0">
+              {hasChildren && !isChild
+                ? (isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />)
+                : <BookOpen size={isChild ? 14 : 16} />}
+            </span>
+            <div className="flex-1 min-w-0">
+              {isRenaming ? (
+                <input
+                  ref={renameInputRef}
+                  type="text"
+                  value={renameValue}
+                  onChange={(e) => setRenameValue(e.target.value)}
+                  onKeyDown={(e) => {
+                    e.stopPropagation();
+                    if (e.key === "Enter") handleRename();
+                    if (e.key === "Escape") setRenaming(null);
+                  }}
+                  onBlur={handleRename}
+                  onClick={(e) => e.stopPropagation()}
+                  className="text-sm bg-surface rounded px-1.5 py-0.5 text-on-surface outline-none border border-maple/50 w-full"
+                />
+              ) : (
+                <>
+                  <span className="text-sm text-on-surface truncate block">
+                    {page.pageType === "goal" && <span className="text-amber-500 mr-1" data-testid="goal-star-icon">⭐</span>}
+                    {page.title}
+                  </span>
+                  {page.activeGoals.length > 0 && (
+                    <span className="text-[10px] text-muted-accessible truncate block flex items-center gap-1">
+                      <Target size={10} className="shrink-0" />
+                      {page.activeGoals[0].title}
+                      {page.activeGoals.length > 1 && ` +${page.activeGoals.length - 1}`}
+                    </span>
+                  )}
+                </>
+              )}
+            </div>
+            {totalRecords > 0 && (
+              <span className="text-xs font-mono text-muted-accessible">{totalRecords}</span>
+            )}
+          </button>
+          {/* 三点菜单按钮 */}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setContextMenu({ pageId: page.id, title: page.title, recordCount: totalRecords });
+            }}
+            className="w-7 h-7 flex items-center justify-center rounded-full text-muted-accessible/50 hover:text-on-surface transition-all shrink-0"
+            aria-label="更多操作"
+          >
+            <MoreVertical size={14} />
+          </button>
+        </div>
+        {hasChildren && !isChild && isExpanded && (
+          <div className="ml-4">
+            {children.map((child) => renderPageItem(child, true))}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   if (!open) return null;
 
@@ -249,8 +368,8 @@ export function SidebarDrawer({
             </>
           )}
 
-          {/* ── Wiki Page 主题树 ── */}
-          <>
+          {/* ── 主题区 ── */}
+          <div data-testid="sidebar-topic-section">
             <div className="my-5 flex items-center gap-3">
               <div className="flex-1 h-px bg-border/40" />
               <span className="text-xs text-muted-accessible tracking-widest">主题</span>
@@ -291,176 +410,40 @@ export function SidebarDrawer({
               </div>
             )}
 
-            {roots.length === 0 && !showCreateInput ? (
+            {topicRoots.length === 0 && !showCreateInput ? (
               <p className="px-3 text-xs text-muted-accessible leading-relaxed">
                 录几段话，AI 会自动整理主题
               </p>
             ) : (
               <nav className="space-y-0.5">
-                {roots.map((page) => {
-                  const children = childrenMap.get(page.id) ?? [];
-                  const hasChildren = children.length > 0;
-                  const isExpanded = expandedPages.has(page.id);
-                  const totalRecords = page.recordCount + children.reduce((s, c) => s + c.recordCount, 0);
-                  const isRenaming = renaming?.pageId === page.id;
-
-                  return (
-                    <div key={page.id}>
-                      <div className="group flex items-center">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (hasChildren) {
-                              setExpandedPages(prev => {
-                                const next = new Set(prev);
-                                next.has(page.id) ? next.delete(page.id) : next.add(page.id);
-                                return next;
-                              });
-                            } else {
-                              onClose();
-                              onSelectPage?.(page.id);
-                            }
-                          }}
-                          onContextMenu={(e) => {
-                            e.preventDefault();
-                            setContextMenu({ pageId: page.id, title: page.title, recordCount: totalRecords });
-                          }}
-                          className="flex items-center gap-3 flex-1 min-w-0 px-3 py-2.5 rounded-xl text-left hover:bg-surface/60 active:bg-surface/80 transition-colors select-none"
-                        >
-                          <span className="text-muted-accessible shrink-0">
-                            {hasChildren
-                              ? (isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />)
-                              : <BookOpen size={16} />}
-                          </span>
-                          <div className="flex-1 min-w-0">
-                            {isRenaming ? (
-                              <input
-                                ref={renameInputRef}
-                                type="text"
-                                value={renameValue}
-                                onChange={(e) => setRenameValue(e.target.value)}
-                                onKeyDown={(e) => {
-                                  e.stopPropagation();
-                                  if (e.key === "Enter") handleRename();
-                                  if (e.key === "Escape") setRenaming(null);
-                                }}
-                                onBlur={handleRename}
-                                onClick={(e) => e.stopPropagation()}
-                                className="text-sm bg-surface rounded px-1.5 py-0.5 text-on-surface outline-none border border-maple/50 w-full"
-                              />
-                            ) : (
-                              <>
-                                <span className="text-sm text-on-surface truncate block">
-                                  {page.pageType === "goal" && <span className="text-amber-500 mr-1">⭐</span>}
-                                  {page.title}
-                                </span>
-                                {page.activeGoals.length > 0 && (
-                                  <span className="text-[10px] text-muted-accessible truncate block flex items-center gap-1">
-                                    <Target size={10} className="shrink-0" />
-                                    {page.activeGoals[0].title}
-                                    {page.activeGoals.length > 1 && ` +${page.activeGoals.length - 1}`}
-                                  </span>
-                                )}
-                              </>
-                            )}
-                          </div>
-                          <span className="text-xs font-mono text-muted-accessible">{totalRecords || ""}</span>
-                        </button>
-                        {/* 三点菜单按钮 */}
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setContextMenu({ pageId: page.id, title: page.title, recordCount: totalRecords });
-                          }}
-                          className="w-7 h-7 flex items-center justify-center rounded-full text-muted-accessible/50 hover:text-on-surface transition-all shrink-0"
-                          aria-label="更多操作"
-                        >
-                          <MoreVertical size={14} />
-                        </button>
-                      </div>
-                      {hasChildren && isExpanded && (
-                        <div className="ml-4">
-                          {page.recordCount > 0 && (
-                            <button
-                              type="button"
-                              onClick={() => { onClose(); onSelectPage?.(page.id); }}
-                              className="flex items-center gap-3 w-full px-3 py-2 rounded-xl text-left hover:bg-surface/60 transition-colors select-none"
-                            >
-                              <span className="text-muted-accessible shrink-0"><BookOpen size={14} /></span>
-                              <span className="flex-1 min-w-0 text-sm text-on-surface truncate">概览</span>
-                              <span className="text-xs font-mono text-muted-accessible">{page.recordCount}</span>
-                            </button>
-                          )}
-                          {children.map((child) => {
-                            const isChildRenaming = renaming?.pageId === child.id;
-                            return (
-                              <div key={child.id} className="group flex items-center">
-                                <button
-                                  type="button"
-                                  onClick={() => { onClose(); onSelectPage?.(child.id); }}
-                                  onContextMenu={(e) => {
-                                    e.preventDefault();
-                                    setContextMenu({ pageId: child.id, title: child.title, recordCount: child.recordCount });
-                                  }}
-                                  className="flex items-center gap-3 flex-1 min-w-0 px-3 py-2 rounded-xl text-left hover:bg-surface/60 transition-colors select-none"
-                                >
-                                  <span className="text-muted-accessible shrink-0"><BookOpen size={14} /></span>
-                                  <div className="flex-1 min-w-0">
-                                    {isChildRenaming ? (
-                                      <input
-                                        ref={renameInputRef}
-                                        type="text"
-                                        value={renameValue}
-                                        onChange={(e) => setRenameValue(e.target.value)}
-                                        onKeyDown={(e) => {
-                                          e.stopPropagation();
-                                          if (e.key === "Enter") handleRename();
-                                          if (e.key === "Escape") setRenaming(null);
-                                        }}
-                                        onBlur={handleRename}
-                                        onClick={(e) => e.stopPropagation()}
-                                        className="text-sm bg-surface rounded px-1.5 py-0.5 text-on-surface outline-none border border-maple/50 w-full"
-                                      />
-                                    ) : (
-                                      <>
-                                        <span className="text-sm text-on-surface truncate block">
-                                          {child.pageType === "goal" && <span className="text-amber-500 mr-1">⭐</span>}
-                                          {child.title}
-                                        </span>
-                                        {child.activeGoals.length > 0 && (
-                                          <span className="text-[10px] text-muted-accessible truncate block flex items-center gap-1">
-                                            <Target size={10} className="shrink-0" />
-                                            {child.activeGoals[0].title}
-                                          </span>
-                                        )}
-                                      </>
-                                    )}
-                                  </div>
-                                  <span className="text-xs font-mono text-muted-accessible">{child.recordCount || ""}</span>
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setContextMenu({ pageId: child.id, title: child.title, recordCount: child.recordCount });
-                                  }}
-                                  className="w-7 h-7 flex items-center justify-center rounded-full text-muted-accessible/50 hover:text-on-surface transition-all shrink-0"
-                                  aria-label="更多操作"
-                                >
-                                  <MoreVertical size={14} />
-                                </button>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
+                {topicRoots.map((page) => renderPageItem(page, false))}
               </nav>
             )}
-          </>
+          </div>
+
+          {/* ── 目标区（独立 goal，未挂载到 topic 下） ── */}
+          {orphanGoals.length > 0 && (
+            <div data-testid="sidebar-goal-section">
+              <div className="my-5 flex items-center gap-3">
+                <div className="flex-1 h-px bg-border/40" />
+                <button
+                  type="button"
+                  onClick={() => setGoalSectionExpanded(prev => !prev)}
+                  className="flex items-center gap-1.5 text-xs text-muted-accessible tracking-widest hover:text-on-surface transition-colors"
+                >
+                  {goalSectionExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                  目标
+                  <span className="ml-1 text-[10px] bg-surface rounded-full px-1.5 py-0.5">{orphanGoals.length}</span>
+                </button>
+                <div className="flex-1 h-px bg-border/40" />
+              </div>
+              {goalSectionExpanded && (
+                <nav className="space-y-0.5">
+                  {orphanGoals.map((page) => renderPageItem(page, false))}
+                </nav>
+              )}
+            </div>
+          )}
 
           {/* ── 上下文菜单弹窗 ── */}
           {contextMenu && (
@@ -491,6 +474,16 @@ export function SidebarDrawer({
                   <Trash2 size={16} />
                   删除
                 </button>
+                {contextMenu.recordCount === 0 && (
+                  <button
+                    type="button"
+                    onClick={handleArchive}
+                    className="flex items-center gap-3 w-full px-4 py-3 text-left text-sm text-muted-accessible hover:bg-surface/60 transition-colors"
+                  >
+                    <Archive size={16} />
+                    归档
+                  </button>
+                )}
               </div>
             </>
           )}

@@ -3,7 +3,7 @@
  *
  * v3 架构简化：去掉 Strike 中间层
  * Record（日记）和 Todo（待办）是唯一两个核心实体
- * AI 一次返回：summary + domain + tags + todos + commands
+ * AI 一次返回：summary + page_title + tags + todos + commands
  */
 
 import { buildDateAnchor } from "../lib/date-anchor.js";
@@ -11,7 +11,7 @@ import { buildDateAnchor } from "../lib/date-anchor.js";
 export interface UnifiedProcessContext {
   activeGoals: Array<{ id: string; title: string }>;
   pendingTodos: Array<{ id: string; text: string; scheduled_start?: string }>;
-  existingDomains: string[];
+  existingPages: Array<{ id: string; title: string }>;
 }
 
 export function buildUnifiedProcessPrompt(ctx: UnifiedProcessContext): string {
@@ -27,8 +27,8 @@ export function buildUnifiedProcessPrompt(ctx: UnifiedProcessContext): string {
       ).join("\n")
     : "  （无未完成待办）";
 
-  const domainHint = ctx.existingDomains.length > 0
-    ? `\n## 用户已有分类（仅当内容明确属于某个分类时才复用，不确定时创建新分类）\n${ctx.existingDomains.map(d => `- ${d}`).join("\n")}`
+  const pageHint = ctx.existingPages.length > 0
+    ? `\n## 用户已有知识页面（优先从中选择语义最匹配的标题原样返回，不确定时建议新标题）\n${ctx.existingPages.map(p => `- ${p.title}`).join("\n")}`
     : "";
 
   return `你是一个智能日记助手。用户刚说了一段话（语音转文字），你需要一次性完成处理。
@@ -40,7 +40,7 @@ ${goalList}
 
 ## 用户未完成待办
 ${todoList}
-${domainHint}
+${pageHint}
 
 ## 你需要做的事
 
@@ -58,22 +58,22 @@ ${domainHint}
 - **保留情绪和语气**：用户的感叹、强调、反问等表达必须原样保留
 - 严格保留原文结构：短句还是短句，倒装还是倒装，不要改写句式
 - 不要将口语转为书面语，不要合并或拆分句子
-- 使用 Markdown 格式输出：适当添加段落分隔、加粗关键词，让内容易读
+- 使用 Markdown 格式输出：适当添加段落分隔、加粗关键句（对完整的一句话加粗，而不是单个词），让内容易读
 - 较长内容用空行分段，但不要添加标题或列表（除非原文本身是列表）
 
-### 3. 自动归类 → domain
-判断这段输入属于哪个分类：
-- 一级分类：简短中文，如 "工作"、"生活"、"学习"、"健康"
-- 可带子路径：如 "工作/项目A"、"生活/旅行"
-- 只有当内容**明确提到**已有分类中的关键词时才复用已有分类
-- 用户未提到具体产品/项目名称时，不要从已有分类中猜测，创建新的通用分类即可
+### 3. 自动归类 → page_title
+判断这段输入属于哪个知识页面：
+- 优先从下方「用户已有知识页面」列表中选择语义最匹配的标题**原样返回**
+- 例如：内容关于采购进度，已有页面"采购管理" → 返回 "采购管理"（精确复制已有标题）
+- 只有当已有页面中确实无语义匹配时，才建议一个新的简短中文标题
+- 新标题应简洁自然（如 "供应链优化"、"Rust 学习"），不要用 "/" 路径格式
 - 无法判断时为 null
 
 ### 4. 提取标签 → tags
-标签 = domain 路径各段 + 1 个核心内容关键词，**最多5个**。
-- 将 domain 的每层路径拆成独立标签（如 domain="工作/项目A" → tags 包含 "工作"、"项目A"）
-- 再加 1 个内容核心词（体现这条记录的独特主题，如 "UI交互"、"报价"）
-- 不要重复 domain 已有的词
+标签 = page_title + 1~3 个内容关键词，**最多5个**。
+- 第一个标签为 page_title（如 "采购管理"）
+- 其余为内容核心关键词（如 "铝价"、"报价"）
+- 不要重复 page_title 中已有的词
 - 不要生成泛化标签（如"日常"、"想法"、"记录"）
 - **硬性上限：tags 数组最多5个元素**
 
@@ -102,9 +102,9 @@ ${domainHint}
 返回纯 JSON（不要 markdown 包裹、不要思考过程）：
 {
   "intent_type": "record",
-  "summary": "铝价又涨了5%，这个涨幅太离谱了。需要找张总确认报价，不然后面没法做预算。",
-  "domain": "工作/采购",
-  "tags": ["工作", "采购", "报价"],
+  "summary": "**铝价又涨了5%，这个涨幅太离谱了。**需要找张总确认报价，不然后面没法做预算。",
+  "page_title": "采购管理",
+  "tags": ["采购管理", "铝价", "报价"],
   "todos": [
     {
       "text": "明天下午3点找张总确认报价",

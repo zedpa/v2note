@@ -1,5 +1,5 @@
 import type { Router } from "../router.js";
-import { readBody, sendJson, sendError, getDeviceId, getUserId } from "../lib/http-helpers.js";
+import { readBody, sendJson, sendError, getUserId } from "../lib/http-helpers.js";
 import { reviewRepo, recordRepo, transcriptRepo } from "../db/repositories/index.js";
 import { chatCompletion } from "../ai/provider.js";
 
@@ -7,18 +7,16 @@ export function registerReviewRoutes(router: Router) {
   // List reviews
   router.get("/api/v1/reviews", async (req, res) => {
     const userId = getUserId(req);
-    const deviceId = getDeviceId(req);
-    const reviews = userId
-      ? await reviewRepo.findByUser(userId)
-      : await reviewRepo.findByDevice(deviceId);
+    if (!userId) { sendError(res, "Unauthorized", 401); return; }
+    const reviews = await reviewRepo.findByUser(userId);
     sendJson(res, reviews);
   });
 
   // Generate review
   router.post("/api/v1/reviews/generate", async (req, res) => {
     try {
-      const deviceId = getDeviceId(req);
       const userId = getUserId(req);
+      if (!userId) { sendError(res, "Unauthorized", 401); return; }
       const { period, start, end } = await readBody<{
         period: string;
         start: string;
@@ -26,9 +24,7 @@ export function registerReviewRoutes(router: Router) {
       }>(req);
 
       // Load records and transcripts in the date range
-      const records = userId
-        ? await recordRepo.findByUserAndDateRange(userId, `${start}T00:00:00`, `${end}T23:59:59`)
-        : await recordRepo.findByDeviceAndDateRange(deviceId, `${start}T00:00:00`, `${end}T23:59:59`);
+      const records = await recordRepo.findByUserAndDateRange(userId, `${start}T00:00:00`, `${end}T23:59:59`);
       const recordIds = records.map((r) => r.id);
       const transcripts = recordIds.length > 0
         ? await transcriptRepo.findByRecordIds(recordIds)
@@ -59,8 +55,8 @@ export function registerReviewRoutes(router: Router) {
       }
 
       const review = await reviewRepo.create({
-        device_id: deviceId,
-        user_id: userId ?? undefined,
+        device_id: userId,
+        user_id: userId,
         period,
         period_start: start,
         period_end: end,

@@ -1,5 +1,5 @@
 import type { Router } from "../router.js";
-import { readBody, sendJson, getDeviceId, getUserId } from "../lib/http-helpers.js";
+import { readBody, sendJson, sendError, getUserId } from "../lib/http-helpers.js";
 import { todoRepo } from "../db/repositories/index.js";
 import { onTodoComplete } from "../cognitive/todo-projector.js";
 
@@ -14,10 +14,8 @@ export function registerTodoRoutes(router: Router) {
   // List todos
   router.get("/api/v1/todos", async (req, res) => {
     const userId = getUserId(req);
-    const deviceId = getDeviceId(req);
-    const todos = userId
-      ? await todoRepo.findByUser(userId)
-      : await todoRepo.findByDevice(deviceId);
+    if (!userId) { sendError(res, "Unauthorized", 401); return; }
+    const todos = await todoRepo.findByUser(userId);
     sendJson(res, todos);
   });
 
@@ -26,7 +24,6 @@ export function registerTodoRoutes(router: Router) {
     const body = await readBody<{
       record_id?: string;
       text: string;
-      domain?: string;
       impact?: number;
       goal_id?: string;
       scheduled_start?: string;
@@ -41,7 +38,7 @@ export function registerTodoRoutes(router: Router) {
       recurrence_end?: string | null;
     }>(_req);
     const userId = getUserId(_req) ?? undefined;
-    const deviceId = getDeviceId(_req);
+    if (!userId) { sendError(res, "Unauthorized", 401); return; }
 
     // 计算 reminder_at：reminder_before（分钟）+ scheduled_start → 自动推算
     let reminder_at: string | undefined;
@@ -54,7 +51,6 @@ export function registerTodoRoutes(router: Router) {
     const shared = {
       record_id: body.record_id || null,
       text: body.text,
-      domain: body.domain,
       impact: body.impact,
       goal_id: body.goal_id,
       scheduled_start: ensureTz(body.scheduled_start) ?? undefined,
@@ -69,7 +65,7 @@ export function registerTodoRoutes(router: Router) {
       recurrence_rule: body.recurrence_rule ?? undefined,
       recurrence_end: body.recurrence_end ?? undefined,
       user_id: userId,
-      device_id: deviceId,
+      device_id: undefined,
     };
 
     // level=0 走去重，level>=1 走 create
@@ -100,7 +96,6 @@ export function registerTodoRoutes(router: Router) {
       priority?: number;
       level?: number;
       status?: string;
-      domain?: string;
       reminder_before?: number | null;
       reminder_types?: string[] | null;
       recurrence_rule?: string | null;

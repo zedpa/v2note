@@ -81,7 +81,8 @@ export function buildDateAnchor(referenceDate?: Date): string {
   const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
   const monthEndStr = fmt(monthEnd);
 
-  return `## 时间锚点（直接查表，禁止自行计算）
+  return `## 时间锚点（仅供 AI 内部推理，禁止直接输出给用户）
+用户询问当前时间/日期时，必须调用 get_current_time 工具获取实时值。
 
 当前：${today}（周${wdName}）
 

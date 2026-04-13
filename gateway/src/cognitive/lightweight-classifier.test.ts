@@ -25,12 +25,17 @@ vi.mock("../db/repositories/wiki-page.js", () => ({
 
 vi.mock("../db/repositories/wiki-page-record.js", () => ({
   link: vi.fn(),
+  findPagesByRecord: vi.fn(),
 }));
 
 vi.mock("../db/repositories/index.js", () => ({
   recordRepo: {
     mergeMetadata: vi.fn(),
   },
+}));
+
+vi.mock("./compile-trigger.js", () => ({
+  checkAndTriggerCompile: vi.fn().mockResolvedValue(undefined),
 }));
 
 // ── 导入 ──
@@ -52,13 +57,14 @@ const mockFindAllActive = vi.mocked(wikiPageRepo.findAllActive);
 const mockCreate = vi.mocked(wikiPageRepo.create);
 const mockIncrementTokenCount = vi.mocked(wikiPageRepo.incrementTokenCount);
 const mockLink = vi.mocked(wikiPageRecordRepo.link);
+const mockFindPagesByRecord = vi.mocked(wikiPageRecordRepo.findPagesByRecord);
 const mockMergeMetadata = vi.mocked(recordRepo.mergeMetadata);
 
 // ── 工厂函数 ──
 
 function makePage(overrides: Partial<{
   id: string; title: string; level: number; parent_id: string | null;
-  user_id: string; domain: string | null; created_by: "ai" | "user";
+  user_id: string; created_by: "ai" | "user";
 }> = {}) {
   return {
     id: overrides.id ?? "wp-1",
@@ -70,7 +76,6 @@ function makePage(overrides: Partial<{
     level: overrides.level ?? 3,
     status: "active" as const,
     merged_into: null,
-    domain: overrides.domain ?? overrides.title ?? "工作",
     page_type: "topic" as const,
     token_count: 0,
     created_by: overrides.created_by ?? "user",
@@ -89,6 +94,7 @@ describe("lightweight-classifier", () => {
     vi.clearAllMocks();
     mockIncrementTokenCount.mockResolvedValue(0);
     mockLink.mockResolvedValue(undefined);
+    mockFindPagesByRecord.mockResolvedValue([]);
     mockMergeMetadata.mockResolvedValue(undefined);
   });
 
@@ -207,10 +213,11 @@ describe("lightweight-classifier", () => {
           user_id: "u-1",
           title: "健康",
           level: 3,
-          domain: "健康",
           created_by: "ai",
         }),
       );
+      // domain 已废弃，不应传入
+      expect(mockCreate.mock.calls[0][0]).not.toHaveProperty("domain");
     });
 
     it("should_create_l2_under_existing_l3_when_page_title_new", async () => {
@@ -228,10 +235,11 @@ describe("lightweight-classifier", () => {
           title: "财务",
           level: 2,
           parent_id: "wp-work",
-          domain: "工作",
           created_by: "ai",
         }),
       );
+      // domain 已废弃，不应传入
+      expect(mockCreate.mock.calls[0][0]).not.toHaveProperty("domain");
     });
 
     it("should_create_both_l3_and_l2_when_both_new", async () => {
@@ -388,6 +396,43 @@ describe("lightweight-classifier", () => {
       expect(systemMsg).toBeDefined();
       expect(systemMsg!.content).toContain("工作");
       expect(systemMsg!.content).toContain("学习");
+    });
+
+    // 场景 4.1: process.ts 已归类 → lightweight-classifier 跳过（不重复计数）
+    it("should_skip_classification_when_record_already_linked", async () => {
+      mockFindPagesByRecord.mockResolvedValue([
+        { wiki_page_id: "wp-existing", record_id: "rec-linked", added_at: "2026-04-13T00:00:00Z" },
+      ]);
+
+      await classifyRecord("rec-linked", "一些内容", "u-1");
+
+      // 不应调用 AI
+      expect(mockGenerateStructured).not.toHaveBeenCalled();
+      // 不应创建新 page
+      expect(mockCreate).not.toHaveBeenCalled();
+      // 不应创建新 link
+      expect(mockLink).not.toHaveBeenCalled();
+      // 不应更新 token_count（process.ts 已做，避免双重计数）
+      expect(mockIncrementTokenCount).not.toHaveBeenCalled();
+      // 不应写入 metadata
+      expect(mockMergeMetadata).not.toHaveBeenCalled();
+    });
+
+    // 场景 4.1 补充: record 无关联 → 正常分类
+    it("should_classify_normally_when_record_has_no_links", async () => {
+      mockFindPagesByRecord.mockResolvedValue([]);
+      const page = makePage({ id: "wp-1", title: "工作", level: 3 });
+      mockFindAllActive.mockResolvedValue([page] as any);
+      mockGenerateStructured.mockResolvedValue({
+        object: { domain_title: "工作" },
+      } as any);
+
+      await classifyRecord("rec-new", "今天和张总讨论了采购方案", "u-1");
+
+      // 应调用 AI
+      expect(mockGenerateStructured).toHaveBeenCalled();
+      // 应建立关联
+      expect(mockLink).toHaveBeenCalledWith("wp-1", "rec-new");
     });
   });
 });

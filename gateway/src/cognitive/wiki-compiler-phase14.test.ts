@@ -12,6 +12,15 @@ const mockPoolConnect = vi.fn();
 const mockClientQuery = vi.fn();
 const mockClientRelease = vi.fn();
 
+const mockWikiPageExists = vi.fn();
+const mockWikiPageFindById = vi.fn();
+const mockWikiPageCreate = vi.fn();
+const mockWikiPageUpdate = vi.fn();
+const mockWikiPageRecordInheritAll = vi.fn();
+const mockWikiPageRecordTransferAll = vi.fn();
+const mockTodoCreate = vi.fn();
+const mockTodoTransferWikiPageRef = vi.fn();
+
 vi.mock("../db/pool.js", () => ({
   getPool: () => ({
     connect: () => mockPoolConnect(),
@@ -29,11 +38,29 @@ vi.mock("../db/repositories/record.js", () => ({
 
 vi.mock("../db/repositories/wiki-page.js", () => ({
   findByUser: vi.fn(),
-  findById: vi.fn(),
-  create: vi.fn(),
-  update: vi.fn(),
+  findById: (...args: any[]) => mockWikiPageFindById(...args),
+  create: (...args: any[]) => mockWikiPageCreate(...args),
+  update: (...args: any[]) => mockWikiPageUpdate(...args),
   updateStatus: vi.fn(),
   findByParent: vi.fn(),
+  exists: (...args: any[]) => mockWikiPageExists(...args),
+}));
+
+vi.mock("../db/repositories/wiki-page-record.js", () => ({
+  findPagesByRecords: vi.fn().mockResolvedValue([]),
+  link: vi.fn(),
+  transferAll: (...args: any[]) => mockWikiPageRecordTransferAll(...args),
+  inheritAll: (...args: any[]) => mockWikiPageRecordInheritAll(...args),
+}));
+
+vi.mock("../db/repositories/wiki-page-link.js", () => ({
+  createLink: vi.fn(),
+}));
+
+vi.mock("../db/repositories/todo.js", () => ({
+  create: (...args: any[]) => mockTodoCreate(...args),
+  update: vi.fn(),
+  transferWikiPageRef: (...args: any[]) => mockTodoTransferWikiPageRef(...args),
 }));
 
 vi.mock("../db/repositories/goal.js", () => ({
@@ -44,10 +71,6 @@ vi.mock("../db/repositories/goal.js", () => ({
 
 vi.mock("../ai/provider.js", () => ({
   chatCompletion: vi.fn(),
-}));
-
-vi.mock("../db/repositories/wiki-page-record.js", () => ({
-  findPagesByRecords: vi.fn().mockResolvedValue([]),
 }));
 
 vi.mock("./wiki-compile-prompt.js", () => ({
@@ -90,32 +113,29 @@ describe("wiki-compiler Phase 14.6 & 14.7", () => {
       release: mockClientRelease,
     });
 
-    // 默认 client.query 实现
+    // client.query 只处理事务控制 + 少量保留的 raw SQL
     mockClientQuery.mockImplementation((sql: string, params?: any[]) => {
       if (sql.includes("BEGIN") || sql.includes("COMMIT") || sql.includes("ROLLBACK") || sql.includes("SET LOCAL")) {
         return { rows: [] };
       }
-      if (sql.includes("SELECT 1 FROM wiki_page WHERE id")) {
-        return { rows: [{ "1": 1 }], rowCount: 1 };
-      }
-      if (sql.includes("INSERT INTO wiki_page")) {
-        return { rows: [{ id: NEW_GOAL_PAGE_ID }], rowCount: 1 };
-      }
       if (sql.includes("SELECT device_id FROM record")) {
         return { rows: [{ device_id: "dev-1" }] };
-      }
-      if (sql.includes("INSERT INTO todo")) {
-        return { rows: [{ id: "goal-new" }], rowCount: 1 };
       }
       if (sql.includes("UPDATE record SET compile_status")) {
         return { rows: [], rowCount: 1 };
       }
-      // 查询 page created_by
-      if (sql.includes("SELECT created_by")) {
-        return { rows: [{ created_by: "ai" }], rowCount: 1 };
-      }
       return { rows: [], rowCount: 0 };
     });
+
+    // ── repo mock 默认值 ──
+    mockWikiPageExists.mockResolvedValue(true);
+    mockWikiPageFindById.mockResolvedValue({ id: PAGE_AI, level: 3, domain: null, created_by: "ai" });
+    mockWikiPageCreate.mockResolvedValue({ id: NEW_GOAL_PAGE_ID });
+    mockWikiPageUpdate.mockResolvedValue(undefined);
+    mockWikiPageRecordInheritAll.mockResolvedValue(0);
+    mockWikiPageRecordTransferAll.mockResolvedValue(0);
+    mockTodoCreate.mockResolvedValue({ id: "todo-1" });
+    mockTodoTransferWikiPageRef.mockResolvedValue(0);
 
     // 默认：AI 创建的 page 可修改
     mockCanAiModifyStructure.mockReturnValue(true);
@@ -142,31 +162,26 @@ describe("wiki-compiler Phase 14.6 & 14.7", () => {
 
       await executeInstructions(instructions, USER_ID, [REC_1]);
 
-      // 验证创建了 goal page（INSERT INTO wiki_page 包含 page_type 和 'goal'）
-      const insertPageCalls = mockClientQuery.mock.calls.filter(
-        (call: any[]) =>
-          typeof call[0] === "string" &&
-          call[0].includes("INSERT INTO wiki_page") &&
-          !call[0].includes("wiki_page_record") &&
-          call[0].includes("page_type"),
+      // 验证通过 repo 创建了 goal page（page_type='goal', created_by='ai'）
+      expect(mockWikiPageCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          page_type: "goal",
+          created_by: "ai",
+          title: "通过四级考试",
+        }),
+        expect.anything(), // client
       );
-      expect(insertPageCalls.length).toBeGreaterThanOrEqual(1);
 
-      // 验证 SQL 或参数中含 'goal'（page_type）和 'ai'（created_by）
-      const pageInsert = insertPageCalls[0];
-      const sqlAndParams = pageInsert[0] + JSON.stringify(pageInsert[1] ?? []);
-      expect(sqlAndParams).toContain("goal");
-      expect(sqlAndParams).toContain("ai");
-
-      // 验证创建了 todo（INSERT INTO todo）并且 wiki_page_id 指向新 page
-      const insertTodoCalls = mockClientQuery.mock.calls.filter(
-        (call: any[]) =>
-          typeof call[0] === "string" &&
-          call[0].includes("INSERT INTO todo"),
+      // 验证通过 repo 创建了 todo 并且 wiki_page_id 指向新 page
+      expect(mockTodoCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          text: "通过四级考试",
+          wiki_page_id: NEW_GOAL_PAGE_ID,
+          level: 1,
+          category: "emerged",
+        }),
+        expect.anything(), // client
       );
-      expect(insertTodoCalls.length).toBeGreaterThanOrEqual(1);
-      // wiki_page_id 应该指向新创建的 goal page
-      expect(insertTodoCalls[0][1]).toContain(NEW_GOAL_PAGE_ID);
     });
 
     it("should_set_goal_wiki_page_id_to_new_page_when_no_existing_wiki_page_id", async () => {
@@ -187,14 +202,15 @@ describe("wiki-compiler Phase 14.6 & 14.7", () => {
 
       await executeInstructions(instructions, USER_ID, [REC_1]);
 
-      // 应创建 wiki_page 和 todo，todo 的 wiki_page_id 指向新 page
-      const insertTodoCalls = mockClientQuery.mock.calls.filter(
-        (call: any[]) =>
-          typeof call[0] === "string" &&
-          call[0].includes("INSERT INTO todo"),
+      // 应创建 wiki_page 和 todo
+      expect(mockWikiPageCreate).toHaveBeenCalled();
+      expect(mockTodoCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          text: "今年减重10kg",
+          wiki_page_id: NEW_GOAL_PAGE_ID,
+        }),
+        expect.anything(),
       );
-      expect(insertTodoCalls.length).toBe(1);
-      expect(insertTodoCalls[0][1]).toContain(NEW_GOAL_PAGE_ID);
     });
   });
 
@@ -204,25 +220,7 @@ describe("wiki-compiler Phase 14.6 & 14.7", () => {
     it("should_execute_split_directly_when_page_created_by_ai", async () => {
       // AI 创建的 page → 直接执行
       mockCanAiModifyStructure.mockReturnValue(true);
-      // 查询 page 时返回 created_by='ai'
-      mockClientQuery.mockImplementation((sql: string, params?: any[]) => {
-        if (sql.includes("BEGIN") || sql.includes("COMMIT") || sql.includes("ROLLBACK") || sql.includes("SET LOCAL")) {
-          return { rows: [] };
-        }
-        if (sql.includes("SELECT") && sql.includes("created_by") && sql.includes("wiki_page")) {
-          return { rows: [{ created_by: "ai" }], rowCount: 1 };
-        }
-        if (sql.includes("SELECT 1 FROM wiki_page WHERE id")) {
-          return { rows: [{ "1": 1 }], rowCount: 1 };
-        }
-        if (sql.includes("INSERT INTO wiki_page")) {
-          return { rows: [{ id: "child-page-id" }], rowCount: 1 };
-        }
-        if (sql.includes("UPDATE record SET compile_status")) {
-          return { rows: [], rowCount: 1 };
-        }
-        return { rows: [], rowCount: 0 };
-      });
+      mockWikiPageFindById.mockResolvedValue({ id: PAGE_AI, level: 3, domain: "工作", created_by: "ai" });
 
       const instructions: CompileInstructions = {
         update_pages: [],
@@ -244,26 +242,14 @@ describe("wiki-compiler Phase 14.6 & 14.7", () => {
       expect(result.pages_split).toBe(1);
       // 不应创建 suggestion
       expect(mockCreateSuggestion).not.toHaveBeenCalled();
+      // 应通过 repo 创建子 page
+      expect(mockWikiPageCreate).toHaveBeenCalled();
     });
 
     it("should_create_suggestion_instead_of_split_when_page_created_by_user", async () => {
       // 用户创建的 page → 创建 suggestion
       mockCanAiModifyStructure.mockReturnValue(false);
-      mockClientQuery.mockImplementation((sql: string, params?: any[]) => {
-        if (sql.includes("BEGIN") || sql.includes("COMMIT") || sql.includes("ROLLBACK") || sql.includes("SET LOCAL")) {
-          return { rows: [] };
-        }
-        if (sql.includes("SELECT") && sql.includes("created_by") && sql.includes("wiki_page")) {
-          return { rows: [{ created_by: "user" }], rowCount: 1 };
-        }
-        if (sql.includes("SELECT 1 FROM wiki_page WHERE id")) {
-          return { rows: [{ "1": 1 }], rowCount: 1 };
-        }
-        if (sql.includes("UPDATE record SET compile_status")) {
-          return { rows: [], rowCount: 1 };
-        }
-        return { rows: [], rowCount: 0 };
-      });
+      mockWikiPageFindById.mockResolvedValue({ id: PAGE_USER, level: 3, domain: null, created_by: "user" });
 
       const instructions: CompileInstructions = {
         update_pages: [],
@@ -298,21 +284,7 @@ describe("wiki-compiler Phase 14.6 & 14.7", () => {
   describe("merge_pages_authorization", () => {
     it("should_execute_merge_directly_when_source_page_created_by_ai", async () => {
       mockCanAiModifyStructure.mockReturnValue(true);
-      mockClientQuery.mockImplementation((sql: string) => {
-        if (sql.includes("BEGIN") || sql.includes("COMMIT") || sql.includes("ROLLBACK") || sql.includes("SET LOCAL")) {
-          return { rows: [] };
-        }
-        if (sql.includes("SELECT") && sql.includes("created_by") && sql.includes("wiki_page")) {
-          return { rows: [{ created_by: "ai" }], rowCount: 1 };
-        }
-        if (sql.includes("SELECT 1 FROM wiki_page WHERE id")) {
-          return { rows: [{ "1": 1 }], rowCount: 1 };
-        }
-        if (sql.includes("UPDATE record SET compile_status")) {
-          return { rows: [], rowCount: 1 };
-        }
-        return { rows: [], rowCount: 0 };
-      });
+      mockWikiPageFindById.mockResolvedValue({ id: PAGE_AI, created_by: "ai" });
 
       const instructions: CompileInstructions = {
         update_pages: [],
@@ -327,25 +299,15 @@ describe("wiki-compiler Phase 14.6 & 14.7", () => {
       const result = await executeInstructions(instructions, USER_ID, [REC_1]);
       expect(result.pages_merged).toBe(1);
       expect(mockCreateSuggestion).not.toHaveBeenCalled();
+      // 验证 repo 方法被调用
+      expect(mockWikiPageUpdate).toHaveBeenCalled();
+      expect(mockWikiPageRecordTransferAll).toHaveBeenCalled();
+      expect(mockTodoTransferWikiPageRef).toHaveBeenCalled();
     });
 
     it("should_create_suggestion_instead_of_merge_when_source_page_created_by_user", async () => {
       mockCanAiModifyStructure.mockReturnValue(false);
-      mockClientQuery.mockImplementation((sql: string) => {
-        if (sql.includes("BEGIN") || sql.includes("COMMIT") || sql.includes("ROLLBACK") || sql.includes("SET LOCAL")) {
-          return { rows: [] };
-        }
-        if (sql.includes("SELECT") && sql.includes("created_by") && sql.includes("wiki_page")) {
-          return { rows: [{ created_by: "user" }], rowCount: 1 };
-        }
-        if (sql.includes("SELECT 1 FROM wiki_page WHERE id")) {
-          return { rows: [{ "1": 1 }], rowCount: 1 };
-        }
-        if (sql.includes("UPDATE record SET compile_status")) {
-          return { rows: [], rowCount: 1 };
-        }
-        return { rows: [], rowCount: 0 };
-      });
+      mockWikiPageFindById.mockResolvedValue({ id: PAGE_USER, created_by: "user" });
 
       const instructions: CompileInstructions = {
         update_pages: [],

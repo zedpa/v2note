@@ -1,0 +1,5 @@
+1:"$Sreact.fragment"
+2:I[77761,["/_next/static/chunks/cd1e79967772bf0d.js","/_next/static/chunks/fd91dd2473954df6.js"],"ViewportBoundary"]
+3:I[77761,["/_next/static/chunks/cd1e79967772bf0d.js","/_next/static/chunks/fd91dd2473954df6.js"],"MetadataBoundary"]
+4:"$Sreact.suspense"
+0:{"buildId":"Jvgz2T-2dHnoqsG_xBGIK","rsc":["$","$1","h",{"children":[["$","meta",null,{"name":"robots","content":"noindex"}],["$","$L2",null,{"children":[["$","meta","0",{"charSet":"utf-8"}],["$","meta","1",{"name":"viewport","content":"width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover, user-scalable=no"}],["$","meta","2",{"name":"theme-color","content":"#FDF9F3"}]]}],["$","div",null,{"hidden":true,"children":["$","$L3",null,{"children":["$","$4",null,{"name":"Next.Metadata","children":[["$","title","0",{"children":"念念有路 — AI 认知伙伴"}],["$","meta","1",{"name":"description","content":"你的每一个想法，我都帮你记住"}]]}]}]}],["$","meta",null,{"name":"next-size-adjust","content":""}]]}],"loading":null,"isPartial":false}

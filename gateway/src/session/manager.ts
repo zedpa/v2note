@@ -9,6 +9,11 @@ export interface PendingConfirm {
   expiresAt: number;    // Date.now() + 30000（30秒超时）
 }
 
+export interface ChatInitOpts {
+  activeSkills: Array<{ name: string; prompt: string }>;
+  dateRange: { start: string; end: string };
+}
+
 export interface Session {
   id: string;
   userId: string;
@@ -16,6 +21,8 @@ export interface Session {
   mode: "idle" | "process" | "chat";
   memoryManager: MemoryManager;
   pendingConfirms: Map<string, PendingConfirm>;
+  /** initChat 时的参数快照，压缩时用于重建 system prompt */
+  chatInitOpts?: ChatInitOpts;
   createdAt: Date;
   lastActivity: Date;
 }

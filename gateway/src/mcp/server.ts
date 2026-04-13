@@ -7,7 +7,7 @@
  */
 
 import type { Router } from "../router.js";
-import { readBody, sendJson, sendError, getDeviceId, getUserId } from "../lib/http-helpers.js";
+import { readBody, sendJson, sendError, getUserId } from "../lib/http-helpers.js";
 import { createDefaultRegistry } from "../tools/definitions/index.js";
 import type { ToolContext } from "../tools/types.js";
 import { loadSkills } from "../skills/loader.js";
@@ -129,8 +129,8 @@ async function handleRpcRequest(req: JsonRpcRequest, deviceId: string, userId?: 
 export function registerMCPServerRoutes(router: Router) {
   router.post("/mcp", async (req, res) => {
     try {
-      const deviceId = getDeviceId(req);
       const userId = getUserId(req);
+      if (!userId) { sendError(res, "Unauthorized", 401); return; }
       const body = await readBody<JsonRpcRequest>(req);
 
       if (body.jsonrpc !== "2.0") {
@@ -138,7 +138,7 @@ export function registerMCPServerRoutes(router: Router) {
         return;
       }
 
-      const response = await handleRpcRequest(body, deviceId, userId ?? undefined);
+      const response = await handleRpcRequest(body, userId, userId);
       sendJson(res, response);
     } catch (err: any) {
       sendJson(res, rpcError(null, -32603, err.message));

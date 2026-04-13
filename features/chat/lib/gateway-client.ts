@@ -58,8 +58,6 @@ export type GatewayResponse =
   | { type: "proactive.morning_briefing"; payload: { text: string } }
   | { type: "proactive.relay_reminder"; payload: { text: string; count: number } }
   | { type: "proactive.evening_summary"; payload: { text: string } }
-  | { type: "reflect.question"; payload: { question: string } }
-  | { type: "ai.status"; payload: { text: string } }
   | { type: "tool.step"; payload: { stepIndex: number; totalSteps: number; toolName: string; status: string; result?: string } }
   | { type: "tool.status"; payload: { toolName: string; label: string; callId: string } }
   | { type: "tool.done"; payload: { toolName: string; callId: string; success: boolean; message: string; durationMs: number } }

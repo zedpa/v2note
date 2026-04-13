@@ -1,5 +1,5 @@
 import type { Router } from "../router.js";
-import { readBody, sendJson, getDeviceId, getUserId } from "../lib/http-helpers.js";
+import { readBody, sendJson, sendError, getUserId } from "../lib/http-helpers.js";
 import {
   recordRepo,
   transcriptRepo,
@@ -45,7 +45,7 @@ function isValidUrl(str: string): boolean {
 export function registerIngestRoutes(router: Router) {
   router.post("/api/v1/ingest", async (req, res) => {
     const userId = getUserId(req);
-    const deviceId = getDeviceId(req);
+    if (!userId) { sendError(res, "Unauthorized", 401); return; }
     const body = await readBody<IngestBody>(req);
 
     if (!body.type) {
@@ -66,8 +66,8 @@ export function registerIngestRoutes(router: Router) {
         }
 
         const record = await recordRepo.create({
-          device_id: deviceId,
-          user_id: userId ?? undefined,
+          device_id: undefined,
+          user_id: userId,
           status: "completed",
           source: "manual",
           source_type: body.source_type ?? "think",
@@ -84,7 +84,7 @@ export function registerIngestRoutes(router: Router) {
           short_summary: body.content,
         });
 
-        digestRecords([record.id], { deviceId, userId: userId ?? undefined }).catch(
+        digestRecords([record.id], { deviceId: userId, userId }).catch(
           (err) => console.error("[ingest] digest failed for record", record.id, ":", err),
         );
 
@@ -106,7 +106,7 @@ export function registerIngestRoutes(router: Router) {
         let imageUrl: string;
         const buf = Buffer.from(body.file_base64, "base64");
         const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-        const imgFileName = `${deviceId}-${timestamp}.jpg`;
+        const imgFileName = `${userId}-${timestamp}.jpg`;
 
         if (isOssConfigured()) {
           try {
@@ -122,8 +122,8 @@ export function registerIngestRoutes(router: Router) {
         const visionResult = await describeImage(imageUrl);
 
         const imgRecord = await recordRepo.create({
-          device_id: deviceId,
-          user_id: userId ?? undefined,
+          device_id: undefined,
+          user_id: userId,
           status: "completed",
           source: "image",
           source_type: "material",
@@ -142,7 +142,7 @@ export function registerIngestRoutes(router: Router) {
           short_summary: visionResult.success ? visionResult.text : "",
         });
 
-        digestRecords([imgRecord.id], { deviceId, userId: userId ?? undefined }).catch(
+        digestRecords([imgRecord.id], { deviceId: userId, userId }).catch(
           (err) => console.error("[ingest] digest failed for record", imgRecord.id, ":", err),
         );
 
@@ -181,7 +181,7 @@ export function registerIngestRoutes(router: Router) {
         if (isOssConfigured()) {
           try {
             const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-            const ossName = `${deviceId}-${timestamp}-${safeFilename}`;
+            const ossName = `${userId}-${timestamp}-${safeFilename}`;
             fileOssUrl = await uploadFile("files", ossName, fileBuf);
           } catch (err) {
             console.error("[ingest] OSS file upload failed:", err);
@@ -189,8 +189,8 @@ export function registerIngestRoutes(router: Router) {
         }
 
         const fileRecord = await recordRepo.create({
-          device_id: deviceId,
-          user_id: userId ?? undefined,
+          device_id: undefined,
+          user_id: userId,
           status: "completed",
           source: "manual",
           source_type: "material",
@@ -210,7 +210,7 @@ export function registerIngestRoutes(router: Router) {
         });
 
         if (parseResult.success) {
-          digestRecords([fileRecord.id], { deviceId, userId: userId ?? undefined }).catch(
+          digestRecords([fileRecord.id], { deviceId: userId, userId }).catch(
             (err) => console.error("[ingest] digest failed for record", fileRecord.id, ":", err),
           );
         }
@@ -239,8 +239,8 @@ export function registerIngestRoutes(router: Router) {
         const { title, content: extracted, image } = await extractUrl(body.content);
 
         const urlRecord = await recordRepo.create({
-          device_id: deviceId,
-          user_id: userId ?? undefined,
+          device_id: undefined,
+          user_id: userId,
           status: "completed",
           source: "url",
           source_type: "material",
@@ -257,7 +257,7 @@ export function registerIngestRoutes(router: Router) {
           short_summary: extracted,
         });
 
-        digestRecords([urlRecord.id], { deviceId, userId: userId ?? undefined }).catch(
+        digestRecords([urlRecord.id], { deviceId: userId, userId }).catch(
           (err) => console.error("[ingest] digest failed for record", urlRecord.id, ":", err),
         );
 

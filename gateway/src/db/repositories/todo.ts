@@ -1,4 +1,5 @@
 import { query, queryOne, execute } from "../pool.js";
+import type { Queryable } from "../pool.js";
 import { getEmbedding, cosineSimilarity } from "../../memory/embeddings.js";
 import { daysAgo } from "../../lib/tz.js";
 
@@ -23,7 +24,6 @@ export interface Todo {
     context?: string;
     direction?: "outgoing" | "incoming";
   };
-  domain?: string;
   impact?: number;
   ai_actionable?: boolean;
   ai_action_plan?: string[];
@@ -57,6 +57,7 @@ export interface Todo {
   calendar_synced_at?: string | null;
 }
 
+/** @deprecated 使用 findByUser 替代。deviceId 身份体系已废弃。 */
 export async function findByDevice(deviceId: string): Promise<Todo[]> {
   return query<Todo>(
     `SELECT t.*,
@@ -155,7 +156,6 @@ export async function create(fields: {
   record_id?: string | null;
   text: string;
   done?: boolean;
-  domain?: string;
   impact?: number;
   goal_id?: string;
   scheduled_start?: string;
@@ -175,13 +175,16 @@ export async function create(fields: {
   recurrence_rule?: string;
   recurrence_end?: string;
   recurrence_parent_id?: string;
-}): Promise<Todo> {
+  // wiki page 关联
+  wiki_page_id?: string;
+  // 分类
+  category?: string;
+}, client?: Queryable): Promise<Todo> {
   const cols = ["text", "done"];
   const vals: any[] = [fields.text, fields.done ?? false];
 
   const optionals: Array<[string, any]> = [
     ["record_id", fields.record_id],
-    ["domain", fields.domain],
     ["impact", fields.impact],
     ["goal_id", fields.goal_id],
     ["scheduled_start", fields.scheduled_start],
@@ -199,6 +202,8 @@ export async function create(fields: {
     ["recurrence_rule", fields.recurrence_rule],
     ["recurrence_end", fields.recurrence_end],
     ["recurrence_parent_id", fields.recurrence_parent_id],
+    ["wiki_page_id", fields.wiki_page_id],
+    ["category", fields.category],
   ];
   for (const [col, val] of optionals) {
     if (val !== undefined && val !== null) {
@@ -211,6 +216,7 @@ export async function create(fields: {
   const row = await queryOne<Todo>(
     `INSERT INTO todo (${cols.join(", ")}) VALUES (${placeholders}) RETURNING *`,
     vals,
+    client,
   );
   return row!;
 }
@@ -241,7 +247,6 @@ export async function update(
     scheduled_start?: string | null;
     scheduled_end?: string | null;
     priority?: number;
-    domain?: string;
     impact?: number;
     ai_actionable?: boolean;
     ai_action_plan?: string[] | null;
@@ -257,7 +262,9 @@ export async function update(
     recurrence_rule?: string | null;
     recurrence_end?: string | null;
     recurrence_parent_id?: string | null;
+    wiki_page_id?: string | null;
   },
+  client?: Queryable,
 ): Promise<void> {
   const sets: string[] = [];
   const params: any[] = [];
@@ -271,7 +278,6 @@ export async function update(
     ["scheduled_start", fields.scheduled_start],
     ["scheduled_end", fields.scheduled_end],
     ["priority", fields.priority],
-    ["domain", fields.domain],
     ["impact", fields.impact],
     ["ai_actionable", fields.ai_actionable],
     ["ai_action_plan", fields.ai_action_plan, (v: any) => JSON.stringify(v)],
@@ -285,6 +291,7 @@ export async function update(
     ["recurrence_rule", fields.recurrence_rule],
     ["recurrence_end", fields.recurrence_end],
     ["recurrence_parent_id", fields.recurrence_parent_id],
+    ["wiki_page_id", fields.wiki_page_id],
   ];
 
   for (const [col, val, transform] of entries) {
@@ -297,7 +304,20 @@ export async function update(
   if (sets.length === 0) return;
   sets.push(`updated_at = now()`);
   params.push(id);
-  await execute(`UPDATE todo SET ${sets.join(", ")} WHERE id = $${i}`, params);
+  await execute(`UPDATE todo SET ${sets.join(", ")} WHERE id = $${i}`, params, client);
+}
+
+/** 批量迁移 wiki_page_id 引用（merge 时用） */
+export async function transferWikiPageRef(
+  fromPageId: string,
+  toPageId: string,
+  client?: Queryable,
+): Promise<number> {
+  return execute(
+    `UPDATE todo SET wiki_page_id = $1 WHERE wiki_page_id = $2 AND level >= 1`,
+    [toPageId, fromPageId],
+    client,
+  );
 }
 
 export async function del(id: string): Promise<void> {
@@ -459,7 +479,6 @@ export async function createWithDedup(params: {
   source?: string;
   status?: string;
   cluster_id?: string;
-  domain?: string;
 }): Promise<{ todo: Todo; action: "created" | "matched" | "suggested" }> {
   // 获取已有活跃目标
   const existing = await query<Todo>(
@@ -517,7 +536,6 @@ export async function dedupCreate(fields: {
   record_id?: string | null;
   text: string;
   done?: boolean;
-  domain?: string;
   impact?: number;
   goal_id?: string;
   scheduled_start?: string;
@@ -583,11 +601,10 @@ export async function createGoalAsTodo(fields: {
   status?: string;
   cluster_id?: string;
   parent_id?: string;
-  domain?: string;
 }): Promise<Todo> {
   const row = await queryOne<Todo>(
-    `INSERT INTO todo (user_id, device_id, text, level, status, cluster_id, parent_id, domain, done)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, false) RETURNING *`,
+    `INSERT INTO todo (user_id, device_id, text, level, status, cluster_id, parent_id, done)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, false) RETURNING *`,
     [
       fields.user_id,
       fields.device_id,
@@ -596,7 +613,6 @@ export async function createGoalAsTodo(fields: {
       fields.status ?? "suggested",
       fields.cluster_id ?? null,
       fields.parent_id ?? null,
-      fields.domain ?? null,
     ],
   );
   return row!;
@@ -619,23 +635,6 @@ export async function updateClusterRef(oldClusterId: string, newClusterId: strin
   );
 }
 
-/** 按 domain(L3) 查询 level>=1 的目标/项目树 */
-export async function findGoalsByDomain(userId: string, domain?: string): Promise<Todo[]> {
-  if (domain) {
-    return query<Todo>(
-      `SELECT * FROM todo WHERE user_id = $1 AND level >= 1 AND domain = $2
-       AND status IN ('active', 'progressing', 'suggested')
-       ORDER BY level DESC, created_at DESC`,
-      [userId, domain],
-    );
-  }
-  return query<Todo>(
-    `SELECT * FROM todo WHERE user_id = $1 AND level >= 1
-     AND status IN ('active', 'progressing', 'suggested')
-     ORDER BY level DESC, created_at DESC`,
-    [userId],
-  );
-}
 
 /** 查询用户所有活跃目标（替代 goalRepo.findActiveByUser） */
 export async function findActiveGoalsByUser(userId: string): Promise<Todo[]> {
@@ -681,24 +680,26 @@ export async function findChildTodos(parentId: string): Promise<Todo[]> {
   );
 }
 
-/** 侧边栏：按 domain 分组统计（支持 user_id 或 device_id）
+/** 侧边栏：按 wiki_page.title 分组统计（支持 user_id 或 device_id）
  * @deprecated 使用 getMyWorldData 替代
+ * 注意：返回字段名仍为 domain（前端兼容），数据来源已改为 wiki_page.title
  */
 export async function getDimensionSummary(userId: string | null, deviceId?: string): Promise<Array<{
   domain: string;
   pending_count: number;
   goal_count: number;
 }>> {
-  const whereClause = userId ? "user_id = $1" : "device_id = $1";
+  const whereClause = userId ? "t.user_id = $1" : "t.device_id = $1";
   const param = userId ?? deviceId;
   if (!param) return [];
   return query(
-    `SELECT COALESCE(domain, '其他') AS domain,
-            COUNT(*) FILTER (WHERE level = 0 AND done = false)::int AS pending_count,
-            COUNT(*) FILTER (WHERE level >= 1 AND status IN ('active', 'progressing'))::int AS goal_count
-     FROM todo
-     WHERE (${whereClause}) AND status != 'archived'
-     GROUP BY COALESCE(domain, '其他')
+    `SELECT COALESCE(wp.title, '其他') AS domain,
+            COUNT(*) FILTER (WHERE t.level = 0 AND t.done = false)::int AS pending_count,
+            COUNT(*) FILTER (WHERE t.level >= 1 AND t.status IN ('active', 'progressing'))::int AS goal_count
+     FROM todo t
+     LEFT JOIN wiki_page wp ON wp.id = t.wiki_page_id
+     WHERE (${whereClause}) AND t.status != 'archived'
+     GROUP BY COALESCE(wp.title, '其他')
      ORDER BY pending_count DESC`,
     [param],
   );

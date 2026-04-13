@@ -27,6 +27,11 @@ vi.mock("../../db/pool.js", () => ({
   })),
 }));
 
+const mockCreateGoalPageWithTodo = vi.fn();
+vi.mock("../../db/repositories/goal-page-factory.js", () => ({
+  createGoalPageWithTodo: (...args: any[]) => mockCreateGoalPageWithTodo(...args),
+}));
+
 import { manageWikiPageTool } from "./manage-wiki-page.js";
 import * as wikiPageRepo from "../../db/repositories/wiki-page.js";
 import * as wikiPageRecordRepo from "../../db/repositories/wiki-page-record.js";
@@ -137,13 +142,14 @@ describe("manage_wiki_page", () => {
       const mockClient = {
         query: vi.fn()
           .mockResolvedValueOnce(undefined) // BEGIN
-          .mockResolvedValueOnce({ rows: [{ id: "page-g", title: "减肥", level: 3 }] }) // INSERT wiki_page
-          .mockResolvedValueOnce(undefined) // INSERT todo
           .mockResolvedValueOnce(undefined), // COMMIT
         release: vi.fn(),
       };
       const { getPool } = await import("../../db/pool.js");
       vi.mocked(getPool).mockReturnValue({ connect: vi.fn().mockResolvedValue(mockClient) } as any);
+
+      // createGoalPageWithTodo 通过 repo 创建 page + todo
+      mockCreateGoalPageWithTodo.mockResolvedValue({ id: "page-g", title: "减肥", level: 3 });
 
       const result = await manageWikiPageTool.handler(
         { action: "create", title: "减肥", page_type: "goal" },
@@ -151,7 +157,9 @@ describe("manage_wiki_page", () => {
       );
 
       expect(result.success).toBe(true);
-      expect(mockClient.query).toHaveBeenCalledTimes(4); // BEGIN + INSERT page + INSERT todo + COMMIT
+      // BEGIN + COMMIT（实际的 INSERT 通过 repo 完成）
+      expect(mockClient.query).toHaveBeenCalledTimes(2);
+      expect(mockCreateGoalPageWithTodo).toHaveBeenCalledWith("user-1", "减肥", null, mockClient);
     });
   });
 

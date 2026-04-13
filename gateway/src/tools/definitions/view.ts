@@ -93,7 +93,6 @@ async function viewRecord(id: string, userId: string) {
       record_id: record.id,
       title: summary?.title ?? null,
       content,
-      domain: record.domain ?? null,
       source: record.source,
       created_at: toLocalDateTime(record.created_at),
       word_count: fullContent.length,

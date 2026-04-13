@@ -29,7 +29,6 @@ export function TodoWorkspace({ onOpenChat, viewMode = "time", onRegisterRefresh
   const { viewedDates, markViewed } = useViewedDates();
   const [editTodo, setEditTodo] = useState<TodoDTO | null>(null);
   const [editOpen, setEditOpen] = useState(false);
-
   const [swipeOpenId, setSwipeOpenId] = useState<string | null>(null);
 
   /** 右滑完成 + 撤销 Toast */

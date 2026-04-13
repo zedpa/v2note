@@ -5,6 +5,7 @@
  * UNIQUE(source_page_id, target_page_id, link_type)
  */
 import { query, queryOne, execute } from "../pool.js";
+import type { Queryable } from "../pool.js";
 
 export interface WikiPageLink {
   id: string;
@@ -21,7 +22,7 @@ export async function createLink(fields: {
   target_page_id: string;
   link_type: "reference" | "related" | "contradicts";
   context_text?: string;
-}): Promise<WikiPageLink> {
+}, client?: Queryable): Promise<WikiPageLink> {
   const row = await queryOne<WikiPageLink>(
     `INSERT INTO wiki_page_link (source_page_id, target_page_id, link_type, context_text)
      VALUES ($1, $2, $3, $4)
@@ -34,6 +35,7 @@ export async function createLink(fields: {
       fields.link_type,
       fields.context_text ?? null,
     ],
+    client,
   );
   return row!;
 }

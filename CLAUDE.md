@@ -153,6 +153,7 @@ v2note/
 - [数据库锁] 禁止在 Supabase transaction pooler（端口 6543）上使用 session-level advisory lock（`pg_advisory_lock/unlock`）。lock 和 unlock 会被路由到不同后端连接，导致锁永远无法释放。必须使用 `pg_try_advisory_xact_lock`（事务级，包裹在 BEGIN/ROLLBACK 中，事务结束自动释放）(来源: 2026-04-10 wiki-compiler lock 泄漏)
 - [数据库锁] Supabase Transaction Pooler 会杀死持有超过约 60 秒的事务连接。禁止在事务中执行 AI 调用或其他长时间操作。如果需要并发控制，单实例服务使用进程内 `Set/Map` 内存锁替代 DB advisory lock (来源: 2026-04-11 wiki-compiler 连接被杀)
 - [数据库迁移] DROP TABLE migration 提交后，必须全局搜索 `FROM/INTO/UPDATE/JOIN/DELETE FROM <table_name>` 清理所有代码引用。不能只修触发报错的路径——低频调用路径（定时任务、侧边栏、认知引擎）的残留 SQL 会在后续运行时爆炸 (来源: 2026-04-12 fix-record-delete-strike，strike 表删除后 11 处 SQL 残留)
+- [身份迁移] 身份体系迁移（如 deviceId→userId）必须覆盖全链路：JWT签发 → WS认证 → Session管理 → HTTP路由层 → DB Schema(NOT NULL约束) → 编译部署。遗漏任一层会在不同时机爆炸。特别注意：(1) DB 列的 NOT NULL 约束必须同步迁移；(2) HTTP 路由层的 helper 函数（如 getDeviceId）必须同步替换，否则大量路由返回 401；(3) 修改 gateway 代码后必须重新 `pnpm build` 并重启服务 (来源: 2026-04-13 fix-device-id-cleanup)
 - [AI 幻觉] LLM 输出的任何 ID（UUID / FK 引用）都不可信。在执行 DB 写入前必须：(1) 正则校验格式（`/^[0-9a-f]{8}-...-[0-9a-f]{12}$/i`）；(2) `SELECT 1 FROM target_table WHERE id = $1` 存在性检查。AI 会编造格式正确但不存在的 UUID，也会编造格式非法的伪 UUID。INSERT 语句使用 `WHERE EXISTS` 子查询防护 (来源: 2026-04-11 wiki-compiler 6 层 FK violation)
 
 ## 🎯 风险分级

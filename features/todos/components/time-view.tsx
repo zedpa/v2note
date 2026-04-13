@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState, useMemo } from "react";
+import { useCallback, useState, useMemo, useEffect } from "react";
 import { TIME_SLOTS, type TimeSlot } from "../lib/time-slots";
 import type { TimeSlotGroup, TodoDTO } from "../lib/todo-types";
 import { TimeViewHeader } from "./time-view-header";
@@ -52,6 +52,7 @@ export function TimeView({
   const [createOpen, setCreateOpen] = useState(false);
   const [createSlot, setCreateSlot] = useState<TimeSlot>("anytime");
   const [calendarExpanded, setCalendarExpanded] = useState(false);
+
 
   const today = useMemo(() => getLocalToday(), []);
 
