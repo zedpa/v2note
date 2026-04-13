@@ -36,8 +36,10 @@ export function getDeviceId(req: IncomingMessage): string {
   if (authHeader && authHeader.startsWith("Bearer ")) {
     try {
       const secret = process.env.JWT_SECRET ?? "dev-jwt-secret-change-me";
-      const payload = jwt.verify(authHeader.slice(7), secret) as { deviceId?: string };
+      const payload = jwt.verify(authHeader.slice(7), secret) as { userId?: string; deviceId?: string };
+      // 优先返回 deviceId（旧 token 兼容），否则 fallback 到 userId
       if (payload.deviceId) return payload.deviceId;
+      if (payload.userId) return payload.userId;
     } catch {
       // JWT invalid — fall through to header
     }
