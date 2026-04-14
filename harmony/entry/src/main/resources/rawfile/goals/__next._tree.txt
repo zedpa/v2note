@@ -6,4 +6,4 @@
 :HL["/_next/static/chunks/cdbec5b1dd77a5f1.css","style"]
 :HL["/_next/static/chunks/f4c152e486479416.css","style"]
 :HC["/",""]
-0:{"buildId":"Jvgz2T-2dHnoqsG_xBGIK","tree":{"name":"","paramType":null,"paramKey":"","hasRuntimePrefetch":false,"slots":{"children":{"name":"goals","paramType":null,"paramKey":"goals","hasRuntimePrefetch":false,"slots":{"children":{"name":"__PAGE__","paramType":null,"paramKey":"__PAGE__","hasRuntimePrefetch":false,"slots":null,"isRootLayout":false}},"isRootLayout":false}},"isRootLayout":true},"staleTime":300}
+0:{"buildId":"SKNKgYDR3UNb6AW08a_51","tree":{"name":"","paramType":null,"paramKey":"","hasRuntimePrefetch":false,"slots":{"children":{"name":"goals","paramType":null,"paramKey":"goals","hasRuntimePrefetch":false,"slots":{"children":{"name":"__PAGE__","paramType":null,"paramKey":"__PAGE__","hasRuntimePrefetch":false,"slots":null,"isRootLayout":false}},"isRootLayout":false}},"isRootLayout":true},"staleTime":300}

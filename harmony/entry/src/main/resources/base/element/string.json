@@ -15,6 +15,22 @@
     {
       "name": "EntryAbility_label",
       "value": "念念有路"
+    },
+    {
+      "name": "microphone_reason",
+      "value": "用于语音输入记录"
+    },
+    {
+      "name": "camera_reason",
+      "value": "用于拍照记录"
+    },
+    {
+      "name": "read_media_reason",
+      "value": "用于读取图片和文件"
+    },
+    {
+      "name": "write_media_reason",
+      "value": "用于保存图片和文件"
     }
   ]
 }

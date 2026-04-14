@@ -12,14 +12,16 @@ const STORE_NAME = 'v2note_preferences';
 export class PreferencesBridge {
   private store: preferences.Preferences | null = null;
 
-  async handle(method: string, args: Record<string, unknown>): Promise<unknown> {
+  async handle(method: string, args: Record<string, Object>): Promise<Object | null> {
     switch (method) {
       case 'get':
         return this.get(args.key as string);
       case 'set':
-        return this.set(args.key as string, args.value as string);
+        await this.set(args.key as string, args.value as string);
+        return 'ok';
       case 'remove':
-        return this.remove(args.key as string);
+        await this.remove(args.key as string);
+        return 'ok';
       default:
         throw new Error(`PreferencesBridge: unknown method ${method}`);
     }
@@ -50,7 +52,7 @@ export class PreferencesBridge {
       await store.flush();
     } catch (err) {
       hilog.error(DOMAIN, TAG, 'Failed to set key "%{public}s": %{public}s', key, JSON.stringify(err));
-      throw err;
+      throw (err instanceof Error ? err : new Error(String(err)));
     }
   }
 
@@ -61,7 +63,7 @@ export class PreferencesBridge {
       await store.flush();
     } catch (err) {
       hilog.error(DOMAIN, TAG, 'Failed to remove key "%{public}s": %{public}s', key, JSON.stringify(err));
-      throw err;
+      throw (err instanceof Error ? err : new Error(String(err)));
     }
   }
 }

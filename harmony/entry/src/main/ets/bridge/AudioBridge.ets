@@ -1,4 +1,4 @@
-import { abilityAccessCtrl, Permissions } from '@kit.AbilityKit';
+import { abilityAccessCtrl, common, Permissions } from '@kit.AbilityKit';
 import { audio } from '@kit.AudioKit';
 import { buffer } from '@kit.ArkTS';
 import { hilog } from '@kit.PerformanceAnalysisKit';
@@ -6,24 +6,47 @@ import { hilog } from '@kit.PerformanceAnalysisKit';
 const TAG = 'AudioBridge';
 const DOMAIN = 0x0000;
 
+interface AudioStopMeta {
+  duration: number;
+  totalBytes: number;
+}
+
 /**
  * 录音桥接
- * 使用 OHAudio / AudioCapturer API 实现录音功能
+ * 16kHz 16-bit mono PCM
+ * stop() 只返回元信息，前端通过 getData(offset, length) 分段获取 base64
  */
 export class AudioBridge {
   private audioCapturer: audio.AudioCapturer | null = null;
-  private audioData: ArrayBuffer[] = [];
   private isRecording: boolean = false;
   private startTime: number = 0;
+  private context: common.UIAbilityContext | null = null;
+  private chunks: ArrayBuffer[] = [];
+  // 录音完成后的合并 PCM 数据，供 getData 分段读取
+  private mergedPcm: ArrayBuffer | null = null;
 
-  async handle(method: string, args: Record<string, unknown>): Promise<unknown> {
+  setContext(context: common.UIAbilityContext): void {
+    this.context = context;
+  }
+
+  async handle(method: string, args: Record<string, Object>): Promise<Object | null> {
     switch (method) {
       case 'requestPermission':
         return this.requestPermission();
+      case 'startStream':
       case 'start':
-        return this.start(args as { format?: 'aac' | 'wav' });
+        await this.start();
+        return 'ok';
       case 'stop':
         return this.stop();
+      case 'getData': {
+        const offset = args.offset as number;
+        const length = args.length as number;
+        return this.getData(offset, length);
+      }
+      case 'cancel':
+        this.cancel();
+        return 'ok';
       case 'getStatus':
         return this.getStatus();
       default:
@@ -31,17 +54,12 @@ export class AudioBridge {
     }
   }
 
-  /**
-   * 请求麦克风权限
-   */
   private async requestPermission(): Promise<boolean> {
     try {
       const atManager = abilityAccessCtrl.createAtManager();
       const permissions: Permissions[] = ['ohos.permission.MICROPHONE'];
-      const result = await atManager.requestPermissionsFromUser(
-        getContext(this),
-        permissions
-      );
+      const ctx = this.context ?? (getContext() as common.UIAbilityContext);
+      const result = await atManager.requestPermissionsFromUser(ctx, permissions);
       const granted = result.authResults.every((r) => r === 0);
       hilog.info(DOMAIN, TAG, 'Microphone permission: %{public}s', granted ? 'granted' : 'denied');
       return granted;
@@ -51,149 +69,118 @@ export class AudioBridge {
     }
   }
 
-  /**
-   * 开始录音
-   */
-  private async start(options?: { format?: 'aac' | 'wav' }): Promise<void> {
+  private async start(): Promise<void> {
     if (this.isRecording) {
-      hilog.warn(DOMAIN, TAG, 'Already recording, stopping previous');
       await this.stop();
     }
 
-    this.audioData = [];
+    this.mergedPcm = null;
+    this.chunks = [];
     this.startTime = Date.now();
 
-    const audioStreamInfo: audio.AudioStreamInfo = {
-      samplingRate: audio.AudioSamplingRate.SAMPLE_RATE_44100,
-      channels: audio.AudioChannel.CHANNEL_1,
-      sampleFormat: audio.AudioSampleFormat.SAMPLE_FORMAT_S16LE,
-      encodingType: audio.AudioEncodingType.ENCODING_TYPE_RAW,
-    };
-
-    const audioCapturerInfo: audio.AudioCapturerInfo = {
-      source: audio.SourceType.SOURCE_TYPE_MIC,
-      capturerFlags: 0,
-    };
-
-    const audioCapturerOptions: audio.AudioCapturerOptions = {
-      streamInfo: audioStreamInfo,
-      capturerInfo: audioCapturerInfo,
+    const capturerOptions: audio.AudioCapturerOptions = {
+      streamInfo: {
+        samplingRate: audio.AudioSamplingRate.SAMPLE_RATE_16000,
+        channels: audio.AudioChannel.CHANNEL_1,
+        sampleFormat: audio.AudioSampleFormat.SAMPLE_FORMAT_S16LE,
+        encodingType: audio.AudioEncodingType.ENCODING_TYPE_RAW,
+      },
+      capturerInfo: {
+        source: audio.SourceType.SOURCE_TYPE_MIC,
+        capturerFlags: 0,
+      },
     };
 
     try {
-      this.audioCapturer = await audio.createAudioCapturer(audioCapturerOptions);
+      this.audioCapturer = await audio.createAudioCapturer(capturerOptions);
 
       this.audioCapturer.on('readData', (data: ArrayBuffer) => {
-        this.audioData.push(data);
+        const copy = new ArrayBuffer(data.byteLength);
+        new Uint8Array(copy).set(new Uint8Array(data));
+        this.chunks.push(copy);
+        if (this.chunks.length <= 3 || this.chunks.length % 50 === 0) {
+          hilog.info(DOMAIN, TAG, 'readData callback: %{public}d bytes, total chunks=%{public}d', data.byteLength, this.chunks.length);
+        }
       });
 
       await this.audioCapturer.start();
       this.isRecording = true;
       hilog.info(DOMAIN, TAG, 'Recording started');
     } catch (err) {
-      hilog.error(DOMAIN, TAG, 'Failed to start recording: %{public}s', JSON.stringify(err));
-      throw err;
+      hilog.error(DOMAIN, TAG, 'Failed to start: %{public}s', JSON.stringify(err));
+      throw (err instanceof Error ? err : new Error(String(err)));
     }
   }
 
   /**
-   * 停止录音并返回 base64 音频数据
+   * 停止录音，合并 PCM 数据到 mergedPcm，返回元信息
    */
-  private async stop(): Promise<{ base64: string; mimeType: string; duration: number }> {
+  private async stop(): Promise<AudioStopMeta> {
     if (!this.audioCapturer || !this.isRecording) {
-      return { base64: '', mimeType: 'audio/wav', duration: 0 };
+      return { duration: 0, totalBytes: 0 };
     }
 
     try {
       await this.audioCapturer.stop();
       await this.audioCapturer.release();
-
-      const duration = Math.floor((Date.now() - this.startTime) / 1000);
-
-      // 合并所有录音数据
-      const totalLength = this.audioData.reduce((sum, buf) => sum + buf.byteLength, 0);
-      const merged = new ArrayBuffer(totalLength);
-      const mergedView = new Uint8Array(merged);
-      let offset = 0;
-      for (const chunk of this.audioData) {
-        mergedView.set(new Uint8Array(chunk), offset);
-        offset += chunk.byteLength;
-      }
-
-      // 添加 WAV 头
-      const wavBuffer = this.addWavHeader(merged, 44100, 1, 16);
-
-      // 转为 base64
-      const base64 = buffer.from(wavBuffer).toString('base64');
-
-      this.audioCapturer = null;
-      this.audioData = [];
-      this.isRecording = false;
-
-      hilog.info(DOMAIN, TAG, 'Recording stopped, duration: %{public}d s', duration);
-
-      return {
-        base64,
-        mimeType: 'audio/wav',
-        duration,
-      };
     } catch (err) {
-      hilog.error(DOMAIN, TAG, 'Failed to stop recording: %{public}s', JSON.stringify(err));
-      this.isRecording = false;
-      throw err;
+      hilog.error(DOMAIN, TAG, 'Failed to stop capturer: %{public}s', JSON.stringify(err));
     }
+
+    const duration = Math.floor((Date.now() - this.startTime) / 1000);
+
+    // 合并所有 chunk
+    const totalBytes = this.chunks.reduce((sum, buf) => sum + buf.byteLength, 0);
+    const merged = new ArrayBuffer(totalBytes);
+    const view = new Uint8Array(merged);
+    let offset = 0;
+    for (const chunk of this.chunks) {
+      view.set(new Uint8Array(chunk), offset);
+      offset += chunk.byteLength;
+    }
+    this.mergedPcm = merged;
+
+    this.audioCapturer = null;
+    this.isRecording = false;
+    this.chunks = [];
+
+    hilog.info(DOMAIN, TAG, 'Stopped: duration=%{public}ds, pcm=%{public}d bytes', duration, totalBytes);
+
+    return { duration, totalBytes };
   }
 
   /**
-   * 获取录音状态
+   * 分段读取录音 PCM 数据（base64），每次最大 32KB
    */
+  private getData(offset: number, length: number): string {
+    if (!this.mergedPcm || offset >= this.mergedPcm.byteLength) {
+      return '';
+    }
+    const end = Math.min(offset + length, this.mergedPcm.byteLength);
+    const slice = this.mergedPcm.slice(offset, end);
+    return buffer.from(slice).toString('base64');
+  }
+
+  /**
+   * 取消录音，直接释放资源，不合并 chunks（节省内存）
+   */
+  private cancel(): void {
+    if (this.audioCapturer) {
+      try {
+        this.audioCapturer.stop();
+        this.audioCapturer.release();
+      } catch (err) {
+        hilog.error(DOMAIN, TAG, 'Cancel release error: %{public}s', String(err));
+      }
+    }
+    this.audioCapturer = null;
+    this.isRecording = false;
+    this.chunks = [];
+    this.mergedPcm = null;
+    hilog.info(DOMAIN, TAG, 'Recording cancelled');
+  }
+
   private async getStatus(): Promise<'idle' | 'recording'> {
     return this.isRecording ? 'recording' : 'idle';
-  }
-
-  /**
-   * 为 PCM 数据添加 WAV 文件头
-   */
-  private addWavHeader(
-    pcmData: ArrayBuffer,
-    sampleRate: number,
-    channels: number,
-    bitsPerSample: number
-  ): ArrayBuffer {
-    const headerSize = 44;
-    const dataSize = pcmData.byteLength;
-    const fileSize = headerSize + dataSize;
-    const wavBuffer = new ArrayBuffer(fileSize);
-    const view = new DataView(wavBuffer);
-
-    // RIFF header
-    this.writeString(view, 0, 'RIFF');
-    view.setUint32(4, fileSize - 8, true);
-    this.writeString(view, 8, 'WAVE');
-
-    // fmt sub-chunk
-    this.writeString(view, 12, 'fmt ');
-    view.setUint32(16, 16, true); // sub-chunk size
-    view.setUint16(20, 1, true); // PCM format
-    view.setUint16(22, channels, true);
-    view.setUint32(24, sampleRate, true);
-    view.setUint32(28, sampleRate * channels * bitsPerSample / 8, true); // byte rate
-    view.setUint16(32, channels * bitsPerSample / 8, true); // block align
-    view.setUint16(34, bitsPerSample, true);
-
-    // data sub-chunk
-    this.writeString(view, 36, 'data');
-    view.setUint32(40, dataSize, true);
-
-    // PCM data
-    new Uint8Array(wavBuffer, headerSize).set(new Uint8Array(pcmData));
-
-    return wavBuffer;
-  }
-
-  private writeString(view: DataView, offset: number, str: string): void {
-    for (let i = 0; i < str.length; i++) {
-      view.setUint8(offset + i, str.charCodeAt(i));
-    }
   }
 }

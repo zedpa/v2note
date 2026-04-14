@@ -57,11 +57,24 @@ export function useAudioRecorder() {
   const stopHarmony = useCallback(async (): Promise<RecordingResult> => {
     const bridge = getHarmonyBridge();
     if (!bridge?.audio) throw new Error("Harmony audio bridge unavailable");
-    const result = await bridge.audio.stop();
+    const meta = await bridge.audio.stop();
+    // 分段获取全部 PCM 数据（每段 32KB）
+    const segments: string[] = [];
+    const SEGMENT_SIZE = 32768;
+    let offset = 0;
+    while (offset < meta.totalBytes) {
+      const len = Math.min(SEGMENT_SIZE, meta.totalBytes - offset);
+      const b64 = await bridge.audio.getData(offset, len);
+      if (!b64) break;
+      segments.push(b64);
+      // 用实际解码长度推进 offset，防止尾段不足 len 时多跳
+      const actualBytes = Math.ceil(b64.length * 3 / 4);
+      offset += actualBytes;
+    }
     return {
-      base64: result.base64,
-      mimeType: result.mimeType,
-      duration: result.duration,
+      base64: segments.join(""),
+      mimeType: "audio/pcm",
+      duration: meta.duration,
     };
   }, []);
 
@@ -140,7 +153,7 @@ export function useAudioRecorder() {
     try {
       if (platform === "harmony") {
         const bridge = getHarmonyBridge();
-        if (bridge?.audio) await bridge.audio.stop();
+        if (bridge?.audio) await bridge.audio.cancel();
       } else if (platform === "capacitor") {
         const { VoiceRecorder } = await import("capacitor-voice-recorder");
         await VoiceRecorder.stopRecording();

@@ -12,3 +12,7 @@ Thumbs.db
 dist-electron/
 gateway/dist/
 gateway/.cache/
+harmony/build/
+harmony/entry/build/
+harmony/.hvigor/
+harmony/local.properties

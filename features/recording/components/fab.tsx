@@ -494,8 +494,19 @@ export function FAB({
       stopTimers();
       pausedRef.current = false;
       setLockedPaused(false);
-      streamingRef.current = false;
+      // 注意：streamingRef 和 gwClientRef 在 stopRecording 之后再清理
+      // 鸿蒙环境下 stopRecording 会异步发送 PCM 数据，需要 gwClientRef 仍有效
       preBufferRef.current = [];
+
+      // 先停止录音（鸿蒙：等待 PCM 数据全部通过 onPCMData→sendBinary 发出）
+      try {
+        await recorder.stopRecording();
+      } catch (err: any) {
+        console.error("[fab] stopRecording error:", err);
+      }
+
+      // 录音停止后再清理引用
+      streamingRef.current = false;
       gwClientRef.current = null;
 
       // 保存录音到本地缓存
@@ -524,8 +535,7 @@ export function FAB({
       }
 
       try {
-        recorder.stopRecording();
-        // 恢复系统音频（不等 IndexedDB 写入）
+        // 恢复系统音频
         deactivateAudioSession();
         const client = getGatewayClient();
 

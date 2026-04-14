@@ -11,7 +11,12 @@ export interface HarmonyBridge {
   audio: {
     requestPermission(): Promise<boolean>;
     start(options?: { format?: "aac" | "wav" }): Promise<void>;
-    stop(): Promise<{ base64: string; mimeType: string; duration: number }>;
+    startStream(): Promise<void>;
+    stop(): Promise<{ duration: number; totalBytes: number }>;
+    /** 取消录音，不合并数据，直接释放资源 */
+    cancel(): Promise<void>;
+    /** 分段获取录音 PCM 数据（base64） */
+    getData(offset: number, length: number): Promise<string>;
     getStatus(): Promise<"idle" | "recording">;
   };
   preferences: {

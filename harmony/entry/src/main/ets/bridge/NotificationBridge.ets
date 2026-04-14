@@ -9,49 +9,60 @@ const DOMAIN = 0x0000;
  * 使用 @ohos.notificationManager 实现本地通知
  */
 export class NotificationBridge {
-  async handle(method: string, args: Record<string, unknown>): Promise<unknown> {
+  private notificationEnabled: boolean = false;
+
+  /** 请求通知权限 */
+  private async ensurePermission(): Promise<void> {
+    if (this.notificationEnabled) return;
+    try {
+      await notificationManager.requestEnableNotification();
+      this.notificationEnabled = true;
+    } catch (err) {
+      // 用户已授权时也会抛异常（code 1600004），忽略即可
+      this.notificationEnabled = true;
+      hilog.warn(DOMAIN, TAG, 'Notification permission request: %{public}s', JSON.stringify(err));
+    }
+  }
+
+  async handle(method: string, args: Record<string, Object>): Promise<Object | null> {
     switch (method) {
       case 'schedule':
-        return this.schedule(args as {
-          id: number;
-          title: string;
-          body: string;
-          scheduledAt?: string;
-          repeatInterval?: 'daily' | 'weekly';
-        });
+        await this.schedule(
+          args.id as number,
+          args.title as string,
+          args.body as string
+        );
+        return 'ok';
       case 'cancel':
-        return this.cancel(args.id as number);
+        await this.cancel(args.id as number);
+        return 'ok';
       case 'cancelAll':
-        return this.cancelAll();
+        await this.cancelAll();
+        return 'ok';
       default:
         throw new Error(`NotificationBridge: unknown method ${method}`);
     }
   }
 
-  private async schedule(options: {
-    id: number;
-    title: string;
-    body: string;
-    scheduledAt?: string;
-    repeatInterval?: 'daily' | 'weekly';
-  }): Promise<void> {
+  private async schedule(id: number, title: string, body: string): Promise<void> {
+    await this.ensurePermission();
     try {
       const notificationRequest: notificationManager.NotificationRequest = {
-        id: options.id,
+        id: id,
         content: {
           notificationContentType: notificationManager.ContentType.NOTIFICATION_CONTENT_BASIC_TEXT,
           normal: {
-            title: options.title,
-            text: options.body,
+            title: title,
+            text: body,
           },
         },
       };
 
       await notificationManager.publish(notificationRequest);
-      hilog.info(DOMAIN, TAG, 'Notification scheduled: id=%{public}d', options.id);
+      hilog.info(DOMAIN, TAG, 'Notification scheduled: id=%{public}d', id);
     } catch (err) {
       hilog.error(DOMAIN, TAG, 'Failed to schedule notification: %{public}s', JSON.stringify(err));
-      throw err;
+      throw (err instanceof Error ? err : new Error(String(err)));
     }
   }
 
@@ -61,7 +72,7 @@ export class NotificationBridge {
       hilog.info(DOMAIN, TAG, 'Notification cancelled: id=%{public}d', id);
     } catch (err) {
       hilog.error(DOMAIN, TAG, 'Failed to cancel notification: %{public}s', JSON.stringify(err));
-      throw err;
+      throw (err instanceof Error ? err : new Error(String(err)));
     }
   }
 
@@ -71,7 +82,7 @@ export class NotificationBridge {
       hilog.info(DOMAIN, TAG, 'All notifications cancelled');
     } catch (err) {
       hilog.error(DOMAIN, TAG, 'Failed to cancel all notifications: %{public}s', JSON.stringify(err));
-      throw err;
+      throw (err instanceof Error ? err : new Error(String(err)));
     }
   }
 }

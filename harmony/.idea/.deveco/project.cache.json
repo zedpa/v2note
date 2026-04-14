@@ -2,7 +2,15 @@
 	"CommonInfo":{
 		"project.ide.version":"6.0.2.650",
 		"current.select.product":"default",
-		"current.select.buildMode":""
+		"current.select.buildMode":"",
+		"crossplatform.projectType":""
 	},
-	"BuildOptions":{}
+	"BuildOptions":{
+		"SELECT_BUILD_PRODUCT":"default",
+		"BUNDLE_NAME":"com.v2note.app",
+		"BUILD_PATH":{
+			"OUTPUT_PATH":"E:\\AI\\workspace-coding\\v2note\\harmony\\build\\outputs\\default"
+		},
+		"SELECT_BUILD_MODE":""
+	}
 }

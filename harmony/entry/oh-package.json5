@@ -1,0 +1,10 @@
+{
+  "modelVersion": "6.0.2",
+  "name": "entry",
+  "version": "1.0.0",
+  "description": "V2Note entry module",
+  "main": "",
+  "author": "",
+  "license": "MIT",
+  "dependencies": {}
+}

@@ -4,12 +4,18 @@ import { hilog } from '@kit.PerformanceAnalysisKit';
 const TAG = 'DeviceBridge';
 const DOMAIN = 0x0000;
 
+interface DeviceInfoResult {
+  platform: string;
+  model: string;
+  osVersion: string;
+}
+
 /**
  * 设备信息桥接
  * 提供设备 ID 和设备信息查询
  */
 export class DeviceBridge {
-  async handle(method: string, args: Record<string, unknown>): Promise<unknown> {
+  async handle(method: string, args: Record<string, Object>): Promise<Object | null> {
     switch (method) {
       case 'getId':
         return this.getId();
@@ -33,18 +39,19 @@ export class DeviceBridge {
       return id;
     } catch (err) {
       hilog.error(DOMAIN, TAG, 'Failed to get device ID: %{public}s', JSON.stringify(err));
-      throw err;
+      throw (err instanceof Error ? err : new Error(String(err)));
     }
   }
 
   /**
    * 获取设备基本信息
    */
-  private async getInfo(): Promise<{ platform: string; model: string; osVersion: string }> {
-    return {
+  private async getInfo(): Promise<DeviceInfoResult> {
+    const result: DeviceInfoResult = {
       platform: 'harmony',
       model: deviceInfo.productModel || 'unknown',
       osVersion: deviceInfo.displayVersion || 'unknown',
     };
+    return result;
   }
 }

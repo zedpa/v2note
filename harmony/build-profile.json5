@@ -1,12 +1,27 @@
 {
   "app": {
-    "signingConfigs": [],
+    "signingConfigs": [
+      {
+        "name": "default",
+        "type": "HarmonyOS",
+        "material": {
+          "certpath": "C:\\Users\\gf-panlifei\\.ohos\\config\\default_harmony_iBlS5oTay7CZug3Xbv9f4P_k0GMgGrfpNyIqzC0inZU=.cer",
+          "keyAlias": "debugKey",
+          "keyPassword": "0000001A28899D83B6CA5A3B55AE5D8DAEB0781681DF451F1C84160AE2E6A6588779FD4645AD0D853050",
+          "profile": "C:\\Users\\gf-panlifei\\.ohos\\config\\default_harmony_iBlS5oTay7CZug3Xbv9f4P_k0GMgGrfpNyIqzC0inZU=.p7b",
+          "signAlg": "SHA256withECDSA",
+          "storeFile": "C:\\Users\\gf-panlifei\\.ohos\\config\\default_harmony_iBlS5oTay7CZug3Xbv9f4P_k0GMgGrfpNyIqzC0inZU=.p12",
+          "storePassword": "0000001ADA094DBE9A20D458B68E7A5003E9360D333BEE35B27F3A9C3F52C0475637FA91C63439E6000F"
+        }
+      }
+    ],
     "products": [
       {
         "name": "default",
         "signingConfig": "default",
         "compatibleSdkVersion": "5.0.0(12)",
-        "runtimeOS": "HarmonyOS"
+        "runtimeOS": "HarmonyOS",
+        "targetSdkVersion": "6.0.2(22)"
       }
     ]
   },
@@ -17,7 +32,9 @@
       "targets": [
         {
           "name": "default",
-          "applyToProducts": ["default"]
+          "applyToProducts": [
+            "default"
+          ]
         }
       ]
     }

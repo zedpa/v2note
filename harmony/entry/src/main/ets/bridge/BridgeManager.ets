@@ -1,7 +1,6 @@
 import { webview } from '@kit.ArkWeb';
 import { window as windowManager } from '@kit.ArkUI';
-import { bundleManager } from '@kit.AbilityKit';
-import { common } from '@kit.AbilityKit';
+import { bundleManager, common, Want } from '@kit.AbilityKit';
 import { DeviceBridge } from './DeviceBridge';
 import { AudioBridge } from './AudioBridge';
 import { PreferencesBridge } from './PreferencesBridge';
@@ -11,6 +10,20 @@ import { hilog } from '@kit.PerformanceAnalysisKit';
 
 const TAG = 'BridgeManager';
 const DOMAIN = 0x0000;
+
+interface SafeAreaInsets {
+  top: number;
+  bottom: number;
+  left: number;
+  right: number;
+}
+
+interface NativeCallRequest {
+  id: number;
+  module: string;
+  method: string;
+  args: Record<string, Object>;
+}
 
 /**
  * JSBridge 注册管理器
@@ -46,13 +59,18 @@ export class BridgeManager {
           }
         };
 
-        // 通用调用方法
+        // 通用调用方法（含 10 秒超时）
         function callNative(module, method, args) {
           return new Promise((resolve, reject) => {
             const id = ++_requestId;
-            _pendingRequests.set(id, { resolve, reject });
-            // 通过 URL scheme 通知原生端
-            // 原生端在 onUrlLoadIntercept 中捕获
+            const timer = setTimeout(() => {
+              _pendingRequests.delete(id);
+              reject(new Error('Bridge call timeout: ' + module + '.' + method));
+            }, 10000);
+            _pendingRequests.set(id, {
+              resolve: (v) => { clearTimeout(timer); resolve(v); },
+              reject: (e) => { clearTimeout(timer); reject(e); },
+            });
             const payload = JSON.stringify({ id, module, method, args: args || {} });
             window.__harmony_native_call__(payload);
           });
@@ -66,7 +84,10 @@ export class BridgeManager {
           audio: {
             requestPermission: () => callNative('audio', 'requestPermission'),
             start: (options) => callNative('audio', 'start', options),
+            startStream: () => callNative('audio', 'startStream'),
             stop: () => callNative('audio', 'stop'),
+            cancel: () => callNative('audio', 'cancel'),
+            getData: (offset, length) => callNative('audio', 'getData', { offset, length }),
             getStatus: () => callNative('audio', 'getStatus'),
           },
           preferences: {
@@ -96,6 +117,14 @@ export class BridgeManager {
     `;
 
     try {
+      // 传递 context 给 AudioBridge（用于权限请求）
+      try {
+        const ctx = getContext() as common.UIAbilityContext;
+        this.audioBridge.setContext(ctx);
+      } catch (e) {
+        hilog.warn(DOMAIN, TAG, 'Failed to set context for AudioBridge: %{public}s', String(e));
+      }
+
       // 注入 bridge 脚本
       controller.runJavaScript(bridgeScript);
 
@@ -123,36 +152,38 @@ export class BridgeManager {
   }
 
   /** safeArea 模块处理 */
-  private async handleSafeArea(method: string): Promise<unknown> {
+  private async handleSafeArea(method: string): Promise<SafeAreaInsets> {
     if (method === 'getInsets') {
       try {
         const win = await windowManager.getLastWindow(getContext() as common.UIAbilityContext);
         const avoidArea = win.getWindowAvoidArea(windowManager.AvoidAreaType.TYPE_SYSTEM);
-        return {
+        const insets: SafeAreaInsets = {
           top: avoidArea.topRect.height,
           bottom: avoidArea.bottomRect.height,
           left: avoidArea.leftRect.width,
           right: avoidArea.rightRect.width,
         };
+        return insets;
       } catch {
-        return { top: 0, bottom: 0, left: 0, right: 0 };
+        const fallback: SafeAreaInsets = { top: 0, bottom: 0, left: 0, right: 0 };
+        return fallback;
       }
     }
     throw new Error(`Unknown safeArea method: ${method}`);
   }
 
   /** system 模块处理 */
-  private async handleSystem(method: string, args: Record<string, unknown>): Promise<unknown> {
+  private async handleSystem(method: string, args: Record<string, Object>): Promise<Object> {
     if (method === 'openUrl') {
       const url = args.url as string;
       try {
         const context = getContext() as common.UIAbilityContext;
-        const want = { action: 'ohos.want.action.viewData', uri: url };
+        const want: Want = { action: 'ohos.want.action.viewData', uri: url };
         await context.startAbility(want);
       } catch (err) {
         hilog.error(DOMAIN, TAG, 'openUrl failed: %{public}s', JSON.stringify(err));
       }
-      return null;
+      return '';
     }
     if (method === 'getVersion') {
       try {
@@ -171,14 +202,9 @@ export class BridgeManager {
    */
   async handleNativeCall(controller: webview.WebviewController, payload: string): Promise<void> {
     try {
-      const request = JSON.parse(payload) as {
-        id: number;
-        module: string;
-        method: string;
-        args: Record<string, unknown>;
-      };
+      const request: NativeCallRequest = JSON.parse(payload) as NativeCallRequest;
 
-      let result: unknown;
+      let result: Object | null = null;
 
       switch (request.module) {
         case 'device':
@@ -214,8 +240,8 @@ export class BridgeManager {
       hilog.error(DOMAIN, TAG, 'Native call error: %{public}s', error);
 
       try {
-        const request = JSON.parse(payload);
-        const callbackScript = `window.__harmony_callback__(${request.id}, null, ${JSON.stringify(error)})`;
+        const errorRequest: NativeCallRequest = JSON.parse(payload) as NativeCallRequest;
+        const callbackScript = `window.__harmony_callback__(${errorRequest.id}, null, ${JSON.stringify(error)})`;
         controller.runJavaScript(callbackScript);
       } catch {
         hilog.error(DOMAIN, TAG, 'Failed to send error callback');

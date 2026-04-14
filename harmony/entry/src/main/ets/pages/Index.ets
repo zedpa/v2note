@@ -23,6 +23,8 @@ struct Index {
         .domStorageAccess(true)
         .mediaPlayGestureAccess(true)
         .mixedMode(MixedMode.All)
+        .fileAccess(true)
+        .onlineImageAccess(true)
         .onPageEnd(() => {
           hilog.info(DOMAIN, TAG, 'WebView page loaded');
           // 注入 JSBridge
@@ -37,6 +39,13 @@ struct Index {
             return true; // 已处理，不弹出 prompt 对话框
           }
           return false; // 非桥接调用，使用默认 prompt 行为
+        })
+        .onPermissionRequest((event) => {
+          // WebView 内权限请求（如摄像头、麦克风），自动授予
+          if (event) {
+            hilog.info(DOMAIN, TAG, 'Permission request: %{public}s', JSON.stringify(event.request.getAccessibleResource()));
+            event.request.grant(event.request.getAccessibleResource());
+          }
         })
         .onErrorReceive((event) => {
           if (event) {

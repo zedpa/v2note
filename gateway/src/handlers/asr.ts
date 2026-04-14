@@ -363,8 +363,10 @@ export async function stopASR(
   const totalDuration = Date.now() - session.startTime;
   console.log(`[asr][⏱ stop] ${totalDuration}ms — ${session.audioChunkCount} chunks, ${session.audioBytes} bytes (${(session.audioBytes / 32000).toFixed(1)}s audio)`);
 
-  // 关闭磁盘写入流
-  session.audioStream.end();
+  // 关闭磁盘写入流，等待 flush 完成
+  await new Promise<void>((resolve) => {
+    session.audioStream.end(() => resolve());
+  });
 
   if (saveAudio) session.saveAudio = true;
   if (forceCommand) session.forceCommand = true;
