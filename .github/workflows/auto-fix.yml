@@ -1,0 +1,109 @@
+name: Auto-Fix Bug
+
+on:
+  issues:
+    types: [labeled]
+
+jobs:
+  auto-fix:
+    name: Auto-Fix with Claude Code
+    if: github.event.label.name == 'auto-fix'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: |
+          pnpm install --frozen-lockfile
+          cd gateway && pnpm install --frozen-lockfile
+
+      - name: Determine severity
+        id: severity
+        run: |
+          LABELS='${{ toJSON(github.event.issue.labels.*.name) }}'
+          if echo "$LABELS" | grep -q "P0\|P1"; then
+            echo "level=high" >> $GITHUB_OUTPUT
+            echo "action=fix" >> $GITHUB_OUTPUT
+          elif echo "$LABELS" | grep -q "P2"; then
+            echo "level=medium" >> $GITHUB_OUTPUT
+            echo "action=spec" >> $GITHUB_OUTPUT
+          else
+            echo "level=low" >> $GITHUB_OUTPUT
+            echo "action=batch" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Auto-fix (P0/P1)
+        if: steps.severity.outputs.action == 'fix'
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            修复 GitHub Issue #${{ github.event.issue.number }}:
+            标题: ${{ github.event.issue.title }}
+            内容: ${{ github.event.issue.body }}
+
+            请按照 CLAUDE.md 中的 Bug 修复快捷流程执行:
+            1. 在 specs/ 下创建临时 fix-spec
+            2. 写回归测试（至少 1 个，标注 regression: fix-xxx）
+            3. 实现最小修复
+            4. 运行 pnpm test 确认通过
+            5. 创建 PR 并关联 Issue #${{ github.event.issue.number }}
+
+            重要约束:
+            - 严格遵循 CLAUDE.md 中的时区契约和已知陷阱
+            - 回归测试不可省略
+            - 如果不确定修复方案，在 Issue 中评论说明而不是强行修复
+          allowed_tools: "Bash(npm test:*),Bash(npx vitest:*),Bash(pnpm test:*),Bash(git:*),Read,Write,Edit,Glob,Grep"
+
+      - name: Generate spec draft (P2)
+        if: steps.severity.outputs.action == 'spec'
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            为 GitHub Issue #${{ github.event.issue.number }} 生成 spec 草案:
+            标题: ${{ github.event.issue.title }}
+            内容: ${{ github.event.issue.body }}
+
+            请按照 CLAUDE.md 的规范:
+            1. 读取 specs/INDEX.md 查找是否有匹配的 spec
+            2. 如果有，在已有 spec 中追加场景
+            3. 如果没有，基于 specs/_template.md 生成新 spec
+            4. 将 spec 内容作为 Issue comment 发布，不要创建 PR
+
+            输出格式: 直接在 Issue 中评论 spec 草案，等待人工确认
+          allowed_tools: "Read,Glob,Grep"
+
+      - name: Skip batch (P3)
+        if: steps.severity.outputs.action == 'batch'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              labels: ['batch-queue']
+            });
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: '已加入批处理队列，将在下次批量处理时自动修复。'
+            });

@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 应用内反馈
+    url: https://v2note.online/feedback
+    about: 在应用内摇一摇或点击反馈按钮，自动附带截图和日志

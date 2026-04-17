@@ -45,11 +45,13 @@ import { registerVocabularyRoutes } from "./routes/vocabulary.js";
 import { registerNotificationRoutes } from "./routes/notifications.js";
 import { registerChatRoutes } from "./routes/chat.js";
 import { registerWikiRoutes } from "./routes/wiki.js";
+import { registerFeedbackRoutes } from "./routes/feedback.js";
 import { getProactiveEngine } from "./proactive/engine.js";
 import { verifyAccessToken } from "./auth/jwt.js";
 
 import { eventBus, type TodoCreatedEvent } from "./lib/event-bus.js";
 import { checkRateLimit, checkWsRateLimit } from "./middleware/rate-limit.js";
+import { initSentry, captureException as sentryCaptureException } from "./lib/sentry.js";
 
 // Load environment
 config({ path: "../.env.local" });
@@ -77,7 +79,10 @@ if (cluster.isPrimary && process.env.NO_CLUSTER !== "1") {
   startWorker();
 }
 
-function startWorker() {
+async function startWorker() {
+
+// ── Sentry 初始化 ──
+await initSentry();
 
 // ── Message types ──
 
@@ -150,6 +155,7 @@ registerVocabularyRoutes(router);
 registerNotificationRoutes(router);
 registerChatRoutes(router);
 registerWikiRoutes(router);
+registerFeedbackRoutes(router);
 
 // ── HTTP Server ──
 
@@ -174,6 +180,13 @@ const server = createServer(async (req, res) => {
   // Health check (before router for speed)
   if (req.url === "/health") {
     sendJson(res, { status: "ok", timestamp: tzNow().toISOString() });
+    return;
+  }
+
+  // Sentry test endpoint (仅开发/测试环境)
+  if (req.url === "/health/sentry-test" && process.env.SENTRY_DSN) {
+    sentryCaptureException(new Error("Sentry test error from /health/sentry-test"));
+    sendJson(res, { status: "ok", message: "Test error sent to Sentry" });
     return;
   }
 
@@ -492,6 +505,7 @@ wss.on("connection", (ws) => {
       }
     } catch (err: any) {
       console.error(`[gateway] Error handling ${msg.type}:`, err);
+      sentryCaptureException(err, { wsMessageType: msg.type, userId: connectionUserMap.get(ws) });
       send(ws, { type: "error", payload: { message: err.message } });
     }
   });

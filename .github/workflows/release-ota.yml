@@ -1,0 +1,75 @@
+name: Release OTA Update
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'app/**'
+      - 'features/**'
+      - 'shared/**'
+      - 'components/**'
+      - 'lib/**'
+  workflow_dispatch:
+
+jobs:
+  ota:
+    name: Build & Publish OTA
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm build
+        env:
+          NEXT_PUBLIC_GATEWAY_URL: ${{ secrets.GATEWAY_URL }}
+
+      - name: Sync Capacitor
+        run: npx cap sync
+
+      - name: Package OTA bundle
+        run: |
+          cd out
+          zip -r ../ota-bundle.zip .
+          cd ..
+          echo "OTA_SIZE=$(stat -c%s ota-bundle.zip)" >> $GITHUB_ENV
+          echo "OTA_SHA256=$(sha256sum ota-bundle.zip | cut -d' ' -f1)" >> $GITHUB_ENV
+
+      - name: Upload OTA to server
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DEPLOY_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "${{ secrets.DEPLOY_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null
+          VERSION=$(node -p "require('./package.json').version")
+          scp -i ~/.ssh/deploy_key ota-bundle.zip \
+            "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:${{ secrets.DEPLOY_PATH }}/gateway/uploads/bundles/ota-${VERSION}.zip"
+
+      - name: Register OTA release
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          curl -s -X POST "${{ secrets.GATEWAY_URL }}/api/v1/releases" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${{ secrets.ADMIN_TOKEN }}" \
+            -d "{
+              \"version\": \"${VERSION}\",
+              \"platform\": \"android\",
+              \"release_type\": \"ota\",
+              \"bundle_url\": \"/uploads/bundles/ota-${VERSION}.zip\",
+              \"file_size\": ${OTA_SIZE},
+              \"checksum\": \"${OTA_SHA256}\",
+              \"changelog\": \"Auto OTA from commit ${{ github.sha }}\",
+              \"is_active\": true
+            }"

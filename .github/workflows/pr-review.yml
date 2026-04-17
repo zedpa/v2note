@@ -1,0 +1,40 @@
+name: AI Code Review
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+jobs:
+  review:
+    name: Claude Code Review
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: AI Review
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            审查这个 PR 的代码变更。参照 CLAUDE.md 中的规则，重点检查:
+
+            1. **已知陷阱**: 检查 15 条已知陷阱（时区、数据库锁、AI 幻觉、删除残留等）
+            2. **时区契约**: 任何日期/时间操作必须符合时区契约（UTC 进，UTC 存，最后一刻转）
+            3. **回归风险**: 修改共享组件时是否影响其他模块
+            4. **测试覆盖**: 新功能/修复是否有对应测试
+            5. **安全问题**: SQL 注入、XSS、认证绕过等
+            6. **错误处理**: async 函数是否有 try/catch
+
+            输出格式:
+            - 对发现的问题直接在相关代码行添加 review comment
+            - 最后给出一个总结评论: 通过/需修改/阻断
+            - 如果没有问题，给一个简短的 LGTM
+
+            注意: 不要提出风格建议（缩进、命名等），只关注功能正确性和安全性
+          allowed_tools: "Read,Glob,Grep"

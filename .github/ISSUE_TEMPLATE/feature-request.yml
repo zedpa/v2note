@@ -1,0 +1,48 @@
+name: 功能建议
+description: 提出新功能或改进建议
+labels: ["enhancement", "triage"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: 你想解决什么问题？
+      description: 清楚描述你的痛点或需求场景
+      placeholder: "例如：我经常在开会时想快速记录一个想法，但打开应用后需要好几步才能开始录音"
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: 你期望的解决方案
+      description: 描述你理想中的功能表现
+    validations:
+      required: false
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: 功能领域
+      options:
+        - 录音 / 语音
+        - 待办 / 任务
+        - 目标 / 规划
+        - 对话 / AI
+        - 时间线 / 回顾
+        - Wiki / 知识库
+        - 通知 / 提醒
+        - UI / 交互
+        - 其他
+    validations:
+      required: true
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: 对你有多重要？
+      options:
+        - 必须有 - 没有这个功能我可能放弃使用
+        - 很想要 - 会显著提升我的体验
+        - 锦上添花 - 有了更好，没有也行
+    validations:
+      required: true

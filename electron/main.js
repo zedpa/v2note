@@ -1,7 +1,18 @@
-const { app, BrowserWindow, shell, protocol } = require('electron')
+const { app, BrowserWindow, shell, protocol, dialog } = require('electron')
 const path = require('path')
 const fs = require('fs')
 const http = require('http')
+
+// Auto-update (仅 production 生效)
+let autoUpdater
+try {
+  autoUpdater = require('electron-updater').autoUpdater
+  autoUpdater.autoDownload = true
+  autoUpdater.autoInstallOnAppQuit = true
+} catch {
+  // electron-updater 未安装（开发模式），跳过
+  autoUpdater = null
+}
 
 // Static export dir
 const STATIC_DIR = path.join(__dirname, '..', 'out')
@@ -116,6 +127,31 @@ function createWindow() {
 app.whenReady().then(async () => {
   await startStaticServer()
   createWindow()
+
+  // 启动自动更新检查
+  if (autoUpdater) {
+    autoUpdater.on('update-available', () => {
+      console.log('[updater] Update available, downloading...')
+    })
+    autoUpdater.on('update-downloaded', () => {
+      dialog.showMessageBox(mainWindow, {
+        type: 'info',
+        title: '更新就绪',
+        message: '新版本已下载完成，重启应用即可更新。',
+        buttons: ['稍后', '立即重启'],
+        defaultId: 1,
+      }).then(({ response }) => {
+        if (response === 1) {
+          autoUpdater.quitAndInstall()
+        }
+      })
+    })
+    autoUpdater.on('error', (err) => {
+      console.error('[updater] Error:', err.message)
+    })
+    // 延迟 5 秒后检查更新，避免启动时卡顿
+    setTimeout(() => autoUpdater.checkForUpdatesAndNotify(), 5000)
+  }
 })
 
 app.on('window-all-closed', () => {

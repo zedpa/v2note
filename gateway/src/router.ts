@@ -1,5 +1,6 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { sendError, HttpError } from "./lib/http-helpers.js";
+import { captureException } from "./lib/sentry.js";
 
 type Handler = (
   req: IncomingMessage,
@@ -65,6 +66,7 @@ export class Router {
           sendError(res, err.message, err.status);
         } else {
           console.error(`[router] Error in ${method} ${pathname}:`, err);
+          captureException(err, { route: `${method} ${pathname}`, query });
           sendError(res, err.message ?? "Internal Server Error", 500);
         }
       }

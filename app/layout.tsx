@@ -4,6 +4,8 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
 
 import { ViewportHeightManager } from "@/components/layout/viewport-height-manager";
+import { SentryInit } from "@/components/sentry-init";
+import { FeedbackButton } from "@/features/feedback/feedback-button";
 import "./fonts"; // @fontsource 本地字体（离线可用，无 CDN 依赖）
 import "./globals.css";
 
@@ -35,8 +37,10 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
+          <SentryInit />
           <ViewportHeightManager />
           {children}
+          <FeedbackButton />
           <Toaster position="bottom-center" />
         </ThemeProvider>
       </body>
