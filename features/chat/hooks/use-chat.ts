@@ -8,6 +8,8 @@ import { fetchChatHistory, clearChatHistory, type ChatHistoryMessage } from "@/s
 import * as chatCache from "@/features/chat/lib/chat-cache";
 import type { ChatCacheMessage } from "@/features/chat/lib/chat-cache";
 import { emit } from "@/features/recording/lib/events";
+import { captureStore } from "@/shared/lib/capture-store";
+import { triggerSync } from "@/shared/lib/sync-orchestrator";
 
 /** 消息内嵌 part 类型 */
 export type MessagePart =
@@ -23,8 +25,21 @@ export type MessagePart =
     }
   | { type: "step-start" };
 
+/**
+ * 同步状态（仅 user role 消息使用）。
+ * regression: fix-cold-resume-silent-loss (Phase 5)
+ */
+export type ChatSyncStatus = "captured" | "syncing" | "synced" | "failed";
+
 export interface ChatMessage {
   id: string;
+  /**
+   * Phase 5：captureStore 中对应的 localId（仅 user role 消息）。
+   * 同时作为发往 gateway 的 client_id，gateway 在 chat.done 中回显。
+   */
+  localId?: string;
+  /** Phase 5：= localId，便于接收端直接按 client_id 匹配 */
+  client_id?: string;
   role: "user" | "assistant" | "plan";
   content: string;
   timestamp: Date;
@@ -36,6 +51,11 @@ export interface ChatMessage {
     intent: string;
     steps: Array<{ index: number; description: string; toolName?: string; needsConfirm?: boolean; status?: string; result?: string }>;
   };
+  /**
+   * Phase 5：同步状态（仅 user role）。
+   * assistant / plan 消息不使用此字段。
+   */
+  syncStatus?: ChatSyncStatus;
 }
 
 interface UseChatOptions {
@@ -222,9 +242,11 @@ export function useChat(
         setStreaming(false);
         const finalText = streamingTextRef.current || msg.payload?.full_text || "";
         streamingTextRef.current = "";
+        // Phase 5：回显 client_id → 把对应 user 消息标为 synced
+        const ackClientId = (msg.payload as any)?.client_id as string | undefined;
         setMessages((prev) => {
           // 将所有 running 的 tool-call parts 切换为 done
-          const updated = prev.map((m): ChatMessage => {
+          let updated = prev.map((m): ChatMessage => {
             if (m.role === "assistant" && m.parts) {
               const hasRunning = m.parts.some((p) => p.type === "tool-call" && p.status === "running");
               if (hasRunning) {
@@ -240,6 +262,14 @@ export function useChat(
             }
             return m;
           });
+          // Phase 5：按 client_id 回写 syncStatus="synced"
+          if (ackClientId) {
+            updated = updated.map((m): ChatMessage =>
+              m.role === "user" && m.client_id === ackClientId
+                ? { ...m, syncStatus: "synced" }
+                : m,
+            );
+          }
           // 空内容兜底
           const last = updated[updated.length - 1];
           if (last?.role === "assistant" && !last.content) {
@@ -254,6 +284,19 @@ export function useChat(
         // AI 回复写入本地缓存
         if (finalText) {
           cacheMsg("assistant", finalText);
+        }
+        // Phase 5：捕获侧 store 同步（让 sync-orchestrator 视角也收敛）
+        // C1/C2：清理 syncingAt 租约，避免 worker 下一轮仍把它当作"悬挂"
+        if (ackClientId) {
+          captureStore
+            .update(ackClientId, {
+              syncStatus: "synced",
+              serverId: ackClientId,
+              syncingAt: null,
+            })
+            .catch(() => {
+              // 条目可能从未入 captureStore（历史 send 路径）或已被删除 → 忽略
+            });
         }
         break;
       }
@@ -491,40 +534,92 @@ export function useChat(
   }, [loadingHistory, hasMore, messages, fromCacheMsg]);
 
   const send = useCallback(async (text: string) => {
-    // Add user message immediately
-    const userMsgId = crypto.randomUUID();
-    setMessages((prev) => [
-      ...prev,
-      {
-        id: userMsgId,
-        role: "user",
-        content: text,
-        timestamp: new Date(),
-      },
-    ]);
-    // 写入本地缓存
-    cacheMsg("user", text, userMsgId);
+    // ── M3: 斜杠命令不入 captureStore ──
+    // /compact、/skill:xxx 等后端命令的文本只在当前会话上下文有意义，
+    // 若入同步队列离线后被当普通 chat.message 推送 → gateway 会按普通
+    // 消息跑 LLM，产生上下文错乱。命令路径保留"在线才发送、发送即丢弃"语义。
+    const trimmed = text.trim();
+    const isSlashCommand =
+      trimmed.startsWith("/") && /^\/[a-zA-Z][\w:-]*(\s|$)/.test(trimmed);
 
-    const client = getGatewayClient();
-    const ready = await client.waitForReady(5000);
+    if (isSlashCommand) {
+      // 仍然乐观渲染用户消息 + 占位 AI 回复，但不入 captureStore / triggerSync
+      const uiId = crypto.randomUUID();
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: uiId,
+          role: "user",
+          content: text,
+          timestamp: new Date(),
+        },
+      ]);
+      cacheMsg("user", text, uiId);
 
-    if (!ready) {
+      setStreaming(true);
+      streamingTextRef.current = "";
       setMessages((prev) => [
         ...prev,
         {
           id: crypto.randomUUID(),
           role: "assistant",
-          content: "当前未连接到服务器，请稍后重试。",
+          content: "",
           timestamp: new Date(),
         },
       ]);
-      setStreaming(false);
-      streamingTextRef.current = "";
-      clearResponseTimeout();
+
+      const client = getGatewayClient();
+      if (client.connected) {
+        client.send({ type: "chat.message", payload: { text } });
+        armResponseTimeout("请求超时，AI暂未返回。请稍后重试。");
+      }
+      // 离线时命令直接丢弃（见 spec §3.5）。不 triggerSync。
       return;
     }
 
-    // Add placeholder for assistant response
+    // ── Phase 5: 本地先落地 ─────────────────────────
+    // 规则（spec §3.1 / §3.2）：
+    // 1. captureStore.create 瞬时落地（localId 即 client_id）
+    // 2. 乐观消息立即入消息列表（syncStatus="captured"）
+    // 3. **不**等 waitForReady；未连接也不插入阻塞错误气泡
+    // 4. WS 已 OPEN → 立即 send chat.message（带 client_id）
+    //    WS 未连 → 由 sync-orchestrator 后台推送
+    let localId: string;
+    let capturedToStore = false;
+    try {
+      const captured = await captureStore.create({
+        kind: "chat_user_msg",
+        text,
+        audioLocalId: null,
+        sourceContext: "chat_view",
+        forceCommand: false,
+        notebook: null,
+        userId: userIdRef.current,
+      });
+      localId = captured.localId;
+      capturedToStore = true;
+    } catch {
+      // 极端：IndexedDB 不可用 → 仍然乐观渲染，退化为内存态 localId
+      // （同步队列无法接管，但不阻塞 UI；用户至少看到自己说了什么）
+      localId = crypto.randomUUID();
+    }
+
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: localId,
+        localId,
+        client_id: localId,
+        role: "user",
+        content: text,
+        timestamp: new Date(),
+        syncStatus: "captured",
+      },
+    ]);
+    // 保留旧的 chat-cache 本地历史缓存（独立于 captureStore，用于返回时快速恢复 UI）
+    cacheMsg("user", text, localId);
+
+    // Add placeholder for assistant response（乐观渲染，不依赖 WS 状态）
     setStreaming(true);
     streamingTextRef.current = "";
     setMessages((prev) => [
@@ -537,13 +632,45 @@ export function useChat(
       },
     ]);
 
-    // 统一走 chat.message
-    client.send({
-      type: "chat.message",
-      payload: { text },
-    });
-    armResponseTimeout("请求超时，AI暂未返回。请稍后重试。");
-  }, [armResponseTimeout, clearResponseTimeout]);
+    // WS 已连 → 直接发 chat.message；未连 → 触发后台同步
+    const client = getGatewayClient();
+    if (client.connected) {
+      // C1 租约：在 client.send 之前把该条目标记为 syncing + 当前租约时间戳，
+      // 使 sync-orchestrator 的 listUnsynced 在租约窗口内跳过此条，
+      // 避免"直接 WS 发送 + 后台 worker"双推 → gateway 重跑 LLM。
+      if (capturedToStore) {
+        try {
+          await captureStore.update(localId, {
+            syncStatus: "syncing",
+            syncingAt: new Date().toISOString(),
+          });
+        } catch {
+          // 可能已被 GC 清理，继续发送不阻塞
+        }
+      }
+
+      client.send({
+        type: "chat.message",
+        payload: { text, client_id: localId },
+      });
+      armResponseTimeout("请求超时，AI暂未返回。请稍后重试。");
+
+      // C1 兜底：若 WS 发送后 chat.done 始终不到达（断连、gateway 挂），
+      // 40s 后触发一次后台同步，让 worker 在租约 60s 过期时回收重试。
+      setTimeout(() => {
+        triggerSync();
+      }, 40_000);
+
+      // M1 注意：online 分支**不再立即** triggerSync()，否则 worker 可能
+      // 在 chat.done 到达前读到 syncing 条目（如果未及时 mark），导致双推。
+    } else {
+      // 离线：由 sync-orchestrator 推送；不插入阻塞错误气泡
+      // TODO(Phase 8): 未登录态（userIdRef.current 为 null）时应禁用输入或
+      // 在 syncStatus=failed 上提示"需登录后同步"；目前会被 pushCapture 的
+      // subject_mismatch / 401 分支拦截，记录保留在本地不丢。
+      triggerSync();
+    }
+  }, [armResponseTimeout, cacheMsg]);
 
   // disconnect is synchronous to avoid race with connect()
   // The chat.end message is fire-and-forget

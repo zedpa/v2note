@@ -168,6 +168,7 @@ export function createSyncOrchestrator(opts: SyncOrchestratorOptions) {
           await captureStore.update(record.localId, {
             syncStatus: "captured",
             lastError: err.message,
+            syncingAt: null,
           });
         } catch (e) {
           if (e instanceof CaptureNotFoundError) return;
@@ -184,6 +185,7 @@ export function createSyncOrchestrator(opts: SyncOrchestratorOptions) {
             syncStatus: "failed",
             lastError: "auth_refresh_exhausted",
             retryCount,
+            syncingAt: null,
           });
           log("warn", `[sync] auth refresh exhausted for ${record.localId}`);
         } else {
@@ -191,6 +193,7 @@ export function createSyncOrchestrator(opts: SyncOrchestratorOptions) {
             syncStatus: "captured",
             lastError: err.message,
             retryCount,
+            syncingAt: null,
           });
           // M5：不在此处触发额外 refreshAuth；下一轮 ensureGatewaySession 会处理
         }
@@ -209,6 +212,7 @@ export function createSyncOrchestrator(opts: SyncOrchestratorOptions) {
           syncStatus: "failed",
           lastError: err.message,
           retryCount,
+          syncingAt: null,
         });
         return;
       }
@@ -219,12 +223,14 @@ export function createSyncOrchestrator(opts: SyncOrchestratorOptions) {
           syncStatus: "failed",
           lastError: err.message,
           retryCount,
+          syncingAt: null,
         });
       } else {
         await captureStore.update(record.localId, {
           syncStatus: "captured",
           lastError: err.message,
           retryCount,
+          syncingAt: null,
         });
       }
     } catch (e) {
@@ -293,7 +299,12 @@ export function createSyncOrchestrator(opts: SyncOrchestratorOptions) {
             state.inFlightLocalIds.add(record.localId);
             try {
               try {
-                await captureStore.update(record.localId, { syncStatus: "syncing" });
+                // C3/C1 租约：必须先 mark syncing + syncingAt 再 push（顺序关键）
+                // 这样其他 tab 的 listUnsynced 会跳过此条（租约未过期）。
+                await captureStore.update(record.localId, {
+                  syncStatus: "syncing",
+                  syncingAt: new Date().toISOString(),
+                });
               } catch (e) {
                 if (e instanceof CaptureNotFoundError) {
                   log("log", `[sync] capture ${record.localId} vanished before push`);
@@ -321,6 +332,7 @@ export function createSyncOrchestrator(opts: SyncOrchestratorOptions) {
                   syncStatus: "synced",
                   serverId: result.serverId,
                   lastError,
+                  syncingAt: null,
                 });
                 // 推送成功 → 重置 auth 计数
                 state.authRefreshCount = 0;

@@ -59,35 +59,71 @@ export function ChatBubble({ message, streaming }: ChatBubbleProps) {
         </div>
       )}
 
-      {/* 气泡 */}
-      <div
-        className={cn(
-          "max-w-[85%] px-[18px] py-[14px] text-sm leading-[1.6] text-on-surface",
-          isUser ? "bg-sky/15" : "bg-surface-high",
-        )}
-        style={{
-          borderRadius: isUser
-            ? "20px 20px 4px 20px"
-            : "20px 20px 20px 4px",
-          border: isUser ? undefined : "1px solid rgba(255,255,255,0.03)",
-        }}
-      >
-        {isUser ? (
-          <p className="whitespace-pre-wrap">{message.content}</p>
-        ) : message.parts && message.parts.length > 0 ? (
-          /* Parts 模式渲染 */
-          <PartsRenderer parts={message.parts} streaming={streaming} />
-        ) : message.content ? (
-          <MarkdownContent>{message.content}</MarkdownContent>
-        ) : streaming ? (
-          <span className="inline-flex gap-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-deer animate-bounce" style={{ animationDelay: "0ms" }} />
-            <span className="w-1.5 h-1.5 rounded-full bg-deer animate-bounce" style={{ animationDelay: "150ms" }} />
-            <span className="w-1.5 h-1.5 rounded-full bg-deer animate-bounce" style={{ animationDelay: "300ms" }} />
-          </span>
+      {/* 气泡 + 同步状态列 */}
+      <div className={cn("flex flex-col", isUser ? "items-end" : "items-start")}>
+        <div
+          className={cn(
+            "max-w-[85%] px-[18px] py-[14px] text-sm leading-[1.6] text-on-surface",
+            isUser ? "bg-sky/15" : "bg-surface-high",
+          )}
+          style={{
+            borderRadius: isUser
+              ? "20px 20px 4px 20px"
+              : "20px 20px 20px 4px",
+            border: isUser ? undefined : "1px solid rgba(255,255,255,0.03)",
+          }}
+        >
+          {isUser ? (
+            <p className="whitespace-pre-wrap">{message.content}</p>
+          ) : message.parts && message.parts.length > 0 ? (
+            /* Parts 模式渲染 */
+            <PartsRenderer parts={message.parts} streaming={streaming} />
+          ) : message.content ? (
+            <MarkdownContent>{message.content}</MarkdownContent>
+          ) : streaming ? (
+            <span className="inline-flex gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-deer animate-bounce" style={{ animationDelay: "0ms" }} />
+              <span className="w-1.5 h-1.5 rounded-full bg-deer animate-bounce" style={{ animationDelay: "150ms" }} />
+              <span className="w-1.5 h-1.5 rounded-full bg-deer animate-bounce" style={{ animationDelay: "300ms" }} />
+            </span>
+          ) : null}
+        </div>
+        {/* Phase 5：同步状态极小标识（仅 user 消息） */}
+        {isUser && message.syncStatus && message.syncStatus !== "synced" ? (
+          <SyncStatusIndicator status={message.syncStatus} />
         ) : null}
       </div>
     </div>
+  );
+}
+
+/**
+ * 同步状态小标识（Phase 5 最简版）：
+ *   captured / syncing → ⏳ 灰色
+ *   failed            → ⚠️ 淡红
+ * 精细化设计留给 Phase 7（spec §5.3）。
+ */
+function SyncStatusIndicator({ status }: { status: "captured" | "syncing" | "failed" }) {
+  if (status === "failed") {
+    return (
+      <span
+        className="text-[10px] text-maple/70 mt-0.5 select-none"
+        title="同步失败"
+        aria-label="同步失败"
+      >
+        ⚠️
+      </span>
+    );
+  }
+  // captured / syncing
+  return (
+    <span
+      className="text-[10px] text-muted-accessible/60 mt-0.5 select-none"
+      title="同步中"
+      aria-label="同步中"
+    >
+      ⏳
+    </span>
   );
 }
 

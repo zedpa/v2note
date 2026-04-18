@@ -34,7 +34,7 @@ export type GatewayMessage =
         localConfig?: Pick<LocalConfigPayload, "soul" | "skills">;
       };
     }
-  | { type: "chat.message"; payload: { text: string } }
+  | { type: "chat.message"; payload: { text: string; client_id?: string } }
   | { type: "chat.end"; payload: Record<string, never> }
   | { type: "todo.aggregate"; payload: Record<string, never> }
   | { type: "asr.start"; payload: { locationText?: string; mode?: "realtime" | "upload"; notebook?: string; sourceContext?: "todo" | "timeline" | "chat" | "review"; saveAudio?: boolean } }
@@ -45,8 +45,8 @@ export type GatewayMessage =
 
 export type GatewayResponse =
   | { type: "process.result"; payload: Record<string, unknown> }
-  | { type: "chat.chunk"; payload: { text: string } }
-  | { type: "chat.done"; payload: { full_text: string } }
+  | { type: "chat.chunk"; payload: { text: string; client_id?: string } }
+  | { type: "chat.done"; payload: { full_text: string; text?: string; client_id?: string; cached?: boolean } }
   | { type: "todo.result"; payload: { diary_entry: string } }
   | { type: "asr.partial"; payload: { text: string; sentenceId: number } }
   | { type: "asr.sentence"; payload: { text: string; sentenceId: number; begin_time: number; end_time: number } }
@@ -101,6 +101,12 @@ export class GatewayClient {
   private reconnectAttempts = 0;
   private _authRefreshing = false;
   private _unsubAuthLogout: (() => void) | null = null;
+  /**
+   * M1: 所有 pending onceResponse 的 reject 回调集合。
+   * disconnect()/onclose 时统一 reject 为 "connection closed" 错误，
+   * 避免 pushChatUserMsg 等调用者悬挂到超时。
+   */
+  private pendingOnceRejectors: Set<(e: { code: string; message: string }) => void> = new Set();
 
   get connected(): boolean {
     return this._connected;
@@ -184,6 +190,11 @@ export class GatewayClient {
           this._connected = false;
           this._connectPromise = null;
           console.log("[gateway-client] Disconnected");
+          // M1: 统一清理 pending onceResponse（如 chat.done 等待者）
+          this._rejectAllPendingOnce({
+            code: "network",
+            message: "connection closed",
+          });
           // Auto-reconnect with exponential backoff
           if (this.reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
             const delay = BASE_RECONNECT_DELAY * Math.pow(2, Math.min(this.reconnectAttempts, 5));
@@ -259,6 +270,68 @@ export class GatewayClient {
   }
 
   /**
+   * 一次性监听：等待首条符合 (type + filter) 的响应消息，带超时。
+   *
+   * regression: fix-cold-resume-silent-loss (Phase 5)
+   * 用于 capture-push.ts 的 chat_user_msg 推送流：发送 chat.message 后
+   * 订阅 chat.done（按 client_id 过滤），收到即视为"成功投递"。
+   *
+   * 返回 payload；超时抛 { code: "push_timeout", message }。
+   */
+  onceResponse(
+    type: GatewayResponse["type"],
+    filter: (payload: any) => boolean,
+    timeoutMs: number,
+  ): Promise<any> {
+    return new Promise<any>((resolve, reject) => {
+      let unsub: (() => void) | null = null;
+      // M1: 注册本 pending 的 rejector，disconnect/onclose 能统一清理
+      const rejectWrapper = (e: { code: string; message: string }) => {
+        clearTimeout(timer);
+        unsub?.();
+        this.pendingOnceRejectors.delete(rejectWrapper);
+        reject(e);
+      };
+      this.pendingOnceRejectors.add(rejectWrapper);
+
+      const timer = setTimeout(() => {
+        unsub?.();
+        this.pendingOnceRejectors.delete(rejectWrapper);
+        reject({ code: "push_timeout", message: `onceResponse(${type}) timed out after ${timeoutMs}ms` });
+      }, timeoutMs);
+
+      unsub = this.onMessage((msg) => {
+        if (msg.type !== type) return;
+        try {
+          if (!filter((msg as any).payload)) return;
+        } catch {
+          return;
+        }
+        clearTimeout(timer);
+        unsub?.();
+        this.pendingOnceRejectors.delete(rejectWrapper);
+        resolve((msg as any).payload);
+      });
+    });
+  }
+
+  /**
+   * M1: 统一 reject 所有 pending onceResponse（连接关闭时调用）。
+   * 避免 pushChatUserMsg 挂到 10s 超时，让 sync-orchestrator 更快感知失败并重试。
+   */
+  private _rejectAllPendingOnce(reason: { code: string; message: string }): void {
+    const rejectors = Array.from(this.pendingOnceRejectors);
+    this.pendingOnceRejectors.clear();
+    for (const r of rejectors) {
+      try {
+        r(reason);
+      } catch {
+        // swallow
+      }
+    }
+  }
+
+  /**
    * 重置重连退避计数
    *
    * regression: fix-cold-resume-silent-loss §4.1
@@ -287,6 +360,12 @@ export class GatewayClient {
     this.pendingMessages = [];
     this.pendingBinaryData = [];
     this.reconnectAttempts = 0;
+    // M1: 统一 reject 所有 pending onceResponse（如 chat.done 等待者），
+    // 避免调用方挂到超时。
+    this._rejectAllPendingOnce({
+      code: "network",
+      message: "connection closed",
+    });
     // 清理 auth 事件监听
     this._unsubAuthLogout?.();
     this._unsubAuthLogout = null;

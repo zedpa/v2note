@@ -555,6 +555,62 @@ describe("syncOrchestrator [regression: fix-cold-resume-silent-loss]", () => {
     expect(after?.lastError).toBe("audio_blob_missing");
   });
 
+  // ─── C1/C3: worker 在 pushCapture 之前 mark syncing + syncingAt ───
+
+  it("should_mark_syncing_with_syncingAt_before_pushCapture_call [C1/C3]", async () => {
+    // 关键不变量：当 pushCapture 被调用时，数据库里该条记录必须已经是 syncing 且
+    // syncingAt 是一个有效 ISO 时间戳——否则跨 tab / 同 tab 并发 worker 会双推。
+    const rec = await captureStore.create({
+      kind: "chat_user_msg", text: "lease", audioLocalId: null,
+      sourceContext: "chat_view", forceCommand: false, notebook: null, userId: "u-1",
+    });
+
+    let observed: { syncStatus?: string; syncingAt?: string | null } | null = null;
+    const opts = makeOpts({
+      pushCapture: vi.fn(async (c) => {
+        // 在 pushCapture 内部读数据库当前状态
+        const fresh = await captureStore.get(c.localId);
+        observed = {
+          syncStatus: fresh?.syncStatus,
+          syncingAt: fresh?.syncingAt,
+        };
+        return { serverId: `srv-${c.localId}` };
+      }),
+    });
+    const orch = createSyncOrchestrator(opts);
+    await orch.flushNow();
+
+    expect(observed).not.toBeNull();
+    expect(observed!.syncStatus).toBe("syncing");
+    expect(observed!.syncingAt).toBeTruthy();
+    // syncingAt 必须是可解析的 ISO 时间戳
+    expect(Number.isNaN(Date.parse(observed!.syncingAt as string))).toBe(false);
+
+    // 成功后清理 syncingAt
+    const after = await captureStore.get(rec.localId);
+    expect(after?.syncStatus).toBe("synced");
+    expect(after?.syncingAt).toBeNull();
+  });
+
+  it("should_clear_syncingAt_when_push_fails_with_network [C1]", async () => {
+    const rec = await captureStore.create({
+      kind: "chat_user_msg", text: "nerr", audioLocalId: null,
+      sourceContext: "chat_view", forceCommand: false, notebook: null, userId: "u-1",
+    });
+    const opts = makeOpts({
+      pushCapture: vi.fn(async () => {
+        throw { code: "network", message: "offline" };
+      }),
+    });
+    const orch = createSyncOrchestrator(opts);
+    await orch.flushNow();
+
+    const after = await captureStore.get(rec.localId);
+    expect(after?.syncStatus).toBe("captured");
+    // 失败回退时必须清理租约，下次 trigger 才能继续重试
+    expect(after?.syncingAt).toBeNull();
+  });
+
   it("should_timeout_and_mark_captured_when_push_exceeds_limit [M3]", async () => {
     const rec = await captureStore.create({
       kind: "chat_user_msg", text: "slow", audioLocalId: null,

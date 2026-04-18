@@ -18,7 +18,7 @@ import {
   startSyncOrchestrator,
   type SyncOrchestratorOptions,
 } from "@/shared/lib/sync-orchestrator";
-import { pushCapture } from "@/shared/lib/capture-push";
+import { createPushCapture, type ChatPushClient } from "@/shared/lib/capture-push";
 
 async function refreshAuth(): ReturnType<SyncOrchestratorOptions["refreshAuth"]> {
   try {
@@ -49,6 +49,17 @@ async function ensureWs(): Promise<boolean> {
     return false;
   }
 }
+
+/**
+ * Phase 5：构造带 gateway client 注入的 pushCapture。
+ * 真实 gateway-client 实现了 ChatPushClient 接口（connected/send/onceResponse）。
+ */
+async function getChatClient(): Promise<ChatPushClient> {
+  const { getGatewayClient } = await import("@/features/chat/lib/gateway-client");
+  return getGatewayClient() as unknown as ChatPushClient;
+}
+
+const pushCapture = createPushCapture({ getChatClient });
 
 export function SyncBootstrap() {
   useEffect(() => {

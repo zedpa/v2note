@@ -15,7 +15,9 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import "fake-indexeddb/auto";
 import type { CaptureRecord } from "./capture-store";
+import { captureStore, __internal as captureInternal } from "./capture-store";
 import { createPushCapture } from "./capture-push";
 
 function makeDiary(partial: Partial<CaptureRecord> = {}): CaptureRecord {
@@ -33,6 +35,7 @@ function makeDiary(partial: Partial<CaptureRecord> = {}): CaptureRecord {
     syncStatus: "captured",
     lastError: null,
     retryCount: 0,
+    syncingAt: null,
     ...partial,
   };
 }
@@ -47,22 +50,6 @@ function jsonResponse(status: number, body: unknown): Response {
 describe("pushCapture [regression: fix-cold-resume-silent-loss]", () => {
   beforeEach(() => {
     vi.resetAllMocks();
-  });
-
-  it("should_throw_not_implemented_when_kind_is_chat_user_msg", async () => {
-    const fetchImpl = vi.fn();
-    const push = createPushCapture({
-      getGatewayBase: () => "http://gw",
-      getAccessToken: () => "tok",
-      fetchImpl: fetchImpl as unknown as typeof fetch,
-      getAudioBlob: async () => null,
-    });
-
-    await expect(
-      push(makeDiary({ kind: "chat_user_msg", text: "hi" })),
-    ).rejects.toMatchObject({ code: "not_implemented" });
-
-    expect(fetchImpl).not.toHaveBeenCalled();
   });
 
   it("should_throw_not_implemented_when_kind_is_todo_free_text", async () => {
@@ -423,5 +410,245 @@ describe("pushCapture [regression: fix-cold-resume-silent-loss]", () => {
     expect(r.warning).toBe("audio_blob_missing");
     // 未调用 /retry-audio
     expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  // ─── Phase 5: chat_user_msg 推送 ─────────────────────────────
+
+  /** 创建一个可控的 fake chat client */
+  function makeFakeChatClient(overrides: Partial<{
+    connected: boolean;
+    sendImpl: (msg: any) => void;
+    onceResponseImpl: (type: string, filter: (p: any) => boolean, ms: number) => Promise<any>;
+  }> = {}) {
+    const sendMock = vi.fn(overrides.sendImpl);
+    const onceMock = vi.fn(
+      overrides.onceResponseImpl ??
+        (async (_type: string, _filter: (p: any) => boolean, _ms: number) => ({ full_text: "ok" })),
+    );
+    return {
+      client: {
+        connected: overrides.connected ?? true,
+        send: sendMock as any,
+        onceResponse: onceMock as any,
+      },
+      sendMock,
+      onceMock,
+    };
+  }
+
+  it("should_push_chat_user_msg_via_ws_with_client_id", async () => {
+    const { client, sendMock, onceMock } = makeFakeChatClient({
+      onceResponseImpl: async (_t, _f, _ms) => ({ client_id: "lid-chat-1", full_text: "hello" }),
+    });
+
+    const push = createPushCapture({
+      getGatewayBase: () => "http://gw",
+      getAccessToken: () => "tok",
+      fetchImpl: vi.fn() as unknown as typeof fetch,
+      getAudioBlob: async () => null,
+      getChatClient: () => client,
+    });
+
+    const r = await push(
+      makeDiary({ localId: "lid-chat-1", kind: "chat_user_msg", text: "hello" }),
+    );
+
+    expect(r).toEqual({ serverId: "lid-chat-1" });
+    expect(sendMock).toHaveBeenCalledTimes(1);
+    const [msg] = sendMock.mock.calls[0];
+    expect(msg.type).toBe("chat.message");
+    expect(msg.payload.text).toBe("hello");
+    expect(msg.payload.client_id).toBe("lid-chat-1");
+    expect(onceMock).toHaveBeenCalledTimes(1);
+    // 订阅在 send 之前注册
+    const onceOrder = onceMock.mock.invocationCallOrder[0];
+    const sendOrder = sendMock.mock.invocationCallOrder[0];
+    expect(onceOrder).toBeLessThan(sendOrder);
+  });
+
+  it("should_throw_network_error_when_ws_not_connected_for_chat_msg", async () => {
+    const { client, sendMock } = makeFakeChatClient({ connected: false });
+
+    const push = createPushCapture({
+      getGatewayBase: () => "http://gw",
+      getAccessToken: () => "tok",
+      fetchImpl: vi.fn() as unknown as typeof fetch,
+      getAudioBlob: async () => null,
+      getChatClient: () => client,
+    });
+
+    await expect(
+      push(makeDiary({ kind: "chat_user_msg", text: "hi" })),
+    ).rejects.toMatchObject({ code: "network" });
+
+    // 没触发 send
+    expect(sendMock).not.toHaveBeenCalled();
+  });
+
+  it("should_resolve_when_chat_done_with_matching_client_id_received", async () => {
+    // 验证 filter 只有在 client_id 匹配时才解析
+    const { client } = makeFakeChatClient({
+      onceResponseImpl: async (_t, filter, _ms) => {
+        // 模拟 gateway 推两条 chat.done：第一条不匹配，第二条匹配
+        expect(filter({ client_id: "other" })).toBe(false);
+        expect(filter({ client_id: "lid-match" })).toBe(true);
+        return { client_id: "lid-match", full_text: "bye" };
+      },
+    });
+
+    const push = createPushCapture({
+      getChatClient: () => client,
+      getGatewayBase: () => "http://gw",
+      getAccessToken: () => null,
+      fetchImpl: vi.fn() as unknown as typeof fetch,
+      getAudioBlob: async () => null,
+    });
+
+    const r = await push(
+      makeDiary({ localId: "lid-match", kind: "chat_user_msg", text: "bye" }),
+    );
+    expect(r.serverId).toBe("lid-match");
+  });
+
+  it("should_timeout_when_chat_done_not_received_within_10s", async () => {
+    // 模拟 onceResponse 超时抛出
+    const { client } = makeFakeChatClient({
+      onceResponseImpl: async (_t, _f, _ms) => {
+        throw { code: "push_timeout", message: "timed out" };
+      },
+    });
+
+    const push = createPushCapture({
+      getChatClient: () => client,
+      getGatewayBase: () => "http://gw",
+      getAccessToken: () => null,
+      fetchImpl: vi.fn() as unknown as typeof fetch,
+      getAudioBlob: async () => null,
+    });
+
+    await expect(
+      push(makeDiary({ kind: "chat_user_msg", text: "x" })),
+    ).rejects.toMatchObject({ code: "push_timeout" });
+  });
+
+  // ─── C2: 与 UI 层 chat.done 监听器的竞态保护 ───────────────────
+
+  it("should_persist_synced_status_when_chat_done_received_via_onceResponse [C2]", async () => {
+    // onceResponse resolve 时 pushChatUserMsg 必须把 captureStore 标为 synced，
+    // 避免 UI 层先于 capture-push 退出时 sync-orchestrator 仍认为该条 syncing。
+    await new Promise<void>((resolve) => {
+      const req = indexedDB.deleteDatabase(captureInternal.DB_NAME);
+      req.onsuccess = () => resolve();
+      req.onerror = () => resolve();
+      req.onblocked = () => resolve();
+    });
+
+    // 预先在 captureStore 中创建该条（模拟 use-chat send 先落地）
+    const rec = await captureStore.create({
+      kind: "chat_user_msg",
+      text: "hello-synced-track",
+      audioLocalId: null,
+      sourceContext: "chat_view",
+      forceCommand: false,
+      notebook: null,
+      userId: "u-1",
+    });
+
+    const { client } = makeFakeChatClient({
+      onceResponseImpl: async (_t, _f, _ms) => ({
+        client_id: rec.localId,
+        full_text: "hi back",
+      }),
+    });
+
+    const push = createPushCapture({
+      getChatClient: () => client,
+      getGatewayBase: () => "http://gw",
+      getAccessToken: () => null,
+      fetchImpl: vi.fn() as unknown as typeof fetch,
+      getAudioBlob: async () => null,
+    });
+
+    await push({
+      ...rec,
+      kind: "chat_user_msg",
+      text: "hello-synced-track",
+    });
+
+    const after = await captureStore.get(rec.localId);
+    expect(after?.syncStatus).toBe("synced");
+    expect(after?.syncingAt).toBeNull();
+  });
+
+  it("should_treat_push_as_success_when_captureStore_already_synced_before_timeout [C2]", async () => {
+    // 场景：UI 层的 chat.done 监听器先到，把 captureStore 标为 synced；
+    //      随后 onceResponse 超时抛 push_timeout。
+    //      pushChatUserMsg 必须在抛错前再查一次 captureStore，
+    //      发现已 synced → 视为成功返回。
+    await new Promise<void>((resolve) => {
+      const req = indexedDB.deleteDatabase(captureInternal.DB_NAME);
+      req.onsuccess = () => resolve();
+      req.onerror = () => resolve();
+      req.onblocked = () => resolve();
+    });
+
+    const rec = await captureStore.create({
+      kind: "chat_user_msg",
+      text: "race-hello",
+      audioLocalId: null,
+      sourceContext: "chat_view",
+      forceCommand: false,
+      notebook: null,
+      userId: "u-1",
+    });
+
+    const { client } = makeFakeChatClient({
+      onceResponseImpl: async (_t, _f, _ms) => {
+        // 模拟：UI 层已经先到，把 captureStore 标为 synced
+        await captureStore.update(rec.localId, {
+          syncStatus: "synced",
+          serverId: rec.localId,
+          syncingAt: null,
+        });
+        // 然后 onceResponse 自己超时
+        throw { code: "push_timeout", message: "simulated timeout" };
+      },
+    });
+
+    const push = createPushCapture({
+      getChatClient: () => client,
+      getGatewayBase: () => "http://gw",
+      getAccessToken: () => null,
+      fetchImpl: vi.fn() as unknown as typeof fetch,
+      getAudioBlob: async () => null,
+    });
+
+    // 不应抛错——而是视为成功返回
+    const r = await push({
+      ...rec,
+      kind: "chat_user_msg",
+      text: "race-hello",
+    });
+    expect(r.serverId).toBe(rec.localId);
+  });
+
+  it("should_reject_chat_user_msg_with_empty_text", async () => {
+    const { client, sendMock } = makeFakeChatClient();
+
+    const push = createPushCapture({
+      getChatClient: () => client,
+      getGatewayBase: () => "http://gw",
+      getAccessToken: () => null,
+      fetchImpl: vi.fn() as unknown as typeof fetch,
+      getAudioBlob: async () => null,
+    });
+
+    await expect(
+      push(makeDiary({ kind: "chat_user_msg", text: "" })),
+    ).rejects.toMatchObject({ code: "bad_request" });
+    await expect(
+      push(makeDiary({ kind: "chat_user_msg", text: "   " })),
+    ).rejects.toMatchObject({ code: "bad_request" });
+    expect(sendMock).not.toHaveBeenCalled();
   });
 });

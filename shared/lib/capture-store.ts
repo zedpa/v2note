@@ -38,7 +38,18 @@ export interface CaptureRecord {
   syncStatus: CaptureSyncStatus;
   lastError: string | null;
   retryCount: number;
+  /**
+   * 同步租约时间戳（ISO 8601 UTC）。C1/C3 修复：
+   * - 当条目转为 syncingAt 时写入 `new Date().toISOString()`。
+   * - listUnsynced 会过滤掉"syncing 且租约未过期"的条目（避免 tab/worker 双推）。
+   * - 租约超时（默认 60s）视为崩溃/悬挂，允许被下一轮 worker 回收重试。
+   * - 其他状态（captured/synced/failed）时应为 null。
+   */
+  syncingAt: string | null;
 }
+
+/** C1：租约超时阈值（毫秒）。超过该时间未 synced 的 syncing 条目视为悬挂，允许被回收重推。 */
+export const SYNC_LEASE_TTL_MS = 60_000;
 
 export interface AudioBlobRecord {
   id: string;
@@ -49,7 +60,13 @@ export interface AudioBlobRecord {
 
 export type CaptureCreateInput = Omit<
   CaptureRecord,
-  "localId" | "createdAt" | "syncStatus" | "retryCount" | "serverId" | "lastError"
+  | "localId"
+  | "createdAt"
+  | "syncStatus"
+  | "retryCount"
+  | "serverId"
+  | "lastError"
+  | "syncingAt"
 > & {
   /** 可选：同时创建 audio blob（单事务原子写入） */
   audioBlob?: { pcmData: ArrayBuffer; duration: number };
@@ -144,6 +161,7 @@ async function create(input: CaptureCreateInput): Promise<CaptureRecord> {
       syncStatus: "captured",
       lastError: null,
       retryCount: 0,
+      syncingAt: null,
     };
 
     // 跨 store 原子写入
@@ -220,18 +238,34 @@ async function get(localId: string): Promise<CaptureRecord | null> {
 }
 
 /**
- * 列出所有处于待同步阶段的记录（仅 captured / syncing），按 createdAt 升序。
+ * 列出所有处于待同步阶段的记录，按 createdAt 升序。
  *
  * M6 修复：不再返回 syncStatus === "failed" 的记录——failed 需要用户通过
  * retryCapture() 手动复活，避免 worker 不断拉起"已确认失败"条目。
+ *
+ * C1/C3 修复（租约机制）：
+ *   - 返回所有 syncStatus === "captured" 的条目（无租约）
+ *   - 对于 syncStatus === "syncing" 的条目：仅当租约已过期（syncingAt 为 null
+ *     或距今 > SYNC_LEASE_TTL_MS）时返回，用于回收"悬挂"任务。
+ *   - 这样避免跨 tab / 跨 worker 迭代对同一条目双推。
  */
-async function listUnsynced(): Promise<CaptureRecord[]> {
+async function listUnsynced(nowMs: number = Date.now()): Promise<CaptureRecord[]> {
   const db = await openDB();
   try {
     const tx = db.transaction(CAPTURES_STORE, "readonly");
     const all = (await reqToPromise(tx.objectStore(CAPTURES_STORE).getAll())) as CaptureRecord[];
     return all
-      .filter((r) => r.syncStatus === "captured" || r.syncStatus === "syncing")
+      .filter((r) => {
+        if (r.syncStatus === "captured") return true;
+        if (r.syncStatus === "syncing") {
+          // 租约仍有效 → 不要触碰（其他 worker/tab 正在推送）
+          if (!r.syncingAt) return true; // 异常：没有租约视作可回收
+          const ts = Date.parse(r.syncingAt);
+          if (Number.isNaN(ts)) return true;
+          return nowMs - ts > SYNC_LEASE_TTL_MS;
+        }
+        return false;
+      })
       .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
   } finally {
     db.close();
@@ -322,6 +356,7 @@ async function retryCapture(localId: string): Promise<void> {
     syncStatus: "captured",
     retryCount: 0,
     lastError: null,
+    syncingAt: null,
   });
 }
 

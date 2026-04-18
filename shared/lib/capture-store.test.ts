@@ -11,7 +11,7 @@
 
 import { describe, it, expect, beforeEach } from "vitest";
 import "fake-indexeddb/auto";
-import { captureStore, CaptureNotFoundError, __internal } from "./capture-store";
+import { captureStore, CaptureNotFoundError, SYNC_LEASE_TTL_MS, __internal } from "./capture-store";
 
 // 每个 test 都删库重建
 async function resetDB(): Promise<void> {
@@ -194,6 +194,56 @@ describe("captureStore [regression: fix-cold-resume-silent-loss]", () => {
     expect(after?.syncStatus).toBe("captured");
     expect(after?.retryCount).toBe(0);
     expect(after?.lastError).toBeNull();
+  });
+
+  // ─── C1/C3: syncingAt 租约机制 ───────────────────────────────────
+
+  it("should_skip_syncing_captures_with_active_lease_from_listUnsynced [C1]", async () => {
+    // 一条刚被 worker 抢到的 syncing 条目：租约未过期 → listUnsynced 必须跳过它
+    const a = await captureStore.create({
+      kind: "chat_user_msg", text: "fresh", audioLocalId: null,
+      sourceContext: "chat_view", forceCommand: false, notebook: null, userId: "u-1",
+    });
+    const nowIso = new Date().toISOString();
+    await captureStore.update(a.localId, {
+      syncStatus: "syncing",
+      syncingAt: nowIso,
+    });
+    // 同时间点调用 listUnsynced → 应跳过 a（租约未过期）
+    const list = await captureStore.listUnsynced(Date.parse(nowIso) + 1000);
+    expect(list.find((r) => r.localId === a.localId)).toBeUndefined();
+  });
+
+  it("should_reclaim_syncing_captures_with_expired_lease [C1]", async () => {
+    // 一条"租约已过期"的 syncing 条目（worker 崩溃或 tab 关闭） → listUnsynced 必须返回它
+    const a = await captureStore.create({
+      kind: "chat_user_msg", text: "stale", audioLocalId: null,
+      sourceContext: "chat_view", forceCommand: false, notebook: null, userId: "u-1",
+    });
+    const oldTs = new Date(Date.now() - (SYNC_LEASE_TTL_MS + 5000)).toISOString();
+    await captureStore.update(a.localId, {
+      syncStatus: "syncing",
+      syncingAt: oldTs,
+    });
+    const list = await captureStore.listUnsynced();
+    const found = list.find((r) => r.localId === a.localId);
+    expect(found).toBeDefined();
+    expect(found?.syncStatus).toBe("syncing");
+  });
+
+  it("should_reclaim_syncing_captures_with_null_syncingAt [C1]", async () => {
+    // 异常路径：syncStatus=syncing 但 syncingAt 为 null（历史数据/不完整迁移）
+    // 视为"无租约"立即回收
+    const a = await captureStore.create({
+      kind: "chat_user_msg", text: "nolease", audioLocalId: null,
+      sourceContext: "chat_view", forceCommand: false, notebook: null, userId: "u-1",
+    });
+    await captureStore.update(a.localId, {
+      syncStatus: "syncing",
+      syncingAt: null,
+    });
+    const list = await captureStore.listUnsynced();
+    expect(list.map((r) => r.localId)).toContain(a.localId);
   });
 
   it("should_exclude_failed_from_listUnsynced [M6]", async () => {

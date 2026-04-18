@@ -63,6 +63,20 @@ function defaultGetCurrentUserId(): string | null {
   }
 }
 
+/**
+ * 最小化 gateway client 抽象（仅本模块 chat_user_msg 推送使用）。
+ * 真实实现由 features/chat/lib/gateway-client 提供；测试注入 mock。
+ */
+export interface ChatPushClient {
+  readonly connected: boolean;
+  send(msg: { type: "chat.message"; payload: { text: string; client_id: string } }): void;
+  onceResponse(
+    type: "chat.done",
+    filter: (payload: any) => boolean,
+    timeoutMs: number,
+  ): Promise<{ full_text?: string; text?: string; client_id?: string; cached?: boolean }>;
+}
+
 export interface PushCaptureDeps {
   /** 获取 HTTP base URL（测试注入 "http://x" 即可） */
   getGatewayBase?: () => Promise<string> | string;
@@ -83,6 +97,15 @@ export interface PushCaptureDeps {
    * 这样即使步骤 2（/retry-audio）失败，下次重试也能跳过步骤 1，直接重试音频上传。
    */
   persistServerId?: (localId: string, serverId: string) => Promise<void>;
+  /**
+   * Phase 5：chat_user_msg 推送用的 gateway WS 客户端。
+   * 未注入时运行时会动态 import 真实实现（@/features/chat/lib/gateway-client）。
+   */
+  getChatClient?: () => Promise<ChatPushClient> | ChatPushClient;
+  /**
+   * Phase 5：chat.done 等待超时（ms），默认 10000。
+   */
+  chatDoneTimeoutMs?: number;
 }
 
 // ──────────────────────────────────────────────────────────────
@@ -150,12 +173,108 @@ export function createPushCapture(deps: PushCaptureDeps = {}) {
       );
     }
 
-    // Phase 4 只接入 diary；其余类型让 sync-orchestrator 走 bad_request 跳过
-    if (c.kind !== "diary") {
-      throw toPushError(undefined, "not_implemented", `kind=${c.kind} not implemented in Phase 4`);
+    if (c.kind === "diary") {
+      return pushDiary(c, { getBase, getToken, fetchImpl, getAudioBlob, persistServerId });
     }
-    return pushDiary(c, { getBase, getToken, fetchImpl, getAudioBlob, persistServerId });
+    if (c.kind === "chat_user_msg") {
+      return pushChatUserMsg(c, {
+        getChatClient: deps.getChatClient ?? defaultGetChatClient,
+        chatDoneTimeoutMs: deps.chatDoneTimeoutMs ?? 10000,
+      });
+    }
+    // todo_free_text 仍未实现——sync-orchestrator 会按 bad_request 分支标 failed。
+    throw toPushError(undefined, "not_implemented", `kind=${c.kind} not implemented`);
   };
+}
+
+/** 默认 chat client 加载器（延迟 import 避免 SSR / 测试环境初始化） */
+async function defaultGetChatClient(): Promise<ChatPushClient> {
+  const mod = await import("@/features/chat/lib/gateway-client");
+  const client = mod.getGatewayClient();
+  // 类型收窄：真实 GatewayClient 已实现 connected / send / onceResponse
+  return client as unknown as ChatPushClient;
+}
+
+interface ChatPushDeps {
+  getChatClient: () => Promise<ChatPushClient> | ChatPushClient;
+  chatDoneTimeoutMs: number;
+}
+
+/**
+ * chat_user_msg 推送：
+ *   1. 解析 chat client；若 WS 未连接 → 抛 network
+ *   2. 订阅一次性 chat.done（filter by client_id=localId），超时抛 push_timeout
+ *   3. client.send chat.message + client_id
+ *   4. 成功返回 { serverId: localId }（chat 没有独立 record id，localId 即 idempotency key）
+ *
+ * 与 use-chat.ts 中 UI 层 chat.done 监听器共存：
+ *   - UI 层负责 messages[].syncStatus + captureStore.update
+ *   - 本函数仅让 sync-orchestrator 感知"已成功投递"
+ */
+async function pushChatUserMsg(
+  c: CaptureRecord,
+  deps: ChatPushDeps,
+): Promise<PushResult> {
+  if (!c.text || !c.text.trim()) {
+    throw toPushError(undefined, "bad_request", "chat_user_msg with empty text");
+  }
+
+  const client = await Promise.resolve(deps.getChatClient());
+
+  if (!client.connected) {
+    throw toPushError(undefined, "network", "gateway ws not connected for chat_user_msg");
+  }
+
+  // 订阅在前，send 在后——避免响应在注册监听器前已到达（极端快速响应 race）
+  const pending = client.onceResponse(
+    "chat.done",
+    (payload) => payload?.client_id === c.localId,
+    deps.chatDoneTimeoutMs,
+  );
+
+  try {
+    client.send({
+      type: "chat.message",
+      payload: { text: c.text, client_id: c.localId },
+    });
+  } catch (e) {
+    throw toPushError(undefined, "network", `chat.message send failed: ${(e as Error).message}`);
+  }
+
+  try {
+    await pending;
+    // C2：onceResponse resolve → 立即把 captureStore 该条目标记为 synced，
+    // 避免 UI 层 chat.done 监听器与 capture-push 的竞态（谁先到都能闭环）。
+    try {
+      await captureStore.update(c.localId, {
+        syncStatus: "synced",
+        serverId: c.localId,
+        syncingAt: null,
+      });
+    } catch {
+      // 可能条目已被删除或从未入库 → 忽略
+    }
+  } catch (e) {
+    // onceResponse 失败：push_timeout 或其他
+    // C2：超时前先查 captureStore —— 如果 UI 层（use-chat chat.done 监听器）
+    // 已经把该条目标为 synced，说明 gateway 其实已回复，视为推送成功。
+    try {
+      const current = await captureStore.get(c.localId);
+      if (current && current.syncStatus === "synced") {
+        return { serverId: current.serverId ?? c.localId };
+      }
+    } catch {
+      // captureStore 访问失败 → 继续按原错误抛
+    }
+
+    const err = e as { code?: string; message?: string };
+    if (err && err.code) {
+      throw toPushError(undefined, err.code, err.message ?? "chat.done failed");
+    }
+    throw toPushError(undefined, "network", String(e));
+  }
+
+  return { serverId: c.localId };
 }
 
 interface ResolvedDeps {
