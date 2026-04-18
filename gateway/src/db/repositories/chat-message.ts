@@ -7,26 +7,83 @@ export interface ChatMessage {
   content: string;
   parts: any | null;
   compressed: boolean;
+  /** 前端幂等键（localId），见 fix-cold-resume-silent-loss §6；旧数据为 null/undefined */
+  client_id?: string | null;
   created_at: string;
 }
 
 /**
  * 写入一条聊天消息（用户/AI回复/压缩摘要）
  * 返回新消息的 id
+ *
+ * @param clientId 可选的前端幂等键（localId），见 fix-cold-resume-silent-loss §6
  */
 export async function saveMessage(
   userId: string,
   role: string,
   content: string,
   parts?: any,
+  clientId?: string | null,
 ): Promise<string> {
   const row = await queryOne<{ id: string }>(
-    `INSERT INTO chat_message (user_id, role, content, parts)
-     VALUES ($1, $2, $3, $4)
+    `INSERT INTO chat_message (user_id, role, content, parts, client_id)
+     VALUES ($1, $2, $3, $4, $5)
      RETURNING id`,
-    [userId, role, content, parts ? JSON.stringify(parts) : null],
+    [userId, role, content, parts ? JSON.stringify(parts) : null, clientId ?? null],
   );
   return row!.id;
+}
+
+/**
+ * 按 (user_id, client_id) 幂等查询：
+ * 若前端用同一 localId 重试发送 chat.message，应返回首次持久化的消息，
+ * 调用方可据此跳过重复 LLM 调用。
+ *
+ * 可选 role 参数允许只匹配特定角色（例如只查 user 消息）。
+ */
+export async function findByClientId(
+  userId: string,
+  clientId: string,
+  role?: string,
+): Promise<ChatMessage | null> {
+  // A5 guard：空串/null/undefined 静默返回 null，避免 SQL WHERE client_id = '' 的巧合安全。
+  if (!clientId || typeof clientId !== "string") return null;
+  if (role) {
+    return queryOne<ChatMessage>(
+      `SELECT * FROM chat_message
+       WHERE user_id = $1 AND client_id = $2 AND role = $3
+       LIMIT 1`,
+      [userId, clientId, role],
+    );
+  }
+  return queryOne<ChatMessage>(
+    `SELECT * FROM chat_message
+     WHERE user_id = $1 AND client_id = $2
+     LIMIT 1`,
+    [userId, clientId],
+  );
+}
+
+/**
+ * 查找紧随某时间点之后的**最近一条** assistant 回复。
+ *
+ * 用于 chat.message 幂等配对（A3 修复）：
+ * 原先实现用 getHistory(30) DESC 后 find(assistant && created_at > userMsg.created_at)
+ * 会返回 **最新** assistant（即最后一轮对话的 AI 回复），而非紧跟该 user 消息的那条，
+ * 造成跨话题回复污染。改为 SQL ASC LIMIT 1 精确拿"下一条"。
+ *
+ * regression: fix-cold-resume-silent-loss
+ */
+export async function findNextAssistantAfter(
+  userId: string,
+  afterCreatedAt: string | Date,
+): Promise<ChatMessage | null> {
+  return queryOne<ChatMessage>(
+    `SELECT * FROM chat_message
+     WHERE user_id = $1 AND role = 'assistant' AND created_at > $2
+     ORDER BY created_at ASC LIMIT 1`,
+    [userId, afterCreatedAt],
+  );
 }
 
 /**

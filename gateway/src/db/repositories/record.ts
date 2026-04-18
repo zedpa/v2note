@@ -21,6 +21,8 @@ export interface Record {
   metadata: { [key: string]: any } | null;
   compile_status: string;
   content_hash: string | null;
+  /** 前端幂等键（localId），见 fix-cold-resume-silent-loss §6；旧数据为 null/undefined */
+  client_id?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -116,10 +118,12 @@ export async function create(fields: {
   notebook?: string;
   file_url?: string;
   file_name?: string;
+  /** 前端幂等键（localId）；见 fix-cold-resume-silent-loss §6 */
+  client_id?: string | null;
 }): Promise<Record> {
   const row = await queryOne<Record>(
-    `INSERT INTO record (device_id, user_id, status, source, source_type, audio_path, duration_seconds, location_text, notebook, file_url, file_name)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`,
+    `INSERT INTO record (device_id, user_id, status, source, source_type, audio_path, duration_seconds, location_text, notebook, file_url, file_name, client_id)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING *`,
     [
       fields.device_id ?? null,
       fields.user_id ?? null,
@@ -132,9 +136,29 @@ export async function create(fields: {
       fields.notebook ?? null,
       fields.file_url ?? null,
       fields.file_name ?? null,
+      fields.client_id ?? null,
     ],
   );
   return row!;
+}
+
+/**
+ * 按 (user_id, client_id) 幂等查询：
+ * 若前端用同一 localId 重试 POST，应返回首次创建的 record，避免重复写入。
+ * 见 fix-cold-resume-silent-loss §6。
+ *
+ * A5 guard：clientId 为空/非字符串时静默返回 null，避免 SQL 侧出现 `= ''` / `= NULL`
+ * 的"巧合安全"行为；调用方应据此走普通创建分支。
+ */
+export async function findByClientId(
+  userId: string,
+  clientId: string,
+): Promise<Record | null> {
+  if (!clientId || typeof clientId !== "string") return null;
+  return queryOne<Record>(
+    `SELECT * FROM record WHERE user_id = $1 AND client_id = $2 LIMIT 1`,
+    [userId, clientId],
+  );
 }
 
 export async function updateStatus(id: string, status: string): Promise<void> {

@@ -10,6 +10,26 @@ import {
 } from "../db/repositories/index.js";
 import { processEntry } from "../handlers/process.js";
 import { getSignedUrl, isOssConfigured } from "../storage/oss.js";
+import { isValidClientId } from "../lib/client-id.js";
+
+/**
+ * A1（fix-cold-resume-silent-loss Phase 3）：
+ * POST /records 并发时可能两条同 (userId, client_id) 请求都 miss 了 findByClientId，
+ * 导致第二条 INSERT 撞 partial unique index 抛 Postgres 23505。
+ * 原先会冒泡成 500，触发前端重试风暴。
+ *
+ * 捕获到约束冲突后回退一次 findByClientId 返回已存在行，语义等同于"幂等成功"。
+ * 错误形状：pg 错误对象带 code="23505"，constraint 字段含 "client_id"。
+ */
+function isClientIdUniqueViolation(err: unknown): boolean {
+  if (!err || typeof err !== "object") return false;
+  const e = err as { code?: unknown; constraint?: unknown; detail?: unknown };
+  if (e.code !== "23505") return false;
+  const constraint = typeof e.constraint === "string" ? e.constraint : "";
+  const detail = typeof e.detail === "string" ? e.detail : "";
+  // 生产索引名称未知，放宽匹配：只要约束名/detail 包含 client_id 即判定
+  return constraint.includes("client_id") || detail.includes("client_id");
+}
 
 export function registerRecordRoutes(router: Router) {
   // Get signed audio URL for a record
@@ -184,6 +204,11 @@ export function registerRecordRoutes(router: Router) {
   });
 
   // Create record
+  // 支持 client_id 幂等（见 fix-cold-resume-silent-loss §6）：
+  //   - 同一 (userId, client_id) 的重复 POST → 直接返回已有行，不创建
+  //   - 未携带 client_id 时退化为普通创建（向后兼容）
+  //   - A2: client_id 格式非法 → 视为未传（warn 日志后走普通创建），不阻塞请求
+  //   - A1: create 触发 23505 → 回退 find 返回已有行（幂等成功，200 OK）
   router.post("/api/v1/records", async (req, res) => {
     const userId = getUserId(req);
     if (!userId) { sendError(res, "Unauthorized", 401); return; }
@@ -193,9 +218,54 @@ export function registerRecordRoutes(router: Router) {
       location_text?: string;
       duration_seconds?: number;
       notebook?: string;
+      client_id?: string;
     }>(req);
-    const record = await recordRepo.create({ device_id: undefined, user_id: userId, ...body });
-    sendJson(res, { id: record.id }, 201);
+
+    // A2: client_id 格式校验。非法值 → 剔除后走普通创建，不阻塞。
+    let clientId: string | null = null;
+    if (body.client_id !== undefined && body.client_id !== null) {
+      if (isValidClientId(body.client_id)) {
+        clientId = body.client_id;
+      } else {
+        const raw: unknown = body.client_id;
+        const preview: string =
+          typeof raw === "string" ? (raw as string).slice(0, 40) : typeof raw;
+        console.warn(`[records] invalid client_id rejected (user=${userId}): ${preview}`);
+      }
+    }
+
+    // 幂等短路：命中已有行直接回放
+    if (clientId) {
+      const existing = await recordRepo.findByClientId(userId, clientId);
+      if (existing) {
+        sendJson(res, { ...existing, id: existing.id, client_id: existing.client_id });
+        return;
+      }
+    }
+
+    const { client_id: _omit, ...rest } = body;
+    try {
+      const record = await recordRepo.create({
+        device_id: undefined,
+        user_id: userId,
+        ...rest,
+        client_id: clientId,
+      });
+      sendJson(res, { id: record.id, client_id: record.client_id ?? clientId ?? null }, 201);
+    } catch (err) {
+      // A1: 并发插入撞 partial unique index → 回退 find，返回已有行
+      if (clientId && isClientIdUniqueViolation(err)) {
+        const existing = await recordRepo.findByClientId(userId, clientId);
+        if (existing) {
+          console.warn(
+            `[records] 23505 race resolved by idempotent replay (user=${userId}, client_id=${clientId})`,
+          );
+          sendJson(res, { ...existing, id: existing.id, client_id: existing.client_id });
+          return;
+        }
+      }
+      throw err;
+    }
   });
 
   // Retry audio: receive WAV, transcribe, process
@@ -285,23 +355,69 @@ export function registerRecordRoutes(router: Router) {
   });
 
   // Create manual note (content + optional AI processing)
+  // 支持 client_id 幂等（同 POST /records）：
+  //   - 命中已有 (userId, client_id) 直接回放，不重复写入 transcript/summary/tags
+  //   - A2: 非法 client_id 忽略（走普通创建）
+  //   - A1: create 并发撞 23505 → 回退 find 返回已有行，跳过 transcript/summary 重复写入
   router.post("/api/v1/records/manual", async (req, res) => {
     const userId = getUserId(req);
     if (!userId) { sendError(res, "Unauthorized", 401); return; }
-    const { content, tags, useAi, notebook } = await readBody<{
+    const { content, tags, useAi, notebook, client_id } = await readBody<{
       content: string;
       tags?: string[];
       useAi?: boolean;
       notebook?: string;
+      client_id?: string;
     }>(req);
 
-    const record = await recordRepo.create({
-      device_id: undefined,
-      user_id: userId,
-      status: useAi ? "processing" : "completed",
-      source: "manual",
-      notebook: notebook || undefined,
-    });
+    // A2: client_id 格式校验
+    let clientId: string | null = null;
+    if (client_id !== undefined && client_id !== null) {
+      if (isValidClientId(client_id)) {
+        clientId = client_id;
+      } else {
+        const raw: unknown = client_id;
+        const preview: string =
+          typeof raw === "string" ? (raw as string).slice(0, 40) : typeof raw;
+        console.warn(
+          `[records/manual] invalid client_id rejected (user=${userId}): ${preview}`,
+        );
+      }
+    }
+
+    // 幂等短路
+    if (clientId) {
+      const existing = await recordRepo.findByClientId(userId, clientId);
+      if (existing) {
+        sendJson(res, { ...existing, id: existing.id, client_id: existing.client_id });
+        return;
+      }
+    }
+
+    let record;
+    try {
+      record = await recordRepo.create({
+        device_id: undefined,
+        user_id: userId,
+        status: useAi ? "processing" : "completed",
+        source: "manual",
+        notebook: notebook || undefined,
+        client_id: clientId,
+      });
+    } catch (err) {
+      // A1: 并发 23505 → 回退 find，若命中则返回已有行并**跳过**后续 transcript/summary 写入
+      if (clientId && isClientIdUniqueViolation(err)) {
+        const existing = await recordRepo.findByClientId(userId, clientId);
+        if (existing) {
+          console.warn(
+            `[records/manual] 23505 race resolved by idempotent replay (user=${userId}, client_id=${clientId})`,
+          );
+          sendJson(res, { ...existing, id: existing.id, client_id: existing.client_id });
+          return;
+        }
+      }
+      throw err;
+    }
 
     await transcriptRepo.create({ record_id: record.id, text: content, language: "zh" });
     await summaryRepo.create({
@@ -328,7 +444,10 @@ export function registerRecordRoutes(router: Router) {
       }).catch((err) => console.error("[records/manual] AI processing failed:", err));
     }
 
-    sendJson(res, { id: record.id }, 201);
+    sendJson(res, {
+      id: record.id,
+      client_id: record.client_id ?? clientId ?? null,
+    }, 201);
   });
 
   // Update record

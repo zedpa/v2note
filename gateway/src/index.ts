@@ -9,6 +9,8 @@ import { initChat, sendChatMessage, endChat, rebuildSystemPrompt, type ChatStart
 import { chatMessageRepo } from "./db/repositories/index.js";
 import { maybeCompress } from "./handlers/chat-compression.js";
 import { shouldTriggerMemory } from "./handlers/chat-memory-trigger.js";
+import { findCachedChatReply } from "./handlers/chat-idempotency.js";
+import { isValidClientId } from "./lib/client-id.js";
 import { aggregateTodos } from "./handlers/todo.js";
 import { startASR, sendAudioChunk, stopASR, cancelASR, type ASRMode } from "./handlers/asr.js";
 import { getSession } from "./session/manager.js";
@@ -90,7 +92,7 @@ type GatewayMessage =
   | { type: "auth"; payload: { token: string } }
   | { type: "process"; payload: ProcessPayload }
   | { type: "chat.start"; payload: ChatStartPayload }
-  | { type: "chat.message"; payload: { text: string } }
+  | { type: "chat.message"; payload: { text: string; client_id?: string } }
   | { type: "chat.end"; payload: Record<string, never> }
   | { type: "todo.aggregate"; payload: Record<string, never> }
   | { type: "asr.start"; payload: { locationText?: string; mode?: ASRMode; notebook?: string; sourceContext?: "todo" | "timeline" | "chat" | "review"; saveAudio?: boolean } }
@@ -103,7 +105,7 @@ type GatewayResponse =
   | { type: "process.result"; payload: ProcessResult }
   | { type: "chat.chunk"; payload: { text: string } }
   | { type: "chat.ready"; payload: Record<string, never> }
-  | { type: "chat.done"; payload: { full_text: string } }
+  | { type: "chat.done"; payload: { full_text: string; text?: string; client_id?: string; cached?: boolean } }
   | { type: "todo.result"; payload: { diary_entry: string } }
   | { type: "asr.partial"; payload: { text: string; sentenceId: number } }
   | { type: "asr.sentence"; payload: { text: string; sentenceId: number; begin_time: number; end_time: number } }
@@ -357,9 +359,68 @@ wss.on("connection", (ws) => {
               }
             }
           }
-          // 持久化用户消息（先于 AI 处理）
-          if (authedUserId && msg.payload.text) {
-            chatMessageRepo.saveMessage(authedUserId, "user", msg.payload.text).catch(e =>
+          // ── client_id 幂等短路（fix-cold-resume-silent-loss §6）──
+          // 同一 (userId, client_id) 的 chat.user 重复：
+          //   - assistant 已配对 → 直接回放原 assistant 回复，不重新调 LLM（短路 chat.done）
+          //   - assistant 未配对（上次 LLM 崩了）→ 跳过 user 持久化，但**继续走 LLM 生成 assistant**
+          //     （A4 契约修正：原先错误地用 text="" + cached=true 短路，前端会留空泡泡）
+          //
+          // A2：client_id 必须通过格式校验；非法值视为未传，避免污染 DB。
+          const rawClientId = msg.payload?.client_id;
+          let clientId: string | null = null;
+          if (rawClientId !== undefined && rawClientId !== null) {
+            if (isValidClientId(rawClientId)) {
+              clientId = rawClientId;
+            } else {
+              const preview: string =
+                typeof rawClientId === "string"
+                  ? (rawClientId as string).slice(0, 40)
+                  : typeof rawClientId;
+              console.warn(
+                `[chat] invalid client_id rejected (user=${authedUserId}): ${preview}`,
+              );
+            }
+          }
+
+          // A4: 标志变量——user 命中但 assistant 未配对时跳过 user 持久化
+          let skipUserPersist = false;
+          if (clientId) {
+            try {
+              const cached = await findCachedChatReply(authedUserId, clientId);
+              if (cached && cached.hasAssistantReply) {
+                // 配对成功 → 直接短路，不再走 LLM
+                sendToUser(authedUserId, {
+                  type: "chat.done",
+                  payload: {
+                    full_text: cached.text,
+                    text: cached.text,
+                    client_id: clientId,
+                    cached: true,
+                  },
+                });
+                break;
+              }
+              if (cached && !cached.hasAssistantReply) {
+                console.warn(
+                  `[chat] idempotency hit user but no assistant reply, resuming LLM (client_id=${clientId})`,
+                );
+                skipUserPersist = true;
+              }
+            } catch (e: any) {
+              console.warn(`[chat] idempotency lookup failed: ${e.message}`);
+            }
+          }
+
+          // 持久化用户消息（先于 AI 处理）；client_id 一同写入。
+          // A4：若 user 已存在（skipUserPersist=true），跳过写入避免重复。
+          if (!skipUserPersist && authedUserId && msg.payload.text) {
+            chatMessageRepo.saveMessage(
+              authedUserId,
+              "user",
+              msg.payload.text,
+              undefined,
+              clientId,
+            ).catch(e =>
               console.warn(`[chat] Failed to persist user msg: ${e.message}`),
             );
             // 即时记忆触发：关键词快筛 + 异步 maybeCreateMemory
@@ -406,7 +467,13 @@ wss.on("connection", (ws) => {
           }
           const session = getSession(chatUserId);
           session.context.addMessage({ role: "assistant", content: fullText });
-          sendToUser(chatUserId, { type: "chat.done", payload: { full_text: fullText } });
+          sendToUser(chatUserId, {
+            type: "chat.done",
+            payload: {
+              full_text: fullText,
+              ...(clientId ? { client_id: clientId } : {}),
+            },
+          });
           // 持久化 AI 回复（异步）
           if (fullText && authedUserId) {
             chatMessageRepo.saveMessage(authedUserId, "assistant", fullText).catch(e =>

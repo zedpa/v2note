@@ -40,7 +40,7 @@ describe("chat-message repository", () => {
       expect(result).toBe("msg-1");
       expect(queryOne).toHaveBeenCalledWith(
         expect.stringContaining("INSERT INTO chat_message"),
-        ["u-1", "user", "你好", null],
+        ["u-1", "user", "你好", null, null],
       );
     });
 
@@ -51,7 +51,7 @@ describe("chat-message repository", () => {
       await saveMessage("u-1", "assistant", "搜索结果如下", parts);
       expect(queryOne).toHaveBeenCalledWith(
         expect.stringContaining("INSERT INTO chat_message"),
-        ["u-1", "assistant", "搜索结果如下", JSON.stringify(parts)],
+        ["u-1", "assistant", "搜索结果如下", JSON.stringify(parts), null],
       );
     });
 
@@ -61,7 +61,7 @@ describe("chat-message repository", () => {
       await saveMessage("u-1", "context-summary", "用户讨论了项目计划...");
       expect(queryOne).toHaveBeenCalledWith(
         expect.stringContaining("INSERT INTO chat_message"),
-        ["u-1", "context-summary", "用户讨论了项目计划...", null],
+        ["u-1", "context-summary", "用户讨论了项目计划...", null, null],
       );
     });
   });
@@ -184,6 +184,81 @@ describe("chat-message repository", () => {
       const sql = vi.mocked(queryOne).mock.calls[0][0];
       expect(sql).toContain("COUNT(*)");
       expect(sql).toContain("compressed = false");
+    });
+  });
+});
+
+describe("chat_message client_id idempotency", () => {
+  // regression: fix-cold-resume-silent-loss
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  describe("saveMessage with clientId", () => {
+    it("should_persist_client_id_when_provided", async () => {
+      vi.mocked(queryOne).mockResolvedValue({ id: "msg-1" } as any);
+
+      const { saveMessage } = await import("./chat-message.js");
+      await saveMessage("u-1", "user", "hello", undefined, "local-uuid-1");
+
+      const sql = vi.mocked(queryOne).mock.calls[0][0] as string;
+      const params = vi.mocked(queryOne).mock.calls[0][1] as any[];
+      expect(sql).toContain("client_id");
+      expect(params).toContain("local-uuid-1");
+    });
+
+    it("should_default_client_id_to_null_when_omitted", async () => {
+      vi.mocked(queryOne).mockResolvedValue({ id: "msg-2" } as any);
+
+      const { saveMessage } = await import("./chat-message.js");
+      await saveMessage("u-1", "user", "hello");
+
+      const params = vi.mocked(queryOne).mock.calls[0][1] as any[];
+      // 最后一个参数是 client_id，应为 null
+      expect(params[params.length - 1]).toBeNull();
+    });
+  });
+
+  describe("findByClientId", () => {
+    it("should_return_message_when_match_exists", async () => {
+      vi.mocked(queryOne).mockResolvedValue({
+        id: "msg-1",
+        user_id: "u-1",
+        role: "user",
+        client_id: "local-uuid-1",
+      } as any);
+
+      const { findByClientId } = await import("./chat-message.js");
+      const result = await findByClientId("u-1", "local-uuid-1");
+      expect(result).not.toBeNull();
+      expect(result!.id).toBe("msg-1");
+
+      const sql = vi.mocked(queryOne).mock.calls[0][0] as string;
+      const params = vi.mocked(queryOne).mock.calls[0][1] as any[];
+      expect(sql).toContain("user_id = $1");
+      expect(sql).toContain("client_id = $2");
+      expect(params[0]).toBe("u-1");
+      expect(params[1]).toBe("local-uuid-1");
+    });
+
+    it("should_filter_by_role_when_role_given", async () => {
+      vi.mocked(queryOne).mockResolvedValue(null);
+
+      const { findByClientId } = await import("./chat-message.js");
+      await findByClientId("u-1", "local-uuid-1", "user");
+
+      const sql = vi.mocked(queryOne).mock.calls[0][0] as string;
+      const params = vi.mocked(queryOne).mock.calls[0][1] as any[];
+      expect(sql).toContain("role = $3");
+      expect(params).toEqual(["u-1", "local-uuid-1", "user"]);
+    });
+
+    it("should_return_null_when_no_match", async () => {
+      vi.mocked(queryOne).mockResolvedValue(null);
+
+      const { findByClientId } = await import("./chat-message.js");
+      const result = await findByClientId("u-1", "missing");
+      expect(result).toBeNull();
     });
   });
 });
