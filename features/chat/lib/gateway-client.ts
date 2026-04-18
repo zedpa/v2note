@@ -258,6 +258,21 @@ export class GatewayClient {
     }
   }
 
+  /**
+   * 重置重连退避计数
+   *
+   * regression: fix-cold-resume-silent-loss §4.1
+   * 由 sync-orchestrator 的 ensureGatewaySession 调用：
+   * 长时间未用后，reconnectAttempts 可能已耗尽 → 重置后 connect() 才能真正重试。
+   */
+  resetReconnectBackoff(): void {
+    this.reconnectAttempts = 0;
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+  }
+
   disconnect(): void {
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
