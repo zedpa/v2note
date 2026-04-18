@@ -25,6 +25,8 @@ import {
 
 export interface PushResult {
   serverId: string;
+  /** M5：推送过程软告警（如音频 blob 缺失）— worker 需读取用于 lastError 留痕 */
+  warning?: "audio_blob_missing";
 }
 
 export type PushError = {
@@ -159,6 +161,21 @@ export function createSyncOrchestrator(opts: SyncOrchestratorOptions) {
     const retryCount = (record.retryCount ?? 0) + 1;
 
     try {
+      // C2: subject_mismatch → 保持 captured，**不**增加 retryCount，不标 failed。
+      // 等账号回切时再推送；当前 session 无权限处理此条。
+      if (code === "subject_mismatch") {
+        try {
+          await captureStore.update(record.localId, {
+            syncStatus: "captured",
+            lastError: err.message,
+          });
+        } catch (e) {
+          if (e instanceof CaptureNotFoundError) return;
+          throw e;
+        }
+        return;
+      }
+
       // 401：仅增加计数并保持 captured（或达到上限时标 failed）
       if (status === 401 || code === "auth") {
         state.authRefreshCount += 1;
@@ -296,10 +313,14 @@ export function createSyncOrchestrator(opts: SyncOrchestratorOptions) {
               }
 
               try {
+                // M5：若 pushCapture 返回 warning=audio_blob_missing，record 已上传但没有音频；
+                // 留痕 lastError 方便用户/UI 感知，syncStatus 仍标 synced（避免 worker 死循环重试）。
+                const lastError =
+                  result.warning === "audio_blob_missing" ? "audio_blob_missing" : null;
                 await captureStore.update(record.localId, {
                   syncStatus: "synced",
                   serverId: result.serverId,
-                  lastError: null,
+                  lastError,
                 });
                 // 推送成功 → 重置 auth 计数
                 state.authRefreshCount = 0;

@@ -1,5 +1,13 @@
 "use client";
 
+/**
+ * 已知限制（待后续 Phase 处理）：
+ * - m6 UI 感知 gap：Phase 6（时间线本地合并）未交付前，用户会看到"已记录" toast
+ *   但时间线中暂无该条目（时间线仍只读服务端 records）。等 Phase 6 落地。
+ * - m3 游客模式：userId=null 的 captures pushCapture 会被 gateway 401；
+ *   这是 Phase 8（游客归属）的工作。
+ */
+
 import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { Mic, X, Command, Lock, Send, Sparkles, Check, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -19,6 +27,10 @@ import { startAiPipeline, renewAiPipeline, endAiPipeline } from "@/shared/lib/ai
 import { saveAudio, mergeChunks, checkCacheSize, markCompleted, getAudioByRecordId, type PendingAudio } from "@/features/recording/lib/audio-cache";
 import { createRecord } from "@/shared/lib/api/records";
 import { AudioSession } from "@/shared/lib/audio-session";
+import { saveFabCapture, decideFinishDispatch, shouldAcceptAsrDone } from "@/features/recording/lib/fab-capture";
+import { getCurrentUser } from "@/shared/lib/auth";
+import type { CaptureSource } from "@/shared/lib/capture-store";
+import { captureStore } from "@/shared/lib/capture-store";
 
 function formatDuration(s: number) {
   const m = Math.floor(s / 60);
@@ -92,6 +104,12 @@ export function FAB({
   sourceContextRef.current = sourceContext;
   const gwClientRef = useRef<ReturnType<typeof getGatewayClient> | null>(null);
   const audioActivatedRef = useRef(false);
+  // C3：PCM 门闩。stopRecording() 期间 worklet 尾帧若回调，直接丢弃。
+  const recordingClosedRef = useRef(false);
+  // M3：当前录音会话 id。用于过滤 asr.done 的跨录音错关联。
+  const activeSessionIdRef = useRef<string | null>(null);
+  // M4：最近一次 capture 的 localId（供 asr.done 标记同步）。
+  const lastCaptureLocalIdRef = useRef<string | null>(null);
 
   const startTimers = useCallback(() => {
     setDisplayDuration(0);
@@ -200,33 +218,41 @@ export function FAB({
           setPartialText("");
           break;
         case "asr.done": {
-          // 清除 asr.done 超时检测
+          // M3：跨录音错关联防护（逻辑抽到 shouldAcceptAsrDone 便于单测）
+          const payloadSessionId = (msg.payload as { sessionId?: string }).sessionId;
+          if (!shouldAcceptAsrDone(payloadSessionId, activeSessionIdRef.current)) {
+            break;
+          }
+
           if (asrDoneTimerRef.current) { clearTimeout(asrDoneTimerRef.current); asrDoneTimerRef.current = null; }
 
-          // 关联 recordId 到本地缓存
+          // legacy: 关联 recordId 到旧 audio-cache（仍在用的 pending_retry 记录依赖这个）
           if (msg.payload.recordId && cacheIdRef.current) {
             import("@/features/recording/lib/audio-cache").then(({ updateRecordId }) => {
               if (cacheIdRef.current) updateRecordId(cacheIdRef.current, msg.payload.recordId);
             }).catch(() => {});
           }
 
+          // C1：asr.done 带 recordId 且本地有匹配 localId 的 capture → 标记 synced
+          //   避免后续 pushCapture 重复推送（gateway 已幂等，但这里先标同步节约一次 HTTP）
+          if (msg.payload.recordId && lastCaptureLocalIdRef.current) {
+            const localId = lastCaptureLocalIdRef.current;
+            captureStore
+              .update(localId, { serverId: msg.payload.recordId, syncStatus: "synced" })
+              .catch(() => { /* 不阻塞 UI */ });
+            lastCaptureLocalIdRef.current = null;
+          }
+
+          // C1：forceCommand 分发恢复——asr.done 是指令执行结果的权威来源
           if (commandReleaseRef.current) {
             commandReleaseRef.current = false;
-            setDisplayDuration(0);
-            setConfirmedText("");
-            setPartialText("");
             resetRef.current();
             window.dispatchEvent(new CustomEvent("v2note:forceCommand", {
               detail: { transcript: (msg.payload.transcript || "").trim() },
             }));
             return;
           }
-
-          if (msg.payload.recordId) {
-            emit("recording:uploaded");
-            fabNotify.success("已记录");
-            pipelineIdRef.current = startAiPipeline();
-          }
+          // 新链路：UI 已由 saveFabCapture 处理，不再在此 emit "已记录" 或启动 pipeline
           break;
         }
         case "asr.error":
@@ -298,6 +324,8 @@ export function FAB({
     streamingRef.current = false;
     preCaptureAbortRef.current = false;
     gwClientRef.current = null;
+    // C3：新一次录音开始 → 重新开门
+    recordingClosedRef.current = false;
 
     try {
       // pre-capture 阶段即请求音频焦点，打断系统音频（fix-recording-audio-focus）
@@ -305,6 +333,8 @@ export function FAB({
 
       await recorder.startRecording({
         onPCMData: (chunk) => {
+          // C3：录音已关闭 → 丢弃尾帧（可能是 stopRecording() 期间 worklet 的回调）
+          if (recordingClosedRef.current) return;
           if (pausedRef.current) return;
 
           // 始终累积到 fullBuffer（本地缓存用）
@@ -365,38 +395,63 @@ export function FAB({
       pausedRef.current = false;
       setLockedPaused(false);
       commandReleaseRef.current = false;
+      // C3：新一次录音 → 开门（覆盖 pre-capture 未触发的场景）
+      recordingClosedRef.current = false;
+
+      // M3：生成新的 sessionId 用于后续 asr.done 过滤
+      //     复用 cacheIdRef 当前 uuid（若 pre-capture 已生成）；否则新建一个
+      if (!cacheIdRef.current) cacheIdRef.current = crypto.randomUUID();
+      activeSessionIdRef.current = cacheIdRef.current;
 
       const settings = await getSettings();
       const asrMode = settings.asrMode ?? "realtime";
       asrModeRef.current = asrMode;
 
+      // fix-cold-resume-silent-loss §2.2: 不再 await waitForReady，录音立即启动
+      // WS 连接只用于实时 partial text 预览（非必需）。即使 WS 未就绪，录音数据通过
+      // fullBufferRef 本地累积，释放时由 saveFabCapture 直接落地到 captureStore。
       const client = getGatewayClient();
       if (!client.connected) {
-        client.connect();
-        const ready = await client.waitForReady();
-        if (!ready) {
-          fabNotify.error("无法连接服务器，请检查网络");
-          stopPreCapture();
-          deactivateAudioSession();
-          return;
-        }
+        // 异步触发连接，不 await；失败也不报错（只是没有 partial text）
+        try { client.connect(); } catch { /* best effort */ }
       }
       gwClientRef.current = client;
 
-      client.send({ type: "asr.start", payload: { mode: asrMode, notebook: activeNotebookRef.current ?? undefined, sourceContext: sourceContextRef.current } });
-
-      for (const chunk of preBufferRef.current) {
-        client.sendBinary(chunk);
+      // 若 WS 已 OPEN，发 asr.start 走实时预览；否则跳过（录音仍继续）
+      try {
+        if (client.connected) {
+          client.send({
+            type: "asr.start",
+            // M3：附带 sessionId（gateway 若不回显也无害，但若回显则用于防错关联）
+            payload: {
+              mode: asrMode,
+              notebook: activeNotebookRef.current ?? undefined,
+              sourceContext: sourceContextRef.current,
+              sessionId: activeSessionIdRef.current ?? undefined,
+            } as never,
+          });
+          for (const chunk of preBufferRef.current) {
+            client.sendBinary(chunk);
+          }
+          streamingRef.current = true;
+        }
+      } catch {
+        // WS 相关错误全部吞掉，不阻塞录音
       }
       preBufferRef.current = [];
-      streamingRef.current = true;
 
       if (!recorder.isActive.current) {
         await recorder.startRecording({
           onPCMData: (chunk) => {
+            // C3：录音已关闭 → 丢弃尾帧
+            if (recordingClosedRef.current) return;
             if (pausedRef.current) return;
             fullBufferRef.current.push(chunk.slice(0));
-            client.sendBinary(chunk);
+            // fix-cold-resume-silent-loss §2.2: 仅在 streamingRef 真正建立时才发送
+            // WS 未连接时录音继续在本地累积，松手后由 saveFabCapture 直接落地
+            if (streamingRef.current && client.connected) {
+              try { client.sendBinary(chunk); } catch { /* WS 掉线，忽略 */ }
+            }
             const view = new Int16Array(chunk);
             let sum = 0;
             for (let i = 0; i < view.length; i++) {
@@ -494,79 +549,107 @@ export function FAB({
       stopTimers();
       pausedRef.current = false;
       setLockedPaused(false);
-      // 注意：streamingRef 和 gwClientRef 在 stopRecording 之后再清理
-      // 鸿蒙环境下 stopRecording 会异步发送 PCM 数据，需要 gwClientRef 仍有效
       preBufferRef.current = [];
 
-      // 先停止录音（鸿蒙：等待 PCM 数据全部通过 onPCMData→sendBinary 发出）
+      // C3：先关闭门闩，再 await stopRecording——之后 worklet 的任何尾帧都会被丢弃
+      recordingClosedRef.current = true;
+
+      // 先停止录音（PCM 采集结束，fullBufferRef 已累积完整数据）
       try {
         await recorder.stopRecording();
       } catch (err: any) {
         console.error("[fab] stopRecording error:", err);
       }
 
-      // 录音停止后再清理引用
       streamingRef.current = false;
       gwClientRef.current = null;
+      deactivateAudioSession();
 
-      // 保存录音到本地缓存
+      // M4：不提前清空 fullBufferRef——若 saveFabCapture 抛错，handleRecordingFailure 仍能
+      // 拿到 chunks 兜底到旧 audio-cache。成功/失败后在结尾统一清空。
       const chunks = fullBufferRef.current;
-      const cacheId = cacheIdRef.current;
-      const totalBytes = chunks.reduce((sum, c) => sum + c.byteLength, 0);
-      const durationSec = totalBytes / (16000 * 2);
+      const sessionIdAtFinish = activeSessionIdRef.current;
 
-      // 录音 >= 1 秒才缓存
-      if (cacheId && durationSec >= 1) {
+      // C1：指令录音 → 同步通知 gateway 执行三层指令路由（决策抽到 decideFinishDispatch）
+      const client = getGatewayClient();
+      const wsConnected = client.connected;
+      const dispatch = decideFinishDispatch({
+        asCommand,
+        wsConnected,
+        sessionId: sessionIdAtFinish,
+      });
+      if (dispatch.type === "send_asr_stop_force_command") {
         try {
-          const pcmData = mergeChunks(chunks);
-          await saveAudio({
-            id: cacheId,
-            pcmData,
-            duration: Math.round(durationSec),
-            sourceContext: sourceContextRef.current as PendingAudio["sourceContext"],
-            forceCommand: asCommand,
-            notebook: activeNotebookRef.current ?? null,
-            createdAt: new Date().toISOString(),
-            status: "pending",
-          });
-        } catch (err) {
-          console.error("[fab] Failed to save audio cache:", err);
+          // commandReleaseRef 打开，asr.done 监听器会把 transcript dispatch 到 forceCommand
+          commandReleaseRef.current = true;
+          client.send({ type: "asr.stop", payload: dispatch.payload as never });
+        } catch {
+          // WS 失败不阻塞主流程，后续仍落地本地 capture
         }
       }
 
+      // fix-cold-resume-silent-loss §2.1 / §2.3：录音结束立即本地落地
+      // 不等 WS / token / ASR；saveFabCapture 内部触发 sync 调度器（有网时秒级同步）
+      let savedOk = false;
       try {
-        // 恢复系统音频
-        deactivateAudioSession();
-        const client = getGatewayClient();
-
-        if (!client.connected) {
-          // WS 断开，触发失败流程
-          handleRecordingFailure("WS 连接断开");
-          return;
-        }
-
-        if (asCommand) {
-          commandReleaseRef.current = true;
-          client.send({ type: "asr.stop", payload: { saveAudio: false, forceCommand: true } });
-          fabNotify.info("指令处理中...");
-        } else {
-          commandReleaseRef.current = false;
-          client.send({ type: "asr.stop", payload: {} });
+        const user = getCurrentUser();
+        const sourceCtx: CaptureSource = asCommand ? "fab_command" : "fab";
+        const result = await saveFabCapture({
+          chunks,
+          asCommand,
+          notebook: activeNotebookRef.current ?? null,
+          userId: user?.id ?? null,
+          sourceContext: sourceCtx,
+        });
+        savedOk = result.saved !== null;
+        if (savedOk) {
+          // 记录 localId 供 asr.done 标记 synced（C1 去重）
+          lastCaptureLocalIdRef.current = result.saved?.localId ?? null;
+          // UI 文案：指令模式区分 WS 已连 / 未连两种语义
+          if (asCommand) {
+            if (wsConnected) {
+              fabNotify.info("指令已记录，处理中...");
+            } else {
+              fabNotify.info("指令已记录，联网后执行");
+            }
+          } else {
+            fabNotify.success("已记录");
+          }
+          // 通知时间线刷新（Phase 6 才真正合并本地，当前至少触发一次 refresh）
+          emit("recording:uploaded");
+          // 重置 UI
           setDisplayDuration(0);
           setConfirmedText("");
           setPartialText("");
         }
-
-        // 设置 asr.done 超时检测（15 秒）
-        if (asrDoneTimerRef.current) clearTimeout(asrDoneTimerRef.current);
-        asrDoneTimerRef.current = setTimeout(() => {
-          asrDoneTimerRef.current = null;
-          handleRecordingFailure("识别超时");
-        }, 15000);
+        // 保存完成（成功或短录音丢弃）→ 清空 fullBuffer
+        fullBufferRef.current = [];
+        cacheIdRef.current = null;
+        activeSessionIdRef.current = null;
       } catch (err: any) {
-        commandReleaseRef.current = false;
-        fabNotify.error(`录音结束失败: ${err.message}`);
-        handleRecordingFailure(err.message);
+        console.error("[fab] saveFabCapture failed:", err);
+        // M4：提示用户本地存储问题，给兜底（含当前 chunks）
+        fabNotify.error("本地存储空间不足，录音保存失败，请清理存储后重试");
+        // 兜底到旧 audio-cache（handleRecordingFailure 自行读取 fullBufferRef）
+        handleRecordingFailure(err?.message ?? "save failed");
+        // 最终清空（handleRecordingFailure 已读取过 chunks）
+        fullBufferRef.current = [];
+        cacheIdRef.current = null;
+        activeSessionIdRef.current = null;
+        return;
+      }
+
+      // 有 WS 连接时 cancel 正在进行的 asr 流（普通录音；指令模式走 asr.stop 不再 cancel）
+      if (dispatch.type === "send_asr_cancel") {
+        try {
+          client.send({ type: "asr.cancel", payload: {} });
+        } catch {
+          // 忽略
+        }
+      }
+
+      if (!savedOk) {
+        // 录音太短（<1s）→ 静默不提示
       }
     },
     [recorder, stopTimers, handleRecordingFailure, deactivateAudioSession],
@@ -578,6 +661,10 @@ export function FAB({
     setLockedPaused(false);
     commandReleaseRef.current = false;
     streamingRef.current = false;
+    // C3：取消录音 → 关闭门闩，丢弃后续尾帧
+    recordingClosedRef.current = true;
+    // M3：清空当前 sessionId
+    activeSessionIdRef.current = null;
     preBufferRef.current = [];
     fullBufferRef.current = [];
     cacheIdRef.current = null;

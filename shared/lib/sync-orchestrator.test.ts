@@ -504,6 +504,57 @@ describe("syncOrchestrator [regression: fix-cold-resume-silent-loss]", () => {
 
   // ─── M3: pushCapture 超时 ───────────────────────────────────
 
+  // ─── C2: subject_mismatch 不增加 retryCount ─────────────────
+
+  it("should_not_increment_retryCount_on_subject_mismatch [C2]", async () => {
+    const rec = await captureStore.create({
+      kind: "diary", text: null, audioLocalId: null,
+      sourceContext: "fab", forceCommand: false, notebook: null, userId: "u-A",
+    });
+
+    const opts = makeOpts({
+      pushCapture: vi.fn(async () => {
+        throw {
+          code: "subject_mismatch",
+          message: "capture owner u-A != current u-B",
+        };
+      }),
+    });
+    const orch = createSyncOrchestrator(opts);
+
+    await orch.flushNow();
+
+    const after = await captureStore.get(rec.localId);
+    // 保持 captured，**不**增加 retryCount，**不**标 failed
+    expect(after?.syncStatus).toBe("captured");
+    expect(after?.retryCount).toBe(0);
+    expect(after?.lastError).toMatch(/capture owner/);
+  });
+
+  // ─── M5: audio_blob_missing warning → 标 synced + 留痕 ────
+
+  it("should_record_audio_blob_missing_warning_on_lastError [M5]", async () => {
+    const rec = await captureStore.create({
+      kind: "diary", text: null, audioLocalId: "aud-missing",
+      sourceContext: "fab", forceCommand: false, notebook: null, userId: "u-1",
+    });
+
+    const opts = makeOpts({
+      pushCapture: vi.fn(async (c) => ({
+        serverId: `srv-${c.localId}`,
+        warning: "audio_blob_missing" as const,
+      })),
+    });
+    const orch = createSyncOrchestrator(opts);
+
+    await orch.flushNow();
+
+    const after = await captureStore.get(rec.localId);
+    expect(after?.syncStatus).toBe("synced");
+    expect(after?.serverId).toBe(`srv-${rec.localId}`);
+    expect(after?.lastError).toBe("audio_blob_missing");
+  });
+
   it("should_timeout_and_mark_captured_when_push_exceeds_limit [M3]", async () => {
     const rec = await captureStore.create({
       kind: "chat_user_msg", text: "slow", audioLocalId: null,
