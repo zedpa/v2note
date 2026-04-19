@@ -5,7 +5,7 @@ import { LuluLogo } from "@/components/brand/lulu-logo";
 export const metadata: Metadata = {
   title: "念念有路 — 从思考到行动",
   description:
-    "AI 驱动的个人认知操作系统。随时记录，自动提取，让每一个想法都有归处。",
+    "从说到做的小帮手。随时记录，自动提取，让每一个想法都有归处。",
 };
 
 /* ─── Inline phone mockup (no external images) ─── */
@@ -299,7 +299,7 @@ export default function HomePage() {
           <div>
             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-mono tracking-wide mb-6"
               style={{ background: "rgba(92,122,94,0.1)", color: "#5C7A5E" }}>
-              AI 认知操作系统
+              从说到做的小帮手
             </div>
             <h1 className="font-serif leading-tight mb-6" style={{ color: "#3D3228", fontSize: "clamp(2.5rem, 5vw, 3.5rem)", letterSpacing: "-0.02em" }}>
               你的每一个想法，
@@ -329,17 +329,10 @@ export default function HomePage() {
               </a>
             </div>
 
-            <div className="flex items-center gap-4 mt-10">
-              <div className="flex -space-x-2">
-                {["Z", "L", "M", "W"].map((letter, i) => (
-                  <div key={i} className="w-8 h-8 rounded-full border-2 border-white flex items-center justify-center text-xs font-serif text-white"
-                    style={{ background: `linear-gradient(135deg, ${["#89502C", "#5C7A5E", "#7BA3C4", "#C45C5C"][i]}, ${["#C8845C", "#7BA3C4", "#A0C4D8", "#E8A87C"][i]})` }}>
-                    {letter}
-                  </div>
-                ))}
-              </div>
+            <div className="flex items-center gap-3 mt-10">
+              <div className="w-2 h-2 rounded-full animate-pulse" style={{ background: "#5C7A5E" }} />
               <p className="text-sm" style={{ color: "#89502C" }}>
-                <span className="font-semibold">2,000+</span> 人已在使用
+                正在内测中，敬请期待
               </p>
             </div>
           </div>
