@@ -10,6 +10,7 @@ import type { ChatCacheMessage } from "@/features/chat/lib/chat-cache";
 import { emit } from "@/features/recording/lib/events";
 import { captureStore } from "@/shared/lib/capture-store";
 import { triggerSync } from "@/shared/lib/sync-orchestrator";
+import { fabNotify } from "@/shared/lib/fab-notify";
 import {
   mergeChatHistory,
   type ServerChatMessage,
@@ -60,6 +61,10 @@ export interface ChatMessage {
    * assistant / plan 消息不使用此字段。
    */
   syncStatus?: ChatSyncStatus;
+  /** Phase 7：同步失败次数（仅 user role，用于判断是否 >= 5 → ⚠ 面板） */
+  retryCount?: number;
+  /** Phase 7：最近一次失败原因（面板展开时展示给用户） */
+  lastError?: string | null;
 }
 
 interface UseChatOptions {
@@ -100,6 +105,8 @@ export function useChat(
   const userIdRef = useRef<string | null>(null);
   // 是否已加载过历史（避免重复加载）
   const historyLoadedRef = useRef(false);
+  // M7：retrySync 快速双击节流——记录正在重试推送中的 localId，避免重复唤醒
+  const retryInFlightRef = useRef<Set<string>>(new Set());
 
   // 从 localStorage auth token 解析 userId
   useEffect(() => {
@@ -410,18 +417,12 @@ export function useChat(
     if (gen !== connectGenRef.current) return;
 
     if (!ready) {
+      // Phase 7 §5.3：不再在捕获路径插入阻塞错误气泡。
+      // 离线 / ws 暂不可用由 SyncStatusBanner 统一提示；用户捕获仍可落地。
       setConnected(false);
       setStreaming(false);
       streamingTextRef.current = "";
       clearResponseTimeout();
-      setMessages([
-        {
-          id: crypto.randomUUID(),
-          role: "assistant",
-          content: "连接服务器超时，请检查网络后重试。",
-          timestamp: new Date(),
-        },
-      ]);
       return;
     }
     setConnected(true);
@@ -509,6 +510,9 @@ export function useChat(
           timestamp: new Date(r.created_at),
           parts: r.parts as MessagePart[] | undefined,
           syncStatus: r.role === "user" ? r.syncStatus : undefined,
+          // Phase 7：透传 retryCount / lastError 供 ⚠ 面板使用
+          retryCount: r.role === "user" ? r.retryCount : undefined,
+          lastError: r.role === "user" ? r.lastError ?? null : undefined,
         }));
         setMessages(mergedChatMessages);
         setHasMore(serverFetchOk ? serverHasMore : false);
@@ -635,7 +639,8 @@ export function useChat(
       const client = getGatewayClient();
       if (client.connected) {
         client.send({ type: "chat.message", payload: { text } });
-        armResponseTimeout("请求超时，AI暂未返回。请稍后重试。");
+        // P0.3（M4）：见 spec §5.3，文案由占位"正在同步中…"取代。
+        armResponseTimeout("正在同步中…");
       }
       // 离线时命令直接丢弃（见 spec §3.5）。不 triggerSync。
       return;
@@ -717,7 +722,9 @@ export function useChat(
         type: "chat.message",
         payload: { text, client_id: localId },
       });
-      armResponseTimeout("请求超时，AI暂未返回。请稍后重试。");
+      // P0.3（M4）：占位文案遵循 spec §5.3 — 不出现"超时/失败/请重试"等指责用户的字眼，
+      // 全局 banner (SyncStatusBanner) 统一汇报网络/同步状态。
+      armResponseTimeout("正在同步中…");
 
       // C1 兜底：若 WS 发送后 chat.done 始终不到达（断连、gateway 挂），
       // 40s 后触发一次后台同步，让 worker 在租约 60s 过期时回收重试。
@@ -738,10 +745,15 @@ export function useChat(
 
   // disconnect is synchronous to avoid race with connect()
   // The chat.end message is fire-and-forget
+  //
+  // P0.1 修复（对抗审查 C1）：组件级 disconnect **不再** 调用 client.disconnect()。
+  // gateway-client 是全局单例，被 FAB / sync-orchestrator / voice-to-text 共用；
+  // ChatView 卸载时若关闭全局 WS，会触发 SyncStatusBanner 30s 倒计时误报"同步暂不可用"。
+  // 生命周期由 SyncBootstrap / FAB / orchestrator 自行管理，组件仅清理自己的订阅。
   const disconnect = useCallback(() => {
     const client = getGatewayClient();
 
-    // Fire-and-forget chat.end
+    // Fire-and-forget chat.end（通知 gateway 本会话结束，不影响 WS 生命周期）
     client.send({ type: "chat.end", payload: {} });
 
     if (unsubRef.current) {
@@ -750,7 +762,7 @@ export function useChat(
     }
 
     clearResponseTimeout();
-    client.disconnect();
+    // ⚠️ 禁止 client.disconnect()：全局 WS 由 bootstrap 管理
     setConnected(false);
     sessionStartedRef.current = false;
   }, [clearResponseTimeout]);
@@ -786,6 +798,82 @@ export function useChat(
     );
   }, []);
 
+  /**
+   * Phase 7 §5.1：用户点击 ⚠ 面板中的"重试"按钮。
+   *   - captureStore.update(localId, { syncStatus: "captured", retryCount: 0, lastError: null })
+   *   - triggerSync() 唤醒 worker 重新推送
+   *   - 本地 messages state 同步把 syncStatus 切回 captured
+   */
+  const retrySync = useCallback(async (localId: string) => {
+    // M7：快速双击节流——若该 localId 的重试正在进行中，直接 return
+    if (retryInFlightRef.current.has(localId)) return;
+    retryInFlightRef.current.add(localId);
+    try {
+      try {
+        await captureStore.update(localId, {
+          syncStatus: "captured",
+          retryCount: 0,
+          lastError: null,
+        });
+      } catch {
+        // 记录可能已被其他 tab 删除 → 忽略，仍更新 UI
+      }
+      setMessages((prev) =>
+        prev.map((m): ChatMessage =>
+          m.localId === localId
+            ? { ...m, syncStatus: "captured", retryCount: 0, lastError: null }
+            : m,
+        ),
+      );
+      triggerSync();
+    } finally {
+      // 200ms 节流窗：短时间内不允许再次点 retry（防抖双击）
+      setTimeout(() => {
+        retryInFlightRef.current.delete(localId);
+      }, 200);
+    }
+  }, []);
+
+  /**
+   * Phase 7 §5.1：用户点击 ⚠ 面板中的"删除"按钮。
+   *   - captureStore.delete(localId)
+   *   - 本地 messages state 移除该条
+   */
+  /**
+   * P0.2 修复（对抗审查 C2）：若 capture 已有 serverId（ack 丢失后服务端其实入库成功），
+   * 纯本地删除后下次 fetchChatHistory 会把服务端版本拉回 → 出现"删不掉的僵尸消息"。
+   *
+   * 当前 gateway 并无 `DELETE /api/v1/chat/messages/:id` 按条删除接口
+   * （仅 `DELETE /api/v1/chat/history` 整库清空）。
+   *
+   * 降级策略（本 spec §5.1 边界扩展）：
+   *   - 若 cap.serverId 存在 → 仍然本地删除 + 显示警告 toast：
+   *     "消息已从本设备删除，联网后将尝试清理服务端副本"
+   *   - 若 cap.serverId 为 null → 纯本地删除（现行行为）
+   *
+   * 未来新增 DELETE 接口后，此处可改为调用服务端删除 + 失败降级。
+   */
+  const deleteSync = useCallback(async (localId: string) => {
+    let hadServerCopy = false;
+    try {
+      const cap = await captureStore.get(localId);
+      if (cap && cap.serverId) {
+        hadServerCopy = true;
+      }
+    } catch {
+      // IndexedDB 读失败 → 不影响删除流程
+    }
+    try {
+      await captureStore.delete(localId);
+    } catch {
+      // 已不存在 → 忽略
+    }
+    setMessages((prev) => prev.filter((m) => m.localId !== localId));
+    if (hadServerCopy) {
+      fabNotify.info("消息已从本设备删除，联网后将尝试清理服务端副本");
+    }
+  }, []);
+
   const clearHistory = useCallback(async () => {
     setMessages([]);
     setHasMore(false);
@@ -798,5 +886,21 @@ export function useChat(
     clearChatHistory().catch((e) => console.warn("[chat] Clear history API failed:", e));
   }, []);
 
-  return { messages, send, streaming, connected, connect, disconnect, confirmPlan, loadMore, loadingHistory, hasMore, clearHistory };
+  return {
+    messages,
+    send,
+    streaming,
+    connected,
+    connect,
+    disconnect,
+    confirmPlan,
+    loadMore,
+    loadingHistory,
+    hasMore,
+    clearHistory,
+    /** Phase 7：同步失败条目用户重试（retry >= 5 面板） */
+    retrySync,
+    /** Phase 7：同步失败条目用户删除（retry >= 5 面板） */
+    deleteSync,
+  };
 }

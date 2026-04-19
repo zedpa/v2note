@@ -41,6 +41,10 @@ export interface ChatMergedRow {
    * 播放 UI 暂未实现（defer），此处仅保证数据链路不丢。
    */
   audioLocalId?: string | null;
+  /** Phase 7：同步失败次数（本地行透传，服务端行恒为 0） */
+  retryCount?: number;
+  /** Phase 7：最近一次失败原因（本地行透传） */
+  lastError?: string | null;
   [k: string]: unknown;
 }
 
@@ -145,6 +149,9 @@ export function mergeChatHistory(
       syncStatus: c.syncStatus,
       // C4（§2.4 语音降级）：透传 audioLocalId，UI 播放回放留待后续 phase
       audioLocalId: c.audioLocalId,
+      // Phase 7：透传失败原因用于 ⚠ 面板
+      retryCount: c.retryCount,
+      lastError: c.lastError,
       // M4：悬空 synced 行也要渲染（保持时间顺序），状态已经由 syncStatus 表达
       _dangling: danglingSyncedLocalIds.has(c.localId) || undefined,
     });

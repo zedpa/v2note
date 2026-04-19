@@ -35,7 +35,7 @@ interface ChatViewProps {
 
 export function ChatView({ dateRange, onClose, initialMessage, title, mode: modeProp, commandContext, mood, moodText, deerState, skill }: ChatViewProps) {
   const resolvedMode = modeProp ?? (initialMessage ? "command" : "review");
-  const { messages, send, streaming, connected, connect, disconnect, confirmPlan, loadMore, loadingHistory, hasMore, clearHistory } =
+  const { messages, send, streaming, connected, connect, disconnect, confirmPlan, loadMore, loadingHistory, hasMore, clearHistory, retrySync, deleteSync } =
     useChat(dateRange, {
       mode: resolvedMode,
       initialMessage,
@@ -276,6 +276,8 @@ export function ChatView({ dateRange, onClose, initialMessage, title, mode: mode
                 <ChatBubble
                   message={msg}
                   streaming={streaming && i === messages.length - 1 && msg.role === "assistant"}
+                  onRetrySync={retrySync}
+                  onDeleteSync={deleteSync}
                 />
               </div>
             );

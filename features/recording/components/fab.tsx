@@ -473,10 +473,12 @@ export function FAB({
       setPartialText("");
       startTimers();
     } catch (err: any) {
+      // Phase 7 §5.3：捕获路径不再把网络错误作为阻塞提示。
+      // 网络相关错误（fetch/network）→ 静默，交由 SyncStatusBanner 汇总；
+      // 只有真实的"无法启动录音"（麦克风权限 / 设备错误）才向用户提示。
       const msg = err.message ?? "";
-      if (msg.includes("fetch") || msg.includes("network")) {
-        fabNotify.error("无法连接服务器，请检查网络");
-      } else {
+      const isNetworkErr = msg.includes("fetch") || msg.includes("network");
+      if (!isNetworkErr) {
         fabNotify.error(`无法开始录音: ${msg}`);
       }
       stopTimers();

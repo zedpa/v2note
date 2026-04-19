@@ -4,10 +4,15 @@ import { cn } from "@/lib/utils";
 import { MarkdownContent } from "@/shared/components/markdown-content";
 import type { ChatMessage, MessagePart } from "@/features/chat/hooks/use-chat";
 import { ToolCallCard, ToolCallGroup } from "./tool-call-card";
+import { SyncStatusIndicator } from "@/components/sync/sync-status-indicator";
 
 interface ChatBubbleProps {
   message: ChatMessage;
   streaming?: boolean;
+  /** Phase 7：重试失败条目（retryCount >= 5 → ⚠ 展开重试/删除） */
+  onRetrySync?: (localId: string) => void | Promise<void>;
+  /** Phase 7：删除本地未同步条目 */
+  onDeleteSync?: (localId: string) => void | Promise<void>;
 }
 
 type ToolCallPart = Extract<MessagePart, { type: "tool-call" }>;
@@ -36,8 +41,9 @@ function groupParts(parts: MessagePart[]): Array<MessagePart | ToolCallPart[]> {
   return groups;
 }
 
-export function ChatBubble({ message, streaming }: ChatBubbleProps) {
+export function ChatBubble({ message, streaming, onRetrySync, onDeleteSync }: ChatBubbleProps) {
   const isUser = message.role === "user";
+  const localId = message.localId;
 
   return (
     <div
@@ -88,42 +94,18 @@ export function ChatBubble({ message, streaming }: ChatBubbleProps) {
             </span>
           ) : null}
         </div>
-        {/* Phase 5：同步状态极小标识（仅 user 消息） */}
-        {isUser && message.syncStatus && message.syncStatus !== "synced" ? (
-          <SyncStatusIndicator status={message.syncStatus} />
+        {/* Phase 7：同步状态标识（共享组件，支持 retry >= 5 的 ⚠ + 展开面板） */}
+        {isUser && message.syncStatus ? (
+          <SyncStatusIndicator
+            status={message.syncStatus}
+            retryCount={message.retryCount}
+            lastError={message.lastError}
+            onRetry={localId && onRetrySync ? () => onRetrySync(localId) : undefined}
+            onDelete={localId && onDeleteSync ? () => onDeleteSync(localId) : undefined}
+          />
         ) : null}
       </div>
     </div>
-  );
-}
-
-/**
- * 同步状态小标识（Phase 5 最简版）：
- *   captured / syncing → ⏳ 灰色
- *   failed            → ⚠️ 淡红
- * 精细化设计留给 Phase 7（spec §5.3）。
- */
-function SyncStatusIndicator({ status }: { status: "captured" | "syncing" | "failed" }) {
-  if (status === "failed") {
-    return (
-      <span
-        className="text-[10px] text-maple/70 mt-0.5 select-none"
-        title="同步失败"
-        aria-label="同步失败"
-      >
-        ⚠️
-      </span>
-    );
-  }
-  // captured / syncing
-  return (
-    <span
-      className="text-[10px] text-muted-accessible/60 mt-0.5 select-none"
-      title="同步中"
-      aria-label="同步中"
-    >
-      ⏳
-    </span>
   );
 }
 

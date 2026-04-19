@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/sonner";
 
 import { ViewportHeightManager } from "@/components/layout/viewport-height-manager";
 import { SyncBootstrap } from "@/components/layout/sync-bootstrap";
+import { SyncStatusBanner } from "@/components/layout/sync-status-banner";
 import { SentryInit } from "@/components/sentry-init";
 import { FeedbackButton } from "@/features/feedback/feedback-button";
 import "./fonts"; // @fontsource 本地字体（离线可用，无 CDN 依赖）
@@ -41,6 +42,7 @@ export default function RootLayout({
           <SentryInit />
           <ViewportHeightManager />
           <SyncBootstrap />
+          <SyncStatusBanner />
           {children}
           <FeedbackButton />
           <Toaster position="bottom-center" />

@@ -69,6 +69,15 @@ export type GatewayResponse =
 
 type MessageHandler = (msg: GatewayResponse) => void;
 
+/**
+ * WS 状态订阅（Phase 7 §5.2）：
+ * - connecting: ws 正在建立中
+ * - open:       ws 已就绪
+ * - closed:     ws 未连 / 已断 / 重连失败
+ */
+export type GatewayWsStatus = "connecting" | "open" | "closed";
+type StatusHandler = (s: GatewayWsStatus) => void;
+
 import { getGatewayWsUrl } from "@/shared/lib/gateway-url";
 import { getAccessToken, logout as authLogout, onAuthEvent } from "@/shared/lib/auth";
 
@@ -107,9 +116,37 @@ export class GatewayClient {
    * 避免 pushChatUserMsg 等调用者悬挂到超时。
    */
   private pendingOnceRejectors: Set<(e: { code: string; message: string }) => void> = new Set();
+  /** Phase 7 §5.2：ws 状态订阅（sync-status-banner 使用） */
+  private statusHandlers: Set<StatusHandler> = new Set();
 
   get connected(): boolean {
     return this._connected;
+  }
+
+  /** Phase 7 §5.2：当前 ws 状态（供 banner 轮询/初始化读取） */
+  getStatus(): GatewayWsStatus {
+    if (!this.ws) return "closed";
+    if (this.ws.readyState === WebSocket.OPEN) return "open";
+    if (this.ws.readyState === WebSocket.CONNECTING) return "connecting";
+    return "closed";
+  }
+
+  /** Phase 7 §5.2：订阅 ws 状态变化 */
+  onStatusChange(handler: StatusHandler): () => void {
+    this.statusHandlers.add(handler);
+    return () => {
+      this.statusHandlers.delete(handler);
+    };
+  }
+
+  private _emitStatus(s: GatewayWsStatus): void {
+    for (const h of this.statusHandlers) {
+      try {
+        h(s);
+      } catch {
+        // swallow handler errors
+      }
+    }
   }
 
   connect(): void {
@@ -131,11 +168,13 @@ export class GatewayClient {
     this._connectPromise = new Promise<void>((resolve) => {
       try {
         this.ws = new WebSocket(getGatewayWsUrl());
+        this._emitStatus("connecting");
 
         this.ws.onopen = () => {
           this._connected = true;
           this.reconnectAttempts = 0;
           console.log("[gateway-client] Connected");
+          this._emitStatus("open");
 
           // Send auth message if logged in
           const token = getAccessToken();
@@ -190,6 +229,7 @@ export class GatewayClient {
           this._connected = false;
           this._connectPromise = null;
           console.log("[gateway-client] Disconnected");
+          this._emitStatus("closed");
           // M1: 统一清理 pending onceResponse（如 chat.done 等待者）
           this._rejectAllPendingOnce({
             code: "network",
@@ -360,6 +400,7 @@ export class GatewayClient {
     this.pendingMessages = [];
     this.pendingBinaryData = [];
     this.reconnectAttempts = 0;
+    this._emitStatus("closed");
     // M1: 统一 reject 所有 pending onceResponse（如 chat.done 等待者），
     // 避免调用方挂到超时。
     this._rejectAllPendingOnce({

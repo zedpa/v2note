@@ -91,7 +91,9 @@ describe("useVoiceToText", () => {
     expect(mockWaitForReady).toHaveBeenCalled();
   });
 
-  it("should_error_when_gateway_unreachable", async () => {
+  it("should_silently_skip_when_gateway_unreachable_regression_fix_cold_resume_silent_loss", async () => {
+    // Phase 7 §5.3：捕获路径不再抛阻塞式"无法连接服务器"；
+    // ws 不可用时 start() 静默返回，录音不发起（由 FAB 的 captureStore 本地落地兜底）。
     mockConnected = false;
     mockWaitForReady.mockResolvedValue(false);
     const { result } = await importAndRender();
@@ -101,7 +103,7 @@ describe("useVoiceToText", () => {
     });
 
     expect(result.current.recording).toBe(false);
-    expect(onError).toHaveBeenCalledWith("无法连接服务器，请检查网络");
+    expect(onError).not.toHaveBeenCalled();
   });
 
   it("should_stop_recording_and_send_asr_stop", async () => {

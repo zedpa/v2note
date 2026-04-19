@@ -52,7 +52,9 @@ export function useVoiceToText({
         client.connect();
         const ready = await client.waitForReady();
         if (!ready) {
-          onErrorRef.current?.("无法连接服务器，请检查网络");
+          // Phase 7 §5.3：捕获路径不再阻塞式报错。
+          // ws 不可用时静默退出，SyncStatusBanner 会统一提示。
+          // 录音本身已由上层通过 captureStore 落地（§2.4），此处仅跳过实时 ASR。
           return;
         }
       }

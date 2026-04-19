@@ -226,8 +226,10 @@ export function TextBottomSheet({
           type: "process",
           payload: { text: trimmed, sourceContext: "todo" },
         });
-      } catch (err: any) {
-        fabNotify.error(`发送失败: ${err.message}`);
+      } catch (err: unknown) {
+        // M5（fix-cold-resume-silent-loss §5.3）：捕获路径禁用"发送失败"阻塞文案。
+        // todo_free_text 的本地落地由后续 spec 展开；此处仅静默记录不打扰用户。
+        console.warn("[text-bottom-sheet] gateway process dispatch failed:", err);
       }
       return;
     }
