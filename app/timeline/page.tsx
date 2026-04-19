@@ -4,6 +4,9 @@ import { useState, useEffect, useCallback, type MouseEvent } from 'react'
 import { fetchClusters, type ClusterSummary } from '@/shared/lib/api/cognitive'
 import { listRecords, getRecord } from '@/shared/lib/api/records'
 import { PCLayout } from '@/components/layout/pc-layout'
+import { captureStore } from '@/shared/lib/capture-store'
+import { mergeTimeline, type TimelineRow } from '@/shared/lib/timeline-merge'
+import { toLocalDateStr } from '@/features/todos/lib/date-utils'
 
 type FilterType = '全部' | '语音' | '文字' | '图片' | '带文件'
 
@@ -45,12 +48,59 @@ export default function TimelinePage() {
   }, [])
 
   useEffect(() => {
+    // Phase 6（spec §1.2）：本地 + 服务端并发拉取 → 三角桥去重合并
+    // regression: fix-cold-resume-silent-loss
+    let cancelled = false
     setLoadingRecords(true)
     setSelectedRecord(null)
-    listRecords({ limit: 50, notebook: selectedCluster ?? undefined })
-      .then(setRecords)
-      .catch(() => {})
-      .finally(() => setLoadingRecords(false))
+
+    const loadBoth = async () => {
+      const localPromise = captureStore
+        .listByKind('diary', 200)
+        .catch(() => [])
+      // 过滤到当前 notebook（本地端侧过滤，避免与服务端分页耦合）
+      const serverPromise = listRecords({
+        limit: 50,
+        notebook: selectedCluster ?? undefined,
+      }).catch(() => [] as any[])
+
+      const [localAll, serverRecords] = await Promise.all([
+        localPromise,
+        serverPromise,
+      ])
+      if (cancelled) return
+
+      const local = selectedCluster
+        ? localAll.filter((c) => c.notebook === selectedCluster)
+        : localAll
+
+      const merged: TimelineRow[] = mergeTimeline(local, serverRecords, {
+        // M1：防 strict-mode 双触发 + worker 竞争覆盖：只在 fresh.syncStatus !== 'synced' 时 update。
+        // 不是完整的 race 解决（见 defer M9），但挡住常见的双触发场景。
+        onAckRecovered: async (localId, serverId) => {
+          try {
+            const fresh = await captureStore.get(localId)
+            if (!fresh || fresh.syncStatus === 'synced') return
+            await captureStore.update(localId, {
+              syncStatus: 'synced',
+              serverId,
+              syncingAt: null,
+            })
+          } catch {
+            // 吞掉异常（update 失败不影响本轮渲染）
+          }
+        },
+      })
+
+      setRecords(merged as any[])
+      setLoadingRecords(false)
+    }
+
+    loadBoth()
+
+    return () => {
+      cancelled = true
+    }
   }, [selectedCluster])
 
   const handleRecordClick = useCallback(async (id: string) => {
@@ -95,8 +145,14 @@ export default function TimelinePage() {
     if (filter === '文字' && r.source !== 'text') return false
     if (filter === '图片' && r.source !== 'image') return false
     if (filter === '带文件' && !(r.attachments?.length > 0 || r.source === 'file')) return false
-    if (dateFrom && r.created_at && new Date(r.created_at) < new Date(dateFrom)) return false
-    if (dateTo && r.created_at && new Date(r.created_at) > new Date(dateTo + 'T23:59:59')) return false
+    // M2：时区契约——将 r.created_at（UTC ISO）转为本地 YYYY-MM-DD，
+    // 与 dateFrom/dateTo（date input 本身即本地日期）直接字符串比较。
+    // 禁止 new Date(dateTo + 'T23:59:59') 这种裸时间字符串（见 CLAUDE.md）。
+    if ((dateFrom || dateTo) && r.created_at) {
+      const localDate = toLocalDateStr(new Date(r.created_at))
+      if (dateFrom && localDate < dateFrom) return false
+      if (dateTo && localDate > dateTo) return false
+    }
     return true
   })
 

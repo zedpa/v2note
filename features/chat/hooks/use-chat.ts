@@ -10,6 +10,10 @@ import type { ChatCacheMessage } from "@/features/chat/lib/chat-cache";
 import { emit } from "@/features/recording/lib/events";
 import { captureStore } from "@/shared/lib/capture-store";
 import { triggerSync } from "@/shared/lib/sync-orchestrator";
+import {
+  mergeChatHistory,
+  type ServerChatMessage,
+} from "@/shared/lib/chat-history-merge";
 
 /** 消息内嵌 part 类型 */
 export type MessagePart =
@@ -441,17 +445,79 @@ export function useChat(
         } catch { /* IndexedDB 不可用，降级 */ }
       }
 
-      // 2. 后台从服务端同步（补齐新消息）
+      // 2. 后台从服务端同步（补齐新消息）+ 合并本地 captureStore 未同步 chat_user_msg
+      //    regression: fix-cold-resume-silent-loss (Phase 6, spec §3.3)
+      //    刷新页面后，即使服务端失败也要渲染本地未同步消息；三角桥去重。
+      let serverRaw: ChatHistoryMessage[] = [];
+      let serverHasMore = false;
+      let serverFetchOk = false;
       try {
         const res = await fetchChatHistory({ limit: 30 });
         if (gen !== connectGenRef.current) return;
-        if (res.messages.length > 0) {
-          const serverMessages = res.messages.reverse().map(fromCacheMsg);
-          setMessages(serverMessages);
-          setHasMore(res.has_more);
-          if (userId) {
-            chatCache.putBatch(
-              res.messages.map((m) => ({
+        serverRaw = res.messages;
+        serverHasMore = res.has_more;
+        serverFetchOk = true;
+      } catch {
+        // 网络失败 → 保持 serverRaw 为空，继续走合并（本地条目会被渲染）
+      }
+
+      // 拉本地 chat_user_msg
+      let localChatCaps: Awaited<ReturnType<typeof captureStore.listByKind>> = [];
+      try {
+        localChatCaps = await captureStore.listByKind("chat_user_msg", 100);
+      } catch {
+        // IndexedDB 不可用 → 空集合，不阻断
+      }
+
+      if (gen !== connectGenRef.current) return;
+
+      if (serverRaw.length > 0 || localChatCaps.length > 0) {
+        const serverForMerge: ServerChatMessage[] = serverRaw.map((m) => ({
+          id: m.id,
+          // 后端若回显 client_id 则用于去重
+          client_id: (m as { client_id?: string | null }).client_id ?? null,
+          role: m.role,
+          content: m.content,
+          created_at: m.created_at,
+          parts: m.parts,
+        }));
+
+        const merged = mergeChatHistory(localChatCaps, serverForMerge, {
+          // M1：防 strict-mode 双触发 + worker 竞争覆盖：只在 fresh.syncStatus !== 'synced' 时 update。
+          // 不是完整的 race 解决（见 defer M9），但挡住常见的双触发场景。
+          onAckRecovered: async (localId, serverId) => {
+            try {
+              const fresh = await captureStore.get(localId);
+              if (!fresh || fresh.syncStatus === "synced") return;
+              await captureStore.update(localId, {
+                syncStatus: "synced",
+                serverId,
+                syncingAt: null,
+              });
+            } catch {
+              // 吞掉异常（update 失败不影响本轮渲染）
+            }
+          },
+        });
+
+        const mergedChatMessages: ChatMessage[] = merged.map((r) => ({
+          id: r.id,
+          localId: r.localId,
+          client_id: r.client_id,
+          role: r.role,
+          content: r.content,
+          timestamp: new Date(r.created_at),
+          parts: r.parts as MessagePart[] | undefined,
+          syncStatus: r.role === "user" ? r.syncStatus : undefined,
+        }));
+        setMessages(mergedChatMessages);
+        setHasMore(serverFetchOk ? serverHasMore : false);
+
+        // 仅服务端消息写缓存（本地未同步条目由 captureStore 管理，不重复进 chat-cache）
+        if (userId && serverRaw.length > 0) {
+          chatCache
+            .putBatch(
+              serverRaw.map((m) => ({
                 id: m.id,
                 userId,
                 role: m.role,
@@ -459,13 +525,11 @@ export function useChat(
                 parts: m.parts,
                 created_at: m.created_at,
               })),
-            ).catch(() => {});
-          }
-        } else {
-          setHasMore(false);
+            )
+            .catch(() => {});
         }
-      } catch {
-        // 网络失败，缓存数据已展示
+      } else {
+        setHasMore(false);
       }
     }
 
