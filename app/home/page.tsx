@@ -539,6 +539,11 @@ export default function HomePage() {
               &copy; 2026 念念有路. All rights reserved.
             </p>
           </div>
+          <div className="text-center mt-6 text-xs" style={{ color: "#aa9785" }}>
+            <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer" className="hover:underline">
+              陇ICP备2026001728号
+            </a>
+          </div>
         </div>
       </footer>
     </div>
