@@ -92,17 +92,55 @@ export async function uploadFile(
 }
 
 /**
+ * Signed URL 缓存（spec: fix-oss-image-traffic-storm.md）
+ *
+ * 解决：signatureUrl() 每次签出的 query 都不同，浏览器把它当作新 URL → HTTP 缓存失效
+ * 方案：同一 objectPath 在签名过期前 5 分钟都返回同一字符串；
+ *       缓存条目以 objectPath 为键，带 expiresAt 时间戳；命中时若距过期 > 5 分钟就复用。
+ *
+ * 进程内 Map 只在单实例部署时够用；多实例部署应改 Redis（外部注入 ISigningCache）。
+ * 这里先落进程内，保留插拔点给后续接 Redis。
+ */
+const SIGN_TTL_SEC = 3600;          // OSS 签名有效期：1 小时
+const SIGN_REFRESH_AHEAD_MS = 5 * 60 * 1000; // 过期前 5 分钟视为需要刷新
+
+interface SignCacheEntry {
+  url: string;
+  expiresAt: number; // epoch ms
+}
+
+const signCache = new Map<string, SignCacheEntry>();
+
+/** 测试桩：清空缓存 */
+export function __clearSignCacheForTest(): void {
+  signCache.clear();
+}
+
+/**
  * Generate a signed URL for a given OSS object path (valid for 1 hour).
+ * 同一 objectPath 在 TTL 内返回相同字符串，保证浏览器 HTTP 缓存可用。
  */
 export async function getSignedUrl(objectPath: string): Promise<string> {
-  const client = await getClient();
-  // Extract the OSS key from a full URL or use as-is
+  // 归一化出 key（接受 http URL 或裸 key）
   let key = objectPath;
   if (objectPath.startsWith("http")) {
     const url = new URL(objectPath);
     key = decodeURIComponent(url.pathname.replace(/^\//, ""));
   }
-  return client.signatureUrl(key, { expires: 3600 });
+
+  const now = Date.now();
+  const cached = signCache.get(key);
+  if (cached && cached.expiresAt - now > SIGN_REFRESH_AHEAD_MS) {
+    return cached.url;
+  }
+
+  const client = await getClient();
+  const url = client.signatureUrl(key, { expires: SIGN_TTL_SEC }) as string;
+  signCache.set(key, {
+    url,
+    expiresAt: now + SIGN_TTL_SEC * 1000,
+  });
+  return url;
 }
 
 /**

@@ -13,13 +13,21 @@ interface DateGroup {
   notes: NoteItem[];
 }
 
-const POLL_INTERVAL = 5000;
+// spec: fix-oss-image-traffic-storm.md 场景 4/5/6 — 轮询需要死线和可见性感知
+// 默认 5 秒一轮，最多 10 分钟（=120 轮）；测试模式下 env 压缩到秒级
+const POLL_INTERVAL =
+  Number(process.env.NEXT_PUBLIC_POLL_INTERVAL_MS) || 5000;
+const POLL_MAX_MS =
+  Number(process.env.NEXT_PUBLIC_POLL_MAX_MS) || 10 * 60 * 1000;
+const MAX_POLL_ROUNDS = Math.max(1, Math.ceil(POLL_MAX_MS / POLL_INTERVAL));
 
 export function useNotes(notebook?: string | null, wikiPageId?: string | null) {
   const [notes, setNotes] = useState<NoteItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [autoRefreshPaused, setAutoRefreshPaused] = useState(false);
   const pollRef = useRef<NodeJS.Timeout | null>(null);
+  const pollRoundsRef = useRef(0);
   const initialLoadDone = useRef(false);
 
   // 缓存优先：主时间线首次渲染时立即显示缓存，跳过 loading 态
@@ -105,6 +113,10 @@ export function useNotes(notebook?: string | null, wikiPageId?: string | null) {
   }, [notebook, wikiPageId]);
 
   // Start/stop polling based on whether any notes are still processing
+  // spec: fix-oss-image-traffic-storm.md 场景 4/5/6
+  //   - 达到 MAX_POLL_ROUNDS 后停止，页面提示"自动刷新已暂停"
+  //   - 页面不可见时跳过本轮（不消耗计数）
+  //   - 只要无 processing/uploading 就彻底关 timer（场景 6）
   useEffect(() => {
     const hasProcessing = notes.some(
       (n) =>
@@ -113,12 +125,36 @@ export function useNotes(notebook?: string | null, wikiPageId?: string | null) {
         n.status === "processing",
     );
 
-    if (hasProcessing && !pollRef.current) {
-      pollRef.current = setInterval(() => fetchNotes(true), POLL_INTERVAL);
-    } else if (!hasProcessing && pollRef.current) {
-      clearInterval(pollRef.current);
-      pollRef.current = null;
+    // 没有需要轮询的记录 → 关掉 timer，同时重置暂停态（下次有 processing 又会启动）
+    if (!hasProcessing) {
+      if (pollRef.current) {
+        clearInterval(pollRef.current);
+        pollRef.current = null;
+      }
+      pollRoundsRef.current = 0;
+      if (autoRefreshPaused) setAutoRefreshPaused(false);
+      return;
     }
+
+    // 已经暂停或 timer 已存在 → 不重复启动
+    if (autoRefreshPaused || pollRef.current) return;
+
+    pollRef.current = setInterval(() => {
+      // 页面不可见 → 跳过本轮（不消耗次数）
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") {
+        return;
+      }
+      pollRoundsRef.current += 1;
+      if (pollRoundsRef.current > MAX_POLL_ROUNDS) {
+        if (pollRef.current) {
+          clearInterval(pollRef.current);
+          pollRef.current = null;
+        }
+        setAutoRefreshPaused(true);
+        return;
+      }
+      void fetchNotes(true);
+    }, POLL_INTERVAL);
 
     return () => {
       if (pollRef.current) {
@@ -126,7 +162,22 @@ export function useNotes(notebook?: string | null, wikiPageId?: string | null) {
         pollRef.current = null;
       }
     };
-  }, [notes, fetchNotes]);
+  }, [notes, fetchNotes, autoRefreshPaused]);
+
+  // 页面从 hidden → visible 时：重置计数 + 立即拉一次 + 若已暂停则恢复
+  // spec: fix-oss-image-traffic-storm.md 场景 5
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const handler = () => {
+      if (document.visibilityState === "visible") {
+        pollRoundsRef.current = 0;
+        if (autoRefreshPaused) setAutoRefreshPaused(false);
+        void fetchNotes(true);
+      }
+    };
+    document.addEventListener("visibilitychange", handler);
+    return () => document.removeEventListener("visibilitychange", handler);
+  }, [fetchNotes, autoRefreshPaused]);
 
   // Reset on notebook/wikiPageId change
   useEffect(() => {
@@ -205,5 +256,24 @@ export function useNotes(notebook?: string | null, wikiPageId?: string | null) {
     [],
   );
 
-  return { notes, loading, error, refetch: fetchNotes, groupByDate, deleteNotes, archiveNotes, updateNote };
+  // 外部下拉刷新：重置计数 + 恢复自动刷新 + 拉一次
+  // spec: fix-oss-image-traffic-storm.md 场景 4 "下拉可恢复"
+  const refresh = useCallback(async () => {
+    pollRoundsRef.current = 0;
+    if (autoRefreshPaused) setAutoRefreshPaused(false);
+    return fetchNotes(true);
+  }, [fetchNotes, autoRefreshPaused]);
+
+  return {
+    notes,
+    loading,
+    error,
+    refetch: fetchNotes,
+    refresh,
+    autoRefreshPaused,
+    groupByDate,
+    deleteNotes,
+    archiveNotes,
+    updateNote,
+  };
 }

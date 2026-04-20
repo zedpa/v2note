@@ -6,6 +6,7 @@ import { MapPin, Clock, Trash2, X, CheckCircle2, Mic, Paperclip, MoreVertical, P
 import { cn } from "@/lib/utils";
 import { useNotes } from "@/features/notes/hooks/use-notes";
 import { useNoteDetail } from "@/features/notes/hooks/use-note-detail";
+import { useCachedImage } from "@/features/notes/hooks/use-cached-image";
 import { MiniAudioPlayer } from "./mini-audio-player";
 import { fabNotify } from "@/shared/lib/fab-notify";
 import { getAudioByRecordId, deleteAudio, addWavHeader, type PendingAudio } from "@/features/recording/lib/audio-cache";
@@ -45,12 +46,13 @@ function parseDayGroup(dateStr: string): { day: number; monthWeekday: string } {
 }
 
 export function NotesTimeline({ filter, notebook, wikiPageFilter, onOpenChat, onOpenOverlay, onRegisterRefresh }: NotesTimelineProps) {
-  const { notes, loading, deleteNotes, updateNote, refetch } = useNotes(notebook, wikiPageFilter);
+  const { notes, loading, deleteNotes, updateNote, refetch, refresh, autoRefreshPaused } = useNotes(notebook, wikiPageFilter);
 
   // 注册刷新函数供父组件调用（下拉刷新）
+  // spec: fix-oss-image-traffic-storm.md 场景 4 —— 下拉重置轮询计数
   useEffect(() => {
-    onRegisterRefresh?.(() => refetch(true));
-  }, [onRegisterRefresh, refetch]);
+    onRegisterRefresh?.(() => refresh());
+  }, [onRegisterRefresh, refresh]);
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [deleting, setDeleting] = useState(false);
@@ -181,6 +183,14 @@ export function NotesTimeline({ filter, notebook, wikiPageFilter, onOpenChat, on
   return (
     <>
       <div className="px-4 pt-2 pb-28">
+        {autoRefreshPaused && (
+          <div
+            data-testid="auto-refresh-paused"
+            className="mx-1 mb-3 rounded-xl bg-amber-50 text-amber-900 text-xs px-3 py-2 border border-amber-200"
+          >
+            自动刷新已暂停，下拉可恢复
+          </div>
+        )}
         {groups.map((group, groupIdx) => (
           <div key={group.date} className="mb-8">
             {/* Day header — editorial style with serif date */}
@@ -463,6 +473,35 @@ function TimelineCard({
     setMenuPos(null);
   }, [localCache, note.id, note.status, onDelete]);
 
+  // spec: fix-oss-image-traffic-storm.md 场景 3 — 后端清扫将卡住的 uploading 置 failed
+  // 前端展示"上传失败"+ 重试入口；覆盖 pending_retry 之外的 failed 情况
+  if (note.status === "failed") {
+    return (
+      <div
+        data-testid="upload-failed-card"
+        className="rounded-2xl p-5 bg-card shadow-sm border border-red-200/60 animate-card-enter"
+        style={{ animationDelay: `${index * 60}ms` }}
+      >
+        <div className="flex items-center gap-2 mb-2">
+          <AlertTriangle className="w-4 h-4 text-destructive" />
+          <span className="text-sm text-destructive font-medium">上传失败</span>
+          <span className="flex-1" />
+          <button
+            type="button"
+            onClick={() => onDelete()}
+            className="text-[11px] text-muted-foreground hover:text-destructive transition-colors"
+          >
+            删除
+          </button>
+        </div>
+        <div className="flex items-center gap-1.5 text-muted-foreground/60">
+          <Clock className="w-3 h-3" />
+          <span className="text-[11px] font-mono tabular-nums">{note.time}</span>
+        </div>
+      </div>
+    );
+  }
+
   if (note.status === "pending_retry") {
     return (
       <>
@@ -518,7 +557,7 @@ function TimelineCard({
 
   // Only show skeleton if still processing AND no content available yet
   const hasContent = !!(note.short_summary || note.title !== "处理中...");
-  const isProcessing = note.status !== "completed" && note.status !== "error" && note.status !== "failed" && !hasContent;
+  const isProcessing = note.status !== "completed" && note.status !== "error" && !hasContent;
 
   if (isProcessing) {
     return (
@@ -558,6 +597,15 @@ function TimelineCard({
   ));
   const isFile = !!(note.file_url && !isImage);
 
+  // 图片本地缓存（IndexedDB v2note-image-cache）
+  // spec: fix-oss-image-traffic-storm.md 场景 7/8 — 避免签名 URL 轮换导致重复下载，支持离线可见
+  const cachedImage = useCachedImage(
+    isImage ? note.id : null,
+    isImage ? note.file_url : null,
+  );
+  // loading 或 failed 期间不 fallback 到 OSS URL，否则 <img src> 会绕过缓存直接 fetch
+  const displaySrc = (cachedImage.loading || cachedImage.failed) ? null : (cachedImage.src ?? null);
+
   // 只有正文被截断时才支持卡片body点击展开
   // 录音/附件/图片的展开由"原文"按钮独立处理（setExpanded(true)）
   const canExpand = isClamped;
@@ -579,8 +627,10 @@ function TimelineCard({
         selected && "ring-2 ring-primary bg-primary/5",
         sourceBorderColor && "border-l-[3px]",
       )}
-      style={sourceBorderColor ? { borderLeftColor: sourceBorderColor } : undefined}
-      style={{ animationDelay: `${index * 60}ms` }}
+      style={{
+        animationDelay: `${index * 60}ms`,
+        ...(sourceBorderColor ? { borderLeftColor: sourceBorderColor } : {}),
+      }}
     >
       <div className="flex gap-3">
         {/* Selection checkbox */}
@@ -743,11 +793,11 @@ function TimelineCard({
                 )}
 
                 {/* 图片缩略图 — 置于文字摘要之后 */}
-                {isImage && note.file_url && !imgLoadFailed && (
+                {isImage && note.file_url && !imgLoadFailed && displaySrc && (
                   <div className="mt-3" onClick={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()} onPointerUp={(e) => e.stopPropagation()}>
                     <img
                       data-testid="image-thumbnail"
-                      src={note.file_url}
+                      src={displaySrc}
                       alt=""
                       className="rounded-lg max-h-40 object-cover cursor-pointer"
                       onClick={() => setImageViewerOpen(true)}
@@ -930,7 +980,7 @@ function TimelineCard({
           onClick={() => setImageViewerOpen(false)}
         >
           <img
-            src={note.file_url}
+            src={displaySrc ?? note.file_url}
             alt=""
             className="max-w-full max-h-full object-contain"
           />

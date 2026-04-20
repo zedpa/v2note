@@ -3,6 +3,7 @@ id: "065"
 title: "附件系统：持久化 → UI → 文档 RAG"
 status: active
 domain: infra
+risk: medium
 dependencies: []
 superseded_by: null
 created: 2026-03-23
@@ -80,7 +81,7 @@ updated: 2026-04-02
 那么 (Then)   沿用现有逻辑：duration_seconds > 0 → 麦克风 + 时长，否则 → Paperclip + "文字"
 ```
 
-#### P1-7: 笔记详情 — 图片内联预览
+#### P1-7: 笔记详情 — 图片内联预览（含本地缓存 & 离线可见）
 ```
 假设 (Given)  一条 record 的 file_url 为图片类型
 当   (When)   用户点击进入笔记详情
@@ -88,7 +89,29 @@ updated: 2026-04-02
 并且 (And)    圆角，最大宽度 100%，最大高度 300px，object-fit: cover
 并且 (And)    点击图片可在新窗口打开 file_url
 并且 (And)    加载失败时显示 fallback 占位 + 文件名
+并且 (And)    图片首次加载后写入 IndexedDB `v2note-image-cache`（key=record_id，LRU 100MB）
+并且 (And)    再次进入同 record 时优先从本地读取（blob: URL），不再请求 OSS
+并且 (And)    navigator.onLine === false 时若本地已缓存，图片仍可见
+并且 (And)    签名 URL 变化不触发重新 fetch（effect 仅依赖 recordId，fileUrl 存 ref）
+并且 (And)    缓存 miss + fetch 失败时 displaySrc=null，不 fallback 到 OSS URL（防绕过缓存）
+并且 (And)    React Strict Mode 双执行 effect 时，模块级 memoryCache 防止重复 fetch
+并且 (And)    同一 recordId 并发调用通过 resolveInFlight 去重，只发起一次网络请求
 ```
+
+##### 补充边界（来自 fix-oss-image-traffic-storm）
+- **签名 URL 进程内缓存**：gateway `getSignedUrl()` 对同一 object_path 在 TTL 内返回相同签名 URL，减少签名 API 调用
+- **僵尸记录清扫**：status IN ('uploading','processing') 且 updated_at 超 30 分钟的记录，cron 自动标记为 failed（`gateway/src/jobs/sweep-stale-records.ts`）
+- **轮询上限**：前端 uploading/processing 状态轮询设 MAX_POLL_ROUNDS（默认 120 轮 = 10 分钟），达到上限后停止轮询并展示提示横幅
+- **Page Visibility 感知**：页面从 hidden → visible 时重置轮询计数并立即刷新一次
+- **无 uploading 记录时不轮询**：当前数据中无 uploading/processing 状态记录时跳过 setInterval
+
+> 实现锚点（来自 fix-oss-image-traffic-storm 回写）：
+> - `shared/lib/image-cache.ts`（IndexedDB 封装，沿用 capture-store/audio-cache/chat-cache 相同模板）
+> - `features/notes/hooks/use-cached-image.ts`（data: 短路 / hit blob / online fetch+put / offline null）
+> - `features/notes/components/notes-timeline.tsx` + `note-detail.tsx` 双路径同步接入，key 必须是 record_id（不是 file_url / objectPath，避免签名轮换失效）
+> - `gateway/src/storage/oss.ts`（签名 URL 进程内缓存）
+> - `gateway/src/jobs/sweep-stale-records.ts`（僵尸记录 cron 清扫）
+> - `features/notes/hooks/use-notes.ts`（轮询上限 + visibility 感知）
 
 #### P1-8: 笔记详情 — 文件附件卡片
 ```
