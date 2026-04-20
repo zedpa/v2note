@@ -10,7 +10,7 @@
 6. superseded 状态的 spec 已被合并，永远不要引用它们，使用 superseded_by 指向的文件
 -->
 
-> 最后更新：2026-04-13 | 共 105 个 spec（23 active / 6 draft / 46 completed / 29 superseded / 2 deprecated）
+> 最后更新：2026-04-17 | 共 111 个 spec（28 active / 7 draft / 45 completed / 31 superseded / 2 deprecated）
 
 ## 🔵 Active（当前有效，可直接引用和修改）
 
@@ -19,16 +19,22 @@
 
 | 050a | Todo — Core & Logic | todo | todo-core.md | 数据流/AI提取/去重/时间/子任务/Strike关联 |
 | 050b | Todo — UI & Interactions | todo | todo-ui.md | 界面交互 + 实施阶段 |
+| todo-ui-redesign-spec | Todo UI 重构 — 设计规范 | todo | todo-ui-redesign-spec.md | 设计目标/信息架构/数据规范/UI组件规范（拆自 todo-ui-redesign.md） |
+| todo-ui-redesign-scenarios | Todo UI 重构 — 场景与实施 | todo | todo-ui-redesign-scenarios.md | Given/When/Then场景/废弃组件/后端/E2E/实施计划（拆自 todo-ui-redesign.md） |
 | 051 | Chat System | chat | chat-system.md | Header/Entry/Greeting/Skill |
 | 053b | Daily Report — Extended | report | daily-report-extended.md | 周月报/历史报告（Phase 2-4 未开始） |
 | 062 | AI 伴侣窗口 | ui | ai-companion-window.md | |
-| 064a | APP Mobile — Views | ui | app-mobile-views.md | 整体结构/顶栏/日记/待办/FAB |
+| 064a-d | APP Mobile — Diary | app-mobile | app-mobile-views-diary.md | 整体结构/顶栏/日记/下拉刷新 |
+| 064a-t | APP Mobile — Todo & FAB | app-mobile | app-mobile-views-todo.md | 待办视图/FAB 录音按钮 |
 | 064b | APP Mobile — Nav & System | ui | app-mobile-nav.md | 侧边栏/通知/参谋/冷启动/登录 |
 | 065 | 附件持久化 + RAG | infra | attachment-persistence.md | |
 | 071 | 并发扩容方案 | infra | concurrency-scaling.md | |
 | 089 | 移动端行动面板 | ui | mobile-action-panel.md | |
 | 092 | 留存分析 | onboarding | onboarding-retention-analytics.md | |
 | 099 | 主题生命周期 | cognitive | topic-lifecycle.md | Harvest AI摘要生成待完成 |
+| cognitive-wiki-core | 认知 Wiki — 核心模型与编译管线 | cognitive | cognitive-wiki-core.md | 概述/数据模型/实时 Ingest/每日编译（拆自 cognitive-wiki.md） |
+| cognitive-wiki-lifecycle | 认知 Wiki — 搜索、热力与前端适配 | cognitive | cognitive-wiki-lifecycle.md | 搜索/热力/前端适配/迁移/验收行为/边界（拆自 cognitive-wiki.md） |
+| cognitive-wiki-migration | 认知 Wiki — 依赖、接口与实施阶段 | cognitive | cognitive-wiki-migration.md | 依赖/接口/砍掉模块/Batch 1-4 Phases/备注（拆自 cognitive-wiki.md） |
 | 102a | Voice Routing — Core | voice | voice-routing.md | Layer 3 regex预过滤待移除 |
 | 102b | Voice — Todo Extension | voice | voice-todo-ext.md | 确认弹窗UI/提醒/周期未做 |
 | 110 | UI/UX 全局审查与改进 | design | ui-ux-audit.md | 审查完毕,修复0% |
@@ -36,15 +42,23 @@
 | 114 | 录音入口统一 | voice | voice-input-unify.md | 删InputBar死代码 + ChatView接gateway ASR + useVoiceToText hook |
 | 117 | 工具生态增强 | agent | tool-ecosystem-enhance.md | 读取工具+时间感知+认知层查询+描述优化 |
 | 120 | 原生体验深度优化 — 路线A | ui | native-experience-deep.md | Phase 0-D 分阶段 |
-| 123 | 提示词架构 v2 — SharedAgent/UserAgent 分层 | agent | prompt-architecture-v2.md | 五层存储互斥+AI自主维护+wiki注入 |
+| 123a | 提示词架构 v2 — 分层（SharedAgent/UserAgent/五层存储/endChat） | agent | prompt-architecture-v2-layers.md | 拆分自 prompt-architecture-v2.md（§1-§4） |
+| 123b | 提示词架构 v2 — 工具/Skill/组装/实施 | agent | prompt-architecture-v2-skills.md | 拆分自 prompt-architecture-v2.md（§5-§8 + 接口/Phases） |
 | 125 | 待办写入系统日历 & 闹钟 | todo | todo-calendar-alarm.md | Intent方案+SystemIntentPlugin |
 | 087 | 鸿蒙 HarmonyOS NEXT 适配 | infra | harmony-support.md | WebView壳+JSBridge+前端适配层 |
+| PROC-001 | SDD 流程守卫（Hook + Lint） | infra | process-sdd-guardrails.md | A/C/B/D 已完成 |
 | fix-sidebar-wiki-mgmt | Fix: 侧边栏 Wiki 页面管理 | ui | fix-sidebar-wiki-mgmt.md | Phase1-4✅+Phase5显示优化✅ |
 | fix-device-id-cleanup | Fix: deviceId 残留清理 — 路由层全面切 userId | infra | fix-device-id-cleanup.md | ✅ completed |
+| fix-todo-anytime-time | Fix: 随时时段创建待办被自动赋予时间 | todo | fix-todo-anytime-time.md | ✅ completed（已回写 todo-ui.md#1.4a/1.4b） |
+| fix-evening-report-quality | Fix: 晚间总结路径统一+明日预览数据错误 | report | fix-evening-report-quality.md | ✅ completed（已回写 daily-report-core.md#E5/E6） |
+| fix-cold-resume-silent-loss | Fix: 本地优先捕获 — 录音/日记发送不依赖网络与鉴权 | infra | fix-cold-resume-silent-loss.md | 🔴 P0：本地捕获 IndexedDB + 同步调度器，userID 仅作同步键；Phase 10/11 拆分到子域 fix-cold-resume-lazy-bind.md |
+| fix-cold-resume-lazy-bind | Fix: 冷启动懒绑定生命周期补完（§7.7 restored 派发 + §8 懒绑定网络无关） | infra | fix-cold-resume-lazy-bind.md | ✅ completed：§7.7 + §8 懒绑定去网络门控 + WS open 边沿触发 + 跨账号防护；子域回写到 fix-cold-resume-silent-loss.md |
+| fix-onboarding-old-account | Fix: 老账户误触发新手引导（2问+点击引导） | onboarding | fix-onboarding-old-account.md | ✅ completed |
 ## 🟡 Draft（规划中，尚未开始实施）
 
 | id | title | domain | file |
 |----|-------|--------|------|
+| 130 | Desktop Canvas Shell — Foundation | ui | desktop-foundation.md |
 | 124 | Android App Shortcuts — 长按快捷指令 | ui | android-app-shortcuts.md |
 | 075 | 发现页 | ui | discovery-page.md |
 | 080 | 外部数据源集成 | infra | external-integration.md |
@@ -54,6 +68,7 @@
 
 | id | title | domain | file |
 |----|-------|--------|------|
+| fix-oss-image-traffic-storm | Fix: OSS 图片流量风暴（签名缓存 + 本地图片缓存 + 僵尸清扫 + 轮询上限） | infra | fix-oss-image-traffic-storm.md |
 | fix-domain-deprecation | Fix: domain 字段全面废弃 | infra | fix-domain-deprecation.md |
 | fix-goal-wiki-data-cleanup | Fix: Goal/Wiki Page 数据清洗 | cognitive | fix-goal-wiki-data-cleanup.md |
 | repo-transaction-support | Repo 层事务支持 — 消除 raw SQL 绕过 repo | infra | repo-transaction-support.md |
@@ -63,7 +78,6 @@
 | fix-onboarding-step2-guide | Fix: 冷启动第二步改为聚焦操作引导 | onboarding | fix-onboarding-step2-guide.md |
 | fix-remove-device-id | Fix: 全面清除 deviceId 概念 | infra | fix-remove-device-id.md |
 | fix-record-delete-strike | Fix: 删除日记报错 strike 表不存在 | infra | fix-record-delete-strike.md |
-| 119 | 认知 Wiki — 从原子拆解到知识编译 | cognitive | cognitive-wiki.md |
 | fix-briefing-stale-todos | Fix: 早晚报待办过时+数据范围修正 | report | fix-briefing-stale-todos.md |
 | fix-command-sheet-stuck | Fix: 上滑指令 CommandSheet 堵塞 | voice | fix-command-sheet-stuck.md |
 | fix-recording-notify-stale | Fix: 录音处理通知状态滞后 | voice | fix-recording-notify-stale.md |
@@ -79,7 +93,8 @@
 | 052 | Cold Start & Onboarding | onboarding | cold-start.md |
 | 053a | Daily Report — Core | report | daily-report-core.md |
 | 054a | Auth — Token & Session | auth | auth-core.md |
-| 054b | Auth — UX & Registration | auth | auth-ux.md |
+| auth-ux-login | Auth — UX (登录/注册/Device ID/注册安全) | auth | auth-ux-login.md |
+| auth-ux-settings | Auth — UX (邮箱/用户设置/忘记密码/实施阶段) | auth | auth-ux-settings.md |
 | 055 | Schema 清理 + Embedding | infra | 042-schema-cleanup-and-embedding.md |
 | 056 | 行动事件追踪 | cognitive | action-tracking.md |
 | 057 | 参谋上下文 | chat | advisor-context.md |
@@ -135,8 +150,8 @@
 
 ## ⛔ Superseded（已被合并，不要引用）
 
-29 个碎片/拆分前 spec 已被合并或拆分，详见各文件 frontmatter 的 `superseded_by` 字段。
-包括：22 个原始碎片 + 5 个拆分前的域 spec（todo-system.md, auth.md, daily-report.md, app-mobile-redesign.md, voice-routing-v2.md）+ daily-review-redesign.md + chat-ui-redesign.md
+30 个碎片/拆分前 spec 已被合并或拆分，详见各文件 frontmatter 的 `superseded_by` 字段。
+包括：22 个原始碎片 + 6 个拆分前的域 spec（todo-system.md, auth.md, daily-report.md, app-mobile-redesign.md, voice-routing-v2.md, prompt-architecture-v2.md）+ daily-review-redesign.md + chat-ui-redesign.md + auth-ux.md（已拆为 auth-ux-login + auth-ux-settings）
 
 ## 🚫 Deprecated（已废弃）
 

@@ -19,6 +19,133 @@
 
 （按时间倒序，新条目添加在此处下方）
 
+### 2026-04-20 [bug] 老账户误触发新手引���（2问+点击引导）
+- **现象**：老用户清除 App 数据或换设备后，重新打开 App 会再次看到新手名字输入页和 CoachMark 点击引导
+- **根因**：`app/page.tsx` Layer 3 用 `GET /records?limit=1` 做代理判断，但：(1) records 是间接指标，后端有权威的 `user_profile.onboarding_done` 字段未使用；(2) `.catch(() => setIsFirstTime(true))` 在网络失败时默认显示引导，老用户冷启动弱网就会中招
+- **修复**：(1) 后端新增 `GET /api/v1/onboarding/status`，直接查 `user_profile.onboarding_done`；(2) 前端 Layer 3 改用新接口；(3) catch 改为不显示引导（新用户下次打开重检测）；(4) 后端加 try/catch 防 DB 异常
+- **回归测试**：`gateway/src/routes/onboarding.test.ts` > `describe("GET /api/v1/onboarding/status")` — 6 个用例（done=true/false/null/无 profile/DB 异常/401）
+- **教训**：onboarding 状态判断应查权威数据源（`onboarding_done` 字段），不要用 records 数量做代理。错误 fallback 方向应保护老用户（不显示），而非保护新用户（显示）——老用户被迫重走引导的体验损害远大于新用户错过一次引导
+- **已提炼**：❌ 仅此例
+
+### 2026-04-20 [bug] OSS 图片流量风暴：签名不复用 + 客户端轮询无死线 + 僵尸记录无清扫 → 单日 43GB 流出、7 张图被下载 6000 次/张
+- **现象**：CDN/OSS 观测到个别图片被重复下载数千次；日流量尖刺。
+- **根因**：
+  1. `gateway/src/storage/oss.ts::getSignedUrl` 每次调用 `client.signatureUrl`，签名 query 变化 → 浏览器/CDN 视为新资源重复下载（场景 1/2）。
+  2. 记录卡在 `uploading/processing` 无人清扫 → 前端 `useNotes` 无限轮询 → 每轮重新拉 listRecords → 每条图片 → 签名被重签 → HTTP 重新命中（场景 3）。
+  3. 前端无轮询死线/可见性控制/下拉恢复（场景 4/5/6）。
+  4. 浏览器无本地图片缓存，即使同一 recordId 已下载过，切到其他页面再回来仍重新发请求，且离线看不到已下载过的图（场景 7/8）。
+- **修复**（specs/fix-oss-image-traffic-storm.md 完整 4 层防御）：
+  - L1 后端签名 TTL 缓存：`gateway/src/storage/oss.ts` 新增 `signCache` + `SIGN_TTL_SEC=3600` + 5 分钟刷新提前量；HTTP URL 先归一化到 objectKey 再查缓存（场景 1/2）
+  - L2 僵尸清扫：`gateway/src/jobs/sweep-stale-records.ts` 每 10 分钟 UPDATE uploading/processing → failed（阈值 30min，行锁幂等）；入口注册在 `gateway/src/index.ts::startStaleRecordSweeper()`（场景 3）
+  - L3 前端轮询治理：`features/notes/hooks/use-notes.ts` POLL_INTERVAL=5s / POLL_MAX_MS=10min / MAX_ROUNDS=120；visibilitychange=hidden 跳本轮，visible 重置 + 立即拉；pull-to-refresh `refresh()` 重置计数 + 恢复 autoRefreshPaused（场景 4/5/6）
+  - L4 客户端图片缓存：`shared/lib/image-cache.ts`（IndexedDB `v2note-image-cache`, key=record_id, 100MB LRU by lastAccessedAt）+ `features/notes/hooks/use-cached-image.ts`（data: passthrough / 命中 → blob URL / 在线 miss → fetch + put / 离线 miss → null）。`notes-timeline.tsx` + `note-detail.tsx` 双路径同步接入（场景 7/8）
+  - Phase 0 DB 回填：`supabase/migrations/069_backfill_stale_records.sql` — 一次性将历史僵尸记录置 failed，消除当前轮询压力
+  - E2E 辅助：`gateway/src/routes/test-helpers.ts`（ENABLE_E2E_HELPERS=1 门控，仅种 stale record）
+- **回归测试**：
+  - `gateway/src/storage/oss.test.ts` > `describe("getSignedUrl [regression: fix-oss-image-traffic-storm]")` — 4 个（同 key 同 URL / 不同 key / http 归一化 / 过期刷签）
+  - `gateway/src/jobs/sweep-stale-records.test.ts` > `describe("sweepStaleRecords [regression: fix-oss-image-traffic-storm]")` — 5 个（swept 计数 / 秒级 interval / 零记录 / 并发幂等 / env 阈值）
+  - `shared/lib/image-cache.test.ts` > `describe("image-cache [regression: fix-oss-image-traffic-storm]")` — 7 个（miss→null / put+get / upsert / sum / LRU 清理 / delete / clearAll）
+  - `features/notes/hooks/use-cached-image.test.ts` > `describe("useCachedImage [regression: fix-oss-image-traffic-storm]")` — 5 个（data: 短路 / 命中 blob / miss+online fetch+put / miss+offline null / null 参数）
+  - `features/notes/hooks/use-notes.test.ts` > `describe("useNotes polling [regression: fix-oss-image-traffic-storm]")` — 4 个（MAX_ROUNDS 暂停 / hidden 跳过 / visible 重置 / refresh 恢复）
+  - E2E `e2e/oss-image-traffic.spec.ts` 6 个场景（行为 7/8 含 `context.setOffline(true)` 离线验证）— 未跑（Playwright 基础设施 hang，见 MEMORY feedback_e2e_blocked_skip），依赖单元测试 + 对抗性审查
+- **教训**：
+  - **签名 URL 必须本地归一化**：签名 query 变化不等于资源变化。任何拉 CDN 路径前先抽 objectKey，再用 TTL 缓存判等，避免把签名差异当成资源差异。
+  - **轮询必须有死线 + 可见性 + 用户主动恢复**：无界轮询是 OSS 风暴的放大器；兜底三件套 MAX_ROUNDS + document.visibilityState + pull-to-refresh。
+  - **"卡住就轮询" = 账单雪崩**：任何 "while processing → poll" 的前端逻辑必须配合后端清扫任务，否则异常 record 会变成永续请求源。
+  - **本地缓存 key 选服务端稳定主键**：签名 URL / objectPath 都会变；IndexedDB key 必须是 record_id 这类业务主键，才能跨签名命中。
+  - **IndexedDB 已有基建别重造**：`shared/lib/capture-store.ts` / `features/recording/lib/audio-cache.ts` / `features/chat/lib/chat-cache.ts` 已是 `v2note-*` 命名 + openDB/close/readwrite tx 模板，新的 `v2note-image-cache` 完全沿用，降低认知成本。
+- **已提炼**：❌ 仅此例（领域陷阱可归入 docs/pitfalls/ 的"CDN/签名/本地缓存"章节，本次暂未新建）
+
+### 2026-04-20 [bug] 冷启动 §8：懒绑定被 WS 未就绪门控 + WS open 无触发点 → 录音/文字仍丢
+- **现象**：§7.7（`initAuth` 派发 restored）上线后，用户仍复现"长时间未使用打开软件→直接录音 / 直接打字发送→无提示，数据消失"。
+- **根因**：
+  1. `sync-orchestrator.runWorker()` 在 `ensureGatewaySession() === false` 时**整段 break**；懒绑定段（纯 IDB 操作）被网络就绪门控，导致 userId 永远无法回填。
+  2. 触发点里没有 "WS closed → open" 边沿，`ensureWs` 首次失败后 WS 自然 OPEN 不会再次扫描；形成死锁（"懒绑定永不跑 + push 永不跑"）。
+- **修复**（specs/fix-cold-resume-lazy-bind.md §8）：
+  - `sync-orchestrator.ts::runWorker` 重排：先 `ensureGatewaySession` → `listUnsynced` → **无条件执行懒绑定段** → 若 `!sessionOk` 再 break（纯 IDB 的懒绑定永远跑完）
+  - `SyncOrchestratorOptions` 新增 `subscribeWsStatus` / `getCurrentWsStatus`；`startSyncOrchestrator` 注册触发点 5，对 "非 open → open" 边沿触发 `triggerSync`。B2：订阅时用 `getCurrentWsStatus` 初始化 `lastWsStatus`，防止订阅晚于真实 open 错过边沿
+  - `sync-bootstrap.tsx` 静态 import `getGatewayClient`，注入 `onStatusChange` / `getStatus` 到 orchestrator
+- **Phase 3 P0 修复**（一起随本次合并）：
+  - P0-1：worker finally 的 `setTimeout(triggerSync, 1000)` 改为立即 `triggerSync()`（`triggerSync` 自带 200ms debounce，不会压循环）—— 消除 1s 用户感知窗口
+  - P0-2：跨账号污染防护 —— orchestrator 新增 `getLastLoggedInUserId` 选项，懒绑定前校验 `lastUserId !== currentUser.id` 时跳过并交 guest-claim UI 同意流程处理。镜像 `guest-claim.ts` 的既有防护
+  - P0-3：`should_register_ws_unsubscribe_in_globalListeners` 测试加强 —— stop() 后再调 `wsHandler("closed"); wsHandler("open")`，断言 `pushCapture` 调用数不变
+- **回归测试**（11 个新增 §8 测试 + 原有 §7.2 等测试保留）：
+  - `shared/lib/sync-orchestrator.test.ts` > `describe("regression: fix-cold-resume-silent-loss §8")` 共 11 个
+  - 核心锚点：`should_run_lazy_bind_even_when_ensure_session_returns_false`、`should_trigger_sync_on_ws_status_closed_to_open_edge`、`should_skip_lazy_bind_when_last_logged_in_user_differs`
+  - E2E `e2e/fix-cold-resume-lazy-bind.spec.ts` 已编写（blocker 模式注入 FakeBlockedWebSocket），但因 Playwright 基础设施当前 hang（登录 + WS mock + networkidle 叠加 >5min 无输出）**未跑**。依赖单元测试 + Phase 3 对抗性审查作为主要保障
+- **教训**：
+  - **执行顺序契约**：本地优先（local-first）架构里，"纯本地状态更新段"与"依赖网络的段"必须拆开。默认先跑本地段、再判断 session，避免网络抖动导致的本地操作卡死。
+  - **边沿触发 vs 状态回放**：`onStatusChange` 类订阅 API 若不回放当前状态，订阅方必须通过 `getCurrentState` 初始化 lastState，否则注册晚于事件时会错过边沿。
+  - **跨账号复用设备**：任何账号相关的本地回填路径（lazy-bind / claim）都必须检查 `getLastLoggedInUserId() !== currentUser.id`，否则 A 的离线数据会被静默划给 B。
+  - **长跑命令 pipe 陷阱**：`cmd | tail` 会让 `tail` 等管道关闭才输出，调试时用 `> file 2>&1` 直接写文件，避免把"无输出"误判为"hang"
+- **已提炼**：✅ 执行顺序契约 / 边沿触发初始化 / 跨账号防护 三条已落到 `docs/pitfalls/timezone.md` 之外的通用规则；log pipe 陷阱已写入 user-memory
+
+### 2026-04-19 [bug] 冷唤醒首次录音/文字发送静默丢失（Phase 9 运行时兜底）
+- **现象**：Phase 5-8 基础设施已交付（captureStore + sync-orchestrator + FAB + ChatView + 游客 batch），但用户报告"长时间未用后打开软件，首次录音/文字发送**仍**会静默消失"。
+- **根因**（三条并行）：
+  1. `gateway-client.ts` WS 未就绪时 `send()` 静默丢弃控制帧（asr.start / chat.user）—— 冷启动窗口里被用户正常操作踩到
+  2. `sync-orchestrator.ts` 过滤掉 `userId===null` 的 guest 条目；用户冷启动期"录完→登录完成"时序下，已入库条目因 userId 仍为 null 永远不推送
+  3. `fab.tsx` / `use-voice-to-text.ts` 命令模式发 `asr.stop` 后无超时保护，gateway 不回包时 FAB 卡在等待态、用户以为"没反应"而离开
+- **修复**（Phase 9，本 PR）：
+  - §7.1 `features/chat/lib/pending-frames.ts` + gateway-client 内嵌队列：WS 未 OPEN 的控制帧先进队列，OPEN 后按序 flush（含 client_id 去重，防 WS 重连重放）
+  - §7.2 `sync-orchestrator.ts` worker 内懒绑定：`userId===null ∧ guestBatchId===currentSessionBatchId` 时重绑定到 `getCurrentUser().id`，不改 synced 条目；批次不匹配跳过、无 batchId 僵尸警告
+  - §7.3 `features/recording/lib/asr-timeout.ts` 纯状态机：12s 绝对超时 + partial 后 8s 尾包超时，降级时保持本地 capture 不动（forceCommand=true 不丢），UI 复位；迟到的 asr.done 只写 captureStore、不碰 UI
+  - §7.4 `shared/lib/auth.ts` 新增 `auth:user-changed` CustomEvent（严格仅 login / logout 触发，silent refresh 不触发）+ `shared/lib/account-view-filter.ts` 按账号严格隔离本地条目可见性，timeline/chat 对此事件实时响应
+- **回归测试**（新增）：
+  - `features/chat/lib/pending-frames.test.ts` + `gateway-client-pending.test.ts`（13 + 6）
+  - `shared/lib/sync-orchestrator.test.ts` 新 describe `lazy bind §7.2`（6）
+  - `features/recording/lib/asr-timeout.test.ts`（18）
+  - `shared/lib/auth-user-changed.test.ts`（6）
+  - `shared/lib/account-view-filter.test.ts`（7）
+  - 共 56 新单测，全部 regression: fix-cold-resume-silent-loss
+- **教训**：
+  - "基础设施已建好 + 用户还在丢数据" ≠ "再改基础设施"。运行时链路的每个分叉都要过"如果这步 5 秒内没回应，用户能不能挽回？"。一个没 timeout 的 send/await 就够用户丢一次输入。
+  - 跨账号视图隔离必须在**单一读取入口**做（filterCapturesByAccountView），不能把它放进 mergeTimeline 也不能让每个调用者自行实现——否则下一次加第三个入口时漏一处就是 P0。
+  - `auth:user-changed` 事件的语义必须**守住 silent refresh 不触发**这个边界——否则 sync-orchestrator 会在每次 token 刷新时扫全库，性能/数据归属都出问题。
+- **已提炼**：❌ 待 Phase 3 审查后综合
+
+### 2026-04-18 [bug] 冷唤醒首次录音/文字发送静默丢失（Phase 1-2 基础设施）
+- **现象**：用户长时间未用打开 App 后首次录音 → 无处理提示、无新日记、录音完全丢失；首次打字发送 → 输入框清空但消息从未到达后端。
+- **根因**（两层）：
+  - 表层：`gateway-client.ts` `send()`/`sendBinary()` 在无 access_token 时 `console.warn + return` 静默吞消息；`chat-view.tsx:175` 在 send 后同步 `setInput("")`；无 `visibilitychange`/`App.resume` 守卫；`reconnectAttempts` 长时间后台后耗尽
+  - 根层：**整个捕获链路强依赖网络/鉴权**，违反"混沌输入 + 本地优先"产品原则。userID 本应是同步路由键，却成了捕获前置。
+- **修复方向**（spec-level）：本地优先捕获 — IndexedDB `captures` 表即时落地，同步调度器后台推送，userID 仅作同步键
+- **本轮 Phase 1-2 基础设施**：
+  - `shared/lib/capture-store.ts` — 跨 store 单事务 + 启动 GC + `CaptureNotFoundError`
+  - `shared/lib/sync-orchestrator.ts` — 全局 worker + 200ms debounce + per-localId dedupe + 401 按 subject 隔离 + 30s 超时 + pending-scan 续触发
+  - `features/chat/lib/gateway-client.ts` — `resetReconnectBackoff()`
+- **待后续 PR**：Phase 3 gateway `client_id` 幂等；Phase 4 FAB 接入；Phase 5 ChatView 接入；Phase 6 时间线三角合并；Phase 7 UI 状态条；Phase 8 未登录归属
+- **回归测试**：
+  - `shared/lib/capture-store.test.ts`（regression: fix-cold-resume-silent-loss，含 C1/M4/M6/T5）
+  - `shared/lib/sync-orchestrator.test.ts`（regression: fix-cold-resume-silent-loss，含 C2/C3/C4/M1/M2/M3）
+  - `e2e/fix-cold-resume-silent-loss.spec.ts` — 9 个验收行为（暂未跑，等 Phase 4-5 FE 接入后执行）
+- **教训**：
+  - 用户反馈"静默丢失"时，**不要**首先考虑"加更好的错误提示"。要问：这个动作为什么需要网络才能成功？不需要就别等。
+  - 对抗性审查对高风险基础设施有 4 Critical + 6 Major 的放大效应 — 并发/TOCTOU/tick 窗口这类问题不容易从正向实现看出
+- **已提炼**：❌ 待后续 Phase 5/6 合并后综合提炼
+
+### 2026-04-18 [流程改进] Spec 第一版诊断错误方向，用户点醒后整体重写
+- **现象**：第一版 spec 把症状归因为"WS 断/token 过期/send 静默吞"，设计了"主动重连+抛异常+错误文案"路径。用户一句"为什么捕获要依赖网络？"直接否决整体方向。
+- **根因**：Agent 在 Phase 1 偏重"复用现有机制"（gateway-client + session refresh），没回到产品原则（混沌输入 + 本地优先）去质疑"这条路径本该不存在"。
+- **改进**：Phase 1 spec 撰写前，Agent 应先自问："这个路径上的每个外部依赖（网络/鉴权/服务）是必需的吗？若去掉它，能否仍满足用户需求？" 把这个提问作为 spec 概述的固定一节（"必需依赖 vs 可选依赖"清单）。
+- **已提炼**：❌（下次若再出现类似"基础设施层的 fix 越做越偏"，再提炼为 CLAUDE.md 条目）
+
+### 2026-04-16 [bug] 晚间总结路径分裂 + 明日预览包含已完成待办
+- **现象**：晚间总结的"明天要做的事"中出现今天已完成的待办
+- **根因**：`SmartDailyReport`(命令面板)走 legacy `report.ts`，将全量 pending 待办标记为 `todayPending` 喂给 AI，无显式 `tomorrowScheduled` 数据。v2 路径 `daily-loop.ts` 是正确的但未被命令面板调用
+- **修复**：(1) `report.ts` evening 分支代理到 `generateEveningSummary`(v2)；(2) route 层补 `mode` 字段确保前端布局正确；(3) 删除死代码 `evening.md`/`morning.md`/`perspectives.md` + `EVENING_PROMPT`
+- **回归测试**：无新增（gateway 测试环境缺依赖无法运行）
+- **教训**：同一功能多条路径是高危模式 — handler 层统一入口，禁止路由层分叉到不同 handler
+- **已提炼**：❌ 仅此例
+
+### 2026-04-16 [bug] 随时时段创建待办被自动赋予 09:00 时间
+- **现象**：在时间视图「随时」区域点 "+" 创建待办，提交后待办出现在「上午」时段而非「随时」
+- **根因**：`todo-create-sheet.tsx` handleSubmit 中 `time || "09:00"` 将空时间回退为 09:00，导致 `assignTimeSlot` 把它归入 morning；编辑页 `todo-edit-sheet.tsx` 有同样的 09:00 回退 + 00:00 哨兵未识别问题
+- **修复**：(1) 空时间用 `"00:00"` 哨兵替代 `"09:00"`，保留 scheduled_start 日期用于 filterByDate；(2) `assignTimeSlot` 中精确午夜 (hour=0, minutes=0) → "anytime"；(3) 编辑页 syncFromTodo 识别 00:00 为空时间、handleSave 同步用 00:00 哨兵
+- **回归测试**：`features/todos/lib/time-slots.test.ts` — regression: fix-todo-anytime-time（4 个用例）
+- **教训**：创建和编辑两条路径必须同步修复，审查时需检查 create/edit 对称性
+- **已提炼**：❌ 仅此例
+
 ### 2026-04-13 [bug] goal_sync 目标重复生成 + 缺少层级组织
 - **现象**：侧边栏和待办项目页中目标杂乱——重复的 goal（"学英语"+"英语学习"）、全部 L3 顶层平铺
 - **根因**：(1) AI 编译时无已有 goal 列表上下文，无法去重；(2) allPageIndex 无 page_type，AI 不能区分 topic/goal；(3) goal page 硬编码 level=3 parent_id=NULL

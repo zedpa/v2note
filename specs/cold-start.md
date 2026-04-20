@@ -3,6 +3,7 @@ id: "052"
 title: "Cold Start & Onboarding"
 status: active
 domain: onboarding
+risk: medium
 dependencies: []
 superseded_by: null
 created: 2026-03-23
@@ -271,6 +272,25 @@ AI:   好的小潘，每晚我会帮你梳理当天的想法。我们开始吧
 并且 (And)    然后逐字显示回应文字（每字 30-50ms）
 并且 (And)    显示完成后才激活输入框
 并且 (And)    用户在等待时输入框 disabled + placeholder 显示"路路在想..."
+```
+
+#### 场景 2.3.9: 老用户换设备不误触引导 <!-- ✅ completed (fix-onboarding-old-user → fix-onboarding-old-account: Layer 3 改查 onboarding_done + catch 不显示) -->
+```
+假设 (Given)  用户在新设备上完成登录，本机无任何引导完成痕迹
+当   (When)   用户进入主界面
+那么 (Then)   用户直接看到自己过往的日记和待办
+并且 (And)    不出现冷启动新手引导
+并且 (And)    只有真正的新注册用户才会看到冷启动引导
+```
+
+#### 场景 2.3.10: 输入名字后进入聚焦操作引导 <!-- ✅ completed (fix-onboarding-step2-guide) -->
+```
+假设 (Given)  新用户已在第一步输入了称呼
+当   (When)   用户提交名字或点击"跳过，直接开始"
+那么 (Then)   用户直接进入主界面，不再等待 AI 整理
+并且 (And)    主界面出现半透明遮罩，高亮录音按钮并显示"按住说话，松开自动记录"
+并且 (And)    用户点击屏幕继续，高亮切换到待办入口并提示语音指令
+并且 (And)    再次点击后遮罩消失，再次打开 App 不再触发该引导
 ```
 
 ### 2.4 接口约定

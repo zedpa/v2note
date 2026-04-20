@@ -202,20 +202,20 @@ export default function Page() {
       return;
     }
 
-    // 3. localStorage 无记录 → 后端兜底：检查是否有历史数据
-    api.get<{ records: any[] }>("/api/v1/records?limit=1")
+    // 3. localStorage 无记录 → 后端兜底：查询 onboarding 完成状态
+    api.get<{ done: boolean }>("/api/v1/onboarding/status")
       .then((res) => {
-        if (res?.records?.length > 0) {
-          // 老用户有数据，标记为已引导
+        if (res?.done) {
+          // 老用户已完成过 onboarding，标记 localStorage
           localStorage.setItem(key, "true");
         } else {
           // 真正的新用户
           setIsFirstTime(true);
         }
       })
-      .catch(() => {
-        // 网络失败 → 安全 fallback: 显示引导（不会伤害新用户体验）
-        setIsFirstTime(true);
+      .catch((err) => {
+        // 网络失败 → 不显示引导，下次打开重新检测
+        console.warn("[onboarding] status check failed:", err);
       });
   }, [loggedIn, user?.id]);
 
