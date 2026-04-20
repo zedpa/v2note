@@ -6,9 +6,12 @@ import {
   Calendar, Clock, Trash2, Sparkles,
 } from "lucide-react";
 import { updateTodo, deleteTodo } from "@/shared/lib/api/todos";
+import { dispatchIntents, type ReminderType } from "@/shared/lib/intent-dispatch";
+import SystemIntent from "@/shared/lib/system-intent";
 import type { TodoDTO } from "../lib/todo-types";
 import { localTzOffset } from "../lib/time-slots";
 import { parseScheduledTime } from "../lib/date-utils";
+import { REMINDER_TYPE_OPTIONS, type ReminderTypeOption } from "../lib/reminder-options";
 import { PrioritySelector } from "./priority-selector";
 
 interface TodoEditSheetProps {
@@ -26,13 +29,8 @@ const DURATION_OPTIONS = [
   { value: 120, label: "2小时" },
 ] as const;
 
-const REMINDER_OPTIONS = [
-  { value: null, label: "不提醒" },
-  { value: 5, label: "5分钟前" },
-  { value: 15, label: "15分钟前" },
-  { value: 30, label: "30分钟前" },
-  { value: 60, label: "1小时前" },
-] as const;
+import { REMINDER_OPTIONS } from "../lib/reminder-options";
+
 
 export function TodoEditSheet({ todo, open, onClose, onUpdated, onAskAI }: TodoEditSheetProps) {
   const [text, setText] = useState("");
@@ -41,6 +39,7 @@ export function TodoEditSheet({ todo, open, onClose, onUpdated, onAskAI }: TodoE
   const [duration, setDuration] = useState<number | null>(null);
   const [priority, setPriority] = useState(3);
   const [reminderBefore, setReminderBefore] = useState<number | null>(null);
+  const [reminderTypes, setReminderTypes] = useState<ReminderTypeOption[]>(["notification"]);
   const [saving, setSaving] = useState(false);
   const dateRef = useRef<HTMLInputElement>(null);
   const timeRef = useRef<HTMLInputElement>(null);
@@ -51,7 +50,12 @@ export function TodoEditSheet({ todo, open, onClose, onUpdated, onAskAI }: TodoE
       const d = parseScheduledTime(t.scheduled_start);
       const pad = (n: number) => String(n).padStart(2, "0");
       setDate(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`);
-      setTime(`${pad(d.getHours())}:${pad(d.getMinutes())}`);
+      // 00:00 哨兵值 = 无具体时间（anytime），编辑时显示为空
+      if (d.getHours() === 0 && d.getMinutes() === 0) {
+        setTime("");
+      } else {
+        setTime(`${pad(d.getHours())}:${pad(d.getMinutes())}`);
+      }
     } else {
       setDate("");
       setTime("");
@@ -59,6 +63,11 @@ export function TodoEditSheet({ todo, open, onClose, onUpdated, onAskAI }: TodoE
     setDuration(t.estimated_minutes ?? null);
     setPriority(t.priority ?? 3);
     setReminderBefore(t.reminder_before ?? null);
+    setReminderTypes(
+      (t.reminder_types as ReminderTypeOption[] | null)?.length
+        ? (t.reminder_types as ReminderTypeOption[])
+        : ["notification"],
+    );
   }, []);
 
   // 打开时触发同步
@@ -84,7 +93,7 @@ export function TodoEditSheet({ todo, open, onClose, onUpdated, onAskAI }: TodoE
           updates.scheduled_end = `${end.getFullYear()}-${pad(end.getMonth() + 1)}-${pad(end.getDate())}T${pad(end.getHours())}:${pad(end.getMinutes())}:00${tz}`;
         }
       } else if (date) {
-        updates.scheduled_start = `${date}T09:00:00${localTzOffset()}`;
+        updates.scheduled_start = `${date}T00:00:00${localTzOffset()}`; // 无时间 → 00:00 哨兵 = anytime
       }
 
       if (duration !== (todo.estimated_minutes ?? null)) {
@@ -98,8 +107,41 @@ export function TodoEditSheet({ todo, open, onClose, onUpdated, onAskAI }: TodoE
         updates.reminder_before = reminderBefore; // null = 清除提醒
       }
 
+      // 提醒类型变更
+      const origTypes = (todo.reminder_types as ReminderTypeOption[] | null) ?? [];
+      const typesChanged =
+        reminderTypes.length !== origTypes.length ||
+        reminderTypes.some((t) => !origTypes.includes(t));
+      if (typesChanged && reminderBefore != null) {
+        updates.reminder_types = reminderTypes;
+      }
+
       if (Object.keys(updates).length > 0) {
         await updateTodo(todo.id, updates);
+      }
+
+      // 保存成功后，触发日历/闹钟 Intent
+      const finalTypes = reminderBefore != null ? reminderTypes : [];
+      const scheduledStart = updates.scheduled_start ?? todo.scheduled_start;
+      if (
+        scheduledStart &&
+        (finalTypes.includes("calendar") || finalTypes.includes("alarm"))
+      ) {
+        try {
+          await dispatchIntents(
+            {
+              text: text || todo.text,
+              scheduled_start: scheduledStart,
+              scheduled_end: updates.scheduled_end ?? todo.scheduled_end ?? null,
+              estimated_minutes: duration ?? todo.estimated_minutes ?? null,
+              reminder_before: reminderBefore,
+            },
+            finalTypes as ReminderType[],
+            SystemIntent,
+          );
+        } catch {
+          // Intent 失败不影响保存结果
+        }
       }
 
       onUpdated?.();
@@ -107,7 +149,7 @@ export function TodoEditSheet({ todo, open, onClose, onUpdated, onAskAI }: TodoE
     } finally {
       setSaving(false);
     }
-  }, [todo, text, date, time, duration, priority, reminderBefore, saving, onUpdated, onClose]);
+  }, [todo, text, date, time, duration, priority, reminderBefore, reminderTypes, saving, onUpdated, onClose]);
 
   const handleDelete = useCallback(async () => {
     if (!todo) return;
@@ -215,6 +257,40 @@ export function TodoEditSheet({ todo, open, onClose, onUpdated, onAskAI }: TodoE
                   {opt.label}
                 </button>
               ))}
+            </div>
+          </div>
+        )}
+
+        {/* 提醒方式（仅在选择了提醒时间时显示） */}
+        {date && reminderBefore != null && (
+          <div className="mb-6">
+            <div className="mb-2.5 ml-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/60">
+              提醒方式
+            </div>
+            <div className="flex flex-wrap gap-2.5">
+              {REMINDER_TYPE_OPTIONS.map((opt) => {
+                const selected = reminderTypes.includes(opt.value);
+                return (
+                  <button
+                    key={opt.value}
+                    data-testid={`reminder-type-${opt.value}`}
+                    onClick={() => {
+                      setReminderTypes((prev) =>
+                        selected
+                          ? prev.filter((t) => t !== opt.value)
+                          : [...prev, opt.value],
+                      );
+                    }}
+                    className={`rounded-[20px] px-4 py-2 text-[13px] font-medium transition-all ${
+                      selected
+                        ? "bg-primary/15 text-primary"
+                        : "bg-muted/60 text-muted-foreground"
+                    }`}
+                  >
+                    {opt.icon} {opt.label}
+                  </button>
+                );
+              })}
             </div>
           </div>
         )}

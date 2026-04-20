@@ -62,7 +62,7 @@ updated: 2026-04-11
 ```
 假设 (Given)  用户编辑待办，设置 scheduled_start = 明天 09:00，reminder_types 包含 "calendar"
 当   (When)   用户保存待办
-那么 (Then)   API 更新成功后，调用 SystemIntent.insertCalendarEvent
+那么 (Then)   待办更新成功后，调用 SystemIntent.insertCalendarEvent
 并且 (And)    参数: title = 待办文字, beginTime = scheduled_start 的毫秒时间戳
 并且 (And)    endTime = scheduled_end 的毫秒时间戳（如果有），否则 beginTime + estimated_minutes（如果有），否则 beginTime + 30分钟
 ```
@@ -71,7 +71,7 @@ updated: 2026-04-11
 ```
 假设 (Given)  用户编辑待办，设置 scheduled_start = 明天 09:00，reminder_before = 15，reminder_types 包含 "alarm"
 当   (When)   用户保存待办
-那么 (Then)   API 更新成功后，调用 SystemIntent.setAlarm
+那么 (Then)   待办更新成功后，调用 SystemIntent.setAlarm
 并且 (And)    参数: hour = 提醒时间的小时, minutes = 提醒时间的分钟, message = 待办文字
 并且 (And)    提醒时间 = scheduled_start 减去 reminder_before 分钟（本地时间）
 ```
@@ -255,7 +255,7 @@ export default SystemIntent;
 - [x] Phase 1: Android 原生插件（SystemIntentPlugin.kt + MainActivity 注册）
 - [x] Phase 2: 前端 TypeScript 封装（shared/lib/system-intent.ts + Web no-op）
 - [x] Phase 3: Intent 调度逻辑（shared/lib/intent-dispatch.ts — 参数构建 + 队列机制 + 调度入口）
-- [ ] Phase 4: Todo UI 集成（command-sheet/todo-edit-sheet 保存后调用 dispatchTodoReminders）
+- [x] Phase 4: Todo UI 集成（edit-sheet + create-sheet + use-todo-store 接口扩展 + dispatchIntents 调用）
 - [ ] Phase 5: 手动真机验证
 
 ## 备注

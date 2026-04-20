@@ -4,6 +4,9 @@ import { useState, useCallback, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { Calendar, Clock, FolderOpen } from "lucide-react";
 import { getDefaultHourForSlot, localTzOffset, type TimeSlot } from "../lib/time-slots";
+import { REMINDER_OPTIONS, REMINDER_TYPE_OPTIONS, type ReminderTypeOption } from "../lib/reminder-options";
+import { dispatchIntents, type ReminderType } from "@/shared/lib/intent-dispatch";
+import SystemIntent from "@/shared/lib/system-intent";
 import { PrioritySelector } from "./priority-selector";
 import type { TodoDTO } from "../lib/todo-types";
 
@@ -24,6 +27,8 @@ interface TodoCreateSheetProps {
     priority?: number;
     domain?: string;
     parent_id?: string;
+    reminder_before?: number | null;
+    reminder_types?: string[] | null;
   }) => Promise<any>;
   defaultDate?: string;
   defaultSlot?: TimeSlot;
@@ -45,6 +50,8 @@ export function TodoCreateSheet({
   const [time, setTime] = useState("");
   const [priority, setPriority] = useState(3);
   const [duration, setDuration] = useState<number | null>(null);
+  const [reminderBefore, setReminderBefore] = useState<number | null>(null);
+  const [reminderTypes, setReminderTypes] = useState<ReminderTypeOption[]>(["notification"]);
   const [parentId, setParentId] = useState<string | undefined>(defaultParentId);
   const [showProjects, setShowProjects] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -57,6 +64,8 @@ export function TodoCreateSheet({
       setText("");
       setPriority(3);
       setDuration(null);
+      setReminderBefore(null);
+      setReminderTypes(["notification"]);
       setParentId(defaultParentId);
       setShowProjects(false);
       // 从预设值初始化日期/时间
@@ -84,7 +93,7 @@ export function TodoCreateSheet({
       let scheduledStart: string | undefined;
       if (date) {
         const tz = localTzOffset();
-        const t = time || "09:00";
+        const t = time || "00:00"; // 无时间时用 00:00 哨兵，assignTimeSlot 识别为 anytime
         scheduledStart = `${date}T${t}:00${tz}`;
       }
 
@@ -94,14 +103,38 @@ export function TodoCreateSheet({
         estimated_minutes: duration ?? undefined,
         priority: priority !== 3 ? priority : undefined,
         parent_id: parentId,
+        reminder_before: reminderBefore,
+        reminder_types: reminderBefore != null ? reminderTypes : null,
       });
+
+      // 保存成功后，触发日历/闹钟 Intent
+      const finalTypes = reminderBefore != null ? reminderTypes : [];
+      if (
+        scheduledStart &&
+        (finalTypes.includes("calendar") || finalTypes.includes("alarm"))
+      ) {
+        try {
+          await dispatchIntents(
+            {
+              text: trimmed,
+              scheduled_start: scheduledStart,
+              estimated_minutes: duration ?? null,
+              reminder_before: reminderBefore,
+            },
+            finalTypes as ReminderType[],
+            SystemIntent,
+          );
+        } catch {
+          // Intent 失败不影响创建结果
+        }
+      }
 
       setText("");
       onClose();
     } finally {
       setSubmitting(false);
     }
-  }, [text, submitting, date, time, parentId, priority, duration, onCreate, onClose]);
+  }, [text, submitting, date, time, parentId, priority, duration, reminderBefore, reminderTypes, onCreate, onClose]);
 
   if (!open) return null;
 
@@ -183,6 +216,64 @@ export function TodoCreateSheet({
             ))}
           </div>
         </div>
+
+        {/* 提醒（仅在有日期时显示） */}
+        {date && (
+          <div className="mb-6">
+            <div className="mb-2.5 ml-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/60">
+              提醒
+            </div>
+            <div className="flex flex-wrap gap-2.5">
+              {REMINDER_OPTIONS.map((opt) => (
+                <button
+                  key={opt.value ?? "none"}
+                  onClick={() => setReminderBefore(opt.value)}
+                  className={`rounded-[20px] px-4 py-2 text-[13px] font-medium transition-all ${
+                    reminderBefore === opt.value
+                      ? "bg-primary/15 text-primary"
+                      : "bg-muted/60 text-muted-foreground"
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* 提醒方式（仅在选择了提醒时间时显示） */}
+        {date && reminderBefore != null && (
+          <div className="mb-6">
+            <div className="mb-2.5 ml-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/60">
+              提醒方式
+            </div>
+            <div className="flex flex-wrap gap-2.5">
+              {REMINDER_TYPE_OPTIONS.map((opt) => {
+                const selected = reminderTypes.includes(opt.value);
+                return (
+                  <button
+                    key={opt.value}
+                    data-testid={`reminder-type-${opt.value}`}
+                    onClick={() => {
+                      setReminderTypes((prev) =>
+                        selected
+                          ? prev.filter((t) => t !== opt.value)
+                          : [...prev, opt.value],
+                      );
+                    }}
+                    className={`rounded-[20px] px-4 py-2 text-[13px] font-medium transition-all ${
+                      selected
+                        ? "bg-primary/15 text-primary"
+                        : "bg-muted/60 text-muted-foreground"
+                    }`}
+                  >
+                    {opt.icon} {opt.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* 优先级 */}
         <div className="mb-6">

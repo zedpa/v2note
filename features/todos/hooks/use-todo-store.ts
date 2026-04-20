@@ -151,6 +151,8 @@ export function useTodoStore() {
       domain?: string;
       parent_id?: string;
       level?: number;
+      reminder_before?: number | null;
+      reminder_types?: string[] | null;
     }) => {
       const result = await apiCreateTodo(params);
       // 刷新以获取完整数据（含后端计算的 reminder_at）
