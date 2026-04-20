@@ -255,11 +255,12 @@ export function TodoCreateSheet({
                     key={opt.value}
                     data-testid={`reminder-type-${opt.value}`}
                     onClick={() => {
-                      setReminderTypes((prev) =>
-                        selected
+                      setReminderTypes((prev) => {
+                        if (selected && prev.length <= 1) return prev; // 至少保留一种方式
+                        return selected
                           ? prev.filter((t) => t !== opt.value)
-                          : [...prev, opt.value],
-                      );
+                          : [...prev, opt.value];
+                      });
                     }}
                     className={`rounded-[20px] px-4 py-2 text-[13px] font-medium transition-all ${
                       selected

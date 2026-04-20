@@ -116,14 +116,16 @@ export function TodoEditSheet({ todo, open, onClose, onUpdated, onAskAI }: TodoE
         updates.reminder_types = reminderTypes;
       }
 
-      if (Object.keys(updates).length > 0) {
+      const hasChanges = Object.keys(updates).length > 0;
+      if (hasChanges) {
         await updateTodo(todo.id, updates);
       }
 
-      // 保存成功后，触发日历/闹钟 Intent
+      // 仅在有实际变更时触发日历/闹钟 Intent（避免无修改保存弹出系统 App）
       const finalTypes = reminderBefore != null ? reminderTypes : [];
       const scheduledStart = updates.scheduled_start ?? todo.scheduled_start;
       if (
+        hasChanges &&
         scheduledStart &&
         (finalTypes.includes("calendar") || finalTypes.includes("alarm"))
       ) {
@@ -275,11 +277,12 @@ export function TodoEditSheet({ todo, open, onClose, onUpdated, onAskAI }: TodoE
                     key={opt.value}
                     data-testid={`reminder-type-${opt.value}`}
                     onClick={() => {
-                      setReminderTypes((prev) =>
-                        selected
+                      setReminderTypes((prev) => {
+                        if (selected && prev.length <= 1) return prev; // 至少保留一种方式
+                        return selected
                           ? prev.filter((t) => t !== opt.value)
-                          : [...prev, opt.value],
-                      );
+                          : [...prev, opt.value];
+                      });
                     }}
                     className={`rounded-[20px] px-4 py-2 text-[13px] font-medium transition-all ${
                       selected
