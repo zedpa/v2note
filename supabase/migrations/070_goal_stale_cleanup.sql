@@ -117,7 +117,23 @@ WHERE id IN (SELECT wiki_page_id FROM dismissed WHERE wiki_page_id IS NOT NULL)
 
 -- strike 表已被 064_drop_strike_system.sql 删除，
 -- todo.cluster_id 所有值已为 NULL（ON DELETE SET NULL）
+-- goal view 依赖 cluster_id，需先 DROP 再重建
+DROP VIEW IF EXISTS goal CASCADE;
 DROP INDEX IF EXISTS idx_todo_cluster;
 ALTER TABLE todo DROP COLUMN IF EXISTS cluster_id;
+
+-- 重建 goal view（不含 cluster_id）
+CREATE OR REPLACE VIEW goal AS
+SELECT id,
+    device_id,
+    user_id,
+    text AS title,
+    parent_id,
+    status,
+    COALESCE(category, 'speech'::text) AS source,
+    created_at,
+    COALESCE(updated_at, created_at) AS updated_at
+FROM todo
+WHERE level >= 1;
 
 COMMIT;
