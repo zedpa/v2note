@@ -31,34 +31,37 @@ const noopPlugin: SystemIntentPlugin = {
 
 let _plugin: SystemIntentPlugin | null = null;
 
-async function getPlugin(): Promise<SystemIntentPlugin> {
-  if (_plugin) return _plugin;
+/**
+ * 初始化插件（同步缓存，避免 async 函数 return Capacitor Proxy 触发 thenable check）
+ * Capacitor registerPlugin 返回的 Proxy 会拦截 .then 访问，
+ * 如果从 async 函数 return 该 Proxy，JS Promise 机制会触发 .then → 报错
+ */
+function ensurePlugin(): void {
+  if (_plugin) return;
 
   const platform = getPlatform();
 
   if (platform === "capacitor") {
     try {
-      const { registerPlugin } = await import("@capacitor/core");
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const { registerPlugin } = require("@capacitor/core");
       _plugin = registerPlugin<SystemIntentPlugin>("SystemIntent");
     } catch {
       _plugin = noopPlugin;
     }
   } else {
-    // harmony / web / electron — no-op
     _plugin = noopPlugin;
   }
-
-  return _plugin;
 }
 
 const SystemIntent: SystemIntentPlugin = {
   async insertCalendarEvent(options) {
-    const plugin = await getPlugin();
-    return plugin.insertCalendarEvent(options);
+    ensurePlugin();
+    return _plugin!.insertCalendarEvent(options);
   },
   async setAlarm(options) {
-    const plugin = await getPlugin();
-    return plugin.setAlarm(options);
+    ensurePlugin();
+    return _plugin!.setAlarm(options);
   },
 };
 
