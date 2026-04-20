@@ -20,7 +20,6 @@ function makeTodo(overrides: Partial<TodoDTO> = {}): TodoDTO {
     ai_actionable: false,
     ai_action_plan: null,
     parent_id: null,
-    cluster_id: null,
     status: "active",
     goal_id: null,
     subtask_count: 0,

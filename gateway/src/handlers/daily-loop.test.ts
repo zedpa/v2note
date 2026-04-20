@@ -272,8 +272,8 @@ describe("场景 1.2: 早报包含进行中目标", () => {
     // 准备活跃目标
     const mockedGoalFindActive = vi.mocked(goalRepo.findActiveByUser);
     mockedGoalFindActive.mockResolvedValue([
-      { id: "g1", title: "学习 Rust", device_id: "d", user_id: "u", parent_id: null, status: "active" as const, source: "manual" as const, cluster_id: null, wiki_page_id: null, created_at: "", updated_at: "" },
-      { id: "g2", title: "健身计划", device_id: "d", user_id: "u", parent_id: null, status: "progressing" as const, source: "manual" as const, cluster_id: null, wiki_page_id: null, created_at: "", updated_at: "" },
+      { id: "g1", title: "学习 Rust", device_id: "d", user_id: "u", parent_id: null, status: "active" as const, source: "manual" as const, wiki_page_id: null, created_at: "", updated_at: "" },
+      { id: "g2", title: "健身计划", device_id: "d", user_id: "u", parent_id: null, status: "progressing" as const, source: "manual" as const, wiki_page_id: null, created_at: "", updated_at: "" },
     ]);
 
     // 用批量查询的 findTodosByGoalIds
@@ -339,7 +339,7 @@ describe("场景 1.2: 早报包含进行中目标", () => {
     const goals = Array.from({ length: 8 }, (_, i) => ({
       id: `g${i}`, title: `目标${i}`, device_id: "d", user_id: "u",
       parent_id: null, status: "active" as const, source: "manual" as const,
-      cluster_id: null, wiki_page_id: null, created_at: "", updated_at: "",
+      wiki_page_id: null, created_at: "", updated_at: "",
     }));
     vi.mocked(goalRepo.findActiveByUser).mockResolvedValue(goals);
     vi.mocked(goalRepo.findTodosByGoalIds).mockResolvedValue([]);

@@ -15,7 +15,6 @@ export interface Goal {
   parent_id: string | null;
   status: "active" | "paused" | "completed" | "abandoned" | "progressing" | "blocked" | "suggested" | "dismissed";
   source: "speech" | "chat" | "manual" | "explicit" | "emerged";
-  cluster_id: string | null;
   wiki_page_id: string | null;
   created_at: string;
   updated_at: string;
@@ -24,7 +23,7 @@ export interface Goal {
 /** SQL: todo → Goal 字段映射 */
 const SELECT_AS_GOAL = `
   SELECT id, device_id, user_id, text AS title, parent_id, status,
-         COALESCE(category, 'speech') AS source, cluster_id, wiki_page_id,
+         COALESCE(category, 'speech') AS source, wiki_page_id,
          created_at, COALESCE(updated_at, created_at) AS updated_at
   FROM todo
   WHERE level >= 1
@@ -79,7 +78,7 @@ export async function create(fields: {
     `INSERT INTO todo (device_id, user_id, text, parent_id, category, status, level, done)
      VALUES ($1, $2, $3, $4, $5, $6, 1, false)
      RETURNING id, device_id, user_id, text AS title, parent_id, status,
-               COALESCE(category, 'speech') AS source, cluster_id, wiki_page_id,
+               COALESCE(category, 'speech') AS source, wiki_page_id,
                created_at, COALESCE(updated_at, created_at) AS updated_at`,
     [
       fields.device_id,
@@ -95,7 +94,7 @@ export async function create(fields: {
 
 export async function update(
   id: string,
-  fields: { title?: string; status?: string; parent_id?: string | null; cluster_id?: string | null; wiki_page_id?: string | null },
+  fields: { title?: string; status?: string; parent_id?: string | null; wiki_page_id?: string | null },
 ): Promise<void> {
   const sets: string[] = [];
   const params: any[] = [];
@@ -115,10 +114,6 @@ export async function update(
     sets.push(`parent_id = $${i++}`);
     params.push(fields.parent_id);
   }
-  if (fields.cluster_id !== undefined) {
-    sets.push(`cluster_id = $${i++}`);
-    params.push(fields.cluster_id);
-  }
   if (fields.wiki_page_id !== undefined) {
     sets.push(`wiki_page_id = $${i++}`);
     params.push(fields.wiki_page_id);
@@ -137,13 +132,7 @@ export async function updateWikiPageRef(goalId: string, wikiPageId: string | nul
   );
 }
 
-/** 批量更新 cluster_id 引用（聚类合并时用） */
-export async function updateClusterRef(oldClusterId: string, newClusterId: string): Promise<void> {
-  await execute(
-    `UPDATE todo SET cluster_id = $1 WHERE cluster_id = $2 AND level >= 1`,
-    [newClusterId, oldClusterId],
-  );
-}
+
 
 export async function findWithTodos(goalId: string) {
   return query<{ id: string; text: string; done: boolean }>(

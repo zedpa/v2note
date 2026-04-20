@@ -1,8 +1,9 @@
 ---
 id: "089"
 title: "移动端行动面板完善"
-status: active
+status: completed
 domain: ui
+risk: medium
 dependencies: []
 superseded_by: null
 created: 2026-03-23

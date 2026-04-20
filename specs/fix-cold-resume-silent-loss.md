@@ -1,14 +1,14 @@
 ---
 id: "fix-cold-resume-silent-loss"
 title: "Fix: 本地优先捕获 — 录音/日记发送不依赖网络与鉴权"
-status: active
+status: completed
 domain: infra
 risk: high
 dependencies: ["recording-resilience.md", "chat-persistence.md", "voice-input-unify.md", "auth-core.md"]
 superseded_by: null
 backport: recording-resilience.md
 created: 2026-04-17
-updated: 2026-04-19
+updated: 2026-04-20
 ---
 
 # Fix: 本地优先捕获 — 录音 / 日记发送不依赖网络与鉴权
@@ -640,7 +640,9 @@ export function triggerSync(): void;   // 外部手动触发
 - [x] Phase 6: 时间线/聊天读取合并本地 + 服务端，去重按 localId↔serverId
 - [x] Phase 7: 清理旧版阻塞错误文案；引入全局"离线条"
 - [~] Phase 8: 未登录捕获 + 登录后归属策略（基础设施已交付，claim 路径 feature-flag 关闭，等 Phase 8.1 修 C1/C2/C3/C4 后开启）
-- [ ] Phase 9: 冷启动运行时修复 — send() 待发队列 + userId 懒绑定 + asr.done 超时降级（§7）
+- [x] Phase 9: 冷启动运行时修复 — send() 待发队列 + userId 懒绑定 + asr.done 超时降级 + 账号视图隔离 + auth:user-changed 事件（§7）
+- [ ] Phase 10: Phase 3 审查遗留修复 —— §7.7 initAuth 恢复派发 / §7.8 flush break 语义 / §7.9 chat 过早 ack / §7.10 voidSession 接线
+- [ ] Phase 11: §8 懒绑定网络无关 + WS onopen 触发 triggerSync（本次追加）
 
 ## 备注
 
@@ -662,3 +664,14 @@ export function triggerSync(): void;   // 外部手动触发
 2. 飞行模式 ChatView 发送文字 → 本地落地 + 聊天可见
 3. token 过期 + ws 挂 → 首次操作不阻塞，后台同步成功
 4. 刷新页面后本地条目仍在并能继续同步
+
+
+---
+
+## Phase 10 / Phase 11：懒绑定生命周期修复（已拆分）
+
+§7.7（Phase 3 P0-1：initAuth 恢复派发 `auth:user-changed(restored)`）和 §8（Phase 11：懒绑定网络无关 + WS open 触发 triggerSync）已拆分到子域 spec：
+
+👉 **详见 [`fix-cold-resume-lazy-bind.md`](./fix-cold-resume-lazy-bind.md)**
+
+拆分原因：本文件超过 spec-lint 800 行阻断线。两节共同处理冷启动 / 长时间未用后懒绑定机制的生命周期 bug，作为独立子域维护便于后续演进。本文件的 §7.2 / §7.4 / §7.5 仍是这两节的契约依赖，不拆。

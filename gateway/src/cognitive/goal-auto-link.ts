@@ -129,7 +129,7 @@ export async function linkNewStrikesToGoals(
 
   // 获取无 wiki_page_id 的活跃目标
   const allGoals = await goalRepo.findActiveByUser(userId);
-  const orphanGoals = allGoals.filter((g) => !g.wiki_page_id && !g.cluster_id);
+  const orphanGoals = allGoals.filter((g) => !g.wiki_page_id);
   if (orphanGoals.length === 0) return result;
 
   // 对每个孤立目标，用 embedding 匹配最近的活跃 wiki_page

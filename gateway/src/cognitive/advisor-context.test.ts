@@ -140,7 +140,6 @@ describe("buildGoalDiscussionContext", () => {
     mockGoalRepo.findById.mockResolvedValueOnce({
       id: "goal-1",
       title: "提升供应链效率",
-      cluster_id: "cluster-1",
       status: "active",
     });
 
@@ -165,7 +164,6 @@ describe("buildGoalDiscussionContext", () => {
     mockGoalRepo.findById.mockResolvedValueOnce({
       id: "goal-1",
       title: "提升供应链效率",
-      cluster_id: "cluster-1",
       status: "active",
     });
 
@@ -186,7 +184,6 @@ describe("buildGoalDiscussionContext", () => {
     mockGoalRepo.findById.mockResolvedValueOnce({
       id: "goal-1",
       title: "学英语",
-      cluster_id: null,
       status: "active",
     });
 

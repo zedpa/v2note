@@ -3,6 +3,7 @@ id: "112"
 title: "Recording Resilience — 录音防丢 + 断线重试"
 status: active
 domain: voice
+risk: medium
 dependencies: ["voice-routing.md"]
 superseded_by: null
 created: 2026-04-04
@@ -12,6 +13,8 @@ updated: 2026-04-04
 # Recording Resilience — 录音防丢 + 断线重试
 
 > 优先级：P0 | 用户反馈录音丢失
+> 
+> **回写记录**（来自 fix-cold-resume-silent-loss）：本地优先捕获已通过 `capture-store.ts`（IndexedDB）+ `sync-orchestrator.ts` 实现，录音/日记发送不再依赖网络与鉴权。详见 `specs/fix-cold-resume-silent-loss.md`（已 completed）。
 
 ## 概述
 
@@ -212,6 +215,17 @@ updated: 2026-04-04
 那么 (Then)   仍然正常缓存（不拒绝）
 并且 (And)    fabNotify.warn("本地录音缓存较多，可在日记菜单中清理")
 并且 (And)    不自动删除任何历史缓存
+```
+
+### 1.6 录音完成后的即时反馈
+
+#### 场景 1.6.1: ASR 识别完成立即展示成功提示 <!-- ✅ completed (fix-recording-notify-stale) -->
+```
+假设 (Given)  用户已完成一段语音录音
+当   (When)   系统收到后端 ASR 识别完成的通知
+那么 (Then)   FAB 显示"已记录"成功提示，2 秒后自动消失
+并且 (And)    时间线刷新显示新日记
+并且 (And)    不再长时间停留在"处理中"旋转动画
 ```
 
 ---

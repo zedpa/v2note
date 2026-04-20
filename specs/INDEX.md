@@ -10,7 +10,7 @@
 6. superseded 状态的 spec 已被合并，永远不要引用它们，使用 superseded_by 指向的文件
 -->
 
-> 最后更新：2026-04-17 | 共 111 个 spec（28 active / 7 draft / 45 completed / 31 superseded / 2 deprecated）
+> 最后更新：2026-04-20 | 共 112 个 spec（21 active / 5 draft / 53 completed / 31 superseded / 2 deprecated）
 
 ## 🔵 Active（当前有效，可直接引用和修改）
 
@@ -19,17 +19,14 @@
 
 | 050a | Todo — Core & Logic | todo | todo-core.md | 数据流/AI提取/去重/时间/子任务/Strike关联 |
 | 050b | Todo — UI & Interactions | todo | todo-ui.md | 界面交互 + 实施阶段 |
-| todo-ui-redesign-spec | Todo UI 重构 — 设计规范 | todo | todo-ui-redesign-spec.md | 设计目标/信息架构/数据规范/UI组件规范（拆自 todo-ui-redesign.md） |
-| todo-ui-redesign-scenarios | Todo UI 重构 — 场景与实施 | todo | todo-ui-redesign-scenarios.md | Given/When/Then场景/废弃组件/后端/E2E/实施计划（拆自 todo-ui-redesign.md） |
 | 051 | Chat System | chat | chat-system.md | Header/Entry/Greeting/Skill |
 | 053b | Daily Report — Extended | report | daily-report-extended.md | 周月报/历史报告（Phase 2-4 未开始） |
 | 062 | AI 伴侣窗口 | ui | ai-companion-window.md | |
 | 064a-d | APP Mobile — Diary | app-mobile | app-mobile-views-diary.md | 整体结构/顶栏/日记/下拉刷新 |
 | 064a-t | APP Mobile — Todo & FAB | app-mobile | app-mobile-views-todo.md | 待办视图/FAB 录音按钮 |
 | 064b | APP Mobile — Nav & System | ui | app-mobile-nav.md | 侧边栏/通知/参谋/冷启动/登录 |
-| 065 | 附件持久化 + RAG | infra | attachment-persistence.md | |
+| 065 | 附件持久化 + RAG | infra | attachment-persistence.md | Phase 1 ✅ 已实现；Phase 2 文档分块 RAG 待开发 |
 | 071 | 并发扩容方案 | infra | concurrency-scaling.md | |
-| 089 | 移动端行动面板 | ui | mobile-action-panel.md | |
 | 092 | 留存分析 | onboarding | onboarding-retention-analytics.md | |
 | 099 | 主题生命周期 | cognitive | topic-lifecycle.md | Harvest AI摘要生成待完成 |
 | cognitive-wiki-core | 认知 Wiki — 核心模型与编译管线 | cognitive | cognitive-wiki-core.md | 概述/数据模型/实时 Ingest/每日编译（拆自 cognitive-wiki.md） |
@@ -48,12 +45,6 @@
 | 087 | 鸿蒙 HarmonyOS NEXT 适配 | infra | harmony-support.md | WebView壳+JSBridge+前端适配层 |
 | PROC-001 | SDD 流程守卫（Hook + Lint） | infra | process-sdd-guardrails.md | A/C/B/D 已完成 |
 | fix-sidebar-wiki-mgmt | Fix: 侧边栏 Wiki 页面管理 | ui | fix-sidebar-wiki-mgmt.md | Phase1-4✅+Phase5显示优化✅ |
-| fix-device-id-cleanup | Fix: deviceId 残留清理 — 路由层全面切 userId | infra | fix-device-id-cleanup.md | ✅ completed |
-| fix-todo-anytime-time | Fix: 随时时段创建待办被自动赋予时间 | todo | fix-todo-anytime-time.md | ✅ completed（已回写 todo-ui.md#1.4a/1.4b） |
-| fix-evening-report-quality | Fix: 晚间总结路径统一+明日预览数据错误 | report | fix-evening-report-quality.md | ✅ completed（已回写 daily-report-core.md#E5/E6） |
-| fix-cold-resume-silent-loss | Fix: 本地优先捕获 — 录音/日记发送不依赖网络与鉴权 | infra | fix-cold-resume-silent-loss.md | 🔴 P0：本地捕获 IndexedDB + 同步调度器，userID 仅作同步键；Phase 10/11 拆分到子域 fix-cold-resume-lazy-bind.md |
-| fix-cold-resume-lazy-bind | Fix: 冷启动懒绑定生命周期补完（§7.7 restored 派发 + §8 懒绑定网络无关） | infra | fix-cold-resume-lazy-bind.md | ✅ completed：§7.7 + §8 懒绑定去网络门控 + WS open 边沿触发 + 跨账号防护；子域回写到 fix-cold-resume-silent-loss.md |
-| fix-onboarding-old-account | Fix: 老账户误触发新手引导（2问+点击引导） | onboarding | fix-onboarding-old-account.md | ✅ completed |
 ## 🟡 Draft（规划中，尚未开始实施）
 
 | id | title | domain | file |
@@ -68,6 +59,16 @@
 
 | id | title | domain | file |
 |----|-------|--------|------|
+| todo-ui-redesign-spec | Todo UI 重构 — 设计规范 | todo | todo-ui-redesign-spec.md |
+| todo-ui-redesign-scenarios | Todo UI 重构 — 场景与实施 | todo | todo-ui-redesign-scenarios.md |
+| 089 | 移动端行动面板 | ui | mobile-action-panel.md |
+| fix-device-id-cleanup | Fix: deviceId 残留清理 — 路由层全面切 userId | infra | fix-device-id-cleanup.md |
+| fix-todo-anytime-time | Fix: 随时时段创建待办被自动赋予时间 | todo | fix-todo-anytime-time.md |
+| fix-evening-report-quality | Fix: 晚间总结路径统一+明日预览数据错误 | report | fix-evening-report-quality.md |
+| fix-cold-resume-silent-loss | Fix: 本地优先捕获 — 录音/日记发送不依赖网络与鉴权 | infra | fix-cold-resume-silent-loss.md |
+| fix-cold-resume-lazy-bind | Fix: 冷启动懒绑定生命周期补完 | infra | fix-cold-resume-lazy-bind.md |
+| fix-onboarding-old-account | Fix: 老账户误触发新手引导 | onboarding | fix-onboarding-old-account.md |
+| fix-goal-stale-cleanup | Fix: 历史低质量目标清理 + 自动化维护 | cognitive | fix-goal-stale-cleanup.md |
 | fix-oss-image-traffic-storm | Fix: OSS 图片流量风暴（签名缓存 + 本地图片缓存 + 僵尸清扫 + 轮询上限） | infra | fix-oss-image-traffic-storm.md |
 | fix-domain-deprecation | Fix: domain 字段全面废弃 | infra | fix-domain-deprecation.md |
 | fix-goal-wiki-data-cleanup | Fix: Goal/Wiki Page 数据清洗 | cognitive | fix-goal-wiki-data-cleanup.md |

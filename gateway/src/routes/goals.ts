@@ -38,13 +38,12 @@ export function registerGoalRoutes(router: Router) {
       sendError(res, "Unauthorized", 401);
       return;
     }
-    const { title, parent_id, cluster_id, source } = await readBody<{
+    const { title, parent_id, source } = await readBody<{
       title: string;
       parent_id?: string;
-      cluster_id?: string;
       source?: string;
     }>(req);
-    // parent_id → level=0 行动；cluster_id 或无父级 → level=1 目标
+    // parent_id → level=0 行动；无父级 → level=1 目标
     const level: 0 | 1 = parent_id ? 0 : 1;
     const goal = await todoRepo.createGoalAsTodo({
       device_id: userId,
@@ -54,7 +53,6 @@ export function registerGoalRoutes(router: Router) {
       source,
       status: "active",
       parent_id,
-      cluster_id,
     });
     sendJson(res, { ...goal, title: goal.text }, 201);
   });

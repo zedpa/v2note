@@ -21,7 +21,6 @@ function makeTodo(overrides: Partial<TodoDTO> = {}): TodoDTO {
     ai_action_plan: null,
     level: overrides.level ?? 0,
     parent_id: overrides.parent_id ?? null,
-    cluster_id: null,
     status: overrides.status ?? "active",
     goal_id: null,
     subtask_count: 0,

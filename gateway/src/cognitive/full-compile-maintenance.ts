@@ -11,6 +11,7 @@ import { query } from "../db/pool.js";
 import { today as tzToday, todayRange } from "../lib/tz.js";
 import { generateAiDiaryRecords } from "./ai-diary-stage.js";
 import { discoverLinks } from "./link-discovery-stage.js";
+import { runGoalQualityCleanup, type GoalQualityResult } from "./goal-quality-stage.js";
 
 /** 触发编译的 token 阈值 */
 const COMPILE_THRESHOLD = 5000;
@@ -26,9 +27,11 @@ export interface FullMaintenanceResult {
     ai_diary: boolean;
     structure_optimization: boolean;
     link_discovery: boolean;
+    goal_quality: boolean;
   };
   compileResult: CompileResult | null;
   bloatedPages: string[];
+  goalQualityStats: GoalQualityResult;
   errors: string[];
 }
 
@@ -51,9 +54,11 @@ export async function runFullCompileMaintenance(
       ai_diary: false,
       structure_optimization: false,
       link_discovery: false,
+      goal_quality: false,
     },
     compileResult: null,
     bloatedPages: [],
+    goalQualityStats: { suggestedDismissed: 0, hollowDismissed: 0, duplicatesMerged: 0 },
     errors: [],
   };
 
@@ -175,6 +180,20 @@ export async function runFullCompileMaintenance(
   } catch (err: any) {
     console.error(`[full-maintenance] 阶段 5 失败: ${err.message}`);
     result.errors.push(`link_discovery: ${err.message}`);
+  }
+
+  // ── 阶段 6: 目标质量维护 ──
+  try {
+    const qualityResult = await runGoalQualityCleanup(userId);
+    result.goalQualityStats = qualityResult;
+    const totalCleaned = qualityResult.suggestedDismissed + qualityResult.hollowDismissed + qualityResult.duplicatesMerged;
+    result.stages.goal_quality = totalCleaned > 0;
+    console.log(
+      `[full-maintenance] 阶段 6 完成: suggested=${qualityResult.suggestedDismissed}, hollow=${qualityResult.hollowDismissed}, dedup=${qualityResult.duplicatesMerged}`,
+    );
+  } catch (err: any) {
+    console.error(`[full-maintenance] 阶段 6 失败: ${err.message}`);
+    result.errors.push(`goal_quality: ${err.message}`);
   }
 
   return result;

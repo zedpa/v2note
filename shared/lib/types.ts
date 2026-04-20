@@ -206,7 +206,6 @@ export interface TodoItem {
   goal_id?: string
   parent_id?: string | null
   level?: number
-  cluster_id?: string | null
   /** wiki page 关联 ID（认知 Wiki 模式） */
   wiki_page_id?: string | null
   status?: string
@@ -219,7 +218,6 @@ export interface Goal {
   id: string
   title: string
   parent_id: string | null
-  cluster_id?: string | null
   /** wiki page 关联 ID（认知 Wiki 模式） */
   wiki_page_id?: string | null
   /** wiki page 标题（由后端 JOIN 返回） */

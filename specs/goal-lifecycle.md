@@ -3,6 +3,7 @@ id: "085"
 title: "目标全生命周期"
 status: active
 domain: goal
+risk: medium
 dependencies: []
 superseded_by: null
 created: 2026-03-23
@@ -173,10 +174,50 @@ updated: 2026-03-30
 并且 (And)    每条日记旁标注关系类型（支持/行动/结果）
 ```
 
+### 场景 17.1: 同语义目标不重复出现 <!-- ✅ completed (fix-goal-quality) -->
+```
+假设 (Given)  用户之前录音已形成目标"学英语"
+当   (When)   用户再次录音表达相似意愿如"英语学习计划要调整一下"
+那么 (Then)   侧边栏目标列表中不出现第二个同语义的目标
+并且 (And)    用户看到的"学英语"目标内容被更新
+```
+
+### 场景 17.2: 目标挂载到相关主题之下 <!-- ✅ completed (fix-goal-quality) -->
+```
+假设 (Given)  侧边栏已有主题页"工作"
+当   (When)   用户录音"今年要把业绩做到300万"
+那么 (Then)   侧边栏"工作"节点下出现新的目标子页"年度业绩300万"
+并且 (And)    目标不再作为顶层节点平铺
+```
+
+### 场景 17.3: 空壳目标自���清退 <!-- ✅ completed (fix-goal-stale-cleanup) -->
+```
+假设 (Given)  用��有一个 level>=1 的目标，创建已超过 7 天，且无任何子任务
+当   (When)   每日 3AM 维护执行
+那么 (Then)   该目标从侧边栏消失（被系统标记为 dismissed���
+并且 (And)    关联的 wiki_page 被归档
+���且 (And)    创建不满 7 天的目标不受影响
+```
+
+### 场景 17.4: 过期 suggested 目标自动清退 <!-- ✅ completed (fix-goal-stale-cleanup) -->
+```
+假设 (Given)  AI 建议了一个目标，用户超过 14 天未确认
+当   (When)   每日 3AM 维护执行
+那么 (Then)   该 suggested 目标从列表消失（被标记为 dismissed）
+```
+
+### 场景 17.5: 口语化短期事项不被提取为目标 <!-- ✅ completed (fix-goal-stale-cleanup) -->
+```
+假设 (Given)  用户录音说"今天要去买菜"或"下午开会"
+当   (When)   wiki-compiler 编译日记
+那么 (Then)   这些口语��一次性事项不���出现在目标列表中
+并且 (And)    只有持续性意图（需多步/多日完成）才被创建为目标
+```
+
 ## 数据库变更
 - goal 表新增状态值：'progressing', 'blocked'（扩展现有 CHECK）
 - 新表 action_event (id, todo_id, type, reason, timestamp)
-- goal 表加 cluster_id（在 todo-strike-bridge 中完成）
+- ~~goal 表加 cluster_id~~（strike 系统已删除，cluster_id 列已在迁移 070 中 DROP）
 
 ## 涉及文件
 | 文件 | 改动类型 |

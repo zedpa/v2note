@@ -125,6 +125,11 @@ ${dateAnchor}
 - goal_sync 创建前，必须检查「已有目标」列表。如果已有 goal 的标题与新 goal 语义一致（如"学英语"和"英语学习"），使用 update 而非 create
 - ❌ 反例：已有"学英语"时又 create "英语学习" → 应 update 已有 goal
 - goal_sync.create 时，parent_page_id 应填写该 goal 最相关的 topic page UUID
+- goal_sync.create 只用于**持续性意图**：需多步/多日完成、可衡量进展的长期目标
+- ❌ 禁止创建：口语化一次性事项（"今天买菜""下午开会""明天带伞"）
+- ❌ 禁止创建：情绪表达/非行动项（"好累啊""天气真好""最近压力大"）
+- ❌ 禁止创建：已在 todo 中作为 level=0 存在的行动项
+- ✅ 目标示例：学英语、减肥、完成毕业论文、Q2 业绩目标
 - 新 Record 内容涉及多个 page 的主题 → \`links\`（在 page 间建立语义关联）
 
 ### 跨页链接规则（links）

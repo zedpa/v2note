@@ -33,7 +33,6 @@ export interface TodoDTO {
   // 层级
   level: number;          // 0=行动, 1=目标, 2=项目
   parent_id: string | null;
-  cluster_id: string | null;
   /** wiki page 关联 ID（认知 Wiki 模式） */
   wiki_page_id?: string | null;
   status: string;         // active|progressing|blocked|paused|completed|...

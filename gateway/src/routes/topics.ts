@@ -81,7 +81,7 @@ export function registerTopicRoutes(router: Router) {
       // 3. 批量查询 active goals（通过 wiki_page_id）
       const activeGoals = await query<Goal>(
         `SELECT id, device_id, user_id, text AS title, parent_id, status,
-                COALESCE(category, 'speech') AS source, cluster_id, wiki_page_id,
+                COALESCE(category, 'speech') AS source, wiki_page_id,
                 created_at, COALESCE(updated_at, created_at) AS updated_at
          FROM todo
          WHERE level >= 1
@@ -141,7 +141,7 @@ export function registerTopicRoutes(router: Router) {
       // 获取关联的所有 goals（通过 wiki_page_id）
       const allGoals = await query<Goal>(
         `SELECT id, device_id, user_id, text AS title, parent_id, status,
-                COALESCE(category, 'speech') AS source, cluster_id, wiki_page_id,
+                COALESCE(category, 'speech') AS source, wiki_page_id,
                 created_at, COALESCE(updated_at, created_at) AS updated_at
          FROM todo
          WHERE level >= 1

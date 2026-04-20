@@ -32,8 +32,6 @@ export interface Todo {
   subtask_done_count?: number;
   /** 层级：0=行动, 1=目标, 2=项目（DB DEFAULT 0） */
   level?: number;
-  /** 关联的 Cluster（level>=1 时使用，用于认知叙事） */
-  cluster_id?: string | null;
   /** 关联的 Wiki Page（level>=1 时使用，认知 Wiki 模式） */
   wiki_page_id?: string | null;
   /** 状态（level>=1 时使用）：active/paused/completed/abandoned/progressing/blocked/suggested/dismissed（DB DEFAULT 'active'） */
@@ -478,7 +476,6 @@ export async function createWithDedup(params: {
   level: 1 | 2;
   source?: string;
   status?: string;
-  cluster_id?: string;
 }): Promise<{ todo: Todo; action: "created" | "matched" | "suggested" }> {
   // 获取已有活跃目标
   const existing = await query<Todo>(
@@ -599,19 +596,17 @@ export async function createGoalAsTodo(fields: {
   level: 0 | 1 | 2;
   source?: string;
   status?: string;
-  cluster_id?: string;
   parent_id?: string;
 }): Promise<Todo> {
   const row = await queryOne<Todo>(
-    `INSERT INTO todo (user_id, device_id, text, level, status, cluster_id, parent_id, done)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, false) RETURNING *`,
+    `INSERT INTO todo (user_id, device_id, text, level, status, parent_id, done)
+     VALUES ($1, $2, $3, $4, $5, $6, false) RETURNING *`,
     [
       fields.user_id,
       fields.device_id,
       fields.text,
       fields.level,
       fields.status ?? "suggested",
-      fields.cluster_id ?? null,
       fields.parent_id ?? null,
     ],
   );
@@ -627,13 +622,7 @@ export async function updateStatus(id: string, status: string): Promise<void> {
   );
 }
 
-/** 批量更新 cluster_id 引用（聚类合并时用，替代 goalRepo.updateClusterRef） */
-export async function updateClusterRef(oldClusterId: string, newClusterId: string): Promise<void> {
-  await execute(
-    `UPDATE todo SET cluster_id = $1 WHERE cluster_id = $2 AND level >= 1`,
-    [newClusterId, oldClusterId],
-  );
-}
+
 
 
 /** 查询用户所有活跃目标（替代 goalRepo.findActiveByUser） */

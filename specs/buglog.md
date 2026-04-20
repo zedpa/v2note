@@ -19,6 +19,14 @@
 
 （按时间倒序，新条目添加在此处下方）
 
+### 2026-04-20 [bug] 历史低质量目标未清理 + cluster_id 孤儿列残留
+- **现象**：侧边栏目标列表杂乱——口语化短期事项、空壳无子任务目标、过期 suggested、语义重复大量积压；todo.cluster_id 引用已删除的 strike 表
+- **根因**：(1) 迁移 067 只做精确文本去重，语义重复和空壳目标需手动脚本但从未运行；(2) 手动脚本 Rule 3 无年龄保护；(3) 每日维护无目标质量阶段；(4) wiki-compile prompt 缺乏 goal_sync 质量门控；(5) 迁移 064 �� strike 表后未清理 cluster_id
+- **修复**：(1) goal-quality-stage.ts 三条硬规则 + 阶段 6 自动执行；(2) 迁移 070 清理存量 + DROP cluster_id；(3) repair-goal-quality.mjs AI 辅助脚本；(4) prompt 质量门控；(5) 全局 cluster_id 清理
+- **回归测试**：`gateway/src/cognitive/goal-quality-stage.test.ts` — 13 个用例，标注 `regression: fix-goal-stale-cleanup`
+- **教训**：一次性迁移只解决存量，必须同步增加持续防护；DROP TABLE CASCADE 后必须清理所有孤儿列和代码引用
+- **已提炼**：❌ 仅此例
+
 ### 2026-04-20 [bug] 老账户误触发新手引���（2问+点击引导）
 - **现象**：老用户清除 App 数据或换设备后，重新打开 App 会再次看到新手名字输入页和 CoachMark 点击引导
 - **根因**：`app/page.tsx` Layer 3 用 `GET /records?limit=1` 做代理判断，但：(1) records 是间接指标，后端有权威的 `user_profile.onboarding_done` 字段未使用；(2) `.catch(() => setIsFirstTime(true))` 在网络失败时默认显示引导，老用户冷启动弱网就会中招

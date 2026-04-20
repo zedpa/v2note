@@ -11,7 +11,7 @@ updated: 2026-04-02
 ---
 # 附件系统：持久化 → UI → 文档 RAG
 
-> 状态：🟡 Phase 1 待开发
+> 状态：✅ Phase 1 已实现（ingest 存储 file_url/file_name + 前端图片缓存 + 签名URL缓存 + 僵尸清扫）| 🟡 Phase 2 文档分块 RAG 待开发
 
 ## 概述
 附件上传链路存在断裂：OSS URL 未持久化，前端无附件展示，长文档内容无法被 AI 深度检索。

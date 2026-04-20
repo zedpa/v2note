@@ -2,10 +2,10 @@
  * Step 1a: 硬规则清理（无 AI）
  *
  * 清理规则：
- *   1. status='suggested' 且创建超过 14 天 → archive
- *   2. text 完全相同 → 保留最早的，其余 archive
- *   3. 无子 todo 且无 cluster_id → archive
- *   4. 被 archive 的记录的子 todo.parent_id 迁移到保留的同名记录
+ *   1. status='suggested' 且创建超过 14 天 → dismissed
+ *   2. text 完全相同 → 保留最早的，其余 dismissed
+ *   3. 无子 todo + 超 7 天（年龄保护）→ dismissed
+ *   4. 被清退记录的子 todo.parent_id 迁移到保留的同名记录
  *
  * Usage: node scripts/repair-goal-cleanup.mjs [--dry-run]
  */
@@ -60,7 +60,7 @@ async function main() {
 
     if (!dryRun && rule1.rows.length > 0) {
       await client.query(`
-        UPDATE todo SET status = 'archived'
+        UPDATE todo SET status = 'dismissed', done = true
         WHERE level >= 1 AND status = 'suggested'
           AND created_at < NOW() - INTERVAL '14 days'
       `);
@@ -71,7 +71,7 @@ async function main() {
     const dupes = await client.query(`
       SELECT text, array_agg(id ORDER BY created_at ASC) AS ids, COUNT(*)::int AS cnt
       FROM todo
-      WHERE level >= 1 AND status NOT IN ('archived', 'completed', 'abandoned')
+      WHERE level >= 1 AND done = false AND status NOT IN ('completed', 'abandoned', 'dismissed')
       GROUP BY text
       HAVING COUNT(*) > 1
     `);
@@ -91,7 +91,7 @@ async function main() {
 
         // archive 重复的
         await client.query(`
-          UPDATE todo SET status = 'archived'
+          UPDATE todo SET status = 'dismissed', done = true
           WHERE id = ANY($1)
         `, [archiveIds]);
       }
@@ -103,20 +103,21 @@ async function main() {
     console.log(`规则2: ${rule2Count} 个重复名称 archive（${dupes.rows.length} 组重复）`);
     totalArchived += rule2Count;
 
-    // ── 规则 3: 无子 todo 且无 cluster_id ─────────────────────────
+    // ── 规则 3: 无子 todo + 超 7 天（年龄保护）─────────────────────────
     const rule3 = await client.query(`
       SELECT t.id, t.text FROM todo t
       WHERE t.level >= 1
-        AND t.status NOT IN ('archived', 'completed', 'abandoned')
-        AND t.cluster_id IS NULL
+        AND t.done = false
+        AND t.status NOT IN ('completed', 'abandoned', 'dismissed')
+        AND t.created_at < NOW() - INTERVAL '7 days'
         AND NOT EXISTS (SELECT 1 FROM todo child WHERE child.parent_id = t.id)
     `);
-    console.log(`规则3: ${rule3.rows.length} 个无子todo且无cluster关联`);
+    console.log(`规则3: ${rule3.rows.length} 个空壳目标（无子todo + 超7天）`);
 
     if (!dryRun && rule3.rows.length > 0) {
       const ids = rule3.rows.map(r => r.id);
       await client.query(`
-        UPDATE todo SET status = 'archived'
+        UPDATE todo SET status = 'dismissed', done = true
         WHERE id = ANY($1)
       `, [ids]);
     }

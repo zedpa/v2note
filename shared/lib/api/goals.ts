@@ -8,7 +8,6 @@ export async function listGoals(): Promise<Goal[]> {
 export async function createGoal(fields: {
   title: string;
   parent_id?: string;
-  cluster_id?: string;
   source?: string;
 }): Promise<Goal> {
   return api.post("/api/v1/goals", fields);

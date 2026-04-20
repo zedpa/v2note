@@ -37,18 +37,24 @@ vi.mock("../lib/tz.js", () => ({
   })),
 }));
 
+vi.mock("./goal-quality-stage.js", () => ({
+  runGoalQualityCleanup: vi.fn(),
+}));
+
 // ── 导入 ──
 
 import { runFullCompileMaintenance } from "./full-compile-maintenance.js";
 import * as wikiPageRepo from "../db/repositories/wiki-page.js";
 import { compileWikiForUser } from "./wiki-compiler.js";
 import { query } from "../db/pool.js";
+import { runGoalQualityCleanup } from "./goal-quality-stage.js";
 
 const mockFindByUser = vi.mocked(wikiPageRepo.findByUser);
 const mockFindAllActive = vi.mocked(wikiPageRepo.findAllActive);
 const mockUpdate = vi.mocked(wikiPageRepo.update);
 const mockCompile = vi.mocked(compileWikiForUser);
 const mockQuery = vi.mocked(query);
+const mockGoalQuality = vi.mocked(runGoalQualityCleanup);
 
 // ── 工厂函数 ──
 
@@ -92,6 +98,11 @@ describe("full-compile-maintenance", () => {
     });
     mockUpdate.mockResolvedValue(undefined);
     mockQuery.mockResolvedValue([] as any);
+    mockGoalQuality.mockResolvedValue({
+      suggestedDismissed: 0,
+      hollowDismissed: 0,
+      duplicatesMerged: 0,
+    });
   });
 
   describe("runFullCompileMaintenance", () => {
@@ -140,7 +151,7 @@ describe("full-compile-maintenance", () => {
       expect(result.stages).toHaveProperty("link_discovery");
     });
 
-    it("should_return_all_5_stage_results", async () => {
+    it("should_return_all_6_stage_results", async () => {
       mockQuery.mockResolvedValue([] as any);
       mockFindAllActive.mockResolvedValue([]);
 
@@ -151,6 +162,7 @@ describe("full-compile-maintenance", () => {
       expect(result.stages).toHaveProperty("ai_diary");
       expect(result.stages).toHaveProperty("structure_optimization");
       expect(result.stages).toHaveProperty("link_discovery");
+      expect(result.stages).toHaveProperty("goal_quality");
     });
 
     it("should_detect_bloated_pages_in_structure_optimization", async () => {
@@ -163,6 +175,49 @@ describe("full-compile-maintenance", () => {
 
       expect(result.stages.structure_optimization).toBe(true);
       expect(result.bloatedPages).toContain("wp-bloat");
+    });
+
+    it("should_set_goal_quality_true_when_goals_cleaned", async () => {
+      mockQuery.mockResolvedValue([] as any);
+      mockFindAllActive.mockResolvedValue([]);
+      mockGoalQuality.mockResolvedValue({
+        suggestedDismissed: 2,
+        hollowDismissed: 1,
+        duplicatesMerged: 0,
+      });
+
+      const result = await runFullCompileMaintenance("u-1");
+
+      expect(result.stages.goal_quality).toBe(true);
+      expect(result.goalQualityStats.suggestedDismissed).toBe(2);
+      expect(result.goalQualityStats.hollowDismissed).toBe(1);
+    });
+
+    it("should_set_goal_quality_false_when_nothing_cleaned", async () => {
+      mockQuery.mockResolvedValue([] as any);
+      mockFindAllActive.mockResolvedValue([]);
+
+      const result = await runFullCompileMaintenance("u-1");
+
+      expect(result.stages.goal_quality).toBe(false);
+      expect(result.goalQualityStats).toEqual({
+        suggestedDismissed: 0,
+        hollowDismissed: 0,
+        duplicatesMerged: 0,
+      });
+    });
+
+    it("should_continue_when_goal_quality_stage_fails", async () => {
+      mockQuery.mockResolvedValue([] as any);
+      mockFindAllActive.mockResolvedValue([]);
+      mockGoalQuality.mockRejectedValue(new Error("goal quality failed"));
+
+      const result = await runFullCompileMaintenance("u-1");
+
+      expect(result.stages.goal_quality).toBe(false);
+      expect(result.errors).toContain("goal_quality: goal quality failed");
+      // 其他阶段结果仍然存在
+      expect(result.stages.todo_sync).toBe(true);
     });
 
     it("should_execute_stages_serially_not_in_parallel", async () => {

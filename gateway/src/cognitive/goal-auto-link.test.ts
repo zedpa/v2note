@@ -1,6 +1,6 @@
 /**
  * goal-auto-link spec 测试
- * 场景 1: 全量关联 | 场景 2: 孤立目标自动关联集群 | 场景 4: 项目进度汇总
+ * 场景 1: 全量关联 | 场景 2: 孤立目标自动关联 wiki_page | 场景 4: 项目进度汇总
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { Goal } from "../db/repositories/goal.js";
@@ -15,7 +15,6 @@ function makeGoal(overrides: Partial<Goal> = {}): Goal {
     parent_id: null,
     status: "active",
     source: "explicit",
-    cluster_id: null,
     wiki_page_id: null,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
@@ -79,32 +78,32 @@ beforeEach(() => {
 });
 
 describe("场景 1: 目标创建后全量关联", () => {
-  it("should_link_to_matching_cluster", async () => {
-    const goal = makeGoal({ id: "goal-1", cluster_id: null });
+  it("should_link_to_matching_wiki_page", async () => {
+    const goal = makeGoal({ id: "goal-1", wiki_page_id: null });
     mockGoalFindById.mockResolvedValue(goal);
 
-    // 1. cluster embedding 匹配
-    mockQuery.mockResolvedValueOnce([{ id: "cluster-1", similarity: 0.8 }]);
+    // 1. wiki_page embedding 匹配
+    mockQuery.mockResolvedValueOnce([{ id: "wp-1", similarity: 0.8 }]);
     // 2. 相关记录统计
-    mockQuery.mockResolvedValueOnce([{ id: "rec-1" }, { id: "rec-2" }]);
+    mockQuery.mockResolvedValueOnce([{ count: "2" }]);
     // 3. pending todo 匹配
     mockQuery.mockResolvedValueOnce([{ id: "todo-1", text: "联系供应商", similarity: 0.7 }]);
 
     const result = await goalAutoLink("goal-1", "user-1");
 
     expect(result.clusterLinked).toBe(true);
-    expect(mockGoalUpdate).toHaveBeenCalledWith("goal-1", { cluster_id: "cluster-1" });
+    expect(mockGoalUpdate).toHaveBeenCalledWith("goal-1", { wiki_page_id: "wp-1" });
     expect(result.recordsFound).toBe(2);
     expect(result.todosLinked).toBe(1);
   });
 
-  it("should_not_link_cluster_if_similarity_below_threshold", async () => {
+  it("should_not_link_wiki_page_if_similarity_below_threshold", async () => {
     const goal = makeGoal({ id: "goal-1" });
     mockGoalFindById.mockResolvedValue(goal);
 
-    // cluster 匹配度低
-    mockQuery.mockResolvedValueOnce([{ id: "cluster-1", similarity: 0.5 }]);
-    mockQuery.mockResolvedValueOnce([]);
+    // wiki_page 匹配度低于 0.7
+    mockQuery.mockResolvedValueOnce([{ id: "wp-1", similarity: 0.5 }]);
+    mockQuery.mockResolvedValueOnce([{ count: "0" }]);
     mockQuery.mockResolvedValueOnce([]);
 
     const result = await goalAutoLink("goal-1", "user-1");
@@ -113,11 +112,11 @@ describe("场景 1: 目标创建后全量关联", () => {
     expect(mockGoalUpdate).not.toHaveBeenCalled();
   });
 
-  it("should_skip_if_goal_already_has_cluster", async () => {
-    const goal = makeGoal({ id: "goal-1", cluster_id: "existing-cluster" });
+  it("should_skip_if_goal_already_has_wiki_page", async () => {
+    const goal = makeGoal({ id: "goal-1", wiki_page_id: "existing-wp" });
     mockGoalFindById.mockResolvedValue(goal);
 
-    mockQuery.mockResolvedValueOnce([]);
+    mockQuery.mockResolvedValueOnce([{ count: "0" }]);
     mockQuery.mockResolvedValueOnce([]);
 
     const result = await goalAutoLink("goal-1", "user-1");
@@ -136,17 +135,17 @@ describe("场景 1: 目标创建后全量关联", () => {
   });
 });
 
-describe("场景 2: digest 后孤立目标自动关联集群", () => {
-  it("should_link_orphan_goal_to_matching_cluster", async () => {
-    // 孤立目标（无 cluster_id）
+describe("场景 2: digest 后孤立目标自动关联 wiki_page", () => {
+  it("should_link_orphan_goal_to_matching_wiki_page", async () => {
+    // 孤立目标（无 wiki_page_id）
     const activeGoals = [
-      makeGoal({ id: "goal-1", title: "评估供应商", cluster_id: null }),
+      makeGoal({ id: "goal-1", title: "评估供应商", wiki_page_id: null }),
     ];
     mockGoalFindActiveByUser.mockResolvedValue(activeGoals);
 
-    // query: goal embedding vs cluster embedding 匹配
+    // query: goal embedding vs wiki_page embedding 匹配
     mockQuery.mockResolvedValueOnce([
-      { cluster_id: "cluster-1", similarity: 0.72 },
+      { page_id: "wp-1", similarity: 0.72 },
     ]);
 
     const result = await linkNewStrikesToGoals(
@@ -155,18 +154,18 @@ describe("场景 2: digest 后孤立目标自动关联集群", () => {
     );
 
     expect(result.linked).toBe(1);
-    expect(mockGoalUpdate).toHaveBeenCalledWith("goal-1", { cluster_id: "cluster-1" });
+    expect(mockGoalUpdate).toHaveBeenCalledWith("goal-1", { wiki_page_id: "wp-1" });
   });
 
   it("should_not_link_when_similarity_below_threshold", async () => {
     const activeGoals = [
-      makeGoal({ id: "goal-1", title: "评估供应商", cluster_id: null }),
+      makeGoal({ id: "goal-1", title: "评估供应商", wiki_page_id: null }),
     ];
     mockGoalFindActiveByUser.mockResolvedValue(activeGoals);
 
     // 匹配度低于 0.6
     mockQuery.mockResolvedValueOnce([
-      { cluster_id: "cluster-1", similarity: 0.4 },
+      { page_id: "wp-1", similarity: 0.4 },
     ]);
 
     const result = await linkNewStrikesToGoals(
@@ -178,9 +177,9 @@ describe("场景 2: digest 后孤立目标自动关联集群", () => {
     expect(mockGoalUpdate).not.toHaveBeenCalled();
   });
 
-  it("should_skip_when_all_goals_already_have_cluster", async () => {
+  it("should_skip_when_all_goals_already_have_wiki_page", async () => {
     const activeGoals = [
-      makeGoal({ id: "goal-1", cluster_id: "cluster-1" }),
+      makeGoal({ id: "goal-1", wiki_page_id: "wp-1" }),
     ];
     mockGoalFindActiveByUser.mockResolvedValue(activeGoals);
 
