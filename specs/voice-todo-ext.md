@@ -42,14 +42,14 @@ updated: 2026-04-04
 |------|------|------|
 | D1 零等待弹出 | ✅ 完成 | app/page.tsx:150-162 asr.done→立即打开CommandSheet |
 | D2 待办卡片 | ✅ 完成 | command-sheet.tsx CommandCard 显示所有字段 |
-| D3 多指令独立✓/✕ | ❌ 未实现 | 只有底部"全部确认"，无单卡片按钮 |
+| D3 多指令独立✓/✕ | ✅ 完成 | CommandCard 多条时显示独立 ✓/✕ 按钮，单条确认即时执行 |
 | D4 继续说话修改 | ❌ 空函数 | app/page.tsx:533 `/* v2: trigger recording again */` |
 | D5 字段点击编辑 | ✅ 完成 | TodoDetailEdit 支持text/time/priority/reminder编辑 |
 | D6 Agent状态流 | 🟡 部分 | tool.step接收并显示，但结果非实时流式 |
 | D8 查询结果展示 | ✅ 完成 | 最多5条+查看更多跳转 |
 | D8b 查看更多跳转 | ✅ 完成 | onViewMore跳转到目标详情或待办页 |
-| D9 静默执行 | ❌ 未接通 | confirm_before_execute设置项存在但未使用 |
-| D10 撤销操作 | ❌ 未实现 | use-undo-toast基础设施在，未连接 |
+| D9 静默执行 | ✅ 完成 | silentExecuteCommands 读取 confirm_before_execute 设置，跳过弹窗直接执行 |
+| D10 撤销操作 | ✅ 完成 | silentExecuteCommands 内含 undo toast（5秒撤销 create/complete/modify） |
 
 ### Section 3: 隐藏Record E1-E3
 | 场景 | 状态 | 说明 |
@@ -75,7 +75,7 @@ updated: 2026-04-04
 | F4 完成周期实例 | ✅ 完成 | 标记实例done=true，模板保持false |
 | F5 停止周期 | 🟡 后端 | 可设recurrence_end，但无对应的voice command处理 |
 | G1 提醒心跳检查 | ✅ 完成 | engine.ts 30min窗口+WebSocket推送+标记已发送 |
-| G2 修改时间重算提醒 | ❌ 未实现 | 修改scheduled_start时不自动重算reminder_at |
+| G2 修改时间重算提醒 | ✅ 完成 | routes/todos.ts PATCH + update-todo.ts 均调 recalcReminderAt |
 
 ### ✅ 全链路已接通（2026-04-23 审查确认）
 1. `app/page.tsx` handleCommandConfirm 已传递 goal_id/reminder_before/reminder_types/recurrence_rule/recurrence_end
@@ -579,7 +579,7 @@ interface TodoReminderMessage {
 
 - [x] 周期任务模板被删除 → 已生成的实例保留（recurrence_parent_id 设为 NULL via ON DELETE SET NULL）— DB FK配置
 - [x] 提醒时间已过（reminder_at < now）→ 跳过，不补发 — engine.ts窗口查询自然跳过
-- [ ] 同一待办多次修改时间 → reminder_at 每次自动重算 — **未实现：修改时间不重算reminder_at**
+- [x] 同一待办多次修改时间 → reminder_at 每次自动重算 — ✅ recalcReminderAt 已接入 PATCH 路由和 update_todo 工具
 
 ## 关键文件变更
 

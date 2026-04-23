@@ -173,6 +173,18 @@ export function CommandSheet({
     });
   }, [onClose]);
 
+  /** 单条确认：立即执行该条指令，从列表移除 */
+  const handleConfirmSingle = useCallback((idx: number) => {
+    const cmd = editableCommands[idx];
+    if (!cmd) return;
+    onConfirm([cmd]);
+    setEditableCommands((prev) => {
+      const next = prev.filter((_, i) => i !== idx);
+      if (next.length === 0) onClose();
+      return next;
+    });
+  }, [editableCommands, onConfirm, onClose]);
+
   const handleConfirmAll = useCallback(() => {
     onConfirm(editableCommands);
   }, [editableCommands, onConfirm]);
@@ -321,6 +333,7 @@ export function CommandSheet({
                         }
                       }}
                       onDismiss={editableCommands.length > 1 ? () => handleDismissCommand(idx) : undefined}
+                      onConfirmSingle={editableCommands.length > 1 ? () => handleConfirmSingle(idx) : undefined}
                     />
                   ))}
                 </div>
@@ -471,7 +484,7 @@ export function CommandSheet({
 
 // ── 子组件：指令卡片 ──────────────────────────────────────────
 
-function CommandCard({ command, onTap, onDismiss }: { command: TodoCommand; onTap: () => void; onDismiss?: () => void }) {
+function CommandCard({ command, onTap, onDismiss, onConfirmSingle }: { command: TodoCommand; onTap: () => void; onDismiss?: () => void; onConfirmSingle?: () => void }) {
   const { action_type } = command;
 
   // 查询结果列表
@@ -588,16 +601,33 @@ function CommandCard({ command, onTap, onDismiss }: { command: TodoCommand; onTa
         />
       )}
 
-      {/* 移除按钮 */}
-      {onDismiss && (
-        <div
-          role="button"
-          tabIndex={0}
-          onClick={(e) => { e.stopPropagation(); onDismiss(); }}
-          onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); onDismiss(); } }}
-          className="ml-1 flex h-6 w-6 items-center justify-center rounded-full hover:bg-white/10 transition-colors cursor-pointer"
-        >
-          <X className="h-3.5 w-3.5 text-white/30 hover:text-white/60" />
+      {/* 单条确认/拒绝按钮（仅多条指令时显示） */}
+      {(onConfirmSingle || onDismiss) && (
+        <div className="ml-1 flex items-center gap-1 flex-shrink-0">
+          {onConfirmSingle && (
+            <div
+              role="button"
+              tabIndex={0}
+              onClick={(e) => { e.stopPropagation(); onConfirmSingle(); }}
+              onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); onConfirmSingle(); } }}
+              className="flex h-6 w-6 items-center justify-center rounded-full bg-green-500/20 hover:bg-green-500/30 transition-colors cursor-pointer"
+              data-testid="confirm-single"
+            >
+              <Check className="h-3.5 w-3.5 text-green-400" />
+            </div>
+          )}
+          {onDismiss && (
+            <div
+              role="button"
+              tabIndex={0}
+              onClick={(e) => { e.stopPropagation(); onDismiss(); }}
+              onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); onDismiss(); } }}
+              className="flex h-6 w-6 items-center justify-center rounded-full hover:bg-white/10 transition-colors cursor-pointer"
+              data-testid="dismiss-single"
+            >
+              <X className="h-3.5 w-3.5 text-white/30 hover:text-white/60" />
+            </div>
+          )}
         </div>
       )}
     </button>
