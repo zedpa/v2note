@@ -6,5 +6,8 @@ export default defineConfig({
   retries: 1,
   use: {
     baseURL: "http://localhost:3000",
+    screenshot: "only-on-failure",
+    trace: "retain-on-failure",
+    video: "retain-on-failure",
   },
 });

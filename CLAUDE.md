@@ -57,12 +57,13 @@ v2note/
 4. 修改完成后，将 spec 展示给用户确认
 5. ⚠️ 用户看到的 spec 必须已经经过审查和修正，不要让用户替你找问题
 
-### Phase 2a: 生成 E2E 验收测试（独立于实现）
+### Phase 2a: 生成 E2E 验收测试（主 Agent 执行）
 1. 从 spec 的「验收行为（E2E 锚点）」部分，生成 E2E 测试到 `e2e/` 目录
 2. E2E 测试只描述**用户可见的操作和结果**，不涉及内部实现细节
 3. 这一步必须在写任何实现代码之前完成
 4. **生成 E2E 测试后暂停，等待用户确认是否准确反映验收标准**
 5. ⚠️ 后续实现阶段**禁止修改 E2E 测试**，只能让代码通过它
+6. ⚠️ 编写 E2E 测试时必须参照 `docs/e2e-patterns.md` 中的模式手册，禁止凭空编写冷启动/鉴权逻辑
 
 ### Phase 2b: 生成单元测试 + 实现代码（sdd-implementer Agent）
 **必须使用 `sdd-implementer` Agent 执行此阶段**，确保实现与 E2E 测试的上下文完全隔离。
@@ -81,16 +82,33 @@ v2note/
 3. 如果发现问题 → 主 Agent 补充测试用例 → 修复代码 → 重新验证
 4. 审查结果记录在本次任务的输出中
 
+### 🚀 子 Agent 调用规范：预注入上下文以节省 token
+调用任何子 Agent 时，主 Agent **必须**在 prompt 中附带已掌握的结构化上下文，减少子 Agent 重复 grep/read：
+```
+## 预计算上下文（主 Agent 提供）
+- Spec 路径: specs/xxx.md
+- 涉及文件: [已知的改动文件列表]
+- 依赖链: [已分析的模块依赖关系]
+- 已知约束: [从 spec/pitfalls 中提取的关键约束]
+```
+⚠️ **隔离边界不可突破**：预注入上下文不得包含被隔离的信息。例如：
+- `sdd-implementer` 禁止接收 E2E 测试内容、文件路径、断言逻辑
+- `code-review-global` 禁止接收实现过程中的试错细节（只传最终 diff）
+- 原则：**传结论不传过程，传坐标不传内容**（告知"涉及 use-notes.ts 的轮询逻辑"而非贴代码段）
+
 ### Phase 4: 验证循环
 1. 运行 `pnpm test` 或 `npm run verify`（**全量**单元测试 → tsc → eslint）
    - ⚠️ 必须跑全量测试，不能只跑当前 feature 的测试。全量测试是回归防护网。
-2. 运行 `npx playwright test`（**全量** E2E 验收测试）
+2. **使用 `e2e-runner` Agent** 运行 `npx playwright test`（**全量** E2E 验收测试）
    - ⚠️ 同理，必须跑全部 E2E，确保新改动没有破坏已有功能。
+   - `e2e-runner` 内置 V2Note 常见失败模式诊断知识（冷启动卡住、WS 阻塞、onboarding 未跳过等）
+   - 失败时 Agent 自动读取 `test-results/` 下的截图 + error-context.md，输出诊断报告
+   - **Agent 只诊断不修复**，主 Agent 根据诊断报告决定修复方向
 3. 如果测试失败：
    - 先区分：是**当前 feature 的测试**失败，还是**其他模块的回归测试**失败
    - 回归测试失败 → 说明本次改动引入了回归 bug，优先修复，**不得删除或修改已有回归测试**
    - 当前 feature 测试失败 → 修改实现代码（不是修改测试！不是修改 E2E！）
-   - 重新运行测试
+   - 重新运行测试（再次调用 `e2e-runner`）
    - 最多循环 5 次
 4. 如果 5 次后仍有失败，向用户报告具体问题
 5. 全部通过后，运行 TypeScript 类型检查
@@ -101,8 +119,16 @@ v2note/
 3. 如果是 bug 修复，必须在 `specs/buglog.md` 追加一条记录
 4. 如果本次实现中出现过测试失败→修复的循环，分析根因并沉淀：
    - 是 spec 描述不清？→ 改进 spec 对应部分
-   - 是 Agent 理解偏差？→ 追加到本文件「已知陷阱」部分
+   - 是主 Agent 理解偏差？→ 追加到本文件「已知陷阱」部分
    - 是测试覆盖不足？→ 追加边界场景到 spec
+   - 是子 Agent 的问题？→ 追加到对应 Agent 定义文件（`.claude/agents/<agent>.md`）的已知陷阱/注意事项部分，例如：
+     - `e2e-runner` 诊断遗漏的失败模式 → 写入 `e2e-runner.md`
+     - `sdd-implementer` 实现中反复犯的错误模式 → 写入 `sdd-implementer.md`
+     - `code-review-global` 审查漏掉的问题类型 → 写入 `code-review-global.md`
+
+### Phase 5b: 提交
+1. Phase 4 + Phase 5 全部完成后，**必须先创建 git commit**，再进入流程回顾
+2. 确保所有改动（实现代码、测试、spec 更新、buglog）都已暂存并提交
 
 ### Phase 6: 流程回顾（用户参与）
 
@@ -134,27 +160,25 @@ v2note/
    - 如果某条教训具有通用性（不限于特定 bug）→ 立即提炼
 3. 提炼后将对应条目标记为「已提炼: ✅」
 
-## 🛡️ 已知陷阱（从历史错误中沉淀）
+## 🛡️ 已知陷阱（按需加载）
 
-每次功能验收失败或 bug 修复后，如果教训具有通用性，必须在此追加一条规则：
-- 格式：`- [领域] 具体规则描述 (来源: fix-xxx.md 或日期)`
-- 规则应具体可执行，不要写泛泛的"注意 xxx"
+领域陷阱已拆分到 `docs/pitfalls/`，Hook 会按本次改动的文件路径自动注入相关内容：
 
-（随项目迭代持续积累，以下为初始条目）
+- `docs/pitfalls/timezone.md` — 后端 + 前端时区契约陷阱
+- `docs/pitfalls/shared-components.md` — 共享组件/模板/多路径分裂
+- `docs/pitfalls/ai-hallucination.md` — LLM 输出 ID 校验 / 去重防护
+- `docs/pitfalls/db-lock.md` — Supabase pooler 锁与长事务
+- `docs/pitfalls/migration.md` — DROP TABLE 清理 / 身份迁移全链路
+
+流程类通用规则保留在本文件：
 - [测试] 禁止同一个 Agent 在同一上下文中既写实现又写 E2E 测试，防止"自我对齐"假绿
-- [共享组件] 修改任何被 2+ 个 feature 引用的组件前，必须 grep 所有引用方并在 spec 中列出影响范围
 - [删除操作] spec 中涉及删除必须明确标注 soft/hard delete，默认 soft
-- [回归] Phase 4 必须跑全量测试，不能只跑当前 feature；回归测试失败优先级高于新 feature 测试失败 (来源: 2026-04-08 流程讨论)
-- [流程] Phase 1b spec 审查必须前台等待结果，禁止后台化与实现并行。审查的价值是拦截 spec 偏差，后台化等于跳过审查 (来源: 2026-04-08 fix-tag-overflow)
-- [日期] gateway 中日期计算禁止使用 `toISOString().split("T")[0]`（返回 UTC）和 `created_at.split("T")[0]`（DB 可能返回 UTC ISO）。必须使用 `lib/tz.ts` 导出函数：`today()`, `daysAgo(n)`, `toLocalDate(d)`, `todayRange()`, `dayRange()`, `weekRange()`, `monthRange()`。tz.ts 硬编码 Asia/Shanghai 不依赖 process.env.TZ。DB 连接池已设 `SET timezone = 'Asia/Shanghai'` (来源: fix-timezone-systematic)
-- [模板] 共享 prompt 模板（如 `templates.ts`）有多个消费者时，更新占位符必须同步更新所有消费者的 `.replace()` 逻辑，否则 AI 会收到未替换的 `{变量名}` 字面量 (来源: fix-morning-briefing)
-- [前端时区] 前端解析后端 `timestamptz` 值时，禁止 `.replace(/Z$/i, "")` 剥离 Z 后缀。直接 `new Date(isoString)` 会正确解析 UTC，`getHours()`/`getDate()` 自动返回本地时间。剥离 Z 会导致 UTC 时间被当作本地时间，产生 -8h 偏移 (来源: fix-todo-time-shift)
-- [前端时区] 前端获取"今天日期"禁止 `new Date().toISOString().split("T")[0]`（返回 UTC 日期）。必须用 `getLocalToday()` 或 `toLocalDateStr(new Date())`。同理，从时间戳提取日期用 `toLocalDate(ts)` 而非 `ts.split("T")[0]` (来源: fix-todo-time-shift)
-- [数据库锁] 禁止在 Supabase transaction pooler（端口 6543）上使用 session-level advisory lock（`pg_advisory_lock/unlock`）。lock 和 unlock 会被路由到不同后端连接，导致锁永远无法释放。必须使用 `pg_try_advisory_xact_lock`（事务级，包裹在 BEGIN/ROLLBACK 中，事务结束自动释放）(来源: 2026-04-10 wiki-compiler lock 泄漏)
-- [数据库锁] Supabase Transaction Pooler 会杀死持有超过约 60 秒的事务连接。禁止在事务中执行 AI 调用或其他长时间操作。如果需要并发控制，单实例服务使用进程内 `Set/Map` 内存锁替代 DB advisory lock (来源: 2026-04-11 wiki-compiler 连接被杀)
-- [数据库迁移] DROP TABLE migration 提交后，必须全局搜索 `FROM/INTO/UPDATE/JOIN/DELETE FROM <table_name>` 清理所有代码引用。不能只修触发报错的路径——低频调用路径（定时任务、侧边栏、认知引擎）的残留 SQL 会在后续运行时爆炸 (来源: 2026-04-12 fix-record-delete-strike，strike 表删除后 11 处 SQL 残留)
-- [身份迁移] 身份体系迁移（如 deviceId→userId）必须覆盖全链路：JWT签发 → WS认证 → Session管理 → HTTP路由层 → DB Schema(NOT NULL约束) → 编译部署。遗漏任一层会在不同时机爆炸。特别注意：(1) DB 列的 NOT NULL 约束必须同步迁移；(2) HTTP 路由层的 helper 函数（如 getDeviceId）必须同步替换，否则大量路由返回 401；(3) 修改 gateway 代码后必须重新 `pnpm build` 并重启服务 (来源: 2026-04-13 fix-device-id-cleanup)
-- [AI 幻觉] LLM 输出的任何 ID（UUID / FK 引用）都不可信。在执行 DB 写入前必须：(1) 正则校验格式（`/^[0-9a-f]{8}-...-[0-9a-f]{12}$/i`）；(2) `SELECT 1 FROM target_table WHERE id = $1` 存在性检查。AI 会编造格式正确但不存在的 UUID，也会编造格式非法的伪 UUID。INSERT 语句使用 `WHERE EXISTS` 子查询防护 (来源: 2026-04-11 wiki-compiler 6 层 FK violation)
+- [回归] Phase 4 必须跑全量测试，不能只跑当前 feature；回归测试失败优先级高于新 feature 测试失败
+- [流程] Phase 1b spec 审查必须前台等待结果，禁止后台化与实现并行
+- [E2E] 所有 E2E 测试必须由 `e2e-writer` Agent 编写，该 Agent 内置 V2Note 冷启动/鉴权/导航模式，避免主 Agent 每次新上下文重复试错
+- [E2E] 冷启动必须处理三步：登录 → onboarding 跳过 → first-run 遮罩关闭；或用 Gateway API 注册 + token 注入绕过全部 UI 流程
+
+新发现的通用规则（跨域、流程类）追加到此处；领域陷阱追加到 `docs/pitfalls/` 对应文件。
 
 ## 🎯 风险分级
 

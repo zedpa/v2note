@@ -12,6 +12,9 @@
     "test:coverage": "vitest run --coverage",
     "verify": "bash scripts/dev-loop.sh",
     "spec:check": "bash scripts/spec-check.sh",
+    "spec:lint": "tsx scripts/spec-lint.ts",
+    "sdd:gate": "bash scripts/sdd-gate.sh",
+    "prepare": "simple-git-hooks || true",
     "cap:sync": "node scripts/sync-version.cjs && next build && cap sync",
     "cap:android": "cap open android",
     "cap:ios": "cap open ios",
@@ -137,8 +140,12 @@
   "pnpm": {
     "onlyBuiltDependencies": [
       "electron",
-      "electron-winstaller"
+      "electron-winstaller",
+      "simple-git-hooks"
     ]
+  },
+  "simple-git-hooks": {
+    "pre-commit": "bash scripts/sdd-gate.sh"
   },
   "devDependencies": {
     "@capacitor/cli": "^8.0.2",
@@ -151,10 +158,13 @@
     "@types/react-dom": "^19",
     "electron": "^41.0.3",
     "electron-builder": "^26.8.1",
+    "fake-indexeddb": "^6.2.5",
     "jsdom": "^28.1.0",
     "playwright": "^1.58.2",
     "postcss": "^8.5",
+    "simple-git-hooks": "^2.13.1",
     "tailwindcss": "^3.4.17",
+    "tsx": "^4.21.0",
     "typescript": "5.7.3",
     "vitest": "^4.1.0"
   }

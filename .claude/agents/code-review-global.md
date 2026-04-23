@@ -1,6 +1,6 @@
 ---
 name: "code-review-global"
-description: "Use this agent when code has been newly written or modified and needs to be reviewed for global impact, execution efficiency, and spec compliance. This agent should be called after a significant code change is completed by another agent or by the user."\\n  assistant: (refactors the code)\\n  assistant: \"I'll use the code-review-global agent to review performance implications and spec alignment of this refactor.\"\\n  Commentary: Refactoring core logic can affect many downstream consumers. Use the Agent tool to launch the code-review-global agent."
+description: "SDD Phase 3 对抗性审查 Agent。审查本次 diff 的全局影响、执行效率和 Spec 合规性，输出结构化报告，不修改代码。\n\nExamples:\n\n- user: \"审查本次改动\"\n  assistant: Uses the Agent tool to launch code-review-global.\n  Commentary: Refactoring core logic can affect many downstream consumers.\n\n- user: \"Phase 3 审查\"\n  assistant: Uses the Agent tool to launch code-review-global with the diff context.\n  Commentary: This agent should be called after implementation is complete."
 tools: Bash, CronCreate, CronDelete, CronList, EnterWorktree, ExitWorktree, Glob, Grep, Read, RemoteTrigger, Skill, TaskCreate, TaskGet, TaskList, TaskUpdate, ToolSearch, WebFetch, WebSearch, NotebookEdit
 model: opus
 color: yellow

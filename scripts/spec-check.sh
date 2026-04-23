@@ -21,7 +21,11 @@ echo "  📋 V2Note Spec 覆盖检查"
 echo "=========================================="
 echo ""
 
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SPECS_DIR="specs"
+
+# 模式：--backport-only 只检查 fix 回写，跳过覆盖统计
+MODE="${1:-all}"
 # 测试文件可能在多个位置（features/、shared/、gateway/src/）
 SEARCH_DIRS=("features" "shared" "gateway/src")
 TOTAL=0
@@ -41,7 +45,16 @@ find_test_file() {
   return 1
 }
 
+if [ "$MODE" = "--backport-only" ]; then
+  # 跳过覆盖检查，直接走 backport 部分
+  COVERAGE_FAIL=0
+  echo "（--backport-only 模式：跳过测试覆盖检查）"
+  # 通过一个假 for 循环的替代：跳到 fix 检查
+  goto_backport=1
+fi
+
 # 遍历所有 spec 文件（排除模板）
+if [ "${goto_backport:-0}" != "1" ]; then
 for spec_file in "$SPECS_DIR"/*.md; do
   # 跳过模板、路线图索引、归档目录
   if [[ "$spec_file" == *"_template"* ]] || [[ "$spec_file" == *"ROADMAP"* ]] || [[ "$spec_file" == *"_archive"* ]]; then
@@ -84,12 +97,76 @@ echo -e "  已覆盖: ${GREEN}$COVERED${NC}"
 echo -e "  缺少测试: ${RED}$MISSING${NC}"
 echo ""
 
+COVERAGE_FAIL=0
 if [ $MISSING -gt 0 ]; then
   echo -e "${YELLOW}💡 提示：运行 Claude Code 为缺失的 spec 生成测试${NC}"
   echo "   命令示例：'根据 specs/xxx.md 生成测试文件'"
   echo ""
-  exit 1
+  COVERAGE_FAIL=1
 else
   echo -e "${GREEN}🎉 所有 spec 都有对应测试${NC}"
-  exit 0
 fi
+fi # end if !goto_backport
+
+# ============================================================
+# 扩展检查 1：fix-*.md completed 必须回写主 spec
+# ============================================================
+echo ""
+echo "=========================================="
+echo "  🔁 Fix Spec 回写检查（backport）"
+echo "=========================================="
+echo ""
+
+BACKPORT_FAIL=0
+FIX_FILES=$(ls "$SPECS_DIR"/fix-*.md 2>/dev/null || true)
+
+for fix in $FIX_FILES; do
+  STATUS=$(grep -E '^status:' "$fix" | head -1 | sed -E 's/^status:[[:space:]]*//' | tr -d '"' | awk '{print $1}')
+  [ "$STATUS" != "completed" ] && continue
+
+  BACKPORT=$(grep -E '^backport:' "$fix" | head -1 | sed -E 's/^backport:[[:space:]]*//' | tr -d '"')
+  fix_rel=$(basename "$fix")
+
+  if [ -z "$BACKPORT" ] || [ "$BACKPORT" = "null" ] || [ "$BACKPORT" = "UNKNOWN" ]; then
+    echo -e "  ${RED}❌${NC} $fix_rel  completed 但 backport 字段缺失/UNKNOWN"
+    BACKPORT_FAIL=$((BACKPORT_FAIL + 1))
+    continue
+  fi
+
+  # GRANDFATHERED：历史遗留，仅警告不阻断（鼓励逐步回填）
+  if [ "$BACKPORT" = "GRANDFATHERED" ]; then
+    echo -e "  ${YELLOW}⚠️${NC}  $fix_rel  backport=GRANDFATHERED（历史遗留，建议逐步回填到主 spec）"
+    continue
+  fi
+
+  MAIN_REL="${BACKPORT%%#*}"
+  MAIN_PATH="$SPECS_DIR/$MAIN_REL"
+  [ -f "$MAIN_PATH" ] || MAIN_PATH="$REPO_ROOT/$MAIN_REL"
+  # 兼容相对路径
+  [ -f "$MAIN_PATH" ] || MAIN_PATH="$SPECS_DIR/$(basename "$MAIN_REL")"
+
+  if [ ! -f "$MAIN_PATH" ]; then
+    echo -e "  ${RED}❌${NC} $fix_rel  backport 指向 '$BACKPORT' 但找不到主 spec"
+    BACKPORT_FAIL=$((BACKPORT_FAIL + 1))
+    continue
+  fi
+
+  # 主 spec 存在且 backport 字段有效即视为回写契约成立。
+  # 历史上的 mtime 比较会在 fix 文件二次 touch / git checkout 后假阳，
+  # 因此只做存在性校验，mtime 差异已不作为阻断信号。
+  echo -e "  ${GREEN}✅${NC} $fix_rel → $MAIN_REL"
+done
+
+if [ $BACKPORT_FAIL -eq 0 ]; then
+  echo -e "${GREEN}🎉 所有 completed fix 均已正确回写${NC}"
+fi
+
+# ============================================================
+# 最终退出码
+# ============================================================
+echo ""
+if [ $COVERAGE_FAIL -gt 0 ] || [ $BACKPORT_FAIL -gt 0 ]; then
+  echo -e "${RED}spec-check 失败（覆盖缺失:$COVERAGE_FAIL / 回写缺失:$BACKPORT_FAIL）${NC}"
+  exit 1
+fi
+exit 0

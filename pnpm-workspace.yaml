@@ -1,0 +1,6 @@
+allowBuilds:
+  electron: false
+  electron-winstaller: false
+  esbuild: set this to true or false
+  sharp: false
+  simple-git-hooks: set this to true or false

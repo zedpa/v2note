@@ -9,7 +9,7 @@
 		"SELECT_BUILD_PRODUCT":"default",
 		"BUNDLE_NAME":"com.v2note.app",
 		"BUILD_PATH":{
-			"OUTPUT_PATH":"E:\\AI\\workspace-coding\\v2note\\harmony\\build\\outputs\\default"
+			"OUTPUT_PATH":"/Users/a1/workspace/v2note/harmony/build/outputs/default"
 		},
 		"SELECT_BUILD_MODE":""
 	}

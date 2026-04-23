@@ -27,4 +27,4 @@ include ':capgo-capacitor-updater'
 project(':capgo-capacitor-updater').projectDir = new File('../node_modules/.pnpm/@capgo+capacitor-updater@8.43.10_@capacitor+core@8.0.2/node_modules/@capgo/capacitor-updater/android')
 
 include ':capacitor-voice-recorder'
-project(':capacitor-voice-recorder').projectDir = new File('../node_modules/.pnpm/capacitor-voice-recorder@7._afce050cfe015c01cb95da0607e6650f/node_modules/capacitor-voice-recorder/android')
+project(':capacitor-voice-recorder').projectDir = new File('../node_modules/.pnpm/capacitor-voice-recorder@7.0.6_@capacitor+core@8.0.2_@capacitor+filesystem@8.1.0_@capacitor+core@8.0.2_/node_modules/capacitor-voice-recorder/android')
