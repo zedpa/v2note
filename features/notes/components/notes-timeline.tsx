@@ -3,6 +3,7 @@
 import { useMemo, useState, useRef, useCallback, useEffect, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { MapPin, Clock, Trash2, X, CheckCircle2, Mic, Paperclip, MoreVertical, Pencil, Copy, RotateCcw, AlertTriangle, HardDrive, Bot, Globe, Quote, ChevronUp, ChevronRight, FileText, Image as ImageIcon, Save } from "lucide-react";
+import { useVirtualList } from "@/shared/hooks/use-virtual-list";
 import { cn } from "@/lib/utils";
 import { useNotes } from "@/features/notes/hooks/use-notes";
 import { useNoteDetail } from "@/features/notes/hooks/use-note-detail";
@@ -34,6 +35,12 @@ interface DayGroup {
   monthWeekday: string;
   notes: NoteItem[];
 }
+
+/** 虚拟滚动的扁平行类型：日期头 或 笔记卡片 或 洞察卡片 */
+type FlatRow =
+  | { type: "day-header"; day: number; monthWeekday: string }
+  | { type: "note-card"; note: NoteItem; cardIndex: number }
+  | { type: "insight"; };
 
 const WEEKDAYS = ["日", "一", "二", "三", "四", "五", "六"];
 
@@ -129,6 +136,36 @@ export function NotesTimeline({ filter, notebook, wikiPageFilter, onOpenChat, on
     return groups.sort((a, b) => b.date.localeCompare(a.date));
   }, [notes, filter]);
 
+  // 将 day-grouped 数据扁平化为虚拟滚动行
+  const flatRows = useMemo<FlatRow[]>(() => {
+    const rows: FlatRow[] = [];
+    let cardIdx = 0;
+    groups.forEach((group, groupIdx) => {
+      // 日期头
+      rows.push({ type: "day-header", day: group.day, monthWeekday: group.monthWeekday });
+      // 笔记卡片
+      for (const note of group.notes) {
+        rows.push({ type: "note-card", note, cardIndex: cardIdx++ });
+      }
+      // 第一个日期组后插入 insight 卡片（如果有）
+      if (groupIdx === 0 && insightText) {
+        rows.push({ type: "insight" });
+      }
+    });
+    return rows;
+  }, [groups, insightText]);
+
+  // 虚拟滚动容器 ref — 绑定到父组件的滚动容器
+  const virtualParentRef = useRef<HTMLDivElement>(null);
+
+  const { virtualItems, totalSize, measureElement } = useVirtualList({
+    count: flatRows.length,
+    estimateSize: 120,
+    overscan: 3,
+    parentRef: virtualParentRef,
+    enabled: flatRows.length > 0,
+  });
+
   if (loading) {
     return (
       <div className="px-4 space-y-6 pt-4">
@@ -178,11 +215,9 @@ export function NotesTimeline({ filter, notebook, wikiPageFilter, onOpenChat, on
     );
   }
 
-  let cardIndex = 0;
-
   return (
     <>
-      <div className="px-4 pt-2 pb-28">
+      <div ref={virtualParentRef} className="px-4 pt-2 pb-28 overflow-y-auto flex-1">
         {autoRefreshPaused && (
           <div
             data-testid="auto-refresh-paused"
@@ -191,49 +226,68 @@ export function NotesTimeline({ filter, notebook, wikiPageFilter, onOpenChat, on
             自动刷新已暂停，下拉可恢复
           </div>
         )}
-        {groups.map((group, groupIdx) => (
-          <div key={group.date} className="mb-8">
-            {/* Day header — editorial style with serif date */}
-            <div className="flex items-baseline gap-2 py-3">
-              <span className="text-4xl font-serif-display text-foreground/80 leading-none tabular-nums">
-                {group.day}
-              </span>
-              <span className="text-xs text-muted-foreground/60 tracking-wide">
-                {group.monthWeekday}
-              </span>
-            </div>
+        {/* 虚拟滚动内容容器 */}
+        <div
+          data-testid="virtual-list-inner"
+          style={{
+            height: `${totalSize}px`,
+            width: "100%",
+            position: "relative",
+          }}
+        >
+          {virtualItems.map((virtualRow) => {
+            const row = flatRows[virtualRow.index];
+            if (!row) return null;
 
-            {/* Note cards */}
-            <div className="space-y-6">
-              {group.notes.map((note) => {
-                const idx = cardIndex++;
-                return (
-                  <TimelineCard
-                    key={note.id}
-                    note={note}
-                    index={idx}
-                    selectionMode={selectionMode}
-                    selected={selectedIds.has(note.id)}
-                    onToggleSelect={() => toggleSelect(note.id)}
-                    onLongPress={() => enterSelectionMode(note.id)}
-                    onDelete={() => deleteNotes([note.id])}
-                    onUpdate={(fields) => updateNote(note.id, fields)}
-                  />
-                );
-              })}
-            </div>
-
-            {/* Insert insight card after the first day group */}
-            {groupIdx === 0 && insightText && (
-              <div className="mt-6">
-                <InsightCard
-                  text={insightText}
-                  onDetail={onOpenChat ? () => onOpenChat(`路路发现：${insightText}`) : undefined}
-                />
+            return (
+              <div
+                key={virtualRow.index}
+                ref={measureElement}
+                data-index={virtualRow.index}
+                style={{
+                  position: "absolute",
+                  top: 0,
+                  left: 0,
+                  width: "100%",
+                  transform: `translateY(${virtualRow.start}px)`,
+                }}
+              >
+                {row.type === "day-header" && (
+                  <div className="flex items-baseline gap-2 py-3 mt-4">
+                    <span className="text-4xl font-serif-display text-foreground/80 leading-none tabular-nums">
+                      {row.day}
+                    </span>
+                    <span className="text-xs text-muted-foreground/60 tracking-wide">
+                      {row.monthWeekday}
+                    </span>
+                  </div>
+                )}
+                {row.type === "note-card" && (
+                  <div className="py-3">
+                    <TimelineCard
+                      note={row.note}
+                      index={row.cardIndex}
+                      selectionMode={selectionMode}
+                      selected={selectedIds.has(row.note.id)}
+                      onToggleSelect={() => toggleSelect(row.note.id)}
+                      onLongPress={() => enterSelectionMode(row.note.id)}
+                      onDelete={() => deleteNotes([row.note.id])}
+                      onUpdate={(fields) => updateNote(row.note.id, fields)}
+                    />
+                  </div>
+                )}
+                {row.type === "insight" && (
+                  <div className="mt-6">
+                    <InsightCard
+                      text={insightText!}
+                      onDetail={onOpenChat ? () => onOpenChat(`路路发现：${insightText}`) : undefined}
+                    />
+                  </div>
+                )}
               </div>
-            )}
-          </div>
-        ))}
+            );
+          })}
+        </div>
       </div>
 
       {/* Selection toolbar */}

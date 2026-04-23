@@ -67,6 +67,36 @@ vi.mock("./mini-audio-player", () => ({
   MiniAudioPlayer: () => null,
 }));
 
+// useCachedImage — 回归测试需要返回 file_url 作为 src，模拟缓存命中
+vi.mock("@/features/notes/hooks/use-cached-image", () => ({
+  useCachedImage: vi.fn((_recordId: string | null, fileUrl: string | null) => ({
+    src: fileUrl,
+    loading: false,
+    failed: false,
+  })),
+}));
+
+// useVirtualList mock — 透传所有 items（不做虚拟化裁剪），让回归测试能看到全部渲染内容
+vi.mock("@/shared/hooks/use-virtual-list", () => ({
+  useVirtualList: vi.fn((opts: any) => {
+    const estimateSize = opts.estimateSize || 120;
+    const items = Array.from({ length: opts.count }, (_, i) => ({
+      index: i,
+      start: i * estimateSize,
+      size: estimateSize,
+      end: (i + 1) * estimateSize,
+      key: i,
+    }));
+    return {
+      virtualizer: { getVirtualItems: () => items, getTotalSize: () => opts.count * estimateSize, measure: vi.fn() },
+      virtualItems: items,
+      totalSize: opts.count * estimateSize,
+      measureElement: vi.fn(),
+      remeasure: vi.fn(),
+    };
+  }),
+}));
+
 // react-dom createPortal mock — 直接渲染 children
 vi.mock("react-dom", async () => {
   const actual = await vi.importActual<typeof import("react-dom")>("react-dom");
@@ -113,6 +143,8 @@ async function setMockNotes(notes: NoteItem[]) {
     updateNote: vi.fn(),
     groupByDate: vi.fn(() => []),
     refetch: vi.fn(() => Promise.resolve(true)),
+    refresh: vi.fn(() => Promise.resolve(true)),
+    autoRefreshPaused: false,
   } as any);
 }
 
