@@ -3,6 +3,7 @@ id: "117"
 title: "工具生态增强"
 status: active
 domain: agent
+risk: medium
 dependencies: ["agent-tool-layer.md", "chat-tool-ui.md", "product-repositioning.md"]
 superseded_by: null
 created: 2026-04-06

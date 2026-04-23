@@ -3,6 +3,7 @@ id: "084"
 title: "目标粒度处理——快路径 + 慢路径"
 status: active
 domain: goal
+risk: medium
 dependencies: []
 superseded_by: null
 created: 2026-03-23

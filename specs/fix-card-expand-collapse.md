@@ -2,6 +2,7 @@
 id: fix-card-expand-collapse
 title: "Fix: 日记卡片展开逻辑优化+收起按钮高度"
 status: completed
+backport: app-mobile-views.md#场景 3.3b
 domain: ui
 risk: low
 dependencies: []
@@ -47,8 +48,8 @@ updated: 2026-04-11
 
 ### 场景 3: 收起按钮区域紧凑化
 ```
-假设 (Given)  卡片已展开
-当   (When)   展开区域没有 todos/related 等详情内容
+假设 (Given)  卡片没有待办/关联等详情内容，用户已展开
+当   (When)   用户滚动到卡片底部查看收起按钮
 那么 (Then)   收起按钮紧贴内容，不留大段空白
 并且 (And)    收起按钮高度适配文字行高
 ```

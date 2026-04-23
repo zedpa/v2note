@@ -3,6 +3,7 @@ id: "078"
 title: "Emergence Lifecycle — L2 涌现全生命周期"
 status: active
 domain: cognitive
+risk: medium
 dependencies: []
 superseded_by: null
 created: 2026-03-23

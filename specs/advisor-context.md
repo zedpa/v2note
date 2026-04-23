@@ -3,6 +3,7 @@ id: "057"
 title: "参谋上下文合并"
 status: completed
 domain: chat
+risk: medium
 dependencies: []
 superseded_by: null
 created: 2026-03-23

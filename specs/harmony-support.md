@@ -201,7 +201,7 @@ updated: 2026-04-11
 
       getPlatform() === 'harmony'  → HarmonyBridge（JSBridge 调用）
       getPlatform() === 'capacitor' → Capacitor 插件（现有逻辑不变）
-      else                          → Web API fallback
+      else                          → 浏览器原生能力降级
 
 并且 (And)    改动文件：
       shared/lib/platform.ts        — 新增，平台检测 + isNativePlatform()
@@ -226,7 +226,7 @@ updated: 2026-04-11
 
 假设 (Given)  鸿蒙桥接不可用
 当   (When)   调用通知相关方法
-那么 (Then)   降级到 Web Notification API（如浏览器支持）
+那么 (Then)   降级为浏览器原生通知能力（如浏览器支持）
 ```
 
 ### 场景 12: Web API 兼容性——鸿蒙 WebView 非 Chromium 适配

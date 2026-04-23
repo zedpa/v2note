@@ -2,10 +2,12 @@
 id: fix-record-delete-ghost
 title: "Fix: 日记删除后幽灵 Strike 残留 + 数据未清理"
 status: completed
+backport: strike-extraction.md
 domain: cognitive
 risk: medium
 dependencies: ["todo-core.md"]
 created: 2026-04-10
+updated: 2026-04-17
 ---
 
 # Fix: 日记删除后幽灵 Strike 残留 + 数据未清理
@@ -63,7 +65,7 @@ DELETE FROM strike WHERE source_id IS NULL AND is_cluster = false;
 ```
 假设 (Given)  一条日记关联了 3 条 active Strike
 当   (When)   用户删除该日记
-那么 (Then)   该日记的 record 从数据库删除
+那么 (Then)   该日记的 record 被移除
 并且 (And)    关联的 3 条 Strike 也被删除
 并且 (And)    Strike 关联的 Bond 和 StrikeTag 级联删除
 ```

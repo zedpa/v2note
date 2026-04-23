@@ -3,6 +3,7 @@ id: "083"
 title: "目标自动拆解与关联"
 status: active
 domain: goal
+risk: medium
 dependencies: []
 superseded_by: null
 created: 2026-03-23

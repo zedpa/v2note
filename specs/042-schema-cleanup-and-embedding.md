@@ -3,6 +3,7 @@ id: "055"
 title: "数据库 Schema 清理 + Embedding 持久化"
 status: completed
 domain: infra
+risk: high
 dependencies: []
 superseded_by: null
 created: 2026-03-23
@@ -79,6 +80,15 @@ updated: 2026-03-30
 那么 (Then)   创建 idx_strike_user_created(user_id, created_at DESC)
 并且 (And)    创建 idx_todo_user_done_level(user_id, done, level)
 并且 (And)    创建 idx_todo_device_done_level(device_id, done, level)
+```
+
+### 场景 A8: 废弃 strike 表后删除日记不再报错 <!-- ✅ completed (fix-record-delete-strike) -->
+```
+假设 (Given)  strike/bond 表已在历史迁移中下线，代码中仍有残留引用
+当   (When)   用户在日记视图中选中一条或多条日记并删除
+那么 (Then)   选中的日记从列表中消失
+并且 (And)    用户不会看到任何错误提示
+并且 (And)    后续的每日编译、目标联动、提醒等功能继续正常运行
 ```
 
 ---

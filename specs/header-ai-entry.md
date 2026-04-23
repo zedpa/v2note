@@ -1,6 +1,11 @@
 ---
 status: superseded
 superseded_by: "chat-system.md"
+id: "header-ai-entry"
+domain: ui
+risk: medium
+created: 2026-04-17
+updated: 2026-04-17
 ---
 
 # Header 路路 AI 入口 + 全局后台处理状态
@@ -80,7 +85,7 @@ superseded_by: "chat-system.md"
 假设 (Given)  用户上传图片或导入 URL
 当   (When)   请求发出
 那么 (Then)   路路图标切换为处理中
-并且 (And)    请求完成后（ingest API 返回），后台 digest 可能还在跑
+并且 (And)    请求完成后（ingest 管道入口返回），后台 digest 可能还在跑
 并且 (And)    管道最终完成后恢复静态
 ```
 

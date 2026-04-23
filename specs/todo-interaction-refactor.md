@@ -1,6 +1,11 @@
 ---
 status: superseded
 superseded_by: "todo-system.md"
+id: "todo-interaction-refactor"
+domain: todo
+risk: medium
+created: 2026-04-17
+updated: 2026-04-17
 ---
 
 # 待办交互重构
@@ -88,7 +93,7 @@ superseded_by: "todo-system.md"
 ### 场景 0.4b: 左滑删除 + 撤销 Toast
 ```
 假设 (Given)  用户点击左滑操作区的"删除"按钮并确认
-当   (When)   待办被删除
+当   (When)   该待办被删除
 那么 (Then)   底部弹出撤销 Toast："已删除「找张总确认报价」 [撤销]"
 并且 (And)    3 秒内点撤销可恢复，超时后永久删除
 并且 (And)    Capacitor 环境下触发警告震动（UINotificationFeedbackType.Warning）
@@ -299,7 +304,7 @@ API：update 支持 priority，create 缺失 priority 参数
 那么 (Then)   文本下方显示优先级选择器（低/中/高/紧急）
 并且 (And)    默认选中"中"
 并且 (And)    用户可点击切换优先级
-并且 (And)    提交时 priority 值一起传给 API（1=低, 3=中, 4=高, 5=紧急）
+并且 (And)    提交时 priority 值一起保存（1=低, 3=中, 4=高, 5=紧急）
 ```
 
 ### 场景 2.2: 编辑待办时修改优先级
@@ -313,7 +318,7 @@ API：update 支持 priority，create 缺失 priority 参数
 ### 场景 2.3: 详情页显示优先级
 ```
 假设 (Given)  用户打开待办详情 Sheet
-当   (When)   待办 priority=5
+当   (When)   该待办 priority=5
 那么 (Then)   在 Impact badge 旁显示"紧急"标签（红色）
 并且 (And)    优先级选择器可编辑
 ```
@@ -334,7 +339,7 @@ API：update 支持 priority，create 缺失 priority 参数
 假设 (Given)  用户通过语音/对话创建待办，AI 提取到 priority
 当   (When)   调用 create_todo tool handler
 那么 (Then)   priority 字段被正确写入数据库
-并且 (And)    前端 API createTodo 也支持 priority 参数
+并且 (And)    前端 createTodo 入口也支持 priority 参数
 并且 (And)    与前端创建表单行为一致
 ```
 
@@ -467,6 +472,10 @@ API：update 支持 priority，create 缺失 priority 参数
 
 ### 场景 3.7: 日期状态圆点 — 三色系统
 ```
+假设 (Given)  日历视图需要标识日期的待办状态
+当   (When)   渲染日期下方的圆点
+那么 (Then)   按以下三色系统显示：
+
 日期下方的小圆点根据该日待办状态显示不同颜色：
 
   🔴 红点 — 有新待办，用户尚未查看过该日期

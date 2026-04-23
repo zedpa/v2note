@@ -3,6 +3,7 @@ id: "102a"
 title: "Voice Routing — Core"
 status: active
 domain: voice
+risk: high
 dependencies: []
 superseded_by: null
 related: ["voice-todo-ext.md"]
@@ -133,6 +134,14 @@ process.ts: processEntry(payload)
 并且 (And)    通过 WebSocket 流式推送工具执行状态（tool.status 消息）
 并且 (And)    返回最终结果给前端（不存日记列表、不触发 Digest）
 并且 (And)    前端弹出 AgentCommandSheet 展示执行过程和结果
+```
+
+### 场景 B2a: 指令模式 CommandSheet 空结果/超时兜底 <!-- ✅ completed (fix-command-sheet-stuck) -->
+```
+假设 (Given)  用户上滑进入指令模式，CommandSheet 已弹出并显示处理中
+当   (When)   用户上滑松手后超过 20 秒仍无有效指令结果
+那么 (Then)   CommandSheet 显示"未识别到指令，请重试"
+并且 (And)    用户可手动关闭后重新录音
 ```
 
 ### 场景 B3: Layer 3 — 日记 + AI 分类（默认路径）

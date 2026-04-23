@@ -3,6 +3,7 @@ id: "064b"
 title: "APP Mobile — Navigation & System"
 status: active
 domain: ui
+risk: medium
 dependencies: ["auth.md", "cold-start.md"]
 superseded_by: null
 related: ["app-mobile-views.md"]
@@ -120,7 +121,7 @@ updated: 2026-04-04
 ```
 假设 (Given)  从侧边栏点击某个目标
 当   (When)   目标详情 overlay 显示
-那么 (Then)   调用 GET /goals/:id/todos + GET /goals/:id/health + GET /goals/:id/timeline
+那么 (Then)   加载目标的待办列表、健康度、时间轴数据
 并且 (And)    overlay 内容:
   - 顶部: ← 返回 + "Goal Detail" + ⋮ 菜单
   - 目标名 (Serif display) + 进度百分比 (大字)
@@ -198,7 +199,7 @@ updated: 2026-04-04
 假设 (Given)  从侧边栏点击"每日回顾"
 当   (When)   回顾页显示
 那么 (Then)   默认显示最新一期（晨间或晚间）
-并且 (And)    调用 GET /daily/briefing 或 GET /daily/evening-summary
+并且 (And)    加载对应时段的简报或总结内容
 并且 (And)    内容: 今日行动摘要 + 路路的发现(洞察卡片) + 统计
 并且 (And)    底部: "💬 和路路聊聊今天" → 打开参谋对话 overlay
 并且 (And)    可左右滑动切换历史回顾
@@ -208,7 +209,7 @@ updated: 2026-04-04
 ```
 假设 (Given)  从侧边栏点击"认知统计"
 当   (When)   统计页显示
-那么 (Then)   调用 GET /cognitive/stats + GET /stats/*
+那么 (Then)   加载认知统计数据
 并且 (And)    显示:
   - 极性分布: 4种极性(感知/判断/领悟/意图)占比环形图
     注意：感受(feel)类 Strike 不参与统计分析（"只记录不分析"原则），
@@ -306,6 +307,7 @@ updated: 2026-04-04
 ### 场景 9.2: 不同 mode 的上下文
 ```
 假设 (Given)  进入参谋对话
+当   (When)   系统初始化对话会话
 那么 (Then)   根据 mode 设置不同上下文:
   - review: WS chat.start {mode:"review", dateRange, ...}
   - command: WS chat.start {mode:"command", initialMessage:"/xxx"}

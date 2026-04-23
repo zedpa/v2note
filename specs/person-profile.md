@@ -3,6 +3,7 @@ id: "093"
 title: "人物画像系统"
 status: active
 domain: cognitive
+risk: medium
 dependencies: []
 superseded_by: null
 created: 2026-03-23

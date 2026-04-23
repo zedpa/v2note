@@ -2,7 +2,9 @@
 id: "fix-tag-limit"
 title: "Fix: 标签系统清理 — 删除系统标签 + 限制每条记录至多5个"
 status: completed
+backport: record-hierarchy-tags.md
 domain: cognitive
+risk: medium
 dependencies: []
 superseded_by: null
 created: 2026-04-06

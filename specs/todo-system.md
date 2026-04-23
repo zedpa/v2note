@@ -1,6 +1,11 @@
 ---
 status: superseded
 superseded_by: ["todo-core.md", "todo-ui.md"]
+id: "todo-system"
+domain: todo
+risk: medium
+created: 2026-04-17
+updated: 2026-04-17
 ---
 # Todo System — 已拆分
 

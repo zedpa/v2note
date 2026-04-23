@@ -2,6 +2,7 @@
 id: fix-briefing-stale-todos
 title: "Fix: 早晚报待办过时 + 数据范围修正"
 status: completed
+backport: daily-report-core.md#场景 M6
 domain: report
 risk: medium
 dependencies: ["daily-report-core.md", "daily-report-extended.md"]

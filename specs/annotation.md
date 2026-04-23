@@ -3,6 +3,7 @@ id: "063"
 title: "批注系统"
 status: deprecated
 domain: ui
+risk: medium
 dependencies: []
 superseded_by: null
 created: 2026-03-23

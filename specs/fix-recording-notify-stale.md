@@ -2,6 +2,7 @@
 id: fix-recording-notify-stale
 title: "Fix: 录音处理通知状态滞后"
 status: completed
+backport: recording-resilience.md#场景 1.6.1
 domain: voice
 risk: low
 dependencies: ["voice-routing.md", "recording-resilience.md"]
@@ -43,7 +44,7 @@ updated: 2026-04-11
 ### 场景 1.1: 正常录音完成 → 即时成功提示
 ```
 假设 (Given)  用户已完成一段语音录音
-当   (When)   后端 ASR 识别完成，发送 asr.done（含 recordId）
+当   (When)   系统收到后端 ASR 识别完成的通知
 那么 (Then)   FAB 胶囊显示"已记录"成功提示，2 秒后自动消失
 并且 (And)    时间线刷新显示新日记
 并且 (And)    不再显示"处理中"旋转动画
@@ -52,24 +53,24 @@ updated: 2026-04-11
 ### 场景 1.2: AI 后处理静默完成
 ```
 假设 (Given)  ASR 已完成，"已记录"提示已消失
-当   (When)   后端 AI 处理完成，发送 process.result
+当   (When)   系统收到后端 AI 后处理完成的通知
 那么 (Then)   时间线静默刷新（日记摘要/标签更新）
-并且 (And)    不弹出额外通知（移除原有的 fabNotify.success("处理完成")）
+并且 (And)    不弹出额外通知
 ```
 
 ### 场景 1.3: AI 后处理失败
 ```
-假设 (Given)  ASR 已完成，AI pipeline 正在后台运行（pipelineIdRef 非 null）
-当   (When)   后端 AI 处理失败，发送 error
-那么 (Then)   FAB 胶囊显示"整理失败"错误提示（用 pipelineIdRef 判断，不再依赖 processing 状态）
+假设 (Given)  ASR 已完成，AI 后处理仍在后台运行
+当   (When)   系统收到后端 AI 处理失败的错误通知
+那么 (Then)   FAB 胶囊显示"整理失败"错误提示
 并且 (And)    日记内容不受影响（仅缺少摘要/标签）
-并且 (And)    清理 pipelineIdRef
+并且 (And)    后台处理状态被清理
 ```
 
 ### 场景 1.4: ASR 本身失败
 ```
 假设 (Given)  用户已完成录音
-当   (When)   后端 ASR 识别失败，发送 asr.error
+当   (When)   系统收到后端 ASR 识别失败的通知
 那么 (Then)   FAB 显示错误提示（行为不变，保持现有逻辑）
 ```
 

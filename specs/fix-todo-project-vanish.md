@@ -2,6 +2,7 @@
 id: fix-todo-project-vanish
 title: "Fix: 待办项目视图添加后消失"
 status: completed
+backport: todo-core.md
 domain: todo
 risk: medium
 dependencies: ["todo-core.md"]
@@ -40,7 +41,7 @@ WHERE (r.user_id = $1 OR t.user_id = $1) AND t.parent_id IS NULL
 假设 (Given)  用户已有一个活跃项目 P
 当   (When)   用户在项目视图中向 P 添加一个待办 "新任务"
 那么 (Then)   刷新后 "新任务" 出现在 P 的任务列表中
-并且 (And)    API 返回的 todos 中包含 parent_id = P.id 的任务
+并且 (And)    后端返回的 todos 中包含 parent_id = P.id 的任务
 ```
 
 ### 场景 1.2: 已有项目下属待办应正常显示
@@ -63,7 +64,7 @@ WHERE (r.user_id = $1 OR t.user_id = $1) AND t.parent_id IS NULL
 假设 (Given)  待办 A 有子任务 B（B.parent_id = A.id，A.level = 0）
 当   (When)   前端调用 listTodos
 那么 (Then)   A 应被返回
-并且 (And)    B 不应出现在返回结果中（通过 subtasks API 单独获取）
+并且 (And)    B 不应出现在返回结果中（通过 subtasks 端点单独获取）
 ```
 
 ### 场景 1.5: 项目本身（level>=1）不被错误纳入

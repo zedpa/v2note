@@ -2,6 +2,7 @@
 id: fix-agent-tool-behavior
 title: "Fix: AI 工具调用异常（不调用/暴露名称/重复执行）"
 status: completed
+backport: agent-tool-layer.md
 domain: agent
 risk: medium
 dependencies: []

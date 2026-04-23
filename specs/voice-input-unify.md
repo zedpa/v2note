@@ -3,6 +3,7 @@ id: "114"
 title: "Voice Input Unify — 录音入口统一"
 status: active
 domain: voice
+risk: medium
 dependencies: ["voice-routing.md"]
 superseded_by: null
 created: 2026-04-04
@@ -163,6 +164,32 @@ updated: 2026-04-04
 当   (When)   渲染麦克风 / 发送按钮
 那么 (Then)   按钮 w-11 h-11（44×44px）
 并且 (And)    图标 size={20}
+```
+
+### 场景 5.2: 录音方向提示改为可辨认的 pill 按钮样式 <!-- ✅ completed (fix-recording-hint-style) -->
+```
+假设 (Given)  用户长按 FAB 进入录音模式
+当   (When)   用户尚未向任何方向滑动
+那么 (Then)   三个方向提示（取消/常驻/指令）以清晰可辨的 pill 按钮样式展示
+并且 (And)    文字颜色与背景对比度充足，不再偏暗难以看清
+```
+
+### 场景 5.3: 长按录音改为底部半屏面板 <!-- ✅ completed (fix-recording-ui) -->
+```
+假设 (Given)  用户长按 FAB 进入录音状态
+当   (When)   打开录音界面
+那么 (Then)   页面上方约 60% 区域保留轻遮罩，内容可见但不可交互
+并且 (And)    底部约 40% 区域展示紧凑录音面板（状态/波形/转写/方向提示）
+并且 (And)    现有手势行为（左滑取消、右滑常驻、上滑指令）保持一致
+```
+
+### 场景 5.4: 常驻录音改为呼吸浮窗 <!-- ✅ completed (fix-recording-ui) -->
+```
+假设 (Given)  用户通过右滑进入常驻录音
+当   (When)   打开常驻录音
+那么 (Then)   页面完全可交互，FAB 原位替换为带呼吸动画的红色录音指示器
+并且 (And)    用户点击指示器可展开暂停/继续/取消/保存控制浮窗
+并且 (And)    不再显示全屏沉浸式的实时转写界面
 ```
 
 ---

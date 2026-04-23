@@ -3,6 +3,7 @@ id: "096"
 title: "侧边栏「我的世界」重构"
 status: completed
 domain: ui
+risk: medium
 dependencies: []
 superseded_by: null
 created: 2026-03-23

@@ -1,3 +1,12 @@
+---
+id: "decision-template"
+status: completed
+domain: cognitive
+risk: medium
+created: 2026-04-17
+updated: 2026-04-17
+---
+
 # 决策模板涌现
 
 > 状态：✅ completed | 优先级：Phase 6 | 预计：2-3 天

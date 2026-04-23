@@ -3,6 +3,7 @@ id: "113"
 title: "键盘弹出 & Viewport 适配"
 status: completed
 domain: ui
+risk: medium
 dependencies: ["app-mobile-views.md", "chat-system.md", "mobile-native-feel.md"]
 superseded_by: null
 created: 2026-04-04

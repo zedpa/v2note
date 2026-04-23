@@ -2,6 +2,7 @@
 id: "fix-tag-overflow"
 title: "Fix: AI 生成标签数超过5个限制 + strike_tag 弃用"
 status: completed
+backport: record-hierarchy-tags.md
 domain: cognitive
 risk: low
 dependencies: ["fix-tag-limit"]

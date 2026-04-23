@@ -3,6 +3,7 @@ id: "118"
 title: "Chat Persistence — 对话持久化 & 上下文压缩"
 status: completed
 domain: chat
+risk: high
 dependencies: ["chat-system.md", "auth-core.md"]
 superseded_by: null
 created: 2026-04-06
@@ -99,8 +100,8 @@ updated: 2026-04-06
 当   (When)   组件 mount
 那么 (Then)   优先从 IndexedDB 读取最近 30 条消息（毫秒级）
 并且 (And)    立即渲染，用户无感知延迟
-并且 (And)    同时后台调用 GET /api/v1/chat/history?limit=30
-并且 (And)    服务端返回后与本地缓存对比，有新消息则追加并更新缓存
+并且 (And)    后台同步拉取最近 30 条服务端历史
+并且 (And)    服务端数据返回后与本地缓存对比，有新消息则追加并更新缓存
 并且 (And)    加载完成后 WebSocket connect 开始新的实时会话
 ```
 
@@ -110,7 +111,7 @@ updated: 2026-04-06
 当   (When)   触发上滑加载（scrollTop 接近 0）
 那么 (Then)   优先从 IndexedDB 查询 created_at < oldest 的 30 条消息
 并且 (And)    如果本地有 → 直接 prepend，无网络请求
-并且 (And)    如果本地不足 → 调用 GET /api/v1/chat/history?before={oldest_id}&limit=30
+并且 (And)    本地缓存不足时向服务端拉取更早的 30 条历史消息
 并且 (And)    服务端返回的消息写入 IndexedDB 缓存
 并且 (And)    保持当前滚动位置不跳动
 并且 (And)    如果返回 < 30 条，标记已到达最早消息，不再请求
@@ -296,6 +297,14 @@ updated: 2026-04-06
 当   (When)   用户重新打开 ChatView
 那么 (Then)   创建新 session，从 DB 恢复上下文（同场景 7.1）
 并且 (And)    用户无感知，对话无缝继续
+```
+
+### 场景 7.3: AI 正确区分昨天与今天的记录 <!-- ✅ completed (fix-ai-memory-time) -->
+```
+假设 (Given)  用户昨天录了"和张总开会"、今天录了"去超市买菜"
+当   (When)   用户打开聊天并询问今天做了什么
+那么 (Then)   AI 回复中出现"买菜"而不混入"张总开会"
+并且 (And)    再询问昨天时，AI 回复出现"张总开会"
 ```
 
 ---

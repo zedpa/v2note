@@ -3,6 +3,7 @@ id: "050a"
 title: "Todo System — Core & Logic"
 status: active
 domain: todo
+risk: medium
 dependencies: ["strike-extraction.md"]
 superseded_by: null
 related: ["todo-ui.md"]
@@ -173,6 +174,26 @@ LEFT JOIN record r ON r.id = t.record_id
 LEFT JOIN todo parent ON t.parent_id = parent.id AND parent.level >= 1
 LEFT JOIN LATERAL (...) sc ON true
 WHERE ...
+```
+
+### 场景 1.6: 编辑待办时间不产生时区偏移 <!-- ✅ completed (fix-todo-time-shift) -->
+```
+假设 (Given)  用户昨天在北京时区创建了一条 09:00 的待办
+当   (When)   用户打开该待办的编辑面板
+那么 (Then)   面板显示的时间为 09:00（而非 01:00）
+并且 (And)    显示的日期与用户当初选择的日期一致
+当   (When)   用户将时间改为 15:00 并保存
+那么 (Then)   刷新后列表仍显示为当天 15:00
+并且 (And)    待办不会被移动到前一天或错误时间
+```
+
+### 场景 1.7: 推迟凌晨待办保留日期 <!-- ✅ completed (fix-todo-time-shift) -->
+```
+假设 (Given)  一条待办的计划时间为北京时间 03:00（UTC 日期为前一天）
+当   (When)   用户点击"推迟到明天"
+那么 (Then)   新时间为次日 03:00（北京时间）
+并且 (And)    工作区视图显示的时间仍为 03:00
+并且 (And)    日期显示不倒退到前一天
 ```
 
 ### 涉及文件
@@ -357,38 +378,43 @@ WHERE ...
 5. `todo-projector` Strike 行动级 todo
 
 ### 场景 3.1: 相似度 >= 0.65 视为重复 <!-- ✅ completed -->
+
 ```
-Given 用户已有未完成 todo "联系张总确认合同"
-When  创建新 todo "联系张总确认合同细节"，embedding 相似度 0.72
-Then  返回已有 todo，action = "matched"，不插入新记录
+假设 (Given)  用户已有未完成 todo "联系张总确认合同"
+当   (When)   用户输入新 todo "联系张总确认合同细节"，向量相似度 0.72
+那么 (Then)   返回已有 todo，action = "matched"，不插入新记录
 ```
 
 ### 场景 3.2: 相似度 < 0.65 正常创建 <!-- ✅ completed -->
+
 ```
-Given 用户已有未完成 todo "联系张总确认合同"
-When  创建新 todo "去超市买菜"，embedding 相似度 0.15
-Then  正常创建新 todo，action = "created"
+假设 (Given)  用户已有未完成 todo "联系张总确认合同"
+当   (When)   用户输入新 todo "去超市买菜"，向量相似度 0.15
+那么 (Then)   正常创建新 todo，action = "created"
 ```
 
 ### 场景 3.3: 无已有 todo 直接创建 <!-- ✅ completed -->
+
 ```
-Given 用户无任何未完成 todo
-When  创建新 todo
-Then  正常创建，action = "created"
+假设 (Given)  用户无任何未完成 todo
+当   (When)   用户创建新 todo
+那么 (Then)   正常创建，action = "created"
 ```
 
 ### 场景 3.4: embedding 失败降级 <!-- ✅ completed -->
+
 ```
-Given embedding 服务不可用
-When  创建新 todo
-Then  降级直接创建，不报错
+假设 (Given)  向量服务不可用
+当   (When)   用户创建新 todo
+那么 (Then)   降级直接创建，不报错
 ```
 
 ### 场景 3.5: 已完成 todo 不参与去重 <!-- ✅ completed -->
+
 ```
-Given 用户有已完成 todo "联系张总确认合同"（done=true）
-When  创建相同文本的新 todo
-Then  正常创建（不与已完成 todo 去重）
+假设 (Given)  用户有已完成 todo "联系张总确认合同"（done=true）
+当   (When)   用户创建相同文本的新 todo
+那么 (Then)   正常创建（不与已完成 todo 去重）
 ```
 
 ### 接口约定

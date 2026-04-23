@@ -1,6 +1,11 @@
 ---
 status: superseded
 superseded_by: "chat-system.md"
+id: "chat-ui-redesign"
+domain: chat
+risk: medium
+created: 2026-04-17
+updated: 2026-04-17
 ---
 
 # Chat UI 大师级重构

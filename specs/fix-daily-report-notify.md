@@ -2,6 +2,7 @@
 id: fix-daily-report-notify
 title: "Fix: 早报通知未持久化 + 重复发送"
 status: completed
+backport: daily-report-core.md
 domain: report
 risk: medium
 dependencies: []

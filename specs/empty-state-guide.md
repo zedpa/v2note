@@ -3,6 +3,7 @@ id: "079"
 title: "空状态引导"
 status: completed
 domain: design
+risk: medium
 dependencies: []
 superseded_by: null
 created: 2026-03-23

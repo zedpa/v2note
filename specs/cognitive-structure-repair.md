@@ -3,6 +3,7 @@ id: "069"
 title: "认知结构修复 v2 — 统一数据模型 + L3 侧边栏"
 status: completed
 domain: cognitive
+risk: medium
 dependencies: []
 superseded_by: null
 created: 2026-03-23

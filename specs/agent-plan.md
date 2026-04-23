@@ -3,6 +3,7 @@ id: "058"
 title: "Agent Plan 机制"
 status: completed
 domain: agent
+risk: medium
 dependencies: []
 superseded_by: null
 created: 2026-03-23

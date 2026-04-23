@@ -3,6 +3,7 @@ id: "070"
 title: "并发加固 — Semaphore 超时 + AI 调用优先级 + Retry-After"
 status: completed
 domain: infra
+risk: medium
 dependencies: []
 superseded_by: null
 created: 2026-03-23

@@ -3,6 +3,7 @@ id: "051"
 title: "Chat System"
 status: active
 domain: chat
+risk: medium
 dependencies: ["auth.md"]
 superseded_by: null
 created: 2026-03-23

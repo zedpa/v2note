@@ -2,6 +2,7 @@
 id: fix-calendar-swipe
 title: "Fix: 日历滑动与Tab切换手势冲突"
 status: completed
+backport: app-mobile-views.md#场景 1.2a
 domain: ui
 risk: low
 dependencies: ["app-mobile-views.md", "todo-ui.md"]

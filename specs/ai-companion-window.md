@@ -3,6 +3,7 @@ id: "062"
 title: "AI 伴侣窗口 — 像素小鹿 + 心情系统 + 工具可视化"
 status: active
 domain: ui
+risk: medium
 dependencies: []
 superseded_by: null
 created: 2026-03-23
@@ -107,6 +108,7 @@ updated: 2026-03-30
 ### 场景 1.2: 小鹿动画规格
 ```
 假设 (Given)  需要实现像素小鹿动画
+当   (When)   定义动画资源规格
 那么 (Then)   动画资源规格：
 
   精灵图(Sprite Sheet): 一张 PNG，每帧 32×32px，横向排列
@@ -244,6 +246,7 @@ updated: 2026-03-30
 ### 场景 2.5: 输入栏布局与多模态入口
 ```
 假设 (Given)  Chat 输入栏显示中
+当   (When)   渲染输入栏
 那么 (Then)   输入栏布局：
   ┌──────────────────────────────────────────────┐
   │  [+]  [输入框...              ]  🧠  🎙  ▶  │

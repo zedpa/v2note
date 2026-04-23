@@ -3,6 +3,7 @@ id: "074"
 title: "设计语言对齐 — Editorial Serenity 落地"
 status: completed
 domain: design
+risk: medium
 dependencies: []
 superseded_by: null
 created: 2026-03-23

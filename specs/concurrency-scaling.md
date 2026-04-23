@@ -3,6 +3,7 @@ id: "071"
 title: "并发扩容方案（阿里云版）"
 status: active
 domain: infra
+risk: medium
 dependencies: []
 superseded_by: null
 created: 2026-03-23
@@ -93,7 +94,7 @@ echo 'vm.swappiness=10' | sudo tee -a /etc/sysctl.conf
 当   (When)   改为 SQLite 磁盘缓存 + 内存 LRU 热层
 那么 (Then)   磁盘层可存 10 万条 embedding（~400MB），重启不丢失
 并且 (And)    内存只保留最近 100 条热点（LRU），从 4MB 降到 ~0.8MB
-并且 (And)    磁盘读取延迟 ~0.1ms，vs DashScope API ~100ms
+并且 (And)    磁盘读取延迟 ~0.1ms，远低于远程 DashScope 请求的 ~100ms
 并且 (And)    DashScope embedding 调用量减少 50%+（缓存命中）
 ```
 
@@ -128,7 +129,7 @@ export function setCachedEmbedding(key: string, vector: number[]): void {
 
 ```typescript
 // gateway/src/memory/embeddings.ts 改造
-// 查找顺序：内存 LRU(100) → SQLite 磁盘 → DashScope API → 回写两层
+// 查找顺序：内存 LRU(100) → SQLite 磁盘 → DashScope 远程 → 回写两层
 ```
 
 **依赖：** `pnpm add better-sqlite3`（gateway workspace）
@@ -258,7 +259,7 @@ interface UploadTask {
 ```
 假设 (Given)  DashScope API 有隐性 QPS 限制（embedding ~10 QPS，LLM ~5-10 QPS）
 当   (When)   加入 Semaphore 并发控制
-那么 (Then)   embedding API 全局最多 5 个同时请求，超出排队
+那么 (Then)   embedding 调用全局最多 5 个同时请求，超出排队
 并且 (And)    LLM chat 全局最多 3 个同时请求，超出排队
 并且 (And)    默认用 keyword 搜索，仅在结果 < 3 条时 fallback 到 embedding
 ```
@@ -407,7 +408,7 @@ interface UploadTask {
 那么 (Then)   购买 RDS PostgreSQL 基础版 2核4G（~¥200/月）
 并且 (And)    启用 pgvector 扩展（阿里云 RDS PG 14+ 原生支持）
 并且 (And)    数据库与 ECS 同 VPC，延迟从 ~50ms 降至 <1ms
-并且 (And)    连接数上限 200+，无 API 限额
+并且 (And)    连接数上限 200+，无服务级限流
 ```
 
 **迁移方案：**

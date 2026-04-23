@@ -2,6 +2,7 @@
 id: fix-ai-memory-time
 title: "Fix: AI 记忆时间错乱（分不清昨天/今天）"
 status: completed
+backport: chat-persistence.md#场景 7.3
 domain: cognitive
 risk: medium
 dependencies: []
@@ -62,91 +63,36 @@ AI system prompt 中存在三种日期格式，AI 需要跨格式比对才能判
 
 ## 1. 历史消息注入日期分隔
 
-### 场景 1.0a: 跨天消息插入日期分隔标记
+### 场景 1.1: 用户询问今天的事 AI 不混入昨天内容
 ```
-假设 (Given)  恢复最近 20 条未压缩消息，其中包含今天和昨天的对话
-当   (When)   消息按时间正序注入 session context
-那么 (Then)   在日期切换处插入 system 消息作为分隔
-并且 (And)    格式为 "[以下是 2026-04-07 昨天 的对话]" / "[以下是 2026-04-08 今天 的对话]"
-并且 (And)    AI 能清晰区分哪些对话发生在哪天
-```
-
-### 场景 1.0b: 同一天的消息不插入多余分隔
-```
-假设 (Given)  恢复的 20 条消息全部是今天的
-当   (When)   消息注入 session context
-那么 (Then)   只在开头插入一条 "[以下是 2026-04-08 今天 的对话]"
-并且 (And)    不重复插入分隔
+假设 (Given)  用户昨天录了一条关于会议的内容、今天录了一条关于购物的内容
+当   (When)   用户打开聊天询问"我今天做了什么"
+那么 (Then)   AI 回复中仅出现今天的购物内容
+并且 (And)    AI 回复中不出现昨天的会议内容
 ```
 
-### 场景 1.0c: 历史摘要也标注时间范围
+### 场景 1.2: 用户询问昨天的事 AI 正确回忆
 ```
-假设 (Given)  context-summary（压缩摘要）被注入
-当   (When)   摘要内容注入 session context
-那么 (Then)   摘要标题包含其覆盖的时间范围
-并且 (And)    格式如 "[历史对话摘要，截至 2026-04-06]"
-```
-
-## 2. 统一日期格式为 ISO
-
-### 场景 1.1: 日记记录使用 ISO 日期
-```
-假设 (Given)  AI 上下文中包含日记记录
-当   (When)   记录被格式化注入 system prompt
-那么 (Then)   日期格式为 ISO（YYYY-MM-DD），如 [2026-04-08]
-并且 (And)    与时间锚点表格式一致
+假设 (Given)  用户昨天录了一条关于会议的内容
+当   (When)   用户切换话题询问"那昨天呢"
+那么 (Then)   AI 回复中出现昨天的会议内容
+并且 (And)    AI 不将昨天的内容描述为今天发生
 ```
 
-### 场景 1.2: 待办时间使用 ISO 日期
+### 场景 1.3: 用户引用今日日记时 AI 措辞正确
 ```
-假设 (Given)  AI 上下文中包含待办列表
-当   (When)   待办的 scheduled_start 被格式化
-那么 (Then)   日期格式为 ISO（YYYY-MM-DD）
-```
-
-### 场景 1.3: pending intents 使用 ISO 日期
-```
-假设 (Given)  AI 上下文中包含待确认意图
-当   (When)   意图的时间被格式化
-那么 (Then)   日期格式为 ISO（YYYY-MM-DD）
+假设 (Given)  用户今天录入了一条日记
+当   (When)   用户提交聊天内容引用该日记
+那么 (Then)   AI 回复措辞为"今天你提到…"
+并且 (And)    AI 不会误称为"昨天"
 ```
 
-## 2. 添加相对时间标记
-
-### 场景 2.1: 今天的记录标注"今天"
+### 场景 1.4: 跨午夜录入的记录归属正确
 ```
-假设 (Given)  用户查看的日期范围包含今天的记录
-当   (When)   记录被注入 AI 上下文
-那么 (Then)   今天的记录前缀为 [2026-04-08 今天]
-并且 (And)    昨天的记录前缀为 [2026-04-07 昨天]
-并且 (And)    其他日期仅显示 ISO 日期
-```
-
-### 场景 2.2: Memory 添加相对标记
-```
-假设 (Given)  AI 上下文中包含 memory 条目
-当   (When)   memory 的 source_date 是今天或昨天
-那么 (Then)   添加"今天"/"昨天"标记
-当   (When)   memory 的 source_date 为 null
-那么 (Then)   显示 [日期未知]
-```
-
-## 3. 时区同步
-
-### 场景 3.1: 前端传递用户时区
-```
-假设 (Given)  用户打开聊天
-当   (When)   前端发送 chat.start
-那么 (Then)   payload 中包含 timezone 字段（如 "Asia/Shanghai"）
-并且 (And)    gateway 使用该时区生成 buildDateAnchor()
-```
-
-### 场景 3.2: buildDateAnchor 支持时区参数
-```
-假设 (Given)  gateway 收到用户时区
-当   (When)   调用 buildDateAnchor()
-那么 (Then)   使用用户时区计算"今天"等相对日期
-并且 (And)    不依赖服务器本地时间
+假设 (Given)  用户昨天 23:55 录入了一条记录
+当   (When)   用户今天 00:05 打开聊天询问昨天做了什么
+那么 (Then)   AI 回复将该记录归入昨天
+并且 (And)    不将其误归为今天
 ```
 
 ## 验收行为（E2E 锚点）

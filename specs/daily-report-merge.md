@@ -1,6 +1,11 @@
 ---
 status: superseded
 superseded_by: "daily-report.md"
+id: "daily-report-merge"
+domain: report
+risk: medium
+created: 2026-04-17
+updated: 2026-04-17
 ---
 
 # 每日报告合并：智能日报

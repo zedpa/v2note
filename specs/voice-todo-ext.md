@@ -3,6 +3,7 @@ id: "102b"
 title: "Voice — Todo Extension & Reminders"
 status: active
 domain: voice
+risk: medium
 dependencies: ["voice-routing.md", "todo-core.md"]
 superseded_by: null
 related: ["voice-routing.md"]

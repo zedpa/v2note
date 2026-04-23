@@ -1,6 +1,11 @@
 ---
 status: superseded
 superseded_by: "daily-report.md"
+id: "cognitive-report"
+domain: cognitive
+risk: medium
+created: 2026-04-17
+updated: 2026-04-17
 ---
 
 # 认知报告 + 每日回顾数据源

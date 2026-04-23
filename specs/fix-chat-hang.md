@@ -2,7 +2,9 @@
 id: "081"
 title: "修复：Chat AI 回复无限加载"
 status: completed
+backport: chat-system.md
 domain: chat
+risk: medium
 dependencies: []
 superseded_by: null
 created: 2026-03-23

@@ -3,6 +3,7 @@ id: "067"
 title: "认知引擎 v2 — 单次批量分析"
 status: completed
 domain: cognitive
+risk: medium
 dependencies: []
 superseded_by: null
 created: 2026-03-23

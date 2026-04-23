@@ -3,6 +3,7 @@ id: "076"
 title: "领域词库 — DashScope 热词 + 自动收录"
 status: completed
 domain: cognitive
+risk: medium
 dependencies: []
 superseded_by: null
 created: 2026-03-23

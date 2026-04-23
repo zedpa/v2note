@@ -1,6 +1,11 @@
 ---
 status: superseded
 superseded_by: "todo-system.md"
+id: "todo-strike-bridge"
+domain: todo
+risk: medium
+created: 2026-04-17
+updated: 2026-04-17
 ---
 
 # Todo-Strike 数据桥梁

@@ -7,7 +7,7 @@ risk: medium
 dependencies: ["voice-routing.md"]
 superseded_by: null
 created: 2026-04-04
-updated: 2026-04-04
+updated: 2026-04-23
 ---
 
 # Recording Resilience — 录音防丢 + 断线重试

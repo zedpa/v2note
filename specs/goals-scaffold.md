@@ -3,6 +3,7 @@ id: "086"
 title: "目标场景前端骨架"
 status: completed
 domain: goal
+risk: medium
 dependencies: []
 superseded_by: null
 created: 2026-03-23
@@ -44,7 +45,7 @@ updated: 2026-03-30
 ```
 假设 (Given)  用户点击"+"按钮
 当   (When)   输入目标名称 "Q2供应链重建"
-那么 (Then)   POST /api/v1/goals 创建目标
+那么 (Then)   创建并保存新目标
 并且 (And)    可选择父目标（项目归属）
 并且 (And)    创建后立即触发 goal-auto-link 扫描
 ```

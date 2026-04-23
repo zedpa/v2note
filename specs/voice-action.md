@@ -3,6 +3,7 @@ id: "101"
 title: "语音指令自动识别与执行"
 status: completed
 domain: voice
+risk: medium
 dependencies: []
 superseded_by: null
 created: 2026-03-23
@@ -156,7 +157,7 @@ type ActionIntent =
 假设 (Given)  用户有目标"Q2 供应链重建"
 当   (When)   用户录音说"供应链那个目标进展怎么样了"
 那么 (Then)   Process 识别为 action 类型: query_goal
-并且 (And)    匹配目标 + 调用 GET /goals/:id/health
+并且 (And)    匹配目标后加载该目标的健康度
 并且 (And)    AI 气泡: "供应链重建：进度 60%，方向90%/资源60%/路径40%/驱动80%。待办还剩2个。"
 并且 (And)    可点击跳转目标详情页
 ```

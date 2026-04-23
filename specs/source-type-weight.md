@@ -3,6 +3,7 @@ id: "097"
 title: "source_type 权重全链路落地"
 status: completed
 domain: cognitive
+risk: medium
 dependencies: []
 superseded_by: null
 created: 2026-03-23

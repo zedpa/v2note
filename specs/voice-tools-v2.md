@@ -3,6 +3,7 @@ id: "103"
 title: "语音控制完整化 v2"
 status: completed
 domain: voice
+risk: medium
 dependencies: []
 superseded_by: null
 created: 2026-03-23

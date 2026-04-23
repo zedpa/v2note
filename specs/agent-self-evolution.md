@@ -3,6 +3,7 @@ id: "059"
 title: "Agent 自适应——交互偏好学习 + Soul 守护"
 status: completed
 domain: agent
+risk: medium
 dependencies: []
 superseded_by: null
 created: 2026-03-23

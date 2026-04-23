@@ -3,6 +3,7 @@ id: "072"
 title: "每日回顾重构"
 status: superseded
 domain: report
+risk: medium
 dependencies: []
 superseded_by: daily-report.md
 created: 2026-03-23
@@ -30,7 +31,7 @@ updated: 2026-03-30
 假设 (Given)  当前时间 7:00-10:00，用户今日首次打开 App
 当   (When)   主页加载完成
 那么 (Then)   自动弹出 morning-briefing overlay
-并且 (And)    调用 GET /api/v1/daily/briefing
+并且 (And)    加载当日晨间简报数据
 并且 (And)    以卡片横滑方式展示：问候语 → 今日待办 → 洞察 → 目标进展
 ```
 
@@ -48,7 +49,7 @@ updated: 2026-03-30
 假设 (Given)  用户想回顾今天
 当   (When)   用户点击侧边栏"每日回顾" 或 收到晚间通知
 那么 (Then)   打开 evening-summary overlay
-并且 (And)    调用 GET /api/v1/daily/evening-summary
+并且 (And)    加载当日晚间总结数据
 并且 (And)    卡片包含：今日成就 → 认知亮点 → 目标更新 → 需关注项 → 明日预览
 ```
 
@@ -58,7 +59,7 @@ updated: 2026-03-30
 当   (When)   用户点击中继待办
 那么 (Then)   展开该待办详情
 并且 (And)    提供"今天继续"/"推迟"/"放弃"操作
-并且 (And)    选择后调用 PATCH /api/v1/daily/relays/:id
+并且 (And)    选择后提交中继待办的状态更新
 ```
 
 ### 场景 5: 删除 mock 壳

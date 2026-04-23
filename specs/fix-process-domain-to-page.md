@@ -2,6 +2,7 @@
 id: "fix-process-domain-to-page"
 title: "Fix: Layer 3 domain 废弃残留 → 替换为即时 page_title 归类"
 status: completed
+backport: cognitive-wiki-core.md
 domain: cognitive
 risk: medium
 dependencies: ["cognitive-wiki.md", "prompt-architecture-v2.md"]
@@ -263,7 +264,9 @@ interface UnifiedResult {
 
 ### 场景 4.2: process.ts 和 digest.ts 是不同入口
 ```
-说明 (Note)   process.ts（Layer 3）= 语音实时处理路径
+假设 (Given)  存在两条处理路径
+当   (When)   说明两者关系
+那么 (Then)   process.ts（Layer 3）= 语音实时处理路径
              digest.ts = 后台异步批量消化路径
              两者可能处理同一 record，但时序上 process.ts 先执行
              lightweight-classifier 在 digest.ts step 1.6 被 fire-and-forget 调用

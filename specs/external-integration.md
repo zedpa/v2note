@@ -3,6 +3,7 @@ id: "080"
 title: "外部数据源集成"
 status: draft
 domain: infra
+risk: medium
 dependencies: []
 superseded_by: null
 created: 2026-03-23

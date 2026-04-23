@@ -113,6 +113,23 @@ updated: 2026-04-02
 > - `gateway/src/jobs/sweep-stale-records.ts`（僵尸记录 cron 清扫）
 > - `features/notes/hooks/use-notes.ts`（轮询上限 + visibility 感知）
 
+#### P1-7a: 僵尸上传记录自动清退 <!-- ✅ completed (fix-oss-image-traffic-storm) -->
+```
+假设 (Given)  用户之前有一条上传很久未完成的日记（客户端崩溃或网络中断遗留）
+当   (When)   用户打开时间线
+那么 (Then)   该条日记在一段时间内被标记为"上传失败"并展示重试入口
+并且 (And)    页面不会因这条卡住的日记永远保持在"处理中"的忙碌状态
+```
+
+#### P1-7b: 长时间停留不产生持续后台流量 <!-- ✅ completed (fix-oss-image-traffic-storm) -->
+```
+假设 (Given)  用户打开时间线后长时间未操作
+当   (When)   自动刷新累计达到上限
+那么 (Then)   前端停止自动刷新，并提示"自动刷新已暂停，下拉可恢复"
+并且 (And)    用户下拉刷新或回到页面前台时，自动刷新立即恢复
+并且 (And)    页面切到后台 Tab 期间暂停刷新，不产生网络请求
+```
+
 #### P1-8: 笔记详情 — 文件附件卡片
 ```
 假设 (Given)  一条 record 的 file_url 为非图片文件

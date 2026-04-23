@@ -2,6 +2,7 @@
 id: "fix-domain-deprecation"
 title: "Fix: domain 字段全面废弃 — 停止写入 + 读取迁移"
 status: completed
+backport: cognitive-wiki-core.md
 domain: infra
 risk: medium
 dependencies: ["fix-sidebar-wiki-mgmt.md", "fix-process-domain-to-page.md", "fix-goal-quality.md"]

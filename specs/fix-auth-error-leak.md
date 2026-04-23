@@ -1,6 +1,12 @@
 ---
 status: superseded
 superseded_by: "auth.md"
+id: "fix-auth-error-leak"
+domain: auth
+risk: medium
+created: 2026-04-17
+updated: 2026-04-17
+backport: auth-ux-login.md
 ---
 
 # 修复：登录/注册错误状态泄漏

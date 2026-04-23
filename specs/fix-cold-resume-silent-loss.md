@@ -675,3 +675,28 @@ export function triggerSync(): void;   // 外部手动触发
 👉 **详见 [`fix-cold-resume-lazy-bind.md`](./fix-cold-resume-lazy-bind.md)**
 
 拆分原因：本文件超过 spec-lint 800 行阻断线。两节共同处理冷启动 / 长时间未用后懒绑定机制的生命周期 bug，作为独立子域维护便于后续演进。本文件的 §7.2 / §7.4 / §7.5 仍是这两节的契约依赖，不拆。
+
+### 场景 7.7: 页面刷新后 initAuth 恢复用户仍触发懒绑定 <!-- ✅ completed (fix-cold-resume-lazy-bind) -->
+```
+假设 (Given)  用户上次会话已登录，本地有 userId=null 的未同步 capture
+当   (When)   用户刷新页面，initAuth 从 localStorage 恢复登录态
+那么 (Then)   系统自动触发一轮懒绑定扫描
+并且 (And)    该 capture 被归属到当前用户，时间线中可见
+并且 (And)    未登录状态刷新时不触发任何登录事件
+```
+
+### 场景 8.1: 网络未就绪时懒绑定仍正常执行 <!-- ✅ completed (fix-cold-resume-lazy-bind) -->
+```
+假设 (Given)  用户已登录，本地有 userId=null 的 capture 待归属
+当   (When)   同步调度器运行，但 WS 连接尚未建立（网关会话不可用）
+那么 (Then)   懒绑定仍然执行，capture 的 userId 被回填为当前用户
+并且 (And)    数据推送等待下次网络就绪时再进行
+```
+
+### 场景 8.2: WS 连接恢复后自动触发同步 <!-- ✅ completed (fix-cold-resume-lazy-bind) -->
+```
+假设 (Given)  之前一轮同步因网络未就绪而跳过了推送
+当   (When)   WS 连接从断开状态变为已连接
+那么 (Then)   系统自动触发一轮新的同步
+并且 (And)    之前已懒绑定但未推送的 capture 被成功推送到服务端
+```

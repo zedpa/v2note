@@ -1,6 +1,11 @@
 ---
 status: superseded
 superseded_by: "todo-system.md"
+id: "todo-data-flow-fix"
+domain: todo
+risk: medium
+created: 2026-04-17
+updated: 2026-04-17
 ---
 
 # 待办数据通路修复 — 前端字段映射 + API 类型 + goal_title

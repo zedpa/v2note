@@ -2,6 +2,7 @@
 id: fix-recording-hint-style
 title: "Fix: 录音模式方向提示改为小按钮样式"
 status: completed
+backport: voice-input-unify.md#场景 5.2
 domain: voice
 risk: low
 dependencies: []
@@ -24,26 +25,25 @@ updated: 2026-04-11
 ### 场景 1: 默认状态提示可见性
 ```
 假设 (Given)  用户长按 FAB 进入录音模式
-当   (When)   手指未向任何方向滑动（activeDirection === "none"）
+当   (When)   用户未向任何方向滑动
 那么 (Then)   三个方向提示以小按钮/pill 样式显示，包含背景色、边框、图标+文字横排
-并且 (And)    默认 opacity 提升至可清晰辨认（≥ 0.6）
-并且 (And)    文字颜色提升至 text-white/70 级别
+并且 (And)    默认不透明度足够高，文字清晰可辨
 ```
 
 ### 场景 2: 拖动激活效果保持不变
 ```
 假设 (Given)  用户正在录音模式
-当   (When)   手指向某个方向滑动（activeDirection !== "none"）
-那么 (Then)   被激活方向的按钮保持现有的放大 + 变色 + 发光效果
-并且 (And)    非激活方向的按钮变暗（保持现有 opacity 递减逻辑）
+当   (When)   拖动手指向某个方向滑动
+那么 (Then)   被激活方向的按钮保持放大 + 变色 + 发光效果
+并且 (And)    非激活方向的按钮相应变暗
 ```
 
 ### 场景 3: 布局结构变化
 ```
-假设 (Given)  修改提示样式
-当   (When)   将图标+文字从纵向排列改为横向 pill 按钮
-那么 (Then)   图标在左，文字在右，整体为圆角 pill 形状
-并且 (And)    背景为 bg-white/10 + backdrop-blur + border border-white/10（与「松开发送」风格一致）
+假设 (Given)  用户长按进入录音模式
+当   (When)   打开录音界面查看方向提示
+那么 (Then)   图标在左、文字在右，整体为圆角 pill 形状
+并且 (And)    背景与边框风格与底部「松开发送」按钮一致
 ```
 
 ## 验收行为（E2E 锚点）

@@ -3,6 +3,7 @@ id: "060"
 title: "Agent 工具层重构"
 status: completed
 domain: agent
+risk: medium
 dependencies: []
 superseded_by: null
 created: 2026-03-23

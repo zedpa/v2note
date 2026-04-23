@@ -2,6 +2,7 @@
 id: "fix-briefing-prompt-v2"
 title: "Fix: 早晚报接入 v2 提示词架构 + 内容质量提升"
 status: completed
+backport: daily-report-core.md#场景 M5
 domain: report
 risk: medium
 dependencies: ["prompt-architecture-v2.md", "daily-report-core.md"]
@@ -65,133 +66,105 @@ updated: 2026-04-11
 
 ## 1. 早报重构
 
-### 场景 1.1: 早报接入 v2 prompt 架构
+### 场景 1.1: 早报问候体现人格与上下文
 
 ```
-假设 (Given)  用户请求晨间简报
-当   (When)   generateMorningBriefing 被调用
-那么 (Then)   使用 loadWarmContext(mode: "briefing") 加载上下文
-并且 (And)    使用 buildSystemPrompt(agent: "briefing") 构建 system prompt
-并且 (And)    Soul 完整注入（不截断到 200 字）
-并且 (And)    UserAgent 注入（用户规则/通知偏好）
-并且 (And)    Memory 注入（最多 5 条相关记忆）
+假设 (Given)  用户有个人画像与近期记忆
+当   (When)   用户打开晨间简报
+那么 (Then)   问候内容自然体现用户人格特征
+并且 (And)    问候展现了对近期上下文的感知
 ```
 
 ### 场景 1.2: 早报包含进行中目标
 
 ```
-假设 (Given)  用户有 active/progressing 状态的目标
-当   (When)   生成晨间简报
-那么 (Then)   加载活跃目标列表（goalRepo.findActiveByUser）
-并且 (And)    每个目标附带待办完成进度（done/total）
-并且 (And)    prompt 的 user 消息中包含「目标脉搏」段落
-并且 (And)    AI 在 today_focus 中适当引用目标进展
+假设 (Given)  用户有进行中的目标以及关联待办
+当   (When)   用户打开晨间简报
+那么 (Then)   页面显示"目标脉搏"区域
+并且 (And)    每个目标展示名称与待办完成进度
+并且 (And)    今日焦点区域适当呼应目标进展
 ```
 
-### 场景 1.3: 早报 JSON 输出格式
+### 场景 1.3: 早报字段与排版
 
 ```
-假设 (Given)  AI 生成早报
-当   (When)   返回结果
-那么 (Then)   JSON 结构为：
-             {
-               "greeting": "≤30字个性化问候",
-               "today_focus": ["待办/目标相关，按优先级，最多5条"],
-               "carry_over": ["逾期待办，语气轻松"],
-               "goal_pulse": [{"title": "目标名", "progress": "2/5"}],
-               "stats": {"yesterday_done": N, "yesterday_total": N}
-             }
-并且 (And)    新增 goal_pulse 字段
+假设 (Given)  用户打开晨间简报
+当   (When)   用户查看简报内容
+那么 (Then)   页面包含问候、今日焦点、遗留、目标脉搏、昨日统计五个区域
+并且 (And)    目标脉搏区域在用户无目标时显示为空
 ```
 
-### 场景 1.4: 早报尊重 UserAgent 通知偏好
+### 场景 1.4: 早报尊重通知偏好
 
 ```
-假设 (Given)  用户的 UserAgent 通知偏好中设置了"晨间简报: 关闭"
-当   (When)   请求晨间简报
-那么 (Then)   检查 UserAgent 通知偏好
-并且 (And)    如果包含"晨间简报: 关闭" → 返回 null 或空结果，不调用 AI
-并且 (And)    如果未设置或"开启" → 正常生成
+假设 (Given)  用户将晨间简报通知设置为关闭
+当   (When)   系统到达早报推送时间
+那么 (Then)   用户不会收到早报推送通知
+并且 (And)    用户仍可手动打开简报页面查看内容
 ```
 
 ---
 
 ## 2. 晚报重构
 
-### 场景 2.1: 晚报接入 v2 prompt 架构
+### 场景 2.1: 晚报体现人格与上下文
 
 ```
-假设 (Given)  用户请求晚间回顾
-当   (When)   generateEveningSummary 被调用
-那么 (Then)   使用 loadWarmContext(mode: "briefing") 加载上下文
-并且 (And)    使用 buildSystemPrompt(agent: "briefing") 构建 system prompt
-并且 (And)    Soul/Profile/Memory/Wiki 完整注入
+假设 (Given)  用户有画像与近期记忆/知识
+当   (When)   用户打开晚间回顾
+那么 (Then)   内容以用户人格的口吻呈现
+并且 (And)    回顾自然关联近期承诺、决定与关注点
 ```
 
 ### 场景 2.2: 晚报包含日记洞察
 
 ```
-假设 (Given)  用户今天有日记记录（record + transcript）
-当   (When)   生成晚间回顾
-那么 (Then)   加载今日日记（recordRepo.findByUserAndDateRange + transcriptRepo.findByRecordIds）
-并且 (And)    将日记文本（最多 2000 字）传入 prompt 的 user 消息
-并且 (And)    AI 对日记进行洞察：
-             - 准确描述用户今天的感受和状态（不是泛泛总结）
-             - 抽象出更高层级的模式/趋势（如"你最近三天都在纠结同一件事"）
-             - 如果有矛盾或有趣的点，指出来
-并且 (And)    输出在 JSON 的 insight 字段
+假设 (Given)  用户今天写过日记
+当   (When)   用户打开晚间回顾
+那么 (Then)   页面展示基于今日日记的洞察段落
+并且 (And)    洞察准确描述用户当日感受与状态
+并且 (And)    洞察可指出更高层级的模式或有趣之处
 ```
 
 ### 场景 2.3: 晚报包含每日肯定
 
 ```
-假设 (Given)  AI 生成晚间回顾
-当   (When)   返回结果
-那么 (Then)   JSON 包含 affirmation 字段
-并且 (And)    affirmation 是一句真诚的肯定：
-             - 基于今天实际做的事（不是空洞的"你很棒"）
-             - 如果什么都没做 → "今天休息也是一种选择" 类型的接纳
-             - 语气匹配 Soul 人格（温暖但不虚伪）
+假设 (Given)  用户打开晚间回顾
+当   (When)   用户查看回顾内容
+那么 (Then)   页面显示一句真诚的每日肯定
+并且 (And)    肯定内容基于当日实际活动
+并且 (And)    当日无活动时，肯定语气体现温暖的接纳
 ```
 
-### 场景 2.4: 晚报 JSON 输出格式
+### 场景 2.4: 晚报结构与字段
 
 ```
-假设 (Given)  AI 生成晚报
-当   (When)   返回结果
-那么 (Then)   JSON 结构为：
-             {
-               "headline": "≤30字温暖回顾",
-               "accomplishments": ["具体完成的事项"],
-               "insight": "日记洞察 — 准确描述+高阶抽象，2-4句话",
-               "affirmation": "一句真诚的每日肯定",
-               "tomorrow_preview": ["明日排期，最多3条"],
-               "stats": {"done": N, "new_records": N}
-             }
-并且 (And)    新增 insight 和 affirmation 字段
+假设 (Given)  用户打开晚间回顾
+当   (When)   用户查看回顾内容
+那么 (Then)   页面包含标题、成就、洞察、每日肯定、明日预览五个区域
+并且 (And)    洞察与每日肯定在无数据时显示为默认引导语
 ```
 
-### 场景 2.5: 晚报尊重 UserAgent 通知偏好
+### 场景 2.5: 晚报尊重通知偏好
 
 ```
-假设 (Given)  用户的 UserAgent 通知偏好中设置了"晚间回顾: 关闭"
-当   (When)   请求晚间回顾
-那么 (Then)   检查 UserAgent 通知偏好
-并且 (And)    如果包含"晚间回顾: 关闭" → 返回 null，不调用 AI
+假设 (Given)  用户将晚间回顾通知设置为关闭
+当   (When)   系统到达晚报推送时间
+那么 (Then)   用户不会收到晚报推送通知
+并且 (And)    用户仍可手动打开回顾页面查看内容
 ```
 
 ---
 
 ## 3. briefing agent 激活
 
-### 场景 3.1: briefing.md 正确注入
+### 场景 3.1: briefing 人格一致性
 
 ```
-假设 (Given)  agents/briefing.md 已存在
-当   (When)   buildSystemPrompt(agent: "briefing") 被调用
-那么 (Then)   briefing agent prompt 被注入到 SharedAgent 之后
-并且 (And)    prompt 组装顺序遵循 v2 标准：SharedAgent → briefing.md → DateAnchor → Soul → UserAgent → Profile → Memory → Wiki
-             （briefing.md 在位置 2 注入是 buildSystemPrompt 对 agent 参数的标准处理，见 prompt-builder.ts 行 82-84）
+假设 (Given)  系统配置了 briefing 专属的人格引导
+当   (When)   用户打开早报或晚报
+那么 (Then)   报告内容语气与该人格保持一致
+并且 (And)    同日早报与晚报之间的语气连贯
 ```
 
 ---
@@ -239,16 +212,19 @@ interface SummaryResult {
 
 ## 验收行为（E2E 锚点）
 
-### E2E-1: 晨间简报包含目标脉搏
-- 登录 → 创建目标 + 若干待办 → GET /api/v1/daily/briefing?forceRefresh=true
-- 响应包含 goal_pulse 数组，且不为空
+### 行为 1: 晨间简报包含目标脉搏
+- 用户登录并创建目标与若干待办
+- 用户打开晨间简报
+- 页面显示"目标脉搏"区域且内容不为空
 
-### E2E-2: 晚间回顾包含日记洞察和肯定
-- 登录 → 提交日记 → 完成一个待办 → GET /api/v1/daily/evening-summary?forceRefresh=true
-- 响应包含 insight（非空字符串）和 affirmation（非空字符串）
+### 行为 2: 晚间回顾包含日记洞察和肯定
+- 用户提交当日日记并完成一个待办
+- 用户打开晚间回顾
+- 页面显示日记洞察段与每日肯定段，均非空
 
-### E2E-3: 早晚报人格一致
-- 生成早报和晚报 → 两者的 greeting/headline 语气应体现 Soul 人格（非公文腔）
+### 行为 3: 早晚报人格一致
+- 用户打开早报，再打开晚报
+- 两份报告的问候与标题语气均体现用户人格，不是公文腔
 
 ## 改动文件预估
 

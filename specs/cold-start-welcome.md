@@ -1,6 +1,11 @@
 ---
 status: superseded
 superseded_by: "cold-start.md"
+id: "cold-start-welcome"
+domain: onboarding
+risk: medium
+created: 2026-04-17
+updated: 2026-04-17
 ---
 
 # 冷启动欢迎体验
@@ -26,6 +31,10 @@ superseded_by: "cold-start.md"
 
 ### 场景 2: 欢迎日记内容 — 3 篇
 ```
+假设 (Given)  冷启动完成后需要插入欢迎日记
+当   (When)   系统创建欢迎日记
+那么 (Then)   插入以下 3 篇：
+
 日记 1: "念念有路 · 功能介绍"
   内容（Markdown格式）：
     产品核心能力介绍——语音/文字混沌输入、AI 自动拆解为想法和待办、

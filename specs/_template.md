@@ -19,6 +19,9 @@ domain: ""               # todo | chat | auth | cognitive | agent | ui | infra |
 risk: medium             # low（纯UI/已有模式）| medium（新功能/bug修复）| high（新模块/数据模型变更/跨模块）
 dependencies: []         # 例如 ["003-auth.md", "012-voice-routing.md"]
 superseded_by: null       # 被哪个 spec 替代，例如 "020-todo-system.md"
+# 仅 fix-*.md 必填：backport 必须指向主 spec 的场景号，例如：
+# backport: todo-core.md#场景 2.3
+# 历史遗留的 fix 可用 GRANDFATHERED 暂时豁免（但应逐步回填）
 created: YYYY-MM-DD
 updated: YYYY-MM-DD
 ---
@@ -27,6 +30,29 @@ updated: YYYY-MM-DD
 
 ## 概述
 [一句话描述这个功能做什么，为谁解决什么问题]
+
+## ⚠️ 写场景前必读：用户视角 vs 实现视角
+
+场景的 Given/When/Then 必须从**用户视角**写，不是接口测试脚本。
+
+**When 行必须以用户可执行动作起手**（点击/输入/打开/说/选择/拖动/滑动/刷新 等）。
+**Then 行禁止泄露实现**（API/数据库/setState/dispatch/函数调用/表字段）。
+
+```text
+❌ 当   调用 POST /todos 接口                 → 不是用户视角
+✅ 当   用户在待办输入框敲 "周五交报告" 并回车
+
+❌ 那么 数据库 todos 表新增一行              → 泄露实现
+✅ 那么 待办列表顶部出现 "周五交报告" 条目
+
+❌ 那么 setState 更新 isOpen=true           → 泄露实现
+✅ 那么 侧边栏展开，显示今日 3 条待办
+
+❌ 当   组件加载                              → 不是用户动作
+✅ 当   用户打开 /timeline 页面
+```
+
+系统事件（定时任务、外部 webhook）可用「系统」「到达...时」「收到...时」作为 When 起手。
 
 ## 1. [功能模块 A]
 

@@ -2,7 +2,9 @@
 id: "082"
 title: "修复：今日简报 HTTP 500 崩溃"
 status: completed
+backport: daily-report-core.md#场景 M3
 domain: report
+risk: medium
 dependencies: []
 superseded_by: null
 created: 2026-03-23
@@ -45,22 +47,22 @@ features/chat/components/counselor-chat.tsx:118 也绕过 api.ts，无 Authoriza
 ```
 假设 (Given)  用户已登录，有若干待办（含已排期和未排期）
 当   (When)   用户打开今日简报
-那么 (Then)   简报显示问候语、今日待办列表、目标进展、AI 建议
-并且 (And)    scheduled_start 为 Date 或 string 类型均能正确筛选今日待办
+那么 (Then)   页面显示问候语、今日待办列表、目标进展与建议
+并且 (And)    简报不出现崩溃或空白页，正常呈现当日内容
 ```
 
 ### 场景 2: 晚间总结正常加载
 ```
 假设 (Given)  用户已登录，当天有已完成和未完成的待办
 当   (When)   用户打开晚间总结
-那么 (Then)   总结显示今日成就、认知亮点、目标更新、明日预览
+那么 (Then)   页面显示今日成就、认知亮点、目标更新、明日预览
 ```
 
 ### 场景 3: Relay 标记完成
 ```
 假设 (Given)  简报中有 relay 待办
 当   (When)   用户点击 relay 的完成按钮
-那么 (Then)   API 调用成功，按钮状态更新为已完成
+那么 (Then)   按钮状态更新为已完成
 并且 (And)    失败时显示错误提示，按钮恢复可点击
 ```
 
@@ -74,10 +76,10 @@ features/chat/components/counselor-chat.tsx:118 也绕过 api.ts，无 Authoriza
 
 ### 场景 5: Auth token 过期时的降级
 ```
-假设 (Given)  用户 token 已过期
-当   (When)   简报请求返回 401
-那么 (Then)   自动 refresh token 并重试
-并且 (And)    refresh 失败时显示"登录已过期"提示
+假设 (Given)  用户登录态已过期
+当   (When)   用户打开今日简报
+那么 (Then)   系统自动续期后重新加载简报
+并且 (And)    续期失败时显示"登录已过期"提示
 ```
 
 ## 边界条件

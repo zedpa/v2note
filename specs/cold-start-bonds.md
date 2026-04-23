@@ -1,6 +1,11 @@
 ---
 status: superseded
 superseded_by: "cold-start.md"
+id: "cold-start-bonds"
+domain: onboarding
+risk: medium
+created: 2026-04-17
+updated: 2026-04-17
 ---
 
 # 冷启动浅层关联

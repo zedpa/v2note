@@ -3,6 +3,7 @@ id: "077"
 title: "完整涌现链 L1→L2→L3"
 status: deprecated
 domain: cognitive
+risk: medium
 dependencies: []
 superseded_by: null
 created: 2026-03-23

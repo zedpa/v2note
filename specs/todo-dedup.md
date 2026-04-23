@@ -1,6 +1,11 @@
 ---
 status: superseded
 superseded_by: "todo-system.md"
+id: "todo-dedup"
+domain: todo
+risk: medium
+created: 2026-04-17
+updated: 2026-04-17
 ---
 
 # 待办去重（level=0）

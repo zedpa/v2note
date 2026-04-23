@@ -3,6 +3,7 @@ id: "100"
 title: "顶层维度——统一模型实现"
 status: active
 domain: goal
+risk: medium
 dependencies: []
 superseded_by: null
 created: 2026-03-23

@@ -1,6 +1,11 @@
 ---
 status: superseded
 superseded_by: "auth.md"
+id: "auth-hardening"
+domain: auth
+risk: medium
+created: 2026-04-17
+updated: 2026-04-17
 ---
 
 # Auth 加固：登录保持 + 竞态修复 + 体验优化
@@ -246,7 +251,7 @@ function getPasswordStrength(pw: string): "weak" | "medium" | "strong" {
 ### 场景 1：并发 401 不导致登出
 ```
 假设 (Given)  用户已登录，access token 刚过期
-当   (When)   3 个 API 请求同时返回 401
+当   (When)   收到 3 个 API 请求同时返回 401
 那么 (Then)   只发出 1 次 refresh 请求
 并且 (And)    3 个请求都用新 token 重试成功
 并且 (And)    用户无感知
@@ -263,7 +268,7 @@ function getPasswordStrength(pw: string): "weak" | "medium" | "strong" {
 ### 场景 3：2 小时内不需要 refresh
 ```
 假设 (Given)  用户登录后正常使用
-当   (When)   1.5 小时后发起请求
+当   (When)   时间到达登录后 1.5 小时并发起请求
 那么 (Then)   access token 仍有效，直接成功
 并且 (And)    不触发 refresh 流程
 ```

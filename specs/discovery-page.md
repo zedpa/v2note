@@ -3,6 +3,7 @@ id: "075"
 title: "发现页"
 status: draft
 domain: ui
+risk: medium
 dependencies: []
 superseded_by: null
 created: 2026-03-23
@@ -31,7 +32,7 @@ updated: 2026-03-30
 假设 (Given)  用户已登录，有至少 1 个 Cluster
 当   (When)   用户点击侧边栏"发现"菜单项
 那么 (Then)   打开 discovery overlay（全屏，SwipeBack 右滑返回）
-并且 (And)    调用 GET /api/v1/topics 获取方向列表
+并且 (And)    加载方向列表
 并且 (And)    按 stage 分组展示：活跃(active) / 成长(growing) / 种子(seed) / 沉寂(dormant)
 ```
 
@@ -48,7 +49,7 @@ updated: 2026-03-30
 ```
 假设 (Given)  用户在发现页
 当   (When)   用户点击某个方向卡片
-那么 (Then)   调用 GET /api/v1/topics/:clusterId/lifecycle
+那么 (Then)   加载该方向的生命周期数据
 并且 (And)    展示该方向的四阶段时间线：现在(Now) / 成长中(Growing) / 种子(Seeds) / 收获(Harvest)
 并且 (And)    Now 阶段显示最近相关 Strike 列表
 并且 (And)    Growing 阶段显示关联的 Bond 和趋势

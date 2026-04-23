@@ -2,9 +2,11 @@
 id: fix-record-delete-strike
 title: "Fix: 删除日记卡片报错 relation 'strike' does not exist"
 status: completed
+backport: 042-schema-cleanup-and-embedding.md
 domain: infra
 risk: low
 created: 2026-04-12
+updated: 2026-04-17
 ---
 
 # Fix: 删除日记卡片报错 relation "strike" does not exist
@@ -51,9 +53,14 @@ created: 2026-04-12
 
 ## 验收行为（E2E 锚点）
 
-1. 打开日记视图
-2. 对一条日记执行删除操作
-3. 确认删除成功，日记从列表消失，无错误提示
+### 行为 1: 打开日记视图
+用户打开日记视图
+
+### 行为 2: 删除日记
+对一条日记执行删除操作
+
+### 行为 3: 删除生效
+确认删除成功，日记从列表消失，无错误提示
 
 ## 附注：其他 strike 表残留引用
 

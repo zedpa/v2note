@@ -5,6 +5,8 @@ status: superseded
 superseded_by: ["voice-routing.md", "voice-todo-ext.md"]
 created: 2026-03-23
 updated: 2026-04-04
+domain: voice
+risk: medium
 ---
 
 # ⚠️ 本文件已拆分

@@ -3,6 +3,7 @@ id: "116"
 title: "Chat 工具调用 UI 重构"
 status: completed
 domain: chat
+risk: medium
 dependencies: ["chat-system.md"]
 superseded_by: null
 created: 2026-04-06

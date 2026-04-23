@@ -2,6 +2,7 @@
 id: fix-device-id-cleanup
 title: "Fix: deviceId 残留清理 — gateway 路由层全面切换 userId"
 status: completed
+backport: auth-ux-login.md
 domain: infra
 risk: medium
 dependencies: ["fix-remove-device-id.md"]
@@ -108,11 +109,20 @@ if (!userId) { sendError(res, "Unauthorized", 401); return; }
 
 ## 验收行为（E2E 锚点）
 
-1. 用户登录 → 日记列表正常加载
-2. 用户创建待办 → 创建成功，数据库中 device_id 为 null
-3. 用户查看目标 → 目标列表正常显示
-4. 用户发送语音 → 录音识别和保存正常
-5. TypeScript 编译无错误
+### 行为 1: 登录后日记列表加载
+用户登录后日记列表正常加载
+
+### 行为 2: 创建待办
+用户创建待办，数据库中 device_id 为 null
+
+### 行为 3: 目标列表
+用户查看目标，目标列表正常显示
+
+### 行为 4: 录音识别
+用户发送语音，录音识别和保存正常
+
+### 行为 5: 编译通过
+TypeScript 编译无错误
 
 ## 边界条件
 

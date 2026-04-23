@@ -2,7 +2,9 @@
 id: "fix-rec-ui"
 title: "Fix: 录音 UI 精简 — 长按半屏 + 常驻轻量浮窗"
 status: completed
+backport: voice-input-unify.md#场景 5.3
 domain: voice
+risk: low
 dependencies: ["app-mobile-views.md"]
 superseded_by: null
 created: 2026-04-06
@@ -30,7 +32,7 @@ updated: 2026-04-06
 ### 场景 1.1: 底部面板布局
 ```
 假设 (Given)  用户长按 FAB 进入录音状态 (phase === "recording")
-当   (When)   录音界面显示
+当   (When)   用户进入录音界面
 那么 (Then)   页面上方（约 60%）显示轻遮罩 bg-black/30，内容可见但不可交互
 并且 (And)    底部（约 40%）显示录音面板，背景 bg-[#0a0a0f]/95 圆角顶部
 并且 (And)    面板内自上而下排列：
@@ -82,7 +84,7 @@ updated: 2026-04-06
 ### 场景 2.1: 收起态 — 呼吸录音指示器（默认）
 ```
 假设 (Given)  用户通过长按右滑进入常驻录音 (phase === "locked")
-当   (When)   常驻录音开始
+当   (When)   用户进入常驻录音
 那么 (Then)   页面完全可交互，不显示任何遮罩或全屏覆盖
 并且 (And)    FAB 原位替换为呼吸录音指示器：
   - 圆形，与 FAB 同尺寸同位置
@@ -98,7 +100,7 @@ updated: 2026-04-06
 ### 场景 2.2: 展开态 — 暂停控制面板
 ```
 假设 (Given)  用户点击了呼吸录音指示器
-当   (When)   控制面板展开
+当   (When)   用户打开控制面板
 那么 (Then)   录音暂停
 并且 (And)    在 FAB 位置上方展开一个小浮窗（非全屏），包含：
   - 暂停状态 + 时长显示 "⏸ 01:23"

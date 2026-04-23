@@ -8,6 +8,7 @@ dependencies: ["cognitive-wiki.md", "app-mobile-nav.md", "tool-ecosystem-enhance
 superseded_by: null
 created: 2026-04-12
 updated: 2026-04-12
+backport: sidebar-my-world.md
 ---
 
 # Fix: 侧边栏 Wiki Page 统一
@@ -127,8 +128,8 @@ Wiki page 的 title 和 content 已经分离生命周期：
 当   (When)   用户点击主题区域的"+"按钮
 那么 (Then)   弹出输入框，输入主题名称
 并且 (And)    支持选择类型：主题(topic) 或 目标(goal)
-并且 (And)    调用 POST /api/v1/wiki/pages
-并且 (And)    成功后 refetch sidebar 数据，新 page 出现在列表中
+并且 (And)    提交新主题到服务端
+并且 (And)    成功后刷新侧边栏数据，新 page 出现在列表中
 ```
 
 ### 场景 3.2: 重命名主题页
@@ -138,8 +139,8 @@ Wiki page 的 title 和 content 已经分离生命周期：
 那么 (Then)   出现上下文菜单：重命名 / 删除
 当   (When)   用户选择"重命名"
 那么 (Then)   弹出输入框，预填当前标题
-并且 (And)    确认后调用 PATCH /api/v1/wiki/pages/:id
-并且 (And)    refetch sidebar 数据
+并且 (And)    确认后提交重命名
+并且 (And)    刷新侧边栏数据
 ```
 
 ### 场景 3.3: 删除（归档）主题页
@@ -147,8 +148,8 @@ Wiki page 的 title 和 content 已经分离生命周期：
 假设 (Given)  侧边栏有一个 wiki page（关联 N 条记录）
 当   (When)   用户长按 → 选择"删除"
 那么 (Then)   弹出确认对话框："删除「X」？其中 N 条记录将变为未归类"
-并且 (And)    确认后调用 DELETE /api/v1/wiki/pages/:id
-并且 (And)    refetch sidebar 数据，page 消失
+并且 (And)    确认后提交删除
+并且 (And)    刷新侧边栏数据，page 消失
 ```
 
 ### 场景 3.4: 空状态

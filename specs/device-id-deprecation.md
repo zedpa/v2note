@@ -1,6 +1,11 @@
 ---
 status: superseded
 superseded_by: "auth.md"
+id: "device-id-deprecation"
+domain: device
+risk: medium
+created: 2026-04-17
+updated: 2026-04-17
 ---
 
 # device_id 身份职责下线

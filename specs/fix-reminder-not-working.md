@@ -2,6 +2,7 @@
 id: "fix-reminder-not-working"
 title: "Fix: 提醒功能未生效 — Agent工具+编辑页+recalc"
 status: completed
+backport: todo-reminder-notify.md#场景 3a.1
 domain: todo
 risk: medium
 dependencies: ["todo-core.md", "todo-reminder-notify.md", "todo-calendar-alarm.md"]

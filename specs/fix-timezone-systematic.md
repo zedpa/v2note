@@ -2,6 +2,7 @@
 id: "fix-tz"
 title: "Fix: 系统性时区问题 — toISOString().split(T)[0] 全量替换"
 status: completed
+backport: GRANDFATHERED
 domain: infra
 risk: high
 dependencies: []

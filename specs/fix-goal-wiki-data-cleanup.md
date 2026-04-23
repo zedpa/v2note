@@ -2,6 +2,7 @@
 id: "fix-goal-wiki-data-cleanup"
 title: "Fix: Goal/Wiki Page 数据清洗 — 去重 + 孤儿修复 + 重挂载"
 status: completed
+backport: cognitive-wiki-core.md
 domain: cognitive
 risk: medium
 dependencies: ["fix-goal-quality.md", "fix-sidebar-wiki-mgmt.md", "fix-domain-deprecation.md"]

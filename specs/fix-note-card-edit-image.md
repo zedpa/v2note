@@ -2,9 +2,11 @@
 id: fix-note-card-edit-image
 title: "Fix: 日记卡片编辑窗口自适应 + 图片缩略图检测"
 status: completed
+backport: app-mobile-views.md#场景 3.3c
 domain: ui
 risk: low
 created: 2026-04-10
+updated: 2026-04-10
 ---
 
 # Fix: 日记卡片编辑窗口自适应 + 图片缩略图检测

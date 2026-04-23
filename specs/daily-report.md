@@ -3,6 +3,7 @@ id: "053"
 title: "Daily Report System (DEPRECATED — see split files)"
 status: superseded
 domain: report
+risk: medium
 superseded_by: ["daily-report-core.md", "daily-report-extended.md"]
 created: 2026-03-23
 updated: 2026-04-04

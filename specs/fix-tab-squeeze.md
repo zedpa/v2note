@@ -5,6 +5,8 @@ status: active
 domain: ui
 risk: low
 created: 2026-04-12
+updated: 2026-04-17
+backport: app-mobile-views-diary.md
 ---
 
 # Fix: 顶部日记/待办切换 Tab 被挤压成竖排
@@ -46,6 +48,11 @@ created: 2026-04-12
 
 ## 验收行为（E2E 锚点）
 
-1. 在 390×844 视口打开首页
-2. 检查 tablist 中所有 tab 按钮的文字不是竖排（高度 < 宽度）
-3. 切换到待办 tab，确认文字正常水平显示
+### 行为 1: 打开首页
+用户在 390×844 视口打开首页
+
+### 行为 2: Tab 文字水平
+tablist 中所有 tab 按钮的文字不是竖排（高度 < 宽度）
+
+### 行为 3: 切换 Tab
+切换到待办 tab，文字正常水平显示

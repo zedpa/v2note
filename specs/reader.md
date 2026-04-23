@@ -3,6 +3,7 @@ id: "094"
 title: "阅读器"
 status: draft
 domain: ui
+risk: medium
 dependencies: []
 superseded_by: null
 created: 2026-03-23
@@ -29,6 +30,7 @@ updated: 2026-03-30
 ### 场景 2: 阅读器排版
 ```
 假设 (Given)  进入阅读模式
+当   (When)   渲染阅读器页面
 那么 (Then)   居中排版 max-width 640px
 并且 (And)    字体 Noto Serif SC 18px / 行高 1.8
 并且 (And)    顶部：日期 + 来源图标 + 所属 Cluster 标签

@@ -3,6 +3,7 @@ id: "099"
 title: "主题生命周期 — 统一视图 + 认知-实践飞轮"
 status: active
 domain: cognitive
+risk: medium
 dependencies: []
 superseded_by: null
 created: 2026-03-23
@@ -105,7 +106,7 @@ updated: 2026-03-30
 
 并且 (And)    活跃方向按最近 Strike 时间排序（最活跃在上）
 并且 (And)    沉默区默认折叠，展开后灰色弱化显示
-并且 (And)    数据来源: GET /api/v1/topics（新接口，聚合 Cluster + Goal + Strike 统计）
+并且 (And)    数据来源：聚合 Cluster + Goal + Strike 统计的主题列表
 ```
 
 ### 场景 2: 选中主题 → 全局筛选 + Tab 变化
@@ -124,7 +125,7 @@ updated: 2026-03-30
 ```
 假设 (Given)  用户选中了主题「供应链管理」，当前在「进展」Tab
 当   (When)   视图加载
-那么 (Then)   调用 GET /api/v1/topics/:clusterId/lifecycle
+那么 (Then)   加载该主题的生命周期数据
 并且 (And)    按四个阶段展示内容（有数据的阶段才显示）：
 
   ── 此刻 ──────────────────────── Now ──
@@ -160,7 +161,7 @@ updated: 2026-03-30
 ```
 假设 (Given)  用户选中了主题「供应链管理」，切换到「脉络」Tab
 当   (When)   视图加载
-那么 (Then)   调用 GET /api/v1/records?cluster_id=xxx
+那么 (Then)   加载与该主题关联的记录流
 并且 (And)    日记流仅显示与该 Cluster 相关的日记卡片
 并且 (And)    筛选逻辑（三重匹配，取并集）：
   1. record → strike → bond → cluster_id 匹配（认知关联）
@@ -206,7 +207,7 @@ updated: 2026-03-30
   [设为目标]  →  创建 Goal (cluster_id=当前 Cluster, source='manual')
   [和路路聊聊 →]  →  打开参谋对话讨论这个想法
 当   (When)   用户点击 [设为目标]
-那么 (Then)   POST /api/v1/goals { title: Strike.nucleus, cluster_id, source: 'manual' }
+那么 (Then)   创建新目标，标题取自 Strike.nucleus，归属当前 Cluster，来源标为 manual
 并且 (And)    该 Seed 从种子区移入正在长区
 并且 (And)    触发 auto-link 扫描相关 Todo
 ```

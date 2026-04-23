@@ -2,6 +2,7 @@
 id: fix-todo-time-shift
 title: "Fix: 待办时间编辑时区偏移"
 status: completed
+backport: todo-core.md
 domain: todo
 risk: medium
 dependencies: ["todo-core.md"]

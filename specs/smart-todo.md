@@ -1,6 +1,11 @@
 ---
 status: superseded
 superseded_by: "todo-system.md"
+id: "smart-todo"
+domain: todo
+risk: medium
+created: 2026-04-17
+updated: 2026-04-17
 ---
 
 # 智能待办 — 从认知到行动的核心桥梁

@@ -3,6 +3,7 @@ id: "061"
 title: "Agent 联网工具"
 status: completed
 domain: agent
+risk: medium
 dependencies: []
 superseded_by: null
 created: 2026-03-23
@@ -29,7 +30,7 @@ updated: 2026-03-30
 假设 (Given)  用户问"最近铝价行情怎样"
 当   (When)   路路判断需要联网信息
 并且 (And)    调用 web_search({ query: "铝价 最新行情 2026" })
-那么 (Then)   调用搜索服务 API（Tavily / SerpAPI）
+那么 (Then)   向配置的搜索服务（Tavily / SerpAPI）发起查询
 并且 (And)    返回结构化结果：
       {
         success: true,
@@ -74,12 +75,10 @@ updated: 2026-03-30
 ```
 假设 (Given)  fetch_url 成功获取内容
 当   (When)   内容返回给 AI 后
-那么 (Then)   后台异步调用 Ingest：
-      POST /api/v1/ingest {
-        text: "[URL抓取] ${title}\n\n${content}",
-        url: originalUrl,
-        source_type: 'material'
-      }
+那么 (Then)   后台异步提交到 Ingest 管道：
+      text: "[URL抓取] ${title}\n\n${content}"
+      url: originalUrl
+      source_type: 'material'
 并且 (And)    进入标准 Digest 管道 → Strike (salience 1/5~1/10)
 并且 (And)    不参与 Cluster 涌现
 并且 (And)    只在参谋对话中可被引用（被动吸附）
@@ -136,7 +135,7 @@ updated: 2026-03-30
 当   (When)   环境变量 WEB_SEARCH_PROVIDER 决定使用哪个服务
 那么 (Then)   支持以下提供商（按推荐顺序）：
 
-  1. Tavily API（推荐）
+  1. Tavily（推荐）
      优势：为 AI agent 优化，返回结构化摘要 + answer
      配置：TAVILY_API_KEY
 
@@ -145,11 +144,11 @@ updated: 2026-03-30
      配置：SERPAPI_KEY
 
   3. 禁用（默认）
-     未配置任何 API key → web_search 工具不注册到 ToolRegistry
+     未配置任何密钥 → web_search 工具不注册到 ToolRegistry
      路路说"联网搜索未启用"
 
 并且 (And)    搜索失败时不重试，直接告知用户"搜索暂时不可用"
-并且 (And)    搜索服务的 API key 通过环境变量注入，不硬编码
+并且 (And)    搜索服务密钥通过环境变量注入，不硬编码
 ```
 
 ### 场景 7: 联网结果在对话上下文中的生命周期

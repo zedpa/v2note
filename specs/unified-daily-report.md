@@ -1,6 +1,11 @@
 ---
 status: superseded
 superseded_by: "daily-report.md"
+id: "unified-daily-report"
+domain: report
+risk: medium
+created: 2026-04-17
+updated: 2026-04-17
 ---
 
 # 统一日报系统：早晚合并 + 周/月报 + 历史存档

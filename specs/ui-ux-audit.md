@@ -3,6 +3,7 @@ id: "110"
 title: "UI/UX 全局审查与改进"
 status: active
 domain: design
+risk: medium
 dependencies: ["app-mobile-views.md", "app-mobile-nav.md", "chat-system.md", "todo-core.md", "todo-ui.md"]
 superseded_by: null
 created: 2026-04-04

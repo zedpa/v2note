@@ -3,6 +3,7 @@ id: "054a"
 title: "Auth — Token & Session"
 status: active
 domain: auth
+risk: high
 dependencies: []
 superseded_by: null
 related: ["auth-ux.md"]
@@ -206,6 +207,23 @@ async function ensureFreshToken(): Promise<void> {
 当   (When)   用户点击"退出登录"
 那么 (Then)   显示确认弹窗："退出后未同步的数据将丢失，确定退出？"
 并且 (And)    确认后执行场景 2.1
+```
+
+#### 场景 2.6: 登录后数据按账号隔离 <!-- ✅ completed (fix-device-id-cleanup) -->
+```
+假设 (Given)  用户已完成登录
+当   (When)   用户打开日记、待办、目标等任何视图
+那么 (Then)   用户看到的是自己账号下的历史数据
+并且 (And)    同一台设备切换到另一账号后，看到的是新账号的数据，互不污染
+```
+
+#### 场景 2.7: 多设备登录与断连恢复 <!-- ✅ completed (fix-remove-device-id) -->
+```
+假设 (Given)  用户已在设备 A 登录并正常使用
+当   (When)   用户在设备 B 用同一账号登录并发起语音或聊天
+那么 (Then)   设备 B 的操作正常进行
+并且 (And)    设备 A 若处于录音中，其录音自动停止，资源被清理
+并且 (And)    用户重新连接网络后，聊天和语音功能仍可正常恢复
 ```
 
 ### 接口约定

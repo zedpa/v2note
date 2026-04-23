@@ -2,9 +2,11 @@
 id: fix-note-card-menu
 title: Fix: 日记卡片三点菜单按钮被标签挤到第二行
 status: completed
+backport: app-mobile-views.md#场景 3.3a
 domain: ui
 risk: low
 created: 2026-04-09
+updated: 2026-04-09
 ---
 
 # Fix: 日记卡片三点菜单按钮位置固定
@@ -27,14 +29,20 @@ created: 2026-04-09
 ## 场景
 
 ### 场景 1: 标签多时菜单位置固定
-- Given 一条日记有 5+ 个标签
-- When 渲染卡片
-- Then ⋮ 按钮固定在 meta 行右上角，不随标签换行
+```
+假设 (Given)  一条日记有 5+ 个标签，meta 行较长
+当   (When)   用户打开日记视图查看该卡片
+那么 (Then)   三点菜单按钮固定在 meta 行右上角
+并且 (And)    不随标签换行到第二行
+```
 
 ### 场景 2: 标签少时布局不变
-- Given 一条日记有 0-3 个标签
-- When 渲染卡片
-- Then 布局与当前一致，⋮ 在行末
+```
+假设 (Given)  一条日记只有 0-3 个标签
+当   (When)   用户打开日记视图查看该卡片
+那么 (Then)   三点菜单按钮显示在 meta 行末尾
+并且 (And)    整体布局与标签较少时保持一致
+```
 
 ## 影响文件
 - `features/notes/components/notes-timeline.tsx` — meta 行 JSX 结构

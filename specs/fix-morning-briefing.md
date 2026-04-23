@@ -2,6 +2,7 @@
 id: fix-morning-briefing
 title: "Fix: 早报时区错位 + 问候语风格与字数"
 status: completed
+backport: daily-report-core.md#场景 M4
 domain: report
 risk: medium
 dependencies: ["daily-report-core.md"]
@@ -57,41 +58,41 @@ gateway 中还有 20+ 处 `toISOString().split("T")[0]` 调用（如 `digest.ts`
 
 ### 场景 1.1: 早上 7:30 推送使用正确的本地日期
 ```
-假设 (Given)  服务器时区为 UTC+8，当前北京时间为 4月8日 7:30
-当   (When)   proactive engine 触发晨报推送
-那么 (Then)   generateMorningBriefing 使用本地日期 "2026-04-08" 查询缓存和生成报告
-并且 (And)    不会命中 4月7日的缓存
+假设 (Given)  用户所在本地时间为 4月8日 7:30
+当   (When)   系统到达早报推送时间
+那么 (Then)   用户收到的早报内容对应本地日期 4月8日
+并且 (And)    不会看到前一天（4月7日）的缓存内容
 ```
 
 ### 场景 1.2: 晚上 8:00 推送不受影响
 ```
-假设 (Given)  当前北京时间 4月8日 20:00（UTC 12:00，日期一致）
-当   (When)   proactive engine 触发晚报推送
-那么 (Then)   使用本地日期 "2026-04-08"，行为不变
+假设 (Given)  当前本地时间 4月8日 20:00
+当   (When)   系统到达晚报推送时间
+那么 (Then)   用户收到 4月8日当天的晚报内容，行为与以前一致
 ```
 
 ### 场景 1.3: 手动刷新始终返回当日新鲜内容
 ```
 假设 (Given)  用户在 4月8日 8:00 AM 打开简报页面
-当   (When)   调用 GET /api/v1/daily/briefing
-那么 (Then)   today 为 "2026-04-08"（本地日期）
-并且 (And)    如果无缓存则生成当日新内容
+当   (When)   用户打开简报页
+那么 (Then)   页面显示当天（4月8日）最新内容
+并且 (And)    如无缓存则生成新的当日简报
 ```
 
-### 场景 1.4: 凌晨时段 forceRefresh 仍使用正确日期
+### 场景 1.4: 凌晨时段手动刷新仍使用正确日期
 ```
-假设 (Given)  用户在 4月8日 0:30 AM（UTC 仍为 4月7日）手动刷新简报
-当   (When)   forceRefresh=true 触发重新生成
-那么 (Then)   today 为 "2026-04-08"（本地日期），跳过缓存直接生成
-并且 (And)    yesterday 为 "2026-04-07"，昨日统计正确
+假设 (Given)  用户在 4月8日 0:30 AM 查看简报
+当   (When)   用户刷新简报
+那么 (Then)   页面显示 4月8日的新内容
+并且 (And)    昨日统计对应 4月7日，不出现错位
 ```
 
-### 场景 1.5: engine.ts evening 分支日期一致性
+### 场景 1.5: 晚报推送日期与生成保持一致
 ```
-假设 (Given)  当前北京时间 4月8日 20:00
-当   (When)   handleTimedPush("evening") 触发晚报推送
-那么 (Then)   regenerateSummary 和 extractToMemory 传入的日期为 "2026-04-08"（本地日期）
-并且 (And)    与 generateEveningSummary 内部使用的 today 一致
+假设 (Given)  当前本地时间 4月8日 20:00
+当   (When)   系统到达晚报推送时间
+那么 (Then)   用户看到的晚报与推送时间对应同一个本地日期
+并且 (And)    晚报统计与明日预览的日期锚点保持一致
 ```
 
 ### 修复方案
@@ -121,27 +122,26 @@ const yesterday = fmt(yesterdayDate);
 ### 场景 2.1: 问候语由 soul 和 profile 驱动
 ```
 假设 (Given)  用户有 soul（"喜欢简洁务实的沟通"）和 profile（"产品经理，关注效率"）
-当   (When)   晨间简报生成
-那么 (Then)   greeting 基于 soul/profile 生成个性化问候
-并且 (And)    问候语不以待办数量/内容为主题
-并且 (And)    问候语风格与 soul 描述的人格一致
+当   (When)   用户打开晨间简报
+那么 (Then)   问候语体现用户人格特征，呈现个性化表达
+并且 (And)    问候语不以待办数量或内容作为主题
+并且 (And)    问候语风格与 soul 描述保持一致
 ```
 
 ### 场景 2.2: 无 soul/profile 时降级为通用问候
 ```
-假设 (Given)  用户无 soul 且无 profile（新用户）
-当   (When)   晨间简报生成
-那么 (Then)   greeting 使用温暖的通用问候（包含日期 + 一句轻松的话）
-并且 (And)    不出现"你今天有N件事"类措辞
+假设 (Given)  新用户没有 soul 和 profile
+当   (When)   用户打开晨间简报
+那么 (Then)   问候语为温暖的通用问候，包含日期与一句轻松的话
+并且 (And)    不出现"你今天有 N 件事"类措辞
 ```
 
 ### 场景 2.3: 字数放宽到 30 字以内
 ```
-假设 (Given)  AI 生成晨间问候
-当   (When)   greeting 输出
-那么 (Then)   greeting 长度 ≤30 个中文字符
-并且 (And)    AI 有足够空间表达日期 + 个性化内容
-并且 (And)    不至于过长影响 UI 排版
+假设 (Given)  用户打开晨间简报
+当   (When)   用户查看问候区域
+那么 (Then)   问候长度不超过 30 个中文字符
+并且 (And)    内容自然流畅，不影响页面排版
 ```
 
 ### 修复方案

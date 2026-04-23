@@ -3,6 +3,7 @@ id: "115"
 title: "产品重新定位 — 核心体验精简"
 status: completed
 domain: ui
+risk: medium
 dependencies: ["app-mobile-views.md", "app-mobile-nav.md", "daily-report-core.md", "cold-start.md"]
 superseded_by: null
 created: 2026-04-05

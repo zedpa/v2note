@@ -2,7 +2,9 @@
 id: "111"
 title: "Fix: Voice→Todo 管线接通"
 status: completed
+backport: voice-todo-ext.md#场景 D11
 domain: voice
+risk: medium
 dependencies: ["voice-routing.md", "voice-todo-ext.md"]
 superseded_by: null
 created: 2026-04-04
@@ -124,8 +126,8 @@ interface UpdateTodoBody {
 ```
 假设 (Given)  用户语音创建了周期任务（recurrence_rule 非空）
 当   (When)   handleCommandConfirm 调用 createTodo 成功
-那么 (Then)   后端 POST /api/v1/todos 在创建周期模板后自动生成今日实例
-              （复用 todoRepo.createRecurrenceInstance 逻辑）
+那么 (Then)   系统在创建周期模板后自动生成今日实例
+              （复用周期实例生成逻辑）
 并且 (And)    前端无需额外调用
 ```
 

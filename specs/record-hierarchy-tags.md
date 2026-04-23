@@ -3,6 +3,7 @@ id: "095"
 title: "Record 层级标签 — 从涌现结构反向标注"
 status: active
 domain: cognitive
+risk: medium
 dependencies: []
 superseded_by: null
 created: 2026-03-23

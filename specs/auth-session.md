@@ -1,6 +1,11 @@
 ---
 status: superseded
 superseded_by: "auth.md"
+id: "auth-session"
+domain: auth
+risk: medium
+created: 2026-04-17
+updated: 2026-04-17
 ---
 
 # 登出与会话管理
@@ -22,7 +27,7 @@ superseded_by: "auth.md"
 ```
 假设 (Given)  用户已登录
 当   (When)   用户点击侧边栏"退出登录"按钮
-那么 (Then)   调用 POST /api/v1/auth/logout（携带 refreshToken）
+那么 (Then)   向服务端提交登出请求（携带 refreshToken）
 并且 (And)    后端删除该 refresh token 记录
 并且 (And)    前端清除 localStorage 中的 accessToken + refreshToken + deviceId
 并且 (And)    跳转到登录页面
@@ -39,8 +44,8 @@ superseded_by: "auth.md"
 ### 场景 3: Access token 过期静默刷新
 ```
 假设 (Given)  用户的 accessToken 已过期，refreshToken 仍有效
-当   (When)   任意 API 请求返回 401
-那么 (Then)   自动调用 POST /api/v1/auth/refresh
+当   (When)   任意请求返回 401
+那么 (Then)   自动向服务端申请刷新 accessToken
 并且 (And)    用新 accessToken 重试原始请求
 并且 (And)    用户无感知
 ```

@@ -78,9 +78,9 @@ updated: 2026-04-13
 ```
 假设 (Given)  pool.ts 的 query/queryOne/execute 硬编码 getPool().query()
 当   (When)   修改函数签名，增加可选的最后一个参数 client
-那么 (Then)   签名变为 query<T>(sql, params?, client?)
-并且 (And)    有 client 时用 client.query(sql, params)
-并且 (And)    无 client 时用 getPool().query(sql, params)（原有行为不变）
+那么 (Then)   签名变为 query<T>(语句, 参数?, client?)
+并且 (And)    有 client 时用 client.query(语句, 参数)
+并且 (And)    无 client 时用 getPool().query(语句, 参数)（原有行为不变）
 ```
 
 ### 场景 1.2: 类型定义
@@ -98,12 +98,16 @@ updated: 2026-04-13
 ```
 假设 (Given)  wikiPageRepo.create(fields) 使用 queryOne(sql, params)
 当   (When)   改造为 create(fields, client?)
-那么 (Then)   内部改为 queryOne(sql, params, client)
+那么 (Then)   内部改为 queryOne(语句, 参数, client)
 并且 (And)    无 client 时行为与之前完全一致
 ```
 
 ### 场景 2.2: 需要改造的 repo 方法清单
 ```
+假设 (Given)  已定义 client 注入模式
+当   (When)   列出需要改造的 repo 方法
+那么 (Then)   按 wiki-compiler 中的使用频率排序改造：
+
 改造优先级：按 wiki-compiler 中的使用频率排序
 
 wikiPageRepo:

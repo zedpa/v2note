@@ -3,6 +3,7 @@ id: "064"
 title: "APP 移动端重构"
 status: superseded
 domain: ui
+risk: medium
 dependencies: []
 superseded_by: ["app-mobile-views.md", "app-mobile-nav.md"]
 created: 2026-03-23

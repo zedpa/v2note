@@ -3,11 +3,12 @@ id: "053a"
 title: "Daily Report — Core"
 status: active
 domain: report
+risk: medium
 dependencies: ["cognitive-engine-v2.md"]
 superseded_by: null
 related: ["daily-report-extended.md"]
 created: 2026-03-23
-updated: 2026-04-04
+updated: 2026-04-17
 ---
 
 # Daily Report System — Core (日报系统 · 核心)
@@ -280,9 +281,56 @@ GROUP BY g.id;
 并且 (And)    矛盾部分提供"深入了解"链接（跳转决策工坊）
 ```
 
+#### 场景 M3: 晨间简报正常加载 <!-- ✅ completed (fix-daily-briefing-500) -->
+```
+假设 (Given)  用户已登录，有若干待办（含已排期和未排期）
+当   (When)   用户打开今日简报
+那么 (Then)   页面显示问候语、今日待办列表、目标进展与建议
+并且 (And)    无论待办排期字段格式如何，用户都能正常看到当日内容
+```
+
+#### 场景 M4: 晨间问候使用本地日期且体现人格 <!-- ✅ completed (fix-morning-briefing) -->
+```
+假设 (Given)  用户已设置 soul/profile，且本地时间为早上
+当   (When)   用户在本地早晨打开今日简报
+那么 (Then)   问候语中的日期为用户本地日期，不出现跨天错位
+并且 (And)    问候语风格与用户人格一致，不以待办数量作为主题
+并且 (And)    问候长度在 30 字以内，自然温暖
+```
+
+#### 场景 M5: 晨间简报展示目标脉搏 <!-- ✅ completed (fix-briefing-prompt-v2) -->
+```
+假设 (Given)  用户有进行中的目标及关联待办
+当   (When)   用户打开晨间简报
+那么 (Then)   页面显示"目标脉搏"区域，列出活跃目标名称与完成进度
+并且 (And)    晚间总结中同时显示日记洞察与每日肯定两段内容
+```
+
+#### 场景 M6: 晨间简报只展示今日相关待办 <!-- ✅ completed (fix-briefing-stale-todos) -->
+```
+假设 (Given)  用户有 3 个今日排期待办，和 5 个无排期的古早待办
+当   (When)   用户打开晨间简报
+那么 (Then)   "今日焦点"只显示今日排期的 3 个待办
+并且 (And)    古早无排期的待办不出现在当日简报中
+并且 (And)    逾期待办显示在"遗留"区域而非"今日焦点"
+```
+
+#### 场景 M7: 凌晨时段日报日期归属本地"今天" <!-- ✅ completed (fix-timezone-systematic) -->
+```
+假设 (Given)  用户身处东八区，当地时间为凌晨 01:00
+当   (When)   用户打开日报或搜索"今天的日记"
+那么 (Then)   用户看到的是本地"今天"对应的内容，而非前一天
+并且 (And)    凌晨新建的日记在当日日报、搜索和导出文件名中归属同一个本地日期
+并且 (And)    凌晨 00:00~08:00 时段与白天的行为完全一致
+```
+
 ---
 
 ## 3. Evening Summary (晚间总结)
+
+### 路径统一（fix-evening-report-quality）
+
+所有晚间总结入口（`EveningSummary`、`SmartDailyReport`、legacy `/report?mode=evening|auto`）统一走 `daily-loop.ts: generateEveningSummary()`（v2 路径）。禁止 fallback 到 legacy `report.ts: generateEveningReport()`——该路径把全量 pending 错标为 `todayPending` 污染 `tomorrow_preview`。死代码 `gateway/src/prompts/{evening,morning,perspectives}.md` 已删除。
 
 ### 数据源
 
@@ -301,15 +349,16 @@ WHERE r.user_id = $1 AND r.created_at::date = CURRENT_DATE
 ORDER BY r.created_at DESC
 LIMIT 5;
 
--- 今日未完成（用于 tomorrow_preview）
-SELECT t.id, t.text, t.priority
+-- 明日预排（用于 tomorrow_preview）— 只取排期到明天的待办
+SELECT t.id, t.text, t.priority, t.scheduled_start
 FROM todo t
 JOIN record r ON r.id = t.record_id
 WHERE (r.user_id = $1 OR t.user_id = $1) AND t.done = false
+  AND t.scheduled_start::date = (CURRENT_DATE + INTERVAL '1 day')
 ORDER BY t.priority DESC LIMIT 5;
 ```
 
-注入变量：`{today_done}` `{today_records}` `{today_pending}` `{active_goals}`
+注入变量：`{today_done}` `{today_records}` `{tomorrow_scheduled}` `{active_goals}`。`tomorrow_preview` 只能来自明日排期的待办，**禁止**用全量 pending 替代（已完成/无排期/历史 pending 都不进 preview）。
 
 ### 视角轮换（晚间专用）
 
@@ -380,6 +429,14 @@ ORDER BY t.priority DESC LIMIT 5;
 并且 (And)    不显示目标进度等复杂卡片
 ```
 
+#### 场景 E5: 晚间总结明日预览只含明日排期 <!-- ✅ completed (fix-evening-report-quality) -->
+```
+假设 (Given)  用户有 1 个排明天的待办 + 2 个无排期 pending + 今天完成 2 个
+当   (When)   用户打开"晚间总结"或"日报"
+那么 (Then)   tomorrow_preview 只含那 1 个明日排期待办
+并且 (And)    已完成/无排期 pending 均不出现；所有入口统一返回 v2 结构（insight/affirmation/正确 tomorrow_preview）
+```
+
 ---
 
 ## Prompt 模板管理
@@ -405,18 +462,9 @@ ORDER BY t.priority DESC LIMIT 5;
 - 什么都没做 → "今天就这样了"比"明天会更好"真诚
 ```
 
-### 模板文件结构
+### 模板管理
 
-```
-gateway/src/prompts/
-├── morning.md      — 晨间 system prompt
-├── evening.md      — 晚间 system prompt
-├── weekly.md       — 周报 system prompt
-├── monthly.md      — 月报 system prompt
-└── perspectives.md — 晚间视角定义（4种）
-```
-
-每个 `.md` 文件包含完整的 system prompt 文本，`{变量名}` 占位符在 handler 中替换。
+所有日报/周报/月报 prompt 集中在 `gateway/src/prompts/templates.ts`（TS 常量），由 `daily-loop.ts` 的 `generateMorningBriefing()` / `generateEveningSummary()` 消费。历史 `.md` 模板文件（morning/evening/perspectives）已在 fix-evening-report-quality 中删除。
 
 ## 空数据降级
 

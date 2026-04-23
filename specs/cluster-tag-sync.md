@@ -3,6 +3,7 @@ id: "066"
 title: "Cluster 标签反写日记"
 status: completed
 domain: cognitive
+risk: medium
 dependencies: []
 superseded_by: null
 created: 2026-03-23

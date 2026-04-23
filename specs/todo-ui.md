@@ -3,11 +3,12 @@ id: "050b"
 title: "Todo System — UI & Interactions"
 status: active
 domain: todo
+risk: medium
 dependencies: ["todo-core.md"]
 superseded_by: null
 related: ["todo-core.md"]
 created: 2026-03-23
-updated: 2026-04-04
+updated: 2026-04-17
 ---
 
 # Todo System — UI & Interactions (界面与交互层)
@@ -60,6 +61,9 @@ const TIME_SLOTS: TimeSlotConfig[] = [
 ]
 ```
 
+**「随时」判定 assignTimeSlot**：`scheduled_start=null` 或本地时间精确 `00:00` → "anytime"。
+`00:00` 为"无具体时间安排"的哨兵值：用户在「随时」区域创建待办时前端用 `${date}T00:00:00${tz}` 保留日期过滤但不赋时。
+
 ### 1.4 设计 Token
 
 ```css
@@ -81,90 +85,99 @@ const TIME_SLOTS: TimeSlotConfig[] = [
 
 ### 场景 1.1: 时间视图 — 默认加载 <!-- ✅ completed -->
 ```
-Given 用户在待办 Tab
-When  页面加载完成
-Then  显示时间视图（默认）
-  And 显示今天的星期和日期
-  And CalendarStrip 高亮今天，显示本周 7 天
-  And 4 个时段块按序显示（随时/上午/下午/晚上）
-  And 每个时段块内显示对应时段的未完成任务
-  And 无任务的时段块显示空状态占位卡
+假设 (Given)  用户在待办 Tab
+当   (When)   打开待办页面
+那么 (Then)   显示时间视图（默认）
+并且 (And)    显示今天的星期和日期
+并且 (And)    CalendarStrip 高亮今天，显示本周 7 天
+并且 (And)    4 个时段块按序显示（随时/上午/下午/晚上）
+并且 (And)    每个时段块内显示对应时段的未完成任务
+并且 (And)    无任务的时段块显示空状态占位卡
 ```
 
 ### 场景 1.2: 时间视图 — 日期切换（无限滚动） <!-- ✅ completed -->
 ```
-Given 时间视图已加载
-When  用户点击 CalendarStrip 上的某一天
-Then  该日期高亮
-  And TimeViewHeader 更新为对应星期和月份
-  And 4 个时段块刷新为该日期的任务
+假设 (Given)  时间视图已加载
+当   (When)   用户点击 CalendarStrip 上的某一天
+那么 (Then)   该日期高亮
+并且 (And)    TimeViewHeader 更新为对应星期和月份
+并且 (And)    4 个时段块刷新为该日期的任务
 ```
 
 ### 场景 1.3: 时间视图 — 时段折叠 <!-- ✅ completed -->
 ```
-Given 某时段块有 3 个任务
-When  用户点击该时段的 BlockHeader
-Then  任务列表收起（AnimatePresence 淡出 + 高度收缩）
-  And 计数仍然显示
+假设 (Given)  某时段块有 3 个任务
+当   (When)   用户点击该时段的 BlockHeader
+那么 (Then)   任务列表收起（AnimatePresence 淡出 + 高度收缩）
+并且 (And)    计数仍然显示
 ```
 
 ### 场景 1.4: 时间视图 — 快速添加任务 <!-- ✅ completed -->
 ```
-Given 上午时段块显示空状态
-When  用户点击空状态卡片的 + 按钮
-Then  打开 TodoCreateSheet，日期预填为当前 selectedDate，时段预设
-When  用户输入"准备会议 PPT"并提交
-Then  Sheet 关闭，上午时段块立即显示新任务（乐观更新）
+假设 (Given)  上午时段块显示空状态
+当   (When)   用户点击空状态卡片的 + 按钮
+那么 (Then)   打开 TodoCreateSheet，日期预填为当前 selectedDate，时段预设
+当   (When)   用户输入"准备会议 PPT"并提交
+那么 (Then)   Sheet 关闭，上午时段块立即显示新任务（乐观更新）
+```
+
+### 场景 1.4a: 时间视图 — 随时时段创建待办 <!-- ✅ completed (fix-todo-anytime-time) -->
+```
+假设 (Given)  用户在时间视图某日的「随时」区域，时间输入为空
+当   (When)   用户输入待办文字并提交
+那么 (Then)   scheduled_start = "${date}T00:00:00${tz}"（00:00 哨兵）
+并且 (And)    待办归入「随时」，不出现在上午/下午/晚上
+并且 (And)    未来日期场景下：只在目标日期「随时」区显示，今天不显示
 ```
 
 ### 场景 1.5: 项目视图 — 加载 <!-- ✅ completed -->
 ```
-Given 用户点击右上角视图切换按钮
-When  切换到项目视图
-Then  显示第一个活跃项目的 ProjectCard
-  And 底部显示 PageDots 分页指示器
-  And 卡片内列出该项目的子任务
+假设 (Given)  用户在待办 Tab
+当   (When)   用户点击右上角视图切换按钮，切换到项目视图
+那么 (Then)   显示第一个活跃项目的 ProjectCard
+并且 (And)    底部显示 PageDots 分页指示器
+并且 (And)    卡片内列出该项目的子任务
 ```
 
 ### 场景 1.6: 项目视图 — 完成任务 <!-- ✅ completed -->
 ```
-Given 项目"供应链优化"下有任务"回复客户邮件"
-When  用户点击该任务的 checkbox
-Then  checkbox 变为勾选状态，文字添加删除线，项目计数 -1（乐观更新）
+假设 (Given)  项目"供应链优化"下有任务"回复客户邮件"
+当   (When)   用户点击该任务的 checkbox
+那么 (Then)   checkbox 变为勾选状态，文字添加删除线，项目计数 -1（乐观更新）
 ```
 
 ### 场景 1.7: 视图切换 — Segment 下拉菜单 <!-- ✅ completed -->
 ```
-Given 用户在待办 Tab（当前为日期视图）
-When  点击顶部 Segment 的"待办▼"按钮
-Then  弹出下拉菜单，显示"日期视图"和"项目视图"两个选项
-  And 当前选中的视图高亮（primary 色）
-When  选择"项目视图"
-Then  菜单关闭，切换到项目视图
-  And viewMode 状态由 page.tsx 管理，通过 props 传递给 TodoWorkspace
-注意: 日记 Tab 时点击"待办"直接切换 Tab，不弹菜单
+假设 (Given)  用户在待办 Tab（当前为日期视图）
+当   (When)   用户点击顶部 Segment 的"待办▼"按钮
+那么 (Then)   弹出下拉菜单，显示"日期视图"和"项目视图"两个选项
+并且 (And)    当前选中的视图高亮（primary 色）
+当   (When)   用户选择"项目视图"
+那么 (Then)   菜单关闭，切换到项目视图
+并且 (And)    viewMode 状态由 page.tsx 管理，通过 props 传递给 TodoWorkspace
+说明 (Note)   日记 Tab 时点击"待办"直接切换 Tab，不弹菜单
 ```
 
 ### 场景 1.8: 任务详情编辑 <!-- ✅ completed -->
 ```
-Given 时间视图中某任务卡片
-When  用户点击任务行（非 checkbox 区域）
-Then  底部弹出 TodoEditSheet
-  And 显示标题（可编辑）、日期/时间/时长、领域+影响度、关联目标、子任务列表
+假设 (Given)  时间视图中某任务卡片
+当   (When)   用户点击任务行（非 checkbox 区域）
+那么 (Then)   底部弹出 TodoEditSheet
+并且 (And)    显示标题（可编辑）、日期/时间/时长、领域+影响度、关联目标、子任务列表
 ```
 
 ### 场景 1.9: 实时同步 <!-- ✅ completed -->
 ```
-Given 用户正在看待办时间视图
-When  后端通过 AI digest 创建了一个新待办，WebSocket 推送 todo.created 事件
-Then  新待办自动出现在对应时段块中，有轻量入场动画
+假设 (Given)  用户正在看待办时间视图
+当   (When)   收到 WebSocket 推送的 todo.created 事件（后端 AI digest 新建待办）
+那么 (Then)   新待办自动出现在对应时段块中，有轻量入场动画
 ```
 
 ### 场景 1.10: 空状态引导 <!-- ✅ completed -->
 ```
-Given 用户无任何待办
-When  打开待办 Tab
-Then  时间视图 4 个时段块全部显示空状态卡片，每个有对应引导文案和 + 入口
+假设 (Given)  用户无任何待办
+当   (When)   打开待办 Tab
+那么 (Then)   时间视图 4 个时段块全部显示空状态卡片，每个有对应引导文案和 + 入口
 ```
 
 ### 1.5 交互增强 — TaskItem 滑动手势 (P0, 🟡 待开发)
@@ -268,23 +281,32 @@ const PROJECT_COLORS = [
 
 #### 场景 1.18: 点击卡片展开全屏
 ```
-假设 (Given)  用户点击项目卡片头部
-当   (When)   卡片展开
-那么 (Then)   全屏展示该项目的所有待办
+假设 (Given)  用户在项目视图瀑布流
+当   (When)   用户点击项目卡片头部
+那么 (Then)   卡片展开为全屏，展示该项目的所有待办
 并且 (And)    全屏视图支持左右滑动切换项目
 并且 (And)    可以返回瀑布流
 ```
 
-### 场景 1.18b: 项目详情页创建待办 <!-- ✅ completed (bug fix) -->
+#### 场景 1.18a: 项目视图添加待办后立即显示 <!-- ✅ completed (fix-todo-project-vanish) -->
 ```
-Given 用户在项目视图，点击项目卡片头部进入项目详情 Sheet
-When  点击详情页中的"添加任务"按钮
-Then  先关闭项目详情 Sheet，再打开 TodoCreateSheet
-  And TodoCreateSheet 的 parent_id 预设为当前项目 ID
-  And 创建参数类型与 store.create 完全匹配（text/scheduled_start/estimated_minutes/priority/parent_id）
-Bug 修复: 此前 ProjectDetailSheet(shadcn Sheet, z-50) 与 TodoCreateSheet(fixed z-50) 同时打开时，
-  TodoCreateSheet 的 backdrop(z-40) 被 ProjectDetailSheet overlay 遮挡导致无法交互。
-  修复方案: handleAdd 先调 setDetailGroup(null) 关闭详情页再打开创建面板。
+假设 (Given)  用户有一个活跃项目 P
+当   (When)   用户在项目视图向 P 添加一条"新任务"并提交
+那么 (Then)   "新任务"立即出现在 P 的任务列表中，不消失
+并且 (And)    刷新页面后仍在 P 的任务列表中
+并且 (And)    已有挂在项目下的待办也被正确列出（不再永远显示 0 个任务）
+```
+
+#### 场景 1.18b: 项目详情页创建待办 <!-- ✅ completed (bug fix) -->
+```
+假设 (Given)  用户在项目视图，点击项目卡片头部进入项目详情 Sheet
+当   (When)   用户点击详情页中的"添加任务"按钮
+那么 (Then)   先关闭项目详情 Sheet，再打开 TodoCreateSheet
+并且 (And)    TodoCreateSheet 的 parent_id 预设为当前项目 ID
+并且 (And)    创建参数类型与 store.create 完全匹配（text/scheduled_start/estimated_minutes/priority/parent_id）
+说明 (Note)   Bug 修复：此前 ProjectDetailSheet(shadcn Sheet, z-50) 与 TodoCreateSheet(fixed z-50) 同时打开时，
+              TodoCreateSheet 的 backdrop(z-40) 被 ProjectDetailSheet overlay 遮挡导致无法交互。
+              修复方案：handleAdd 先调 setDetailGroup(null) 关闭详情页再打开创建面板。
 ```
 
 ### 1.7 优先级编辑器 (P2, 🟡 待开发)
@@ -370,7 +392,7 @@ Bug 修复: 此前 ProjectDetailSheet(shadcn Sheet, z-50) 与 TodoCreateSheet(fi
 #### 场景 1.25: 周历条左右滑动切换周
 ```
 假设 (Given)  用户在周历条（收起状态）
-当   (When)   手指从右往左滑动
+当   (When)   用户从右往左滑动周历条
 那么 (Then)   周历条切换到下一周，选中日期变为下周同一星期几
 ```
 
@@ -427,6 +449,8 @@ Bug 修复: 此前 ProjectDetailSheet(shadcn Sheet, z-50) 与 TodoCreateSheet(fi
 - [ ] P2 项目列表来源统一：创建表单和项目视图使用同一份 projects 数据
 - [ ] P3 viewedDates 持久化 localStorage，key 含 userId，超过 60 天自动清理
 - [ ] P3 月历在小屏上的宽度适配
+- [x] 随时时段创建：空时间 + 有日期 → `scheduled_start = ${date}T00:00:00${tz}`（哨兵），归入 anytime
+- [x] 随时哨兵向后兼容：已有 `scheduled_start = null` 的待办 → `assignTimeSlot(null)` 仍返回 "anytime"
 
 ---
 

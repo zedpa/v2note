@@ -2,6 +2,7 @@
 id: fix-onboarding-old-user
 title: "Fix: 老用户登录误触发新手引导"
 status: completed
+backport: cold-start.md
 domain: onboarding
 risk: low
 dependencies: []
@@ -65,8 +66,11 @@ if (localStorage.getItem(key) !== "true") {
 
 ## 验收行为（E2E 锚点）
 
-1. 老用户登录 → 直接进入主页，不显示引导
-2. 新用户注册 → 显示 OnboardingSeed
+### 行为 1: 老用户不显示引导
+老用户登录后直接进入主页，不显示引导
+
+### 行为 2: 新用户显示引导
+新用户注册后显示 OnboardingSeed
 
 ## 边界条件
 

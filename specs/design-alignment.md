@@ -3,6 +3,7 @@ id: "073"
 title: "设计对齐 — Phase 8 P1 Spec"
 status: completed
 domain: design
+risk: medium
 dependencies: []
 superseded_by: null
 created: 2026-03-23
@@ -132,7 +133,7 @@ updated: 2026-03-30
 假设 (Given)  Detail Sheet 已打开
 当   (When)   用户点击子任务区域的"+"按钮
 那么 (Then)   列表底部出现文本输入框，聚焦
-并且 (And)    用户输入文字后按回车，创建子任务（POST /api/v1/todos，body 含 parent_id）
+并且 (And)    用户输入文字后按回车，在当前待办下创建子任务
 ```
 
 ### 场景 3.3: 待办列表显示子任务计数

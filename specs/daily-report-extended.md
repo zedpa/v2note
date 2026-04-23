@@ -3,6 +3,7 @@ id: "053b"
 title: "Daily Report — Extended (Weekly/Monthly/Cognitive)"
 status: active
 domain: report
+risk: medium
 dependencies: ["daily-report-core.md"]
 superseded_by: null
 related: ["daily-report-core.md"]
@@ -79,6 +80,23 @@ SmartDailyReport
 | **晚间温暖** | 通知："今天完成了 4 件事，来看看路路的发现" | 21:00 |
 | **首次打开自动弹** | App 恢复前台时，如果距上次查看 >4h，自动展示 | 每次前台恢复 |
 | **红点徽标** | 侧边栏"日报"按钮带数字 badge = 未读发现数 | 有新内容时 |
+
+### 场景 H1: 早报推送落地即看即读 <!-- ✅ completed (fix-daily-report-notify) -->
+```
+假设 (Given)  用户订阅了早报推送
+当   (When)   系统到达早报推送时间
+那么 (Then)   用户收到一条早报通知
+并且 (And)    用户打开 app 后立即看到今日简报内容，无需等待加载
+并且 (And)    同一天内用户不会再次收到重复的早报通知
+```
+
+### 场景 H2: 晚报推送同样预生成且去重 <!-- ✅ completed (fix-daily-report-notify) -->
+```
+假设 (Given)  用户订阅了晚报推送
+当   (When)   系统到达晚报推送时间
+那么 (Then)   用户收到一条晚报通知并能立即查看内容
+并且 (And)    即使服务重启或降级，用户同一天只会收到一次晚报通知
+```
 
 ### 与当前架构的对应
 

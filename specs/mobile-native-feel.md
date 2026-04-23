@@ -3,6 +3,7 @@ id: "090"
 title: "移动端原生体感优化"
 status: completed
 domain: ui
+risk: medium
 dependencies: []
 superseded_by: null
 created: 2026-03-23

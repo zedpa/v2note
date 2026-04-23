@@ -1,6 +1,11 @@
 ---
 status: superseded
 superseded_by: "chat-system.md"
+id: "chat-greeting-and-input-fix"
+domain: chat
+risk: medium
+created: 2026-04-17
+updated: 2026-04-17
 ---
 
 # 聊天模式优化：AI 问候 + 输入框浮动

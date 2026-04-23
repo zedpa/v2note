@@ -2,6 +2,7 @@
 id: "fix-recording-audio-focus"
 title: "Fix: 录音按钮无法中断系统音频播放"
 status: completed
+backport: audio-session-recording.md#场景 7
 domain: voice
 risk: low
 dependencies: ["audio-session-recording.md"]
@@ -25,26 +26,25 @@ updated: 2026-04-12
 ### 场景 1: Pre-capture 阶段即请求音频焦点
 ```
 假设 (Given)  后台正在播放音乐
-当   (When)   用户按住 FAB 按钮超过 120ms，触发 startPreCapture
-那么 (Then)   activateAudioSession() 在 getUserMedia 之前被调用
-并且 (And)    系统音频被打断
+当   (When)   用户长按 FAB 按钮超过 120ms 触发 pre-capture
+那么 (Then)   系统音频在麦克风打开之前被打断
 并且 (And)    麦克风随后正常打开
 ```
 
 ### 场景 2: 短按取消时恢复音频焦点
 ```
-假设 (Given)  用户已按下 FAB 超过 120ms（pre-capture 已启动、音频焦点已获取）
-当   (When)   用户松开（短按，触发 onTap → stopPreCapture）
-那么 (Then)   deactivateAudioSession() 被调用
-并且 (And)    系统音频可恢复播放
+假设 (Given)  用户已长按 FAB 超过 120ms（pre-capture 已启动、音频焦点已获取）
+当   (When)   用户短按松开取消录音
+那么 (Then)   系统音频可恢复播放
+并且 (And)    录音不会继续
 ```
 
 ### 场景 3: Android 使用 EXCLUSIVE 焦点类型
 ```
 假设 (Given)  Android 设备，后台播放音乐
-当   (When)   录音请求音频焦点
-那么 (Then)   使用 AUDIOFOCUS_GAIN_TRANSIENT_EXCLUSIVE
-并且 (And)    播放器完全暂停（而非仅降低音量）
+当   (When)   用户长按 FAB 开始录音
+那么 (Then)   播放器完全暂停，而非仅降低音量
+并且 (And)    录音结束后音乐可恢复播放
 ```
 
 ## 验收行为（E2E 锚点）

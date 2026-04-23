@@ -3,6 +3,7 @@ id: "068"
 title: "认知快照 — 增量分析基础设施"
 status: completed
 domain: cognitive
+risk: medium
 dependencies: []
 superseded_by: null
 created: 2026-03-23

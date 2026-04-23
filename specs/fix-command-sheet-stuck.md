@@ -2,6 +2,7 @@
 id: fix-command-sheet-stuck
 title: "Fix: 上滑指令 CommandSheet 堵塞无响应"
 status: completed
+backport: voice-routing.md#场景 B2a
 domain: voice
 risk: medium
 dependencies: ["voice-routing.md", "voice-todo-ext.md"]
@@ -85,57 +86,57 @@ updated: 2026-04-11
 
 ### 1. CommandSheet 超时保护
 
-#### 场景 1.1: AI 分类返回空结果 → 显示"未识别到指令"
+### 场景 1.1: AI 分类返回空结果 → 显示"未识别到指令"
 ```
 假设 (Given)  用户上滑触发指令模式
-当   (When)   ASR 完成后 AI 分类未识别到有效指令（actions 为空）
+当   (When)   用户说完一段不含指令的话并松手
 那么 (Then)   CommandSheet 显示"未识别到指令，请重新说"提示
 并且 (And)    提供关闭按钮，用户可手动关闭
 ```
 
-#### 场景 1.2: AI 分类超时/失败 → 显示错误
+### 场景 1.2: AI 分类超时/失败 → 显示错误
 ```
 假设 (Given)  用户上滑触发指令模式，CommandSheet 已打开
-当   (When)   process.result 返回 error 字段（如"指令执行失败"）
-那么 (Then)   CommandSheet 显示错误信息
+当   (When)   系统收到后端返回的错误信息
+那么 (Then)   CommandSheet 展示错误提示文案
 并且 (And)    用户可手动关闭后重新录音
 ```
 
-#### 场景 1.3: CommandSheet processing 超时保护
+### 场景 1.3: CommandSheet processing 超时保护
 ```
-假设 (Given)  CommandSheet 已打开且处于 processing 阶段
-当   (When)   超过 20 秒仍未收到有效结果
-那么 (Then)   自动显示"指令处理超时，请重试"
+假设 (Given)  CommandSheet 已打开且处于处理中阶段
+当   (When)   到达 20 秒仍未收到有效结果
+那么 (Then)   CommandSheet 自动切换为"指令处理超时，请重试"
 并且 (And)    提供关闭按钮
 ```
 
 ### 2. 上滑即时反馈
 
-#### 场景 2.1: 上滑松手后立即提示
+### 场景 2.1: 上滑松手后立即提示
 ```
 假设 (Given)  用户正在录音
 当   (When)   用户上滑松手触发指令模式
-那么 (Then)   FAB 显示"指令处理中..."的 info 通知
+那么 (Then)   FAB 显示"指令处理中..."的提示
 并且 (And)    通知在 CommandSheet 打开后自动消失（或 2 秒后消失）
 ```
 
 ### 3. 静默执行模式的空结果处理
 
-#### 场景 3.1: 静默模式下 AI 返回空结果 → 通知用户
+### 场景 3.1: 静默模式下 AI 返回空结果 → 通知用户
 ```
-假设 (Given)  用户设置了 confirm_before_execute=false（跳过确认弹窗）
-当   (When)   上滑指令后 AI 分类未识别到有效指令
-那么 (Then)   显示 fabNotify.info("未识别到指令") 提示
+假设 (Given)  用户关闭了执行前确认（静默模式）
+当   (When)   用户上滑说完一段不含指令的话
+那么 (Then)   FAB 显示"未识别到指令"提示
 并且 (And)    不弹出 CommandSheet
 ```
 
 ### 4. 正常流程不受影响
 
-#### 场景 3.1: AI 分类正常返回 → CommandSheet 正常显示结果
+### 场景 4.1: AI 分类正常返回 → CommandSheet 正常显示结果
 ```
 假设 (Given)  用户上滑说了"帮我创建一个明天开会的待办"
-当   (When)   AI 分类成功返回 create 类型的 todo_commands
-那么 (Then)   CommandSheet 从 processing 切换到 result 阶段
+当   (When)   用户上滑松手后说完
+那么 (Then)   CommandSheet 从处理中切换到结果阶段
 并且 (And)    显示待办创建确认卡片
 ```
 

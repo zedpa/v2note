@@ -3,6 +3,7 @@ id: "092"
 title: "冷启动五问与留存分析"
 status: active
 domain: onboarding
+risk: medium
 dependencies: []
 superseded_by: null
 created: 2026-03-23

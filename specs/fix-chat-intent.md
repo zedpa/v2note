@@ -2,6 +2,7 @@
 id: fix-chat-intent
 title: "Fix: 复合日记意图误判为查询指令"
 status: completed
+backport: prompt-architecture-v2-layers.md
 domain: agent
 risk: medium
 dependencies: []

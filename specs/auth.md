@@ -3,6 +3,7 @@ id: "054"
 title: "Authentication & Security (已拆分)"
 status: superseded
 domain: auth
+risk: medium
 dependencies: []
 superseded_by: ["auth-core.md", "auth-ux.md"]
 created: 2026-03-23
