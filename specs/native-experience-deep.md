@@ -565,7 +565,7 @@ export const staggerItem = {
 - [x] Phase B: Tab fade-in + Overlay slide-in/out 转场动画 ✅
 - [x] Phase C: reduced-motion + 按压缩放反馈 + stagger variants ✅
 - [ ] Phase C+: Sheet 从触发源动画（增强项，非 MVP）
-- [ ] Phase D: 虚拟滚动 + skeleton 占位（最复杂，需逐组件改造）
+- [x] Phase D: 虚拟滚动（日记流已完成，待办/聊天后续迭代）✅
 - [ ] Phase E（探索性）: View Transitions API — 当 Capacitor WKWebView 支持率足够时再评估
 
 ## 备注
