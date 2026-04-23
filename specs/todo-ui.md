@@ -488,13 +488,13 @@ const PROJECT_COLORS = [
 - [x] 实时同步（WebSocket）
 - [x] E2E 测试
 
-### Phase 5: Time Parsing (时间解析) — 🟡 待开发
-- [ ] buildDateAnchor() 共享时间锚点
-- [ ] 三条路径统一注入时间锚点
-- [ ] voice-action 创建统一走 tool handler
+### Phase 5: Time Parsing (时间解析) — ✅ completed
+- [x] buildDateAnchor() 共享时间锚点（date-anchor.ts 已实现）
+- [x] 三条路径统一注入时间锚点（digest/todo-extract/voice-action/command-full/unified-process 全部注入）
+- [x] voice-action 创建统一走 tool handler
 
-### Phase 6: Interaction Enhancement (交互增强) — 🟡 待开发
-- [ ] P0: TaskItem 左右滑动手势 + 撤销 Toast + 触觉反馈
+### Phase 6: Interaction Enhancement (交互增强) — 🟡 进行中
+- [x] P0: TaskItem 左右滑动手势 + 撤销 Toast + 触觉反馈（SwipeableTaskItem 已实现并集成）
 - [ ] P1: 项目视图瀑布流网格重做
 - [ ] P2: 优先级编辑器 + 创建表单增强
 - [ ] P3: 月历展开 + 三色圆点 + 周历滑动切换
