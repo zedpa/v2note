@@ -28,6 +28,8 @@ import { saveAudio, mergeChunks, checkCacheSize, markCompleted, getAudioByRecord
 import { createRecord } from "@/shared/lib/api/records";
 import { AudioSession } from "@/shared/lib/audio-session";
 import { saveFabCapture, decideFinishDispatch, shouldAcceptAsrDone } from "@/features/recording/lib/fab-capture";
+import { createAsrTimeoutMachine, type AsrTimeoutMachine } from "@/features/recording/lib/asr-timeout";
+import { getOrCreateGuestBatchId } from "@/shared/lib/guest-session";
 import { getCurrentUser } from "@/shared/lib/auth";
 import type { CaptureSource } from "@/shared/lib/capture-store";
 import { captureStore } from "@/shared/lib/capture-store";
@@ -94,7 +96,10 @@ export function FAB({
   const preBufferRef = useRef<ArrayBuffer[]>([]);
   const fullBufferRef = useRef<ArrayBuffer[]>([]); // 累积完整录音（本地缓存用）
   const cacheIdRef = useRef<string | null>(null);   // 当前录音的 IndexedDB 缓存 ID
-  const asrDoneTimerRef = useRef<NodeJS.Timeout | null>(null); // asr.done 超时检测
+  // §7.3: asr.stop 发出后两级超时降级状态机（命令模式专用）
+  const asrTimeoutRef = useRef<AsrTimeoutMachine | null>(null);
+  // 当前等待 asr.done 的会话是否为命令模式（决定降级 toast 文案）
+  const awaitingCommandModeRef = useRef(false);
   const streamingRef = useRef(false);
   const preCaptureAbortRef = useRef(false);
   const preCaptureDelayRef = useRef<NodeJS.Timeout | null>(null);
@@ -159,6 +164,33 @@ export function FAB({
     try { await AudioSession.deactivate(); } catch { /* 静默 */ }
   }, []);
 
+  // §7.3: 初始化 ASR 超时状态机（command mode 专用两级降级）
+  useEffect(() => {
+    asrTimeoutRef.current = createAsrTimeoutMachine({
+      onTimeout: () => {
+        // 命令 / 普通模式文案差异
+        const isCommand = awaitingCommandModeRef.current;
+        fabNotify.info(
+          isCommand
+            ? "指令已保存，将在联网后执行"
+            : "录音已保存，转写将在联网后自动完成",
+        );
+        // 复位 UI：让 FAB 立即回到可用状态
+        commandReleaseRef.current = false;
+        awaitingCommandModeRef.current = false;
+        setProcessing(false);
+        setWittyText("");
+        setConfirmedText("");
+        setPartialText("");
+        resetRef.current();
+      },
+    });
+    return () => {
+      asrTimeoutRef.current?.reset();
+      asrTimeoutRef.current = null;
+    };
+  }, []);
+
   // 监听全局 fabNotify 事件，显示胶囊通知
   useEffect(() => {
     return onFabNotify((n) => {
@@ -211,6 +243,8 @@ export function FAB({
     const unsub = client.onMessage((msg: GatewayResponse) => {
       switch (msg.type) {
         case "asr.partial":
+          // §7.3: 切到尾包超时窗口
+          asrTimeoutRef.current?.notifyPartial();
           setPartialText(msg.payload.text);
           break;
         case "asr.sentence":
@@ -224,7 +258,9 @@ export function FAB({
             break;
           }
 
-          if (asrDoneTimerRef.current) { clearTimeout(asrDoneTimerRef.current); asrDoneTimerRef.current = null; }
+          // §7.3: 询问超时机状态——若已降级则为 late arrival，仅更新本地不动 UI
+          const lateRes = asrTimeoutRef.current?.notifyDone();
+          const isLate = lateRes?.isLate === true;
 
           // legacy: 关联 recordId 到旧 audio-cache（仍在用的 pending_retry 记录依赖这个）
           if (msg.payload.recordId && cacheIdRef.current) {
@@ -234,30 +270,42 @@ export function FAB({
           }
 
           // C1：asr.done 带 recordId 且本地有匹配 localId 的 capture → 标记 synced
-          //   避免后续 pushCapture 重复推送（gateway 已幂等，但这里先标同步节约一次 HTTP）
+          //   §7.3 迟到也允许回写本地（spec: "按 client_id 匹配 → 回写 transcript / serverId"）
           if (msg.payload.recordId && lastCaptureLocalIdRef.current) {
             const localId = lastCaptureLocalIdRef.current;
             captureStore
               .update(localId, { serverId: msg.payload.recordId, syncStatus: "synced" })
-              .catch(() => { /* 不阻塞 UI */ });
+              .catch(() => { /* 不阻塞 UI；若 localId 已被删则静默丢弃 */ });
             lastCaptureLocalIdRef.current = null;
+          }
+
+          // §7.3: 迟到的 asr.done 不再触碰 UI，避免干扰已复位的 FAB / 新录音会话
+          if (isLate) {
+            awaitingCommandModeRef.current = false;
+            break;
           }
 
           // C1：forceCommand 分发恢复——asr.done 是指令执行结果的权威来源
           if (commandReleaseRef.current) {
             commandReleaseRef.current = false;
+            awaitingCommandModeRef.current = false;
             resetRef.current();
             window.dispatchEvent(new CustomEvent("v2note:forceCommand", {
               detail: { transcript: (msg.payload.transcript || "").trim() },
             }));
             return;
           }
+          awaitingCommandModeRef.current = false;
           // 新链路：UI 已由 saveFabCapture 处理，不再在此 emit "已记录" 或启动 pipeline
           break;
         }
-        case "asr.error":
-          // 清除超时检测
-          if (asrDoneTimerRef.current) { clearTimeout(asrDoneTimerRef.current); asrDoneTimerRef.current = null; }
+        case "asr.error": {
+          // §7.3: 询问超时机状态——迟到的 error 不再弹 UI
+          const lateErrRes = asrTimeoutRef.current?.notifyError();
+          if (lateErrRes?.isLate === true) {
+            awaitingCommandModeRef.current = false;
+            break;
+          }
           fabNotify.error(`识别错误: ${msg.payload.message}`);
           stopTimers();
           setDisplayDuration(0);
@@ -266,6 +314,7 @@ export function FAB({
           pausedRef.current = false;
           setLockedPaused(false);
           commandReleaseRef.current = false;
+          awaitingCommandModeRef.current = false;
           setProcessing(false);
           setWittyText("");
           resetRef.current();
@@ -273,6 +322,7 @@ export function FAB({
           // 触发失败处理（保留本地缓存供重试）
           handleRecordingFailure(msg.payload.message);
           break;
+        }
         case "process.result":
           emit("recording:processed");
           // 标记本地缓存为已完成（不自动删除，由用户决定）
@@ -584,7 +634,10 @@ export function FAB({
         try {
           // commandReleaseRef 打开，asr.done 监听器会把 transcript dispatch 到 forceCommand
           commandReleaseRef.current = true;
+          awaitingCommandModeRef.current = true;
           client.send({ type: "asr.stop", payload: dispatch.payload as never });
+          // §7.3: 启动两级超时监测（12s / partial 后 8s）
+          asrTimeoutRef.current?.notifyStopSent();
         } catch {
           // WS 失败不阻塞主流程，后续仍落地本地 capture
         }
@@ -595,12 +648,16 @@ export function FAB({
       let savedOk = false;
       try {
         const user = getCurrentUser();
+        const userId = user?.id ?? null;
         const sourceCtx: CaptureSource = asCommand ? "fab_command" : "fab";
+        // Phase 8（spec §4.3）：未登录录音携带 guestBatchId
+        const guestBatchId = userId === null ? getOrCreateGuestBatchId() : null;
         const result = await saveFabCapture({
           chunks,
           asCommand,
           notebook: activeNotebookRef.current ?? null,
-          userId: user?.id ?? null,
+          userId,
+          guestBatchId,
           sourceContext: sourceCtx,
         });
         savedOk = result.saved !== null;
@@ -662,6 +719,9 @@ export function FAB({
     pausedRef.current = false;
     setLockedPaused(false);
     commandReleaseRef.current = false;
+    awaitingCommandModeRef.current = false;
+    // §7.3: 取消录音 → 清掉等待中的 asr 超时
+    asrTimeoutRef.current?.reset();
     streamingRef.current = false;
     // C3：取消录音 → 关闭门闩，丢弃后续尾帧
     recordingClosedRef.current = true;

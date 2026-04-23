@@ -70,7 +70,12 @@ export const TIME_SLOTS: TimeSlotConfig[] = [
 export function assignTimeSlot(scheduledStart: string | null | undefined): TimeSlot {
   if (!scheduledStart) return "anytime";
 
-  const hour = parseScheduledTime(scheduledStart).getHours();
+  const d = parseScheduledTime(scheduledStart);
+  const hour = d.getHours();
+  const minutes = d.getMinutes();
+
+  // 精确午夜 = 无具体时间安排 → 随时（00:00 哨兵值）
+  if (hour === 0 && minutes === 0) return "anytime";
 
   for (const slot of TIME_SLOTS) {
     if (slot.key === "anytime") continue;

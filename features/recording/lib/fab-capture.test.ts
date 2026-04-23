@@ -67,6 +67,8 @@ describe("saveFabCapture [regression: fix-cold-resume-silent-loss]", () => {
           syncStatus: "captured",
           lastError: null,
           retryCount: 0,
+          syncingAt: null,
+          guestBatchId: input.guestBatchId ?? null,
         };
       }),
     } as unknown as typeof import("@/shared/lib/capture-store").captureStore;

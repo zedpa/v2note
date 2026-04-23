@@ -27,9 +27,37 @@ describe("assignTimeSlot", () => {
   });
 
   it("should_return_evening_when_hour_between_0_and_4_next_day", () => {
-    expect(assignTimeSlot("2026-04-01T00:00:00")).toBe("evening");
+    // 00:00 精确午夜现在是 anytime 哨兵值（fix-todo-anytime-time）
+    expect(assignTimeSlot("2026-04-01T00:30:00")).toBe("evening");
     expect(assignTimeSlot("2026-04-01T02:30:00")).toBe("evening");
     expect(assignTimeSlot("2026-04-01T04:59:00")).toBe("evening");
+  });
+
+  // regression: fix-todo-anytime-time
+  it("should_return_anytime_when_scheduled_at_exact_midnight", () => {
+    // 精确 00:00 是「无具体时间」的哨兵值
+    expect(assignTimeSlot("2026-04-16T00:00:00")).toBe("anytime");
+    expect(assignTimeSlot("2026-04-16T00:00:00+08:00")).toBe("anytime");
+    expect(assignTimeSlot("2026-04-01T00:00:00")).toBe("anytime");
+  });
+
+  // regression: fix-todo-anytime-time
+  it("should_still_return_evening_when_early_morning_non_midnight", () => {
+    // 00:01 及之后仍属于 evening 跨日时段
+    expect(assignTimeSlot("2026-04-16T01:00:00")).toBe("evening");
+    expect(assignTimeSlot("2026-04-16T00:01:00")).toBe("evening");
+    expect(assignTimeSlot("2026-04-16T04:00:00")).toBe("evening");
+  });
+
+  // regression: fix-todo-anytime-time — null 仍返回 anytime
+  it("should_return_anytime_when_null_unchanged", () => {
+    expect(assignTimeSlot(null)).toBe("anytime");
+    expect(assignTimeSlot(undefined)).toBe("anytime");
+  });
+
+  // regression: fix-todo-anytime-time — 09:00 仍返回 morning
+  it("should_return_morning_when_09_00_unchanged", () => {
+    expect(assignTimeSlot("2026-04-16T09:00:00")).toBe("morning");
   });
 
   it("should_return_morning_when_hour_is_5_boundary", () => {

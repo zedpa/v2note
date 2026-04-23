@@ -57,6 +57,12 @@ export interface SaveFabCaptureInput {
   userId: string | null;
   /** "fab" | "fab_command" | "chat_voice" 等；由调用方依据入口决定 */
   sourceContext: CaptureSource;
+  /**
+   * Phase 8（spec §4.3）：guest 批次标识。
+   * 仅在 userId === null 时由调用方传入（典型：未登录状态下的录音）。
+   * 登录时应传 null（本地优先的"登录态"捕获不依赖 guest batch）。
+   */
+  guestBatchId?: string | null;
 }
 
 export interface SaveFabCaptureDeps {
@@ -194,6 +200,8 @@ export async function saveFabCapture(
     forceCommand: input.asCommand,
     notebook: input.notebook,
     userId: input.userId,
+    // Phase 8：guest 捕获必须带 batch id；已登录捕获不带
+    guestBatchId: input.userId === null ? input.guestBatchId ?? null : null,
     audioBlob: {
       pcmData: built.pcmData as ArrayBuffer,
       duration: built.durationSec,

@@ -80,6 +80,12 @@ type StatusHandler = (s: GatewayWsStatus) => void;
 
 import { getGatewayWsUrl } from "@/shared/lib/gateway-url";
 import { getAccessToken, logout as authLogout, onAuthEvent } from "@/shared/lib/auth";
+import {
+  PendingControlFramesQueue,
+  type ControlFrameType,
+  isUnboundedKeep,
+  isBestEffort,
+} from "./pending-frames";
 
 const MAX_RECONNECT_ATTEMPTS = 10;
 const BASE_RECONNECT_DELAY = 3000;
@@ -194,6 +200,8 @@ export class GatewayClient {
               this.ws?.send(chunk);
             }
             this.pendingBinaryData = [];
+            // Phase 9 §7.1：OPEN + token 就绪后立即刷出 pendingControl 队列
+            this._flushPendingControl();
           } else if (!token) {
             // 无 token = 未登录，禁止使用 WebSocket，丢弃 pending 消息并断开
             console.warn("[gateway-client] No access token, closing unauthenticated connection");
@@ -215,6 +223,16 @@ export class GatewayClient {
               console.warn("[gateway-client] Auth rejected by gateway, attempting token refresh...");
               this._handleAuthFailure();
               return;
+            }
+
+            // Phase 9 §7.1：server 回显 client_id → 把 pendingControl 中对应帧出队
+            // chat.chunk / chat.done 的 payload 带 client_id，视作 chat.user 的 ack
+            if (
+              (msg.type === "chat.chunk" || msg.type === "chat.done") &&
+              typeof (msg.payload as { client_id?: string }).client_id === "string"
+            ) {
+              const cid = (msg.payload as { client_id: string }).client_id;
+              if (cid) this._ackControlClientId(cid);
             }
 
             for (const handler of this.handlers) {
@@ -266,17 +284,140 @@ export class GatewayClient {
     return this._connected;
   }
 
+  /**
+   * Phase 9 §7.1：控制消息待发队列。
+   * WS 非 OPEN / token 为空时，控制消息不再静默 drop，而是按优先级入队；
+   * WS 进入 OPEN 且 token 可用后由 `_flushPendingControl` 串行刷出。
+   *
+   * 二进制帧（PCM）仍走 pendingBinaryData 路径，不进本队列。
+   */
+  private pendingControl = new PendingControlFramesQueue();
+  /** flush 进行中标记——防止 onopen 和 refresh 完成两处并发 flush */
+  private _flushInFlight = false;
+
   send(msg: GatewayMessage): void {
-    // 未登录时拒绝发送任何消息（auth 消息由 connect 内部处理）
-    if (!getAccessToken()) {
+    const type = msg.type as ControlFrameType;
+    const token = getAccessToken();
+    const wsOpen = this.ws?.readyState === WebSocket.OPEN;
+
+    // §7.1：控制消息——不再静默 drop，按优先级入队；若 WS 已 OPEN 且有 token 则直接 send
+    const isControlFrame = isUnboundedKeep(type) || isBestEffort(type);
+    if (isControlFrame) {
+      if (wsOpen && token) {
+        try {
+          this.ws!.send(JSON.stringify(msg));
+        } catch (e) {
+          // ws.send 同步抛错（罕见） → 回落到入队，等下次 flush
+          console.warn("[gateway-client] ws.send failed, queueing", e);
+          this.pendingControl.enqueue({
+            type,
+            payload: (msg as { payload: Record<string, unknown> }).payload ?? {},
+          });
+        }
+        return;
+      }
+      // 未就绪 → 入队
+      this.pendingControl.enqueue({
+        type,
+        payload: (msg as { payload: Record<string, unknown> }).payload ?? {},
+      });
+      return;
+    }
+
+    // 非控制消息（如 process / chat.start / chat.end / todo.aggregate / plan.confirm）
+    // 保持旧行为：未登录拒发；未 OPEN 入 pendingMessages。
+    if (!token) {
       console.warn("[gateway-client] Not authenticated, message dropped");
       return;
     }
-    if (this.ws?.readyState === WebSocket.OPEN) {
-      this.ws.send(JSON.stringify(msg));
+    if (wsOpen) {
+      this.ws!.send(JSON.stringify(msg));
     } else {
       this.pendingMessages.push(msg);
       console.warn("[gateway-client] Not connected, message queued");
+    }
+  }
+
+  /**
+   * Phase 9 §7.1：WS 进入 OPEN 且 token 就绪后，串行刷出 pendingControlFrames。
+   *
+   * 规则：
+   *   - 带 client_id 的必保留帧（chat.user/message, asr.start） → 仅做 ws.send（同步无抛错视为投递）；
+   *     真正的"ack"由 gateway 的 chat.chunk/done / asr.ack 回显处理；
+   *     此实现用 10s awaitingAck 超时保留在队首，下次 flush 再 send（gateway 幂等兜底）。
+   *   - 不带 client_id 的帧（asr.stop / asr.cancel / heartbeat 等） → ws.send 无抛错即出队。
+   *   - flush 中途 WS 非 OPEN / 401 → 立即中止；已 send 未 ack 的 keep 帧保留 awaitingAck=true。
+   */
+  private _flushPendingControl(): void {
+    if (this._flushInFlight) return;
+    if (this._authRefreshing) return;
+
+    const token = getAccessToken();
+    if (!token) return;
+    if (this.ws?.readyState !== WebSocket.OPEN) return;
+
+    this._flushInFlight = true;
+    try {
+      while (true) {
+        // 每次循环检查 WS / token（中途可能退化）
+        if (this.ws?.readyState !== WebSocket.OPEN) break;
+        if (!getAccessToken()) break;
+
+        const head = this.pendingControl.peek();
+        if (!head) break;
+
+        // 带 client_id 的必保留帧且 awaitingAck=true → 保留队首不重发
+        // （下次唤醒 / 重连后重试；gateway 幂等兜底）
+        if (head.priority === "keep" && head.clientId && head.awaitingAck) {
+          break;
+        }
+
+        try {
+          this.ws.send(JSON.stringify(head.raw));
+        } catch (e) {
+          // ws.send 抛错 → 中止；对应帧留在队首等下次
+          console.warn("[gateway-client] flush: ws.send threw, abort", e);
+          break;
+        }
+
+        if (head.priority === "keep" && head.clientId) {
+          // 带 client_id 的帧需要 server 回显才算投递成功
+          // 用 setTimeout 在 10s 后若仍在队首 → 标记 awaitingAck 等待下次 flush 重发
+          const frameRef = head;
+          setTimeout(() => {
+            // 若帧仍在队列头（未被 onmessage 的 client_id 回显分支 dequeue） → 标 awaitingAck
+            const currentHead = this.pendingControl.peek();
+            if (currentHead === frameRef) {
+              this.pendingControl.markAwaitingAck(frameRef, true);
+            }
+          }, 10000);
+          // 不 dequeue；等 onmessage 的 client_id 回显触发 dequeue
+          // 但为避免阻塞后续帧，标记 awaitingAck=true 立刻中断本轮 flush 下一帧
+          this.pendingControl.markAwaitingAck(frameRef, true);
+          break;
+        }
+
+        // 不带 client_id：ws.send 无抛错 → 视为成功，出队
+        this.pendingControl.dequeue(head);
+      }
+    } finally {
+      this._flushInFlight = false;
+    }
+  }
+
+  /**
+   * Phase 9 §7.1：在 onmessage 中收到 server 对 client_id 的回显时调用，移出队列。
+   * 供 chat.chunk / chat.done / asr.ack 处理路径使用。
+   */
+  private _ackControlClientId(clientId: string): void {
+    const snap = this.pendingControl.snapshot();
+    for (const f of snap) {
+      if (f.clientId === clientId && f.priority === "keep") {
+        this.pendingControl.dequeue(f);
+        // 继续尝试 flush 后续帧
+        this._flushPendingControl();
+        return;
+      }
     }
   }
 
@@ -432,6 +573,8 @@ export class GatewayClient {
             payload: { token },
           }));
           console.log("[gateway-client] Re-authenticated with refreshed token");
+          // Phase 9 §7.1：refresh 完成后恢复 pendingControl flush
+          this._flushPendingControl();
         }
       } else {
         // refresh 也失败，用户需要重新登录

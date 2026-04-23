@@ -22,6 +22,10 @@ import {
   CaptureNotFoundError,
   type CaptureRecord,
 } from "./capture-store";
+import {
+  peekGuestBatchId as defaultPeekGuestBatchId,
+  getLastLoggedInUserId as defaultGetLastLoggedInUserId,
+} from "./guest-session";
 
 export interface PushResult {
   serverId: string;
@@ -58,6 +62,34 @@ export interface SyncOrchestratorOptions {
   maxRetryCount?: number;
   /** 单条推送超时（ms）；默认 30000（M3） */
   pushTimeoutMs?: number;
+  /**
+   * §7.2 懒绑定依赖 — 读取当前登录用户。
+   * 若不提供 → 懒绑定关闭，userId=null 条目永远跳过（向后兼容）。
+   * 返回 { id } 即视为当前已登录。
+   */
+  getCurrentUser?: () => { id: string } | null;
+  /**
+   * §7.2 懒绑定依赖 — 读取当前 session 的 guest batch id。
+   * 默认从 guest-session 模块读取。
+   */
+  peekGuestBatchId?: () => string | null;
+  /**
+   * §8 P0-2（跨账号污染防护）：读取"上一次登录的 user id"。
+   * 若存在且不等于 currentUser.id → 跳过懒绑定（等 guest-claim 流程通过
+   * UI 弹窗获得用户知情同意后再由 confirmClaimGuestCaptures 回填）。
+   * 默认从 guest-session 模块读取；测试可注入。
+   */
+  getLastLoggedInUserId?: () => string | null;
+  /**
+   * §8：订阅 gateway WS 状态（"非 open → open" 边沿触发 triggerSync）。
+   * 返回 unsubscribe 函数。不提供 → §8 行为关闭，向后兼容。
+   */
+  subscribeWsStatus?: (handler: (s: "connecting" | "open" | "closed") => void) => () => void;
+  /**
+   * §8：读取当前 WS 状态，用于订阅注册时初始化 lastWsStatus。
+   * onStatusChange 不回放当前状态；仅靠回调会错过订阅前已发生的 open 边沿。
+   */
+  getCurrentWsStatus?: () => "connecting" | "open" | "closed";
 }
 
 interface OrchestratorState {
@@ -79,6 +111,9 @@ export function createSyncOrchestrator(opts: SyncOrchestratorOptions) {
   const maxRetry = opts.maxRetryCount ?? 5;
   const pushTimeout = opts.pushTimeoutMs ?? 30000;
   const log = opts.logger ?? (() => {});
+  const getCurrentUser = opts.getCurrentUser ?? (() => null);
+  const peekBatch = opts.peekGuestBatchId ?? defaultPeekGuestBatchId;
+  const getLastUser = opts.getLastLoggedInUserId ?? defaultGetLastLoggedInUserId;
 
   const state: OrchestratorState = {
     running: false,
@@ -256,15 +291,73 @@ export function createSyncOrchestrator(opts: SyncOrchestratorOptions) {
         while (true) {
           state.hasPendingScan = false;
 
-          // 确保会话（不阻塞捕获；捕获已经落地）
+          // §8（B9 执行顺序契约）：
+          //   1) 先 await ensureGatewaySession，允许其内部 refreshAuth
+          //      更新 auth 状态 / 切换 authRefreshSubject；
+          //   2) 随后无条件执行懒绑定（只读/写 IDB，网络无关）；
+          //   3) 最后若 sessionOk=false 才 break，跳过 pushable 段。
+          // 这样修复了"WS 未就绪→整个 worker 退出→懒绑定永不跑"的死锁。
           const sessionOk = await ensureGatewaySession();
+
+          const unsynced = await captureStore.listUnsynced();
+
+          // §7.2 懒绑定：userId=null 且 guestBatchId 匹配当前 session 的条目
+          // 在推送前原子回填 userId。禁止改写 synced 条目的 userId。
+          // §8：不再受 sessionOk 门控 —— 懒绑定是纯 IDB 操作，网络无关。
+          // §8 P0-2：跨真实自然人（A 登出→B 登录）污染防护。镜像 guest-claim 的
+          //   getLastLoggedInUserId 检查：若本设备上次登录的 user id 与当前 user
+          //   不一致，跳过自动懒绑定；等 guest-claim 走 UI 同意流程由
+          //   confirmClaimGuestCaptures 显式回填。避免 A 的离线笔记被静默划给 B。
+          const currentUser = getCurrentUser();
+          const currentBatch = peekBatch();
+          const lastUserId = getLastUser();
+          const crossAccountRisk =
+            currentUser !== null &&
+            lastUserId !== null &&
+            lastUserId !== currentUser.id;
+          if (crossAccountRisk) {
+            log(
+              "warn",
+              "[sync] lazy-bind skipped: cross-account risk (last user != current user)",
+            );
+          }
+          if (currentUser && currentBatch && !crossAccountRisk) {
+            for (const r of unsynced) {
+              if (r.userId !== null) continue;
+              if (r.syncStatus === "synced") continue; // §7.5 保护
+              if (r.guestBatchId === null) {
+                log(
+                  "warn",
+                  `[sync] zombie capture without guestBatchId: ${r.localId}`,
+                );
+                continue;
+              }
+              if (r.guestBatchId !== currentBatch) continue; // 跨会话遗留 → Phase 8.1 claim
+              try {
+                await captureStore.update(r.localId, {
+                  userId: currentUser.id,
+                  guestBatchId: null,
+                });
+                // 原地回填 in-memory 副本，供本轮 pushable 过滤使用
+                r.userId = currentUser.id;
+                r.guestBatchId = null;
+              } catch (e) {
+                if (e instanceof CaptureNotFoundError) continue;
+                log("warn", `[sync] lazy bind failed for ${r.localId}`, e);
+              }
+            }
+          }
+
+          // §8：懒绑定完成后，若 session 不 OK 则退出等待下次触发
+          // （online / visibility / auth:user-changed / ws:open / pageshow）
           if (!sessionOk) {
-            log("warn", "[sync] session not ready, will retry on next trigger");
+            log(
+              "warn",
+              "[sync] session not ready; lazy-bind done, will retry on next trigger",
+            );
             break;
           }
 
-          const unsynced = await captureStore.listUnsynced();
-          // 只推送 userId 非 null 的条目（未登录归属逻辑在 §4.3，本轮不启用）
           const pushable = unsynced
             .filter((r) => r.userId !== null)
             .filter((r) => !state.inFlightLocalIds.has(r.localId))
@@ -358,14 +451,17 @@ export function createSyncOrchestrator(opts: SyncOrchestratorOptions) {
       } catch (e) {
         log("error", "[sync] worker error", e);
         // M2：即使 catch 分支也要处理 hasPendingScan 补偿
+        // §8 P0-1：立即触发 debounce 重扫（而非 setTimeout 1s），
+        // 避免用户感知到 1s 的同步空窗。triggerSync 本身有 debounceMs 合并窗口。
         if (state.hasPendingScan) {
-          setTimeout(() => triggerSync(), 1000);
+          triggerSync();
         }
       } finally {
         state.running = false;
         // M2：worker 退出时若有 pending scan 尚未被 break 顶掉的分支（session 失败等）
+        // §8 P0-1：同上，立即重扫。
         if (state.hasPendingScan) {
-          setTimeout(() => triggerSync(), 1000);
+          triggerSync();
         }
         state.currentWorkerPromise = null;
       }
@@ -457,11 +553,15 @@ export function startSyncOrchestrator(opts: SyncOrchestratorOptions): () => void
   const onPageShow = (e: PageTransitionEvent) => {
     if (e.persisted) globalOrchestrator?.triggerSync();
   };
+  // 触发点 4（§7.2 / §7.4）：auth:user-changed 事件
+  // 仅 login/logout 触发；token silent refresh 不触发（契约由 auth 层保证）
+  const onAuthChanged = () => globalOrchestrator?.triggerSync();
 
   if (typeof window !== "undefined") {
     window.addEventListener("online", onOnline);
     window.addEventListener("pageshow", onPageShow as EventListener);
     document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("auth:user-changed", onAuthChanged as EventListener);
     globalListeners.push(() => window.removeEventListener("online", onOnline));
     globalListeners.push(() =>
       window.removeEventListener("pageshow", onPageShow as EventListener),
@@ -469,6 +569,27 @@ export function startSyncOrchestrator(opts: SyncOrchestratorOptions): () => void
     globalListeners.push(() =>
       document.removeEventListener("visibilitychange", onVisibility),
     );
+    globalListeners.push(() =>
+      window.removeEventListener("auth:user-changed", onAuthChanged as EventListener),
+    );
+  }
+
+  // §8 触发点 5：gateway WS 状态订阅（"非 open → open" 边沿触发 triggerSync）。
+  // - 通过 opts 注入订阅能力，避免 orchestrator 直接依赖 gateway-client；
+  // - 订阅前用 getCurrentWsStatus 初始化 lastWsStatus，防止订阅晚于真实 open 事件错过边沿；
+  // - 初始化本身不触发 trigger，仅后续真实边沿触发；
+  // - unsubscribe 注册进 globalListeners，与其他触发点同寿命（B10）。
+  if (opts.subscribeWsStatus) {
+    let lastWsStatus: "connecting" | "open" | "closed" =
+      opts.getCurrentWsStatus?.() ?? "closed";
+    const onWsStatus = (s: "connecting" | "open" | "closed") => {
+      if (lastWsStatus !== "open" && s === "open") {
+        globalOrchestrator?.triggerSync();
+      }
+      lastWsStatus = s;
+    };
+    const unsubscribe = opts.subscribeWsStatus(onWsStatus);
+    globalListeners.push(unsubscribe);
   }
 
   // 立即触发一次（layout mount 场景）
@@ -484,6 +605,34 @@ export function startSyncOrchestrator(opts: SyncOrchestratorOptions): () => void
 /** 外部手动触发（新捕获 / 重试按钮 / ws onopen） */
 export function triggerSync(): void {
   globalOrchestrator?.triggerSync();
+}
+
+/**
+ * Phase 8（spec §4.3a）：登出前的"尽力推送"。
+ *
+ * 触发一次全量同步并 await 当前 worker 完成。若超出 `timeoutMs` 仍未完成，
+ * promise 以 { timedOut: true } 形式 resolve（不抛错，由调用方决定是否弹窗）。
+ *
+ * 若 orchestrator 未初始化（SSR / 测试）→ 立即 resolve { timedOut: false, ran: false }。
+ */
+export async function flushAllUnsynced(
+  timeoutMs: number = 5000,
+): Promise<{ timedOut: boolean; ran: boolean }> {
+  if (!globalOrchestrator) {
+    return { timedOut: false, ran: false };
+  }
+  const pending = globalOrchestrator.flushNow();
+  let timedOut = false;
+  await Promise.race([
+    pending,
+    new Promise<void>((resolve) =>
+      setTimeout(() => {
+        timedOut = true;
+        resolve();
+      }, timeoutMs),
+    ),
+  ]);
+  return { timedOut, ran: true };
 }
 
 /** 测试辅助：清除全局单例状态 */

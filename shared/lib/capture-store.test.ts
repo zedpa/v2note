@@ -11,7 +11,13 @@
 
 import { describe, it, expect, beforeEach } from "vitest";
 import "fake-indexeddb/auto";
-import { captureStore, CaptureNotFoundError, SYNC_LEASE_TTL_MS, __internal } from "./capture-store";
+import {
+  captureStore,
+  CaptureNotFoundError,
+  GuestBatchConflictError,
+  SYNC_LEASE_TTL_MS,
+  __internal,
+} from "./capture-store";
 
 // 每个 test 都删库重建
 async function resetDB(): Promise<void> {
@@ -390,6 +396,118 @@ describe("captureStore [regression: fix-cold-resume-silent-loss]", () => {
 
       expect(await captureStore.getAudioBlob(rec1.audioLocalId!)).not.toBeNull();
       expect(await captureStore.getAudioBlob(rec2.audioLocalId!)).not.toBeNull();
+    });
+  });
+
+  // ──────────────────────────────────────────────────────────────
+  // Phase 8 — guestBatchId 支持（spec §4.3）
+  // ──────────────────────────────────────────────────────────────
+  describe("guestBatchId [regression: fix-cold-resume-silent-loss Phase 8]", () => {
+    it("should_create_capture_with_guestBatchId_when_userId_is_null", async () => {
+      const rec = await captureStore.create({
+        kind: "chat_user_msg",
+        text: "offline guest",
+        audioLocalId: null,
+        sourceContext: "chat_view",
+        forceCommand: false,
+        notebook: null,
+        userId: null,
+        guestBatchId: "batch-A",
+      });
+      expect(rec.userId).toBeNull();
+      expect(rec.guestBatchId).toBe("batch-A");
+      // 落盘读回也应一致
+      const got = await captureStore.get(rec.localId);
+      expect(got?.guestBatchId).toBe("batch-A");
+    });
+
+    it("should_default_guestBatchId_to_null_when_not_provided", async () => {
+      const rec = await captureStore.create({
+        kind: "diary",
+        text: null,
+        audioLocalId: null,
+        sourceContext: "fab",
+        forceCommand: false,
+        notebook: null,
+        userId: "u-1",
+      });
+      expect(rec.guestBatchId).toBeNull();
+    });
+
+    it("should_list_captures_by_guestBatchId", async () => {
+      await captureStore.create({
+        kind: "diary", text: "a", audioLocalId: null,
+        sourceContext: "fab", forceCommand: false, notebook: null,
+        userId: null, guestBatchId: "batch-A",
+      });
+      await new Promise((r) => setTimeout(r, 5));
+      await captureStore.create({
+        kind: "chat_user_msg", text: "b", audioLocalId: null,
+        sourceContext: "chat_view", forceCommand: false, notebook: null,
+        userId: null, guestBatchId: "batch-A",
+      });
+      await captureStore.create({
+        kind: "diary", text: "c", audioLocalId: null,
+        sourceContext: "fab", forceCommand: false, notebook: null,
+        userId: null, guestBatchId: "batch-B",
+      });
+      await captureStore.create({
+        kind: "diary", text: "d", audioLocalId: null,
+        sourceContext: "fab", forceCommand: false, notebook: null,
+        userId: "u-1", // 已归属用户，不属于任何 batch
+      });
+
+      const batchA = await captureStore.listByGuestBatch("batch-A");
+      expect(batchA).toHaveLength(2);
+      expect(batchA.map((r) => r.text)).toEqual(["a", "b"]);
+
+      const batchB = await captureStore.listByGuestBatch("batch-B");
+      expect(batchB).toHaveLength(1);
+      expect(batchB[0]!.text).toBe("c");
+
+      const batchC = await captureStore.listByGuestBatch("batch-C");
+      expect(batchC).toHaveLength(0);
+    });
+
+    it("should_not_allow_both_userId_and_guestBatchId_on_create", async () => {
+      // 运行时校验（语义不变式）
+      await expect(
+        captureStore.create({
+          kind: "chat_user_msg",
+          text: "conflict",
+          audioLocalId: null,
+          sourceContext: "chat_view",
+          forceCommand: false,
+          notebook: null,
+          userId: "u-1",
+          guestBatchId: "batch-A",
+        }),
+      ).rejects.toBeInstanceOf(GuestBatchConflictError);
+    });
+
+    it("should_reject_update_that_would_violate_guestBatch_invariant", async () => {
+      const rec = await captureStore.create({
+        kind: "diary", text: null, audioLocalId: null,
+        sourceContext: "fab", forceCommand: false, notebook: null,
+        userId: null, guestBatchId: "batch-A",
+      });
+      // 只回填 userId，不清 guestBatchId → 违反互斥
+      await expect(
+        captureStore.update(rec.localId, { userId: "u-1" }),
+      ).rejects.toBeInstanceOf(GuestBatchConflictError);
+    });
+
+    it("should_allow_claim_pattern_userId_and_clear_guestBatchId_together", async () => {
+      const rec = await captureStore.create({
+        kind: "diary", text: null, audioLocalId: null,
+        sourceContext: "fab", forceCommand: false, notebook: null,
+        userId: null, guestBatchId: "batch-A",
+      });
+      // 归属动作：同时写 userId 和置空 guestBatchId
+      await captureStore.update(rec.localId, { userId: "u-1", guestBatchId: null });
+      const got = await captureStore.get(rec.localId);
+      expect(got?.userId).toBe("u-1");
+      expect(got?.guestBatchId).toBeNull();
     });
   });
 });

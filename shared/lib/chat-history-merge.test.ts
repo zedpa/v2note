@@ -24,6 +24,7 @@ function mkLocal(partial: Partial<CaptureRecord>): CaptureRecord {
     lastError: partial.lastError ?? null,
     retryCount: partial.retryCount ?? 0,
     syncingAt: partial.syncingAt ?? null,
+    guestBatchId: partial.guestBatchId ?? null,
   };
 }
 

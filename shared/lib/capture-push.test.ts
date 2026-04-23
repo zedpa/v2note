@@ -36,6 +36,7 @@ function makeDiary(partial: Partial<CaptureRecord> = {}): CaptureRecord {
     lastError: null,
     retryCount: 0,
     syncingAt: null,
+    guestBatchId: null,
     ...partial,
   };
 }

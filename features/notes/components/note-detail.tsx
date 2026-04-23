@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { api } from "@/shared/lib/api";
 import { useNoteDetail } from "@/features/notes/hooks/use-note-detail";
 import { useNoteEditor } from "@/features/notes/hooks/use-note-editor";
+import { useCachedImage } from "@/features/notes/hooks/use-cached-image";
 import { SwipeBack } from "@/shared/components/swipe-back";
 import { useConfirmDialog } from "@/shared/components/confirm-dialog";
 
@@ -24,6 +25,13 @@ interface NoteDetailProps {
 export function NoteDetail({ recordId, onClose, onDeleted }: NoteDetailProps) {
   const { detail, loading, refetch } = useNoteDetail(recordId);
   const editor = useNoteEditor(detail, refetch);
+  // 图片本地缓存（IndexedDB v2note-image-cache）
+  // spec: fix-oss-image-traffic-storm.md 场景 7/8
+  const detailFileUrl = detail?.record?.file_url ?? null;
+  const cachedDetailImage = useCachedImage(
+    detailFileUrl && isImageUrl(detailFileUrl) ? recordId : null,
+    detailFileUrl && isImageUrl(detailFileUrl) ? detailFileUrl : null,
+  );
 
   const { confirm, ConfirmDialog } = useConfirmDialog();
 
@@ -112,7 +120,7 @@ export function NoteDetail({ recordId, onClose, onDeleted }: NoteDetailProps) {
           isImageUrl(record.file_url) ? (
             <a href={record.file_url} target="_blank" rel="noopener noreferrer" className="block">
               <img
-                src={record.file_url}
+                src={cachedDetailImage.src ?? record.file_url}
                 alt={record.file_name || "附件图片"}
                 className="w-full max-h-[300px] object-cover rounded-2xl bg-secondary"
                 onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}

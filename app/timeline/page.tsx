@@ -7,6 +7,10 @@ import { PCLayout } from '@/components/layout/pc-layout'
 import { captureStore } from '@/shared/lib/capture-store'
 import { mergeTimeline, type TimelineRow } from '@/shared/lib/timeline-merge'
 import { toLocalDateStr } from '@/features/todos/lib/date-utils'
+// §7.4: 账号视图隔离
+import { filterCapturesByAccountView } from '@/shared/lib/account-view-filter'
+import { peekGuestBatchId } from '@/shared/lib/guest-session'
+import { getCurrentUser } from '@/shared/lib/auth'
 
 type FilterType = '全部' | '语音' | '文字' | '图片' | '带文件'
 
@@ -47,6 +51,14 @@ export default function TimelinePage() {
       .finally(() => setLoadingClusters(false))
   }, [])
 
+  // §7.4: 账号身份变化（登录/登出）时重新加载，避免视图显示旧账号数据
+  const [authGen, setAuthGen] = useState(0)
+  useEffect(() => {
+    const handler = () => setAuthGen((g) => g + 1)
+    window.addEventListener('auth:user-changed', handler)
+    return () => window.removeEventListener('auth:user-changed', handler)
+  }, [])
+
   useEffect(() => {
     // Phase 6（spec §1.2）：本地 + 服务端并发拉取 → 三角桥去重合并
     // regression: fix-cold-resume-silent-loss
@@ -70,9 +82,15 @@ export default function TimelinePage() {
       ])
       if (cancelled) return
 
+      // §7.4: 先做跨账号严格隔离，再按 notebook 过滤
+      const viewCtx = {
+        currentUserId: getCurrentUser()?.id ?? null,
+        currentSessionBatchId: peekGuestBatchId(),
+      }
+      const isolated = filterCapturesByAccountView(localAll, viewCtx)
       const local = selectedCluster
-        ? localAll.filter((c) => c.notebook === selectedCluster)
-        : localAll
+        ? isolated.filter((c) => c.notebook === selectedCluster)
+        : isolated
 
       const merged: TimelineRow[] = mergeTimeline(local, serverRecords, {
         // M1：防 strict-mode 双触发 + worker 竞争覆盖：只在 fresh.syncStatus !== 'synced' 时 update。
@@ -101,7 +119,7 @@ export default function TimelinePage() {
     return () => {
       cancelled = true
     }
-  }, [selectedCluster])
+  }, [selectedCluster, authGen])
 
   const handleRecordClick = useCallback(async (id: string) => {
     try {

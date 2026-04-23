@@ -3,6 +3,8 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { usePCMRecorder } from "./use-pcm-recorder";
 import { getGatewayClient, type GatewayResponse } from "@/features/chat/lib/gateway-client";
+// §7.3: ASR 完成超时降级
+import { createAsrTimeoutMachine, type AsrTimeoutMachine } from "@/features/recording/lib/asr-timeout";
 
 export interface UseVoiceToTextOptions {
   onTranscript: (text: string) => void;
@@ -34,11 +36,27 @@ export function useVoiceToText({
   onErrorRef.current = onError;
   const recordingRef = useRef(false);
   const unsubRef = useRef<(() => void) | null>(null);
+  // §7.3: asr.stop 发出后两级超时机
+  const asrTimeoutRef = useRef<AsrTimeoutMachine | null>(null);
 
   // cleanup on unmount
   useEffect(() => {
+    asrTimeoutRef.current = createAsrTimeoutMachine({
+      onTimeout: () => {
+        // 降级：交给调用方处理"指令已保存，将在联网后执行"文案，同时复位录音状态
+        onErrorRef.current?.("录音已保存，转写将在联网后自动完成");
+        setRecording(false);
+        recordingRef.current = false;
+        setConfirmedText("");
+        setPartialText("");
+        unsubRef.current?.();
+        unsubRef.current = null;
+      },
+    });
     return () => {
       unsubRef.current?.();
+      asrTimeoutRef.current?.reset();
+      asrTimeoutRef.current = null;
     };
   }, []);
 
@@ -66,6 +84,7 @@ export function useVoiceToText({
 
         switch (msg.type) {
           case "asr.partial":
+            asrTimeoutRef.current?.notifyPartial();
             setPartialText(msg.payload.text);
             break;
           case "asr.sentence":
@@ -73,6 +92,11 @@ export function useVoiceToText({
             setPartialText("");
             break;
           case "asr.done": {
+            const lateRes = asrTimeoutRef.current?.notifyDone();
+            if (lateRes?.isLate === true) {
+              // §7.3 迟到：UI 已复位，仅静默丢弃（transcript 无处显示）
+              break;
+            }
             const transcript = (msg.payload.transcript || "").trim();
             if (transcript) {
               onTranscriptRef.current(transcript);
@@ -85,7 +109,9 @@ export function useVoiceToText({
             unsubRef.current = null;
             break;
           }
-          case "asr.error":
+          case "asr.error": {
+            const lateErr = asrTimeoutRef.current?.notifyError();
+            if (lateErr?.isLate === true) break;
             onErrorRef.current?.(msg.payload.message || "语音识别失败");
             setRecording(false);
             recordingRef.current = false;
@@ -94,6 +120,7 @@ export function useVoiceToText({
             unsubRef.current?.();
             unsubRef.current = null;
             break;
+          }
         }
       });
 
@@ -138,7 +165,9 @@ export function useVoiceToText({
       type: "asr.stop",
       payload: { saveAudio: false, forceCommand: true },
     });
-    // recording 状态会在 asr.done 回调中置 false
+    // §7.3: 启动两级超时（12s / partial 后 8s），超时交给降级处理
+    asrTimeoutRef.current?.notifyStopSent();
+    // recording 状态会在 asr.done 回调或降级时置 false
   }, [recorder]);
 
   const cancel = useCallback(() => {
@@ -149,6 +178,8 @@ export function useVoiceToText({
     recordingRef.current = false;
     setConfirmedText("");
     setPartialText("");
+    // §7.3: 取消时清除等待中的 asr 超时
+    asrTimeoutRef.current?.reset();
 
     const client = getGatewayClient();
     client.send({ type: "asr.cancel", payload: {} });

@@ -10,6 +10,9 @@ import type { ChatCacheMessage } from "@/features/chat/lib/chat-cache";
 import { emit } from "@/features/recording/lib/events";
 import { captureStore } from "@/shared/lib/capture-store";
 import { triggerSync } from "@/shared/lib/sync-orchestrator";
+import { getOrCreateGuestBatchId, peekGuestBatchId } from "@/shared/lib/guest-session";
+// §7.4: 账号视图隔离
+import { filterCapturesByAccountView } from "@/shared/lib/account-view-filter";
 import { fabNotify } from "@/shared/lib/fab-notify";
 import {
   mergeChatHistory,
@@ -117,6 +120,17 @@ export function useChat(
         userIdRef.current = parsed.user?.id ?? null;
       }
     } catch { /* ignore */ }
+  }, []);
+
+  // §7.4: auth 身份变化（login/logout）时实时刷新 userIdRef，避免用过期身份过滤/缓存
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const ce = e as CustomEvent<{ kind: string; userId: string | null }>;
+      userIdRef.current = ce.detail?.userId ?? null;
+    };
+    window.addEventListener("auth:user-changed", handler as EventListener);
+    return () =>
+      window.removeEventListener("auth:user-changed", handler as EventListener);
   }, []);
 
   // 缓存消息转 ChatMessage
@@ -466,6 +480,11 @@ export function useChat(
       let localChatCaps: Awaited<ReturnType<typeof captureStore.listByKind>> = [];
       try {
         localChatCaps = await captureStore.listByKind("chat_user_msg", 100);
+        // §7.4: 严格按账号视图过滤，防止切账号后看到上一个账号的本地消息
+        localChatCaps = filterCapturesByAccountView(localChatCaps, {
+          currentUserId: userIdRef.current,
+          currentSessionBatchId: peekGuestBatchId(),
+        });
       } catch {
         // IndexedDB 不可用 → 空集合，不阻断
       }
@@ -655,6 +674,9 @@ export function useChat(
     //    WS 未连 → 由 sync-orchestrator 后台推送
     let localId: string;
     let capturedToStore = false;
+    // Phase 8（spec §4.3）：未登录时写 guestBatchId，登录后由 guest-claim 归属回填
+    const currentUserId = userIdRef.current;
+    const guestBatchId = currentUserId === null ? getOrCreateGuestBatchId() : null;
     try {
       const captured = await captureStore.create({
         kind: "chat_user_msg",
@@ -663,7 +685,8 @@ export function useChat(
         sourceContext: "chat_view",
         forceCommand: false,
         notebook: null,
-        userId: userIdRef.current,
+        userId: currentUserId,
+        guestBatchId,
       });
       localId = captured.localId;
       capturedToStore = true;

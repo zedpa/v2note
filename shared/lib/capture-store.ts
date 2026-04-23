@@ -46,6 +46,19 @@ export interface CaptureRecord {
    * - 其他状态（captured/synced/failed）时应为 null。
    */
   syncingAt: string | null;
+  /**
+   * Phase 8（spec §4.3）：guest 批次标识。
+   *
+   * 语义：未登录（userId=null）时捕获的条目携带此值，标记其归属于一次"guest 会话"；
+   *       登录后由 guest-claim 流程批量回填 userId 并清空此字段。
+   *
+   * 互斥约束：**任意条目的 userId 与 guestBatchId 不应同时非空**。
+   *   - userId !== null → guestBatchId 必须为 null（已归属真实账号）
+   *   - userId === null → guestBatchId 允许为 null（老数据）或非空（新 guest 捕获）
+   *
+   * 老数据兼容：DB schema 升级时旧行读取时自动补 null（见 normalizeRecord）。
+   */
+  guestBatchId: string | null;
 }
 
 /** C1：租约超时阈值（毫秒）。超过该时间未 synced 的 syncing 条目视为悬挂，允许被回收重推。 */
@@ -67,10 +80,26 @@ export type CaptureCreateInput = Omit<
   | "serverId"
   | "lastError"
   | "syncingAt"
+  | "guestBatchId"
 > & {
+  /** Phase 8（spec §4.3）：guest 批次标识（可选，仅 userId=null 时有意义） */
+  guestBatchId?: string | null;
   /** 可选：同时创建 audio blob（单事务原子写入） */
   audioBlob?: { pcmData: ArrayBuffer; duration: number };
 };
+
+/**
+ * Phase 8：userId 与 guestBatchId 不得同时非空。
+ * 运行时校验（create 入口）——此为"语义不变式"，违反即抛 TypeError。
+ */
+export class GuestBatchConflictError extends Error {
+  constructor(userId: string, guestBatchId: string) {
+    super(
+      `GuestBatchConflictError: userId=${userId} and guestBatchId=${guestBatchId} are mutually exclusive`,
+    );
+    this.name = "GuestBatchConflictError";
+  }
+}
 
 /**
  * 更新时找不到对应记录时抛出此错误（C1）。
@@ -133,9 +162,31 @@ function reqToPromise<T>(req: IDBRequest<T>): Promise<T> {
 }
 
 /**
+ * Phase 8：老数据兼容——对从 IndexedDB 读回的记录补齐 `guestBatchId` 默认值。
+ * 不改变其他字段，纯非破坏性补 null。
+ */
+function normalizeRecord(row: unknown): CaptureRecord {
+  const r = row as CaptureRecord & { guestBatchId?: string | null };
+  if (r.guestBatchId === undefined) {
+    return { ...r, guestBatchId: null };
+  }
+  return r as CaptureRecord;
+}
+
+function normalizeMany(rows: unknown[]): CaptureRecord[] {
+  return rows.map((r) => normalizeRecord(r));
+}
+
+/**
  * 创建捕获记录（可选包含音频）。单事务跨 store 原子写入，失败整体回滚。
  */
 async function create(input: CaptureCreateInput): Promise<CaptureRecord> {
+  // Phase 8：互斥性运行时校验
+  const guestBatchId = input.guestBatchId ?? null;
+  if (input.userId !== null && guestBatchId !== null) {
+    throw new GuestBatchConflictError(input.userId, guestBatchId);
+  }
+
   const db = await openDB();
   try {
     const localId = genId();
@@ -162,6 +213,7 @@ async function create(input: CaptureCreateInput): Promise<CaptureRecord> {
       lastError: null,
       retryCount: 0,
       syncingAt: null,
+      guestBatchId,
     };
 
     // 跨 store 原子写入
@@ -204,18 +256,32 @@ async function update(localId: string, patch: Partial<CaptureRecord>): Promise<v
       const store = tx.objectStore(CAPTURES_STORE);
       const getReq = store.get(localId);
       let wasMissing = false;
+      let invariantError: GuestBatchConflictError | null = null;
       getReq.onsuccess = () => {
         const row = getReq.result as CaptureRecord | undefined;
         if (!row) {
           wasMissing = true;
           return;
         }
-        const next = { ...row, ...patch, localId }; // 保护主键
+        const next = normalizeRecord({ ...row, ...patch, localId }); // 保护主键 + 补 guestBatchId 默认
+        // Phase 8：互斥校验
+        if (next.userId !== null && next.guestBatchId !== null) {
+          invariantError = new GuestBatchConflictError(next.userId, next.guestBatchId);
+          tx.abort();
+          return;
+        }
         store.put(next);
       };
       tx.oncomplete = () => resolve(wasMissing);
-      tx.onerror = () => reject(tx.error);
-      tx.onabort = () => reject(tx.error ?? new Error("Transaction aborted"));
+      tx.onerror = () => {
+        // 如果是因 invariantError 主动 abort 的，优先抛出语义错误
+        if (invariantError) reject(invariantError);
+        else reject(tx.error);
+      };
+      tx.onabort = () => {
+        if (invariantError) reject(invariantError);
+        else reject(tx.error ?? new Error("Transaction aborted"));
+      };
     });
     if (missing) {
       throw new CaptureNotFoundError(localId);
@@ -231,7 +297,8 @@ async function get(localId: string): Promise<CaptureRecord | null> {
   try {
     const tx = db.transaction(CAPTURES_STORE, "readonly");
     const row = await reqToPromise(tx.objectStore(CAPTURES_STORE).get(localId));
-    return (row as CaptureRecord | undefined) ?? null;
+    if (!row) return null;
+    return normalizeRecord(row);
   } finally {
     db.close();
   }
@@ -253,7 +320,8 @@ async function listUnsynced(nowMs: number = Date.now()): Promise<CaptureRecord[]
   const db = await openDB();
   try {
     const tx = db.transaction(CAPTURES_STORE, "readonly");
-    const all = (await reqToPromise(tx.objectStore(CAPTURES_STORE).getAll())) as CaptureRecord[];
+    const raw = (await reqToPromise(tx.objectStore(CAPTURES_STORE).getAll())) as unknown[];
+    const all = normalizeMany(raw);
     return all
       .filter((r) => {
         if (r.syncStatus === "captured") return true;
@@ -309,7 +377,30 @@ async function listByKind(kind: CaptureKind, limit = 50): Promise<CaptureRecord[
       cursorReq.onerror = () => reject(cursorReq.error);
     });
     // 索引按 kind 聚集但 createdAt 顺序不保证，这里仍排序取前 limit
-    return results.sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, limit);
+    return normalizeMany(results)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      .slice(0, limit);
+  } finally {
+    db.close();
+  }
+}
+
+/**
+ * Phase 8（spec §4.3）：按 guestBatchId 列出条目（createdAt 升序）。
+ *
+ * 使用场景：登录成功后 guest-claim 读取当前 batch 下的所有 guest 条目，
+ *            批量回填 userId。
+ *
+ * 实现：全表扫 + filter（guest 条目预期数量小；不新增专门索引以减少 DB 版本变更）。
+ */
+async function listByGuestBatch(batchId: string): Promise<CaptureRecord[]> {
+  const db = await openDB();
+  try {
+    const tx = db.transaction(CAPTURES_STORE, "readonly");
+    const raw = (await reqToPromise(tx.objectStore(CAPTURES_STORE).getAll())) as unknown[];
+    return normalizeMany(raw)
+      .filter((r) => r.guestBatchId === batchId)
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
   } finally {
     db.close();
   }
@@ -461,6 +552,8 @@ export const captureStore = {
   get,
   listUnsynced,
   listByKind,
+  /** Phase 8：按 guestBatchId 列出未归属条目 */
+  listByGuestBatch,
   delete: deleteOne,
   getAudioBlob,
   runStartupGC,

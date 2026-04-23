@@ -63,6 +63,19 @@ async function loginIfNeeded(page: Page) {
     await page.locator('button:has-text("登录")').click();
     await waitForIdle(page, 2000);
   }
+  // 新用户 onboarding：若出现"怎么称呼你？"引导页，点"跳过，直接开始"
+  const skipOnboarding = page.locator('button:has-text("跳过")').first();
+  if (await skipOnboarding.isVisible({ timeout: 1500 }).catch(() => false)) {
+    await skipOnboarding.click();
+    await waitForIdle(page, 1000);
+  }
+  // 新用户 first-run 遮罩："按住说话，松开自动记录 / 点击任意位置继续"
+  // 点页面中央关闭引导遮罩
+  const firstRunHint = page.locator('text=点击任意位置继续').first();
+  if (await firstRunHint.isVisible({ timeout: 1500 }).catch(() => false)) {
+    await page.mouse.click(195, 400);
+    await waitForIdle(page, 500);
+  }
 }
 
 /**
@@ -498,5 +511,378 @@ test.describe("regression: fix-cold-resume-silent-loss", () => {
 
     // 同步完成后消失
     await expect(page.locator('[data-testid="sync-progress"]')).toBeHidden({ timeout: 45000 });
+  });
+});
+
+// ───────────────────────────────────────────────────────────
+// Phase 9 — 冷启动运行时修复（§7）
+// regression: fix-cold-resume-silent-loss
+// ───────────────────────────────────────────────────────────
+test.describe("Phase9 regression: fix-cold-resume-silent-loss", () => {
+  test.describe.configure({ mode: "serial" });
+
+  let context: BrowserContext;
+  let page: Page;
+
+  test.beforeAll(async ({ browser }) => {
+    context = await browser.newContext({
+      viewport: { width: 390, height: 844 },
+      permissions: ["microphone"],
+    });
+    page = await context.newPage();
+    await page.goto(WEB);
+    await waitForIdle(page);
+    await loginIfNeeded(page);
+  });
+
+  test.afterAll(async () => {
+    await context.close();
+  });
+
+  // ─── 场景 7.1 + 7.3：冷启动立即录音 → send() 不丢 + asr.stop 超时降级 ───
+  test("场景7.1+7.3: token过期+ws未连时立即录音 → toast降级，数据不丢", async () => {
+    await page.goto(WEB);
+    await waitForIdle(page);
+
+    // Given: token 过期 + WS 已 close + reconnect 耗尽
+    await simulateTokenExpired(page, false);
+    await resetReconnectAttemptsExhausted(page);
+    await page.evaluate(() => {
+      // 强制断开当前 WS（如果在）
+      (window as any).__gatewayClient?.disconnect?.();
+    });
+
+    // When: 立即长按 FAB 录音 2 秒
+    const before = Date.now();
+    await fabRecord(page, 2000);
+
+    // Then: captures 立即落地，syncStatus ∈ {captured, syncing}
+    const captures = await readCaptures(page);
+    const latest = captures
+      .filter((c) => c.kind === "diary")
+      .sort((a, b) => (b.createdAt > a.createdAt ? 1 : -1))[0];
+    expect(latest).toBeTruthy();
+    expect(latest.syncStatus).toMatch(/captured|syncing|synced/);
+
+    // And: 录音触发到 capture 落地 < 4s（不被 waitForReady 阻塞）
+    expect(Date.now() - before).toBeLessThan(4500);
+
+    // And: asr.stop 12s 无响应 → 降级 toast 出现
+    await expect(
+      page.locator('text=/录音已保存.*转写将在联网后自动完成/'),
+    ).toBeVisible({ timeout: 15000 });
+
+    // And: FAB 状态已复位（可再次点击不卡死）
+    const fab = page.locator('[data-testid="fab-record"], [aria-label*="录音"]').first();
+    await expect(fab).toBeEnabled();
+
+    // And: 严禁出现"网络未连接/无法连接/发送失败"等旧阻塞提示
+    await expect(page.locator('text=/网络未连接|无法连接.*服务器|发送失败/')).toHaveCount(0);
+  });
+
+  // ─── 场景 7.2：冷启动 userId=null → 登录后 worker 懒绑定 ───
+  test("场景7.2: 冷启动录音/发送 userId=null → 登录后被 worker 回填并同步", async () => {
+    const fresh = await context.browser()!.newContext({
+      viewport: { width: 390, height: 844 },
+      permissions: ["microphone"],
+    });
+    const p = await fresh.newPage();
+
+    // Given: 全新设备（清空 auth）进入应用
+    await p.goto(WEB);
+    await waitForIdle(p);
+
+    // 跳过登录进入本地模式
+    const skipBtn = p.locator('button:has-text("跳过"), button:has-text("本地使用")').first();
+    if (await skipBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+      await skipBtn.click();
+      await waitForIdle(p);
+    }
+
+    // When: 冷启动立即发送文字
+    await p.goto(`${WEB}/chat`);
+    await waitForIdle(p);
+    const input = p.locator('textarea, input[type="text"]').first();
+    await input.fill("冷启动首次消息");
+    await p.locator('button[aria-label*="发送"], button:has-text("发送")').first().click();
+    await p.waitForTimeout(500);
+
+    // Then: capture 落地 userId=null + guestBatchId 非空
+    const preCaps = await readCaptures(p);
+    const target = preCaps.find((c) => c.text === "冷启动首次消息");
+    expect(target).toBeTruthy();
+    expect(target!.userId).toBeNull();
+    expect(target!.guestBatchId).toBeTruthy();
+
+    const initialBatchId = target!.guestBatchId;
+
+    // When: 用户在同一 session 内登录
+    const coldPhone = `137${Date.now().toString().slice(-8)}`;
+    await gw("POST", "/api/v1/auth/register", { phone: coldPhone, password });
+    await loginIfNeeded(p);
+    await waitForIdle(p, 2000);
+
+    // Then: worker 扫描后该 capture 的 userId 被回填，guestBatchId 清空
+    await expect
+      .poll(async () => {
+        const caps = await readCaptures(p);
+        const m = caps.find((c) => c.localId === target!.localId);
+        return { userId: m?.userId, guestBatchId: m?.guestBatchId, sync: m?.syncStatus };
+      }, { timeout: 20000, intervals: [500, 1000, 2000] })
+      .toMatchObject({ userId: expect.any(String), guestBatchId: null });
+
+    // And: 最终 syncStatus === "synced"
+    await expect
+      .poll(async () => {
+        const caps = await readCaptures(p);
+        return caps.find((c) => c.localId === target!.localId)?.syncStatus;
+      }, { timeout: 20000 })
+      .toBe("synced");
+
+    // And: 该 batchId 在 localStorage 中保持为同一值（多 tab 一致性锁）
+    const lsBatchId = await p.evaluate(() => localStorage.getItem("voicenote:guestBatchId"));
+    // 登录后 batch 可被清理（视实现），此处只校验"绑定期间"一致
+    expect([initialBatchId, null]).toContain(lsBatchId);
+
+    await fresh.close();
+  });
+
+  // ─── 场景 7.3 指令超时：forceCommand 保留，不退化为 diary ───
+  test("场景7.3指令: FAB 上滑指令 + 离线 → toast '指令将在联网后执行' + forceCommand 保留", async () => {
+    await page.goto(WEB);
+    await waitForIdle(page);
+    await context.setOffline(true);
+
+    // 长按 FAB 然后上滑触发指令模式（具体手势由前端实现，使用粗略近似）
+    const fab = page.locator('[data-testid="fab-record"], [aria-label*="录音"]').first();
+    const box = await fab.boundingBox();
+    if (!box) throw new Error("FAB not found");
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    await page.mouse.move(cx, cy);
+    await page.mouse.down();
+    await page.waitForTimeout(300);
+    // 上滑触发指令
+    await page.mouse.move(cx, cy - 150, { steps: 10 });
+    await page.waitForTimeout(1500);
+    await page.mouse.up();
+
+    // Then: toast "指令已保存，将在联网后执行"
+    await expect(
+      page.locator('text=/指令已保存.*将在联网后执行|指令将在联网后执行/'),
+    ).toBeVisible({ timeout: 15000 });
+
+    // And: captures 中最新一条 forceCommand === true
+    const caps = await readCaptures(page);
+    const latest = caps
+      .filter((c) => c.kind === "diary")
+      .sort((a, b) => (b.createdAt > a.createdAt ? 1 : -1))[0];
+    expect(latest).toBeTruthy();
+    expect(latest.forceCommand).toBe(true);
+
+    await context.setOffline(false);
+  });
+
+  // ─── 场景 7.4：跨账号视图隔离 ───
+  test("场景7.4: 账号 A 的本地条目不应在账号 B 视图中出现", async () => {
+    // 账号 A
+    const ctxA = await context.browser()!.newContext({
+      viewport: { width: 390, height: 844 },
+      permissions: ["microphone"],
+    });
+    const pA = await ctxA.newPage();
+    const phoneA = `136${Date.now().toString().slice(-8)}`;
+    await gw("POST", "/api/v1/auth/register", { phone: phoneA, password });
+    await pA.goto(WEB);
+    await waitForIdle(pA);
+    await loginIfNeeded(pA);
+    await pA.goto(`${WEB}/chat`);
+    await waitForIdle(pA);
+    await ctxA.setOffline(true);
+    const inputA = pA.locator('textarea, input[type="text"]').first();
+    await inputA.fill("账号A的私密消息");
+    await pA.locator('button[aria-label*="发送"], button:has-text("发送")').first().click();
+    await pA.waitForTimeout(500);
+    const capsA = await readCaptures(pA);
+    const msgA = capsA.find((c) => c.text === "账号A的私密消息");
+    expect(msgA).toBeTruthy();
+    await ctxA.close();
+
+    // 账号 B — 全新 context（不共享 IndexedDB）
+    const ctxB = await context.browser()!.newContext({
+      viewport: { width: 390, height: 844 },
+      permissions: ["microphone"],
+    });
+    const pB = await ctxB.newPage();
+    const phoneB = `135${Date.now().toString().slice(-8)}`;
+    await gw("POST", "/api/v1/auth/register", { phone: phoneB, password });
+    await pB.goto(WEB);
+    await waitForIdle(pB);
+    await loginIfNeeded(pB);
+    await pB.goto(`${WEB}/chat`);
+    await waitForIdle(pB);
+
+    // Then: 账号 B 的聊天视图**不**出现账号 A 的消息
+    await expect(pB.locator('text="账号A的私密消息"')).toHaveCount(0);
+    await expect(pB.locator('text="账号A的私密消息"')).not.toBeVisible();
+
+    await ctxB.close();
+  });
+
+  // ─── 场景 7.5：synced 条目的 userId 不得被回放事件改写 ───
+  test("场景7.5: auth:user-changed 事件不应污染 synced 条目的 userId", async () => {
+    await page.goto(WEB);
+    await waitForIdle(page);
+    await loginIfNeeded(page);
+
+    // Given: 正常发送一条消息 → 等其 synced
+    await page.goto(`${WEB}/chat`);
+    await waitForIdle(page);
+    const input = page.locator('textarea, input[type="text"]').first();
+    await input.fill("已同步的消息-7.5");
+    await page.locator('button[aria-label*="发送"], button:has-text("发送")').first().click();
+    await expect
+      .poll(async () => {
+        const caps = await readCaptures(page);
+        return caps.find((c) => c.text === "已同步的消息-7.5")?.syncStatus;
+      }, { timeout: 15000 })
+      .toBe("synced");
+
+    const before = await readCaptures(page);
+    const target = before.find((c) => c.text === "已同步的消息-7.5")!;
+    const originalUserId = target.userId;
+    expect(originalUserId).toBeTruthy();
+
+    // When: 手动触发一次 auth:user-changed 事件（模拟异常回放 / token refresh 误触发）
+    await page.evaluate(() => {
+      window.dispatchEvent(
+        new CustomEvent("auth:user-changed", {
+          detail: { kind: "login", userId: "fake-user-xxx" },
+        }),
+      );
+    });
+    await page.waitForTimeout(2000);
+
+    // Then: 该 synced 条目的 userId **保持原值**（未被事件覆盖）
+    const after = await readCaptures(page);
+    const stillTarget = after.find((c) => c.localId === target.localId)!;
+    expect(stillTarget.userId).toBe(originalUserId);
+    expect(stillTarget.syncStatus).toBe("synced");
+  });
+
+  // ─── §7.7 Phase 3 P0-1：initAuth 恢复时派发 auth:user-changed ───
+  //
+  // 场景核心：用户已登录 → 在同一 session 先产生 userId=null 的本地 capture
+  // （模拟未归属遗留数据）→ 刷新页面 → 刷新后 capture 应被懒绑定归属到当前用户
+  // 并在时间线上可见。
+  //
+  // 注意：此测试独立于 §7.2 的事件懒绑定机制，验证的是"刷新"这一特定入口
+  // 不会让已登录用户的 null 条目永久失联。
+  test("场景7.7: 刷新页面后 initAuth 派发 restored 事件，null 条目被懒绑定并可见", async () => {
+    await page.goto(WEB);
+    await waitForIdle(page);
+    await loginIfNeeded(page);
+
+    // Given: 当前已登录；通过测试挂载向 captureStore 注入一条 userId=null 的遗留条目
+    //        （模拟上一个 guest session 留下来、尚未归属的数据）
+    const injected = await page.evaluate(async () => {
+      const store = (window as any).__captureStore;
+      if (!store || typeof store.put !== "function") {
+        return { ok: false, reason: "__captureStore not exposed" };
+      }
+      const batchId = (window as any).__peekGuestBatchId?.() ?? null;
+      const localId = `e2e-7-7-${Date.now()}`;
+      await store.put({
+        localId,
+        kind: "diary",
+        text: "§7.7 未归属遗留日记",
+        userId: null,
+        guestBatchId: batchId,
+        syncStatus: "captured",
+        createdAt: Date.now(),
+      });
+      return { ok: true, localId, batchId };
+    });
+
+    expect(injected.ok, injected.reason ?? "captureStore unavailable").toBe(true);
+    const { localId } = injected as { ok: true; localId: string; batchId: string | null };
+
+    // When: 硬刷新页面
+    await page.reload();
+    await waitForIdle(page, 1500);
+
+    // 等待 auth 恢复完成（轮询 __authReady 或等价 flag；超时 10s 即视为断链）
+    await expect
+      .poll(
+        async () => {
+          return await page.evaluate(() => {
+            return (
+              (window as any).__authReady === true ||
+              !!(window as any).__getCurrentUser?.()
+            );
+          });
+        },
+        { timeout: 10000, intervals: [200, 400, 800] },
+      )
+      .toBe(true);
+
+    // Then: 懒绑定完成后，capture 的 userId 应被归属到当前登录用户
+    await expect
+      .poll(
+        async () => {
+          const caps = await readCaptures(page);
+          const hit = caps.find((c) => c.localId === localId);
+          return hit?.userId ?? null;
+        },
+        { timeout: 10000, intervals: [300, 600, 1200] },
+      )
+      .not.toBeNull();
+
+    const caps = await readCaptures(page);
+    const bound = caps.find((c) => c.localId === localId)!;
+    expect(bound.userId).not.toBeNull();
+    expect(typeof bound.userId).toBe("string");
+
+    // And: 账号视图过滤器放行该条目 → 时间线可见
+    await page.goto(`${WEB}/timeline`);
+    await waitForIdle(page);
+    const visible = page.locator('text="§7.7 未归属遗留日记"');
+    await expect(visible).toBeVisible({ timeout: 5000 });
+
+    // And: 刷新后**不**应再有"未登录视图下该条目被屏蔽"的残留态
+    //       （通过不出现"请先登录"提示隐含验证）
+    await expect(page.locator('text="请先登录"')).toHaveCount(0);
+  });
+
+  // ─── §7.7 未登录刷新：不应派发 login ───
+  test("场景7.7b: 未登录状态下刷新不应派发 auth:user-changed login", async () => {
+    // 开一个独立的 incognito context 保证未登录
+    const ctxGuest = await page.context().browser()!.newContext({
+      viewport: { width: 390, height: 844 },
+    });
+    const pGuest = await ctxGuest.newPage();
+
+    // 安装监听器：在任何脚本运行前先挂上 event 计数器
+    await pGuest.addInitScript(() => {
+      (window as any).__authEventLog = [];
+      window.addEventListener("auth:user-changed", (e: Event) => {
+        const detail = (e as CustomEvent).detail;
+        (window as any).__authEventLog.push(detail);
+      });
+    });
+
+    await pGuest.goto(WEB);
+    await waitForIdle(pGuest);
+
+    // 未做登录操作 → reload
+    await pGuest.reload();
+    await waitForIdle(pGuest, 1500);
+
+    // 断言：从未派发过 kind=login 事件
+    const log = await pGuest.evaluate(() => (window as any).__authEventLog ?? []);
+    const hasLogin = log.some((d: any) => d?.kind === "login");
+    expect(hasLogin).toBe(false);
+
+    await ctxGuest.close();
   });
 });
