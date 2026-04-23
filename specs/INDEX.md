@@ -10,7 +10,7 @@
 6. superseded 状态的 spec 已被合并，永远不要引用它们，使用 superseded_by 指向的文件
 -->
 
-> 最后更新：2026-04-23 | 共 112 个 spec（17 active / 5 draft / 57 completed / 31 superseded / 2 deprecated）
+> 最后更新：2026-04-23 | 共 112 个 spec（15 active / 5 draft / 59 completed / 31 superseded / 2 deprecated）
 
 ## 🔵 Active（当前有效，可直接引用和修改）
 
@@ -34,8 +34,6 @@
 | 102b | Voice — Todo Extension | voice | voice-todo-ext.md | 确认弹窗UI/提醒/周期未做 |
 | 110 | UI/UX 全局审查与改进 | design | ui-ux-audit.md | 审查完毕,修复0% |
 | 120 | 原生体验深度优化 — 路线A | ui | native-experience-deep.md | Phase 0-D 分阶段 |
-| 123a | 提示词架构 v2 — 分层（SharedAgent/UserAgent/五层存储/endChat） | agent | prompt-architecture-v2-layers.md | 拆分自 prompt-architecture-v2.md（§1-§4） |
-| 123b | 提示词架构 v2 — 工具/Skill/组装/实施 | agent | prompt-architecture-v2-skills.md | 拆分自 prompt-architecture-v2.md（§5-§8 + 接口/Phases） |
 | 125 | 待办写入系统日历 & 闹钟 | todo | todo-calendar-alarm.md | Intent方案+SystemIntentPlugin |
 | 087 | 鸿蒙 HarmonyOS NEXT 适配 | infra | harmony-support.md | WebView壳+JSBridge+前端适配层 |
 | PROC-001 | SDD 流程守卫（Hook + Lint） | infra | process-sdd-guardrails.md | A/C/B/D 已完成 |
@@ -59,6 +57,8 @@
 | 112 | Recording Resilience — 录音防丢 | voice | recording-resilience.md |
 | 114 | 录音入口统一 | voice | voice-input-unify.md |
 | 117 | 工具生态增强 | agent | tool-ecosystem-enhance.md |
+| 123a | 提示词架构 v2 — 分层 | agent | prompt-architecture-v2-layers.md |
+| 123b | 提示词架构 v2 — 工具/Skill/组装 | agent | prompt-architecture-v2-skills.md |
 | todo-ui-redesign-spec | Todo UI 重构 — 设计规范 | todo | todo-ui-redesign-spec.md |
 | todo-ui-redesign-scenarios | Todo UI 重构 — 场景与实施 | todo | todo-ui-redesign-scenarios.md |
 | 089 | 移动端行动面板 | ui | mobile-action-panel.md |

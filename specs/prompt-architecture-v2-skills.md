@@ -1,7 +1,7 @@
 ---
 id: "prompt-architecture-v2-skills"
 title: "提示词架构 v2 — 工具 / Skill / 组装 / 实施阶段"
-status: active
+status: completed
 domain: agent
 risk: high
 dependencies: ["cognitive-wiki.md", "chat-system.md", "agent-tool-layer.md", "prompt-architecture-v2-layers.md"]
