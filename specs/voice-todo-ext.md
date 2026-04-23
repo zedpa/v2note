@@ -28,10 +28,10 @@ updated: 2026-04-04
 ### Section 1 场景 C1-C7
 | 场景 | 后端 | 前端 | 差距 |
 |------|------|------|------|
-| C1 创建+目标匹配 | ✅ AI提取+goal_id匹配 | ❌ | **app/page.tsx:208 createTodo()未传goal_id** |
+| C1 创建+目标匹配 | ✅ AI提取+goal_id匹配 | ✅ | handleCommandConfirm 已传 _matched_goal_id |
 | C1b 创建+收集箱 | ✅ | ✅ | 正常工作 |
-| C2 创建+提醒 | ✅ AI提取reminder | ❌ | **createTodo()未传reminder_* 字段；API不接受** |
-| C3 创建+周期 | ✅ AI提取recurrence | ❌ | **createTodo()未传recurrence_* 字段；API不接受** |
+| C2 创建+提醒 | ✅ AI提取reminder | ✅ | handleCommandConfirm 传 reminder_before/reminder_types，API 已接受 |
+| C3 创建+周期 | ✅ AI提取recurrence | ✅ | handleCommandConfirm 传 recurrence_rule/recurrence_end，API 已接受 |
 | C4 创建多条 | ✅ | ✅ | 正常工作 |
 | C5 完成待办 | ✅ target_hint匹配 | ✅ | 正常工作 |
 | C6 修改待办 | ✅ changes对象 | ✅ | 正常工作 |
@@ -64,7 +64,7 @@ updated: 2026-04-04
 |------|------|------|
 | Migration 048 | ✅ 完成 | reminder_at/before/types + recurrence_rule/end/parent_id + 3索引 |
 | todoRepo CRUD | ✅ 完成 | findRecurrenceTemplates/hasInstanceForDate/createRecurrenceInstance/findPendingReminders/markReminderSent |
-| **REST API 接受字段** | ❌ 缺失 | **gateway/src/routes/todos.ts 和 shared/lib/api/todos.ts 均不接受 reminder_*/recurrence_* 字段** |
+| **REST API 接受字段** | ✅ 完成 | gateway/src/routes/todos.ts POST/PATCH 均接受 reminder_*/recurrence_* 字段 |
 
 ### Section 5: 提醒调度 + 周期生成
 | 场景 | 状态 | 说明 |
@@ -77,14 +77,10 @@ updated: 2026-04-04
 | G1 提醒心跳检查 | ✅ 完成 | engine.ts 30min窗口+WebSocket推送+标记已发送 |
 | G2 修改时间重算提醒 | ❌ 未实现 | 修改scheduled_start时不自动重算reminder_at |
 
-### ⚠️ 关键阻断
-**前端确认→API创建的全链路断裂**：
-1. `app/page.tsx:208-214` handleCommandConfirm 只传 text/scheduled_start/estimated_minutes/priority
-2. 漏传: goal_id(_matched_goal_id), reminder_at/before/types, recurrence_rule/end
-3. `shared/lib/api/todos.ts:19-31` createTodo类型定义不含 reminder/recurrence 字段
-4. `gateway/src/routes/todos.ts` POST/PATCH 路由不接受 reminder/recurrence 字段
-
-**修复路径**: API层补字段 → 前端createTodo类型补字段 → handleCommandConfirm补传
+### ✅ 全链路已接通（2026-04-23 审查确认）
+1. `app/page.tsx` handleCommandConfirm 已传递 goal_id/reminder_before/reminder_types/recurrence_rule/recurrence_end
+2. `shared/lib/api/todos.ts` createTodo/updateTodo 类型定义已包含 reminder/recurrence 字段
+3. `gateway/src/routes/todos.ts` POST/PATCH 路由已接受并处理 reminder/recurrence 字段（含 reminder_at 自动计算）
 
 ## 概述
 
@@ -593,15 +589,15 @@ interface TodoReminderMessage {
 | `gateway/src/handlers/todo-extract-prompt.ts` | Layer 1 待办全能模式 AI prompt（注入 activeGoals） | ✅ 已完成 |
 | `gateway/src/tools/definitions/create-todo.ts` | 支持 reminder / recurrence / goal_hint 字段 | ✅ 已完成 |
 | `gateway/src/db/repositories/todo.ts` | 新增 reminder/recurrence CRUD；废弃 domain 写入 | ✅ 已完成 |
-| `gateway/src/routes/todos.ts` | **API 支持 reminder/recurrence 字段** | ❌ **未接受这些字段** |
+| `gateway/src/routes/todos.ts` | API 支持 reminder/recurrence 字段 | ✅ 已完成 |
 | `supabase/migrations/048_todo_reminder_recurrence.sql` | DB schema 变更（reminder + recurrence） | ✅ 已完成 |
 | **调度** | | |
 | `gateway/src/proactive/engine.ts` | reminder 心跳检查（30min 窗口） | ✅ 已完成 |
 | `gateway/src/cognitive/daily-cycle.ts` | generateRecurringInstances()（每日 3:00） | ✅ 已完成 |
 | **前端弹窗** | | |
-| `features/todos/components/command-sheet.tsx` | 统一确认弹窗（待办卡片 + 查询列表 + Agent 状态） | ✅ 组件完成，**确认执行丢字段** |
-| `app/page.tsx` handleCommandConfirm | 确认后调用REST API创建/修改/完成 | 🟡 **只传4个字段，缺goal_id/reminder/recurrence** |
-| `shared/lib/api/todos.ts` createTodo类型 | 前端API类型定义 | 🟡 **缺reminder/recurrence字段** |
+| `features/todos/components/command-sheet.tsx` | 统一确认弹窗（待办卡片 + 查询列表 + Agent 状态） | ✅ 已完成 |
+| `app/page.tsx` handleCommandConfirm | 确认后调用REST API创建/修改/完成 | ✅ 已传递全部字段 |
+| `shared/lib/api/todos.ts` createTodo类型 | 前端API类型定义 | ✅ 已包含 reminder/recurrence 字段 |
 
 ## 依赖
 
