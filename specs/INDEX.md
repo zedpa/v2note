@@ -10,17 +10,15 @@
 6. superseded 状态的 spec 已被合并，永远不要引用它们，使用 superseded_by 指向的文件
 -->
 
-> 最后更新：2026-04-20 | 共 112 个 spec（21 active / 5 draft / 53 completed / 31 superseded / 2 deprecated）
+> 最后更新：2026-04-23 | 共 112 个 spec（17 active / 5 draft / 57 completed / 31 superseded / 2 deprecated）
 
 ## 🔵 Active（当前有效，可直接引用和修改）
 
 | id | title | domain | file | 子域说明 |
 |----|-------|--------|------|---------|
 
-| 050a | Todo — Core & Logic | todo | todo-core.md | 数据流/AI提取/去重/时间/子任务/Strike关联 |
 | 050b | Todo — UI & Interactions | todo | todo-ui.md | 界面交互 + 实施阶段 |
 | 051 | Chat System | chat | chat-system.md | Header/Entry/Greeting/Skill |
-| 053b | Daily Report — Extended | report | daily-report-extended.md | 周月报/历史报告（Phase 2-4 未开始） |
 | 062 | AI 伴侣窗口 | ui | ai-companion-window.md | |
 | 064a-d | APP Mobile — Diary | app-mobile | app-mobile-views-diary.md | 整体结构/顶栏/日记/下拉刷新 |
 | 064a-t | APP Mobile — Todo & FAB | app-mobile | app-mobile-views-todo.md | 待办视图/FAB 录音按钮 |
@@ -35,9 +33,6 @@
 | 102a | Voice Routing — Core | voice | voice-routing.md | Layer 3 regex预过滤待移除 |
 | 102b | Voice — Todo Extension | voice | voice-todo-ext.md | 确认弹窗UI/提醒/周期未做 |
 | 110 | UI/UX 全局审查与改进 | design | ui-ux-audit.md | 审查完毕,修复0% |
-| 112 | Recording Resilience — 录音防丢 | voice | recording-resilience.md | 本地缓存+断线重试+连接保护 |
-| 114 | 录音入口统一 | voice | voice-input-unify.md | 删InputBar死代码 + ChatView接gateway ASR + useVoiceToText hook |
-| 117 | 工具生态增强 | agent | tool-ecosystem-enhance.md | 读取工具+时间感知+认知层查询+描述优化 |
 | 120 | 原生体验深度优化 — 路线A | ui | native-experience-deep.md | Phase 0-D 分阶段 |
 | 123a | 提示词架构 v2 — 分层（SharedAgent/UserAgent/五层存储/endChat） | agent | prompt-architecture-v2-layers.md | 拆分自 prompt-architecture-v2.md（§1-§4） |
 | 123b | 提示词架构 v2 — 工具/Skill/组装/实施 | agent | prompt-architecture-v2-skills.md | 拆分自 prompt-architecture-v2.md（§5-§8 + 接口/Phases） |
@@ -59,6 +54,11 @@
 
 | id | title | domain | file |
 |----|-------|--------|------|
+| 050a | Todo — Core & Logic | todo | todo-core.md |
+| 053b | Daily Report — Extended | report | daily-report-extended.md |
+| 112 | Recording Resilience — 录音防丢 | voice | recording-resilience.md |
+| 114 | 录音入口统一 | voice | voice-input-unify.md |
+| 117 | 工具生态增强 | agent | tool-ecosystem-enhance.md |
 | todo-ui-redesign-spec | Todo UI 重构 — 设计规范 | todo | todo-ui-redesign-spec.md |
 | todo-ui-redesign-scenarios | Todo UI 重构 — 场景与实施 | todo | todo-ui-redesign-scenarios.md |
 | 089 | 移动端行动面板 | ui | mobile-action-panel.md |

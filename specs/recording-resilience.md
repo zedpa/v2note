@@ -1,7 +1,7 @@
 ---
 id: "112"
 title: "Recording Resilience — 录音防丢 + 断线重试"
-status: active
+status: completed
 domain: voice
 risk: medium
 dependencies: ["voice-routing.md"]

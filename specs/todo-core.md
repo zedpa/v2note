@@ -1,7 +1,7 @@
 ---
 id: "050a"
 title: "Todo System — Core & Logic"
-status: active
+status: completed
 domain: todo
 risk: medium
 dependencies: ["strike-extraction.md"]

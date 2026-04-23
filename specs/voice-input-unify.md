@@ -1,7 +1,7 @@
 ---
 id: "114"
 title: "Voice Input Unify — 录音入口统一"
-status: active
+status: completed
 domain: voice
 risk: medium
 dependencies: ["voice-routing.md"]

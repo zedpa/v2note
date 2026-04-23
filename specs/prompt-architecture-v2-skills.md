@@ -406,13 +406,13 @@ function buildSystemPrompt(opts: {
 
 ## Implementation Phases (实施阶段)
 
-- [ ] Phase 1: DB migration — 创建 `user_agent` 表 + repository + 初始模板
-- [ ] Phase 2: SharedAgent + Soul 模板 — 拆分 AGENTS.md + chat.md → SHARED_AGENT.md（系统规则）+ Soul 初始模板（AI 人格）+ UserAgent 模板（用户规则）
-- [ ] Phase 3: 自我维护工具 — 实现 update_soul / update_profile / update_user_agent / create_memory / send_notification 五个工具定义，从 registry 移除 update_user_info
-- [ ] Phase 4: prompt-builder 重构 — 新组装顺序（SharedAgent → Soul → UserAgent → Profile → Memory → Wiki），注入 wikiContext
-- [ ] Phase 5: context loader 重构 — loadWarmContext 加载 UserAgent，传递 wikiContext
-- [ ] Phase 6: chat.ts 重构 — initChat 传递新参数 + 移除 `agent: "chat"`，endChat 精简（移除 soul/profile 更新代码）
-- [ ] Phase 6b: Skill 重构 — loadSkills 默认 `enabled: false`，自动路由检查 UserAgent 技能配置，未开启的 skill 不激活
+- [x] Phase 1: DB migration — 创建 `user_agent` 表 + repository + 初始模板 ✅
+- [x] Phase 2: SharedAgent + Soul 模板 — 拆分 AGENTS.md + chat.md → SHARED_AGENT.md（系统规则）+ Soul 初始模板（AI 人格）+ UserAgent 模板（用户规则） ✅
+- [x] Phase 3: 自我维护工具 — 实现 update_soul / update_profile / update_user_agent / create_memory / send_notification 五个工具定义，从 registry 移除 update_user_info ✅
+- [x] Phase 4: prompt-builder 重构 — 新组装顺序（SharedAgent → Soul → UserAgent → Profile → Memory → Wiki），注入 wikiContext ✅
+- [x] Phase 5: context loader 重构 — loadWarmContext 加载 UserAgent，传递 wikiContext ✅
+- [x] Phase 6: chat.ts 重构 — initChat 传递新参数 + 移除 `agent: "chat"`，endChat 精简（移除 soul/profile 更新代码） ✅
+- [x] Phase 6b: Skill 重构 — loadSkills 默认 `enabled: false`，自动路由检查 UserAgent 技能配置，未开启的 skill 不激活 ✅
 - [ ] Phase 7: advisor-context 迁移 — loadChatCognitive / buildGoalDiscussionContext / buildInsightDiscussionContext / prefetchDeepSkillContext 全部从 strike/bond 改为 wiki_page。**前置条件**：cognitive-wiki.md 的 wiki 编译引擎已上线。如果 wiki 表为空，所有认知上下文函数返回空字符串
 - [ ] Phase 8: 清理 — 删除 agents/chat.md，移除 self-evolution.ts 中的 shouldUpdateSoulStrict（已无调用方），移除 chat.ts 中的 appendToDiary import
 

@@ -1,7 +1,7 @@
 ---
 id: "053b"
 title: "Daily Report — Extended (Weekly/Monthly/Cognitive)"
-status: active
+status: completed
 domain: report
 risk: medium
 dependencies: ["daily-report-core.md"]
