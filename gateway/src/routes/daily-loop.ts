@@ -1,7 +1,7 @@
 import type { Router } from "../router.js";
 import { sendJson, sendError, getUserId, HttpError } from "../lib/http-helpers.js";
 import { generateMorningBriefing, generateEveningSummary } from "../handlers/daily-loop.js";
-import { generateReport } from "../handlers/report.js";
+import { generateReport, resolveMode } from "../handlers/report.js";
 import { todoRepo } from "../db/repositories/index.js";
 import { onTodoComplete } from "../cognitive/todo-projector.js";
 
@@ -67,6 +67,10 @@ export function registerDailyLoopRoutes(router: Router) {
       const url = new URL(req.url ?? "", `http://${req.headers.host}`);
       const mode = url.searchParams.get("mode") ?? "auto";
       const report = await generateReport(mode, userId, userId);
+      // 确保 mode 字段存在（前端 SmartDailyReport 依赖它区分布局）
+      if (report && !report.mode) {
+        report.mode = resolveMode(new Date().getHours());
+      }
       sendJson(res, report);
     } catch (err: any) {
       const status = err instanceof HttpError ? err.status : 500;

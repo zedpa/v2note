@@ -275,7 +275,6 @@ export async function generateEveningSummary(
 
   const now = tzNow();
   const today = fmt(now);
-  const tomorrow = fmt(dfAddDays(now, 1));
 
   // 当日持久缓存（仅 forceRefresh 时跳过）
   if (!forceRefresh) {
@@ -290,118 +289,123 @@ export async function generateEveningSummary(
     }
   }
 
-  // 1. 加载上下文（v2 架构）— 失败时 graceful degrade
-  let loaded: Awaited<ReturnType<typeof loadWarmContext>> = {
-    soul: undefined, userProfile: undefined, userAgent: undefined,
-    memories: [], rawMemories: [], wikiContext: undefined,
-    goals: [],
-  };
+  // 1. 只加载 Soul（语气人格）— 晚报不需要 Memory/Wiki/工具规则
+  let soul: string | undefined;
   try {
-    loaded = await loadWarmContext({ deviceId: uid, userId: uid, mode: "briefing" });
+    const loaded = await loadWarmContext({ deviceId: uid, userId: uid, mode: "briefing" });
+    soul = loaded.soul;
   } catch (err: any) {
-    console.warn(`[daily-loop] loadWarmContext failed, using defaults: ${err.message}`);
+    console.warn(`[daily-loop] loadWarmContext failed: ${err.message}`);
   }
 
-  // 2. 今日完成的待办（DB 层按 completed_at 范围过滤，避免全量查询）
+  // 2. 今日完成的待办
   const todayRng = dayRange(today);
   const todayDone = await todoRepo.findCompletedByUserInRange(uid, todayRng.start, todayRng.end);
 
-  // 3. 今日新记录数
+  // 3. 今日日记
+  let diaryText = "";
   let newRecordCount = 0;
   try {
-    const records = await recordRepo.findByUser(uid, { limit: 100 });
-    newRecordCount = records.filter(
-      (r: any) => r.created_at && toLocalDateStr(r.created_at) === today,
-    ).length;
-  } catch {
-    // non-critical
-  }
-
-  // 4. 明日排期
-  const pending = await todoRepo.findPendingByUser(uid);
-  const tomorrowScheduled = pending.filter((t) =>
-    toLocalDateStr(t.scheduled_start) === tomorrow,
-  );
-
-  // 5. 加载今日日记（record + transcript）— 含条目级摘要
-  let diaryText = "";
-  let diaryEntrySummaries: string[] = [];  // 每条日记的 HH:mm + 前100字
-  {
-    try {
-      const records = await recordRepo.findByUserAndDateRange(uid, todayRng.start, todayRng.end);
-      if (records.length > 0) {
-        const transcripts = await transcriptRepo.findByRecordIds(records.map((r: any) => r.id));
-        // 按完整 record 边界截断到 2000 字（至少保留第一条）
-        let charCount = 0;
-        const parts: string[] = [];
-        for (const t of transcripts) {
-          if (parts.length > 0 && charCount + t.text.length > 2000) break;
-          parts.push(charCount + t.text.length > 2000 ? t.text.slice(0, 2000) : t.text);
-          charCount += parts[parts.length - 1].length;
-
-          // 构建条目级摘要：本地时间 HH:mm + 前100字
-          const record = records.find((r: any) => r.id === t.record_id);
-          const timeStr = record?.created_at
-            ? toLocalDateTime(record.created_at).split(" ")[1] ?? ""
-            : "";
-          const snippet = t.text.length > 100 ? t.text.slice(0, 100) + "..." : t.text;
-          diaryEntrySummaries.push(`${timeStr} ${snippet}`.trim());
-        }
-        diaryText = parts.join("\n\n");
+    const records = await recordRepo.findByUserAndDateRange(uid, todayRng.start, todayRng.end);
+    newRecordCount = records.length;
+    if (records.length > 0) {
+      const transcripts = await transcriptRepo.findByRecordIds(records.map((r: any) => r.id));
+      let charCount = 0;
+      const parts: string[] = [];
+      for (const t of transcripts) {
+        if (parts.length > 0 && charCount + t.text.length > 2000) break;
+        parts.push(charCount + t.text.length > 2000 ? t.text.slice(0, 2000) : t.text);
+        charCount += parts[parts.length - 1].length;
       }
-    } catch (err: any) {
-      console.warn(`[daily-loop] Failed to load diary: ${err.message}`);
+      diaryText = parts.join("\n\n");
     }
+  } catch (err: any) {
+    console.warn(`[daily-loop] Failed to load diary: ${err.message}`);
   }
 
-  // 6. 构建 system prompt（v2 架构）
-  const systemPromptBase = buildSystemPrompt({
-    agent: "briefing",
-    soul: loaded.soul,
-    userAgent: loaded.userAgent,
-    userProfile: loaded.userProfile,
-    memory: loaded.memories,
-    wikiContext: loaded.wikiContext,
-    skills: [],
-  });
+  // 4. 无任何记录 → 不生成报告
+  const hasContent = todayDone.length > 0 || diaryText.length > 0;
+  if (!hasContent) {
+    const empty: SummaryResult = {
+      headline: "",
+      accomplishments: [],
+      insight: "",
+      affirmation: "",
+      tomorrow_preview: [],
+      stats: { done: 0, new_records: newRecordCount },
+    };
+    try { await briefingRepo.upsert(uid, today, "evening", empty, userId); } catch { /* ignore */ }
+    console.log(`[daily-loop] No content today, skip evening summary for ${uid}`);
+    return empty;
+  }
 
-  const diaryInstruction = diaryText
-    ? `\n从今日活动（完成的待办 + 日记内容）中提取"今日亮点"：
-- 准确描述用户今天的感受和状态（不是泛泛总结）
-- 从完成的事项和日记中提炼出最值得记住的亮点
-- 抽象出更高层级的模式/趋势
-- 如果有矛盾或有趣的点，指出来`
-    : "";
+  // 5. 构建 prompt — 只传今日完成 + 今日日记，写 ≤100 字报告
+  const doneList = todayDone.map((t) => {
+    const timeStr = t.completed_at ? toLocalDateTime(t.completed_at).split(" ")[1] : "";
+    return `- [${timeStr}] ${t.text}`;
+  }).join("\n");
 
-  const systemContent = `${systemPromptBase}
+  const soulLine = soul ? `<soul>\n${soul}\n</soul>\n` : "";
 
-根据用户画像生成个性化晚间回顾。返回纯 JSON，不要 markdown 包裹。
+  const systemContent = `${soulLine}你是用户的私人日报作者。根据今天的已完成待办和日记，写一段晚间回顾。
+
+## 输出要求
+
+返回纯 JSON：
 {
-  "headline": "≤30字，基于用户画像的温暖晚间回顾，语气俏皮自然。做了很多→跟他一起开心；什么都没做→'今天就这样了'比'无事项完成'真诚一万倍。绝对不要说'无事项完成''亦无待办遗留'这种公文腔。",
-  "accomplishments": ["完成的事，具体到事项名"],
-  "insight": "今日亮点 — 从完成的事项和日记中提炼亮点，准确描述+高阶抽象，2-4句话。无日记时返回空字符串。",
-  "affirmation": "一句真诚的每日肯定：基于今天实际做的事，不空洞。什么都没做→'今天休息也是一种选择'类型的接纳。语气匹配灵魂人格。",
-  "tomorrow_preview": ["明日排期/待处理，最多3条"],
-  "stats": {"done": 数字, "new_records": 数字}
+  "headline": "≤100字的今日回顾",
+  "accomplishments": ["完成事项，照抄原文即可"],
+  "stats": {"done": number, "new_records": number}
 }
-完成为空时 accomplishments 返回空数组。无明日安排时 tomorrow_preview 返回空数组。${diaryInstruction}`;
 
-  const diaryBlock = diaryText ? `\n今日日记:\n${diaryText}` : "";
-  const diaryEntryBlock = diaryEntrySummaries.length > 0
-    ? `\n日记条目:\n${diaryEntrySummaries.map((s) => `- ${s}`).join("\n")}`
-    : "";
+## headline 写作规则
+
+一段话，不超过 100 字。这是整篇晚报的全部内容。
+
+写作视角——「陪伴者」：你全程在场，看着用户度过了这一天。
+
+结构：「事实 → 我注意到的 → 一句收尾」
+1. 从今天最有记忆点的事切入（具体事项名 / 日记原话）
+2. 点出一个你看到的模式、变化、或值得记住的点
+3. 一句话收尾——肯定、接纳、或留一个轻松的尾巴
+
+## 表达 DNA
+
+句式：
+- 平均句长 ≤18 字。一个判断一句话
+- 开头直入，禁止"今天是充实的一天""回顾今天"
+- 结论先行，不铺垫
+- 引用用户原话用「」标注
+- 转折用"但"，不用"然而""不过"
+
+禁用词：
+"充实""丰富""不断""积极""良好""有效""合理""逐步""值得一提""总的来说""综上""忙碌"
+
+确定性：
+- 有数据（完成数、时间）→ 直接说
+- 推测用户状态 → 用"看起来""像是"
+- 信息不够 → 不编
+
+正反例：
+✓ "PPT终于交了，卡了三天的那个。下午连着回了5封邮件，看起来进入状态了。"
+✓ "你说「核心问题其实不是融资」——这句话挺狠的，跟你最近一直在想的方向是一件事。"
+✓ "就做了一件事，但那件事拖了一周了。动手就是最大的进展。"
+✗ "今天完成了3项任务，工作效率良好，继续保持积极的状态。"
+✗ "充实的一天，各项工作稳步推进，期待明天更好的表现。"
+
+特殊情况：
+- 只有待办没有日记 → 从完成节奏和事项类型中读信息
+- 只有日记没有待办 → 聚焦日记内容，引用原话
+- 日记和行为矛盾 → 直接说出张力，不抹平`;
+
+  const userContent = [
+    doneList ? `今日完成:\n${doneList}` : "",
+    diaryText ? `今日日记:\n${diaryText}` : "",
+  ].filter(Boolean).join("\n\n");
 
   const messages: ChatMessage[] = [
-    {
-      role: "system",
-      content: systemContent,
-    },
-    {
-      role: "user",
-      content: `今日完成(${todayDone.length}): ${todayDone.map((t) => t.text).join("、") || "无"}
-今日记录: ${newRecordCount} 条
-明日排期(${tomorrowScheduled.length}): ${tomorrowScheduled.slice(0, 5).map((t) => t.text).join("、") || "无"}${diaryEntryBlock}${diaryBlock}`,
-    },
+    { role: "system", content: systemContent },
+    { role: "user", content: userContent },
   ];
 
   try {
@@ -416,15 +420,12 @@ export async function generateEveningSummary(
       throw new Error("AI 返回格式异常");
     }
 
-    if (!parsed.stats) {
-      parsed.stats = { done: todayDone.length, new_records: newRecordCount };
-    }
-    if (!parsed.tomorrow_preview) {
-      parsed.tomorrow_preview = tomorrowScheduled.slice(0, 3).map((t) => t.text);
-    }
-    // 新字段默认值
+    // 补全字段（向后兼容前端接口）
+    if (!parsed.stats) parsed.stats = { done: todayDone.length, new_records: newRecordCount };
+    if (!parsed.accomplishments) parsed.accomplishments = todayDone.slice(0, 5).map((t) => t.text);
     if (!parsed.insight) parsed.insight = "";
     if (!parsed.affirmation) parsed.affirmation = "";
+    if (!parsed.tomorrow_preview) parsed.tomorrow_preview = [];
 
     // Cache
     try { await briefingRepo.upsert(uid, today, "evening", parsed, userId); } catch { /* ignore */ }
@@ -442,11 +443,11 @@ export async function generateEveningSummary(
     console.error(`[daily-loop] AI summary generation failed: ${err.message}`);
 
     const fallback: SummaryResult = {
-      headline: todayDone.length > 0 ? `今天搞定了${todayDone.length}件事，不错嘛` : "今天就这样了，也挺好的",
+      headline: todayDone.length > 0 ? `今天搞定了${todayDone.length}件事` : "今天就这样了",
       accomplishments: todayDone.slice(0, 5).map((t) => t.text),
       insight: "",
       affirmation: "",
-      tomorrow_preview: tomorrowScheduled.slice(0, 3).map((t) => t.text),
+      tomorrow_preview: [],
       stats: { done: todayDone.length, new_records: newRecordCount },
     };
 
