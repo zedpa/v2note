@@ -1,14 +1,14 @@
 ---
 id: "050b"
 title: "Todo System — UI & Interactions"
-status: active
+status: completed
 domain: todo
 risk: medium
 dependencies: ["todo-core.md"]
 superseded_by: null
 related: ["todo-core.md"]
 created: 2026-03-23
-updated: 2026-04-17
+updated: 2026-04-24
 ---
 
 # Todo System — UI & Interactions (界面与交互层)
@@ -21,7 +21,7 @@ updated: 2026-04-17
 
 ## 1. UI & Interactions (界面与交互)
 
-> 来源: todo-ui-redesign.md (✅ 实现完成), todo-interaction-refactor.md (🟡 待开发)
+> 来源: todo-ui-redesign.md (✅ 实现完成), todo-interaction-refactor.md (✅ P0-P3 已完成, P4 拖拽排序远期)
 
 ### 1.1 双视图体系 <!-- ✅ completed -->
 
@@ -180,7 +180,7 @@ const TIME_SLOTS: TimeSlotConfig[] = [
 那么 (Then)   时间视图 4 个时段块全部显示空状态卡片，每个有对应引导文案和 + 入口
 ```
 
-### 1.5 交互增强 — TaskItem 滑动手势 (P0, 🟡 待开发)
+### 1.5 交互增强 — TaskItem 滑动手势 (P0, ✅ 已完成)
 
 ```
 正常状态：
@@ -239,7 +239,7 @@ const RIGHT_THRESHOLD = 80;   // 右滑完成阈值
 const ACTION_WIDTH = 120;     // 左滑操作区总宽度
 ```
 
-### 1.6 项目视图 — 瀑布流网格 (P1, 🟡 待开发)
+### 1.6 项目视图 — 瀑布流网格 (P1, ✅ 已完成)
 
 ```
 ┌──────────────┐  ┌────────────────┐
@@ -309,7 +309,7 @@ const PROJECT_COLORS = [
               修复方案：handleAdd 先调 setDetailGroup(null) 关闭详情页再打开创建面板。
 ```
 
-### 1.7 优先级编辑器 (P2, 🟡 待开发)
+### 1.7 优先级编辑器 (P2, ✅ 已完成)
 
 ```
 优先级选择器（内联横排）：
@@ -358,7 +358,7 @@ const PROJECT_COLORS = [
 并且 (And)    无父目标/低优先级时不显示对应元素（避免噪音）
 ```
 
-### 1.8 月历展开 / 周月切换 (P3, 🟡 待开发)
+### 1.8 月历展开 / 周月切换 (P3, ✅ 已完成)
 
 ```
 收起状态（默认）：
@@ -425,9 +425,9 @@ const PROJECT_COLORS = [
 | TaskItem | `features/todos/components/task-item.tsx` | ✅ |
 | TodoCreateSheet | `features/todos/components/todo-create-sheet.tsx` | ✅ |
 | TodoEditSheet | `features/todos/components/todo-edit-sheet.tsx` | ✅ |
-| SwipeableTaskItem | `features/todos/components/swipeable-task-item.tsx` | 🟡 待建 |
-| PrioritySelector | `features/todos/components/priority-selector.tsx` | 🟡 待建 |
-| CalendarExpand | `features/todos/components/calendar-expand.tsx` | 🟡 待建 |
+| SwipeableTaskItem | `features/todos/components/swipeable-task-item.tsx` | ✅ |
+| PrioritySelector | `features/todos/components/priority-selector.tsx` | ✅ |
+| CalendarExpand | `features/todos/components/calendar-expand.tsx` | ✅ |
 
 ### 1.10 待废弃组件
 
@@ -441,14 +441,14 @@ const PROJECT_COLORS = [
 | `features/todos/hooks/use-today-todos.ts` | useTodoStore |
 
 ### UI 边界条件
-- [ ] P0 滑动与纵向滚动冲突：水平位移 > 垂直位移时才进入滑动模式
-- [ ] P0 同一时刻只能有一个卡片处于滑开状态
-- [ ] P1 瀑布流 0 个项目 → 空状态
-- [ ] P1 瀑布流 1 个项目 → 单列居中
-- [ ] P2 priority=null 与 priority=3 视为等价（默认中优先级）
-- [ ] P2 项目列表来源统一：创建表单和项目视图使用同一份 projects 数据
-- [ ] P3 viewedDates 持久化 localStorage，key 含 userId，超过 60 天自动清理
-- [ ] P3 月历在小屏上的宽度适配
+- [x] P0 滑动与纵向滚动冲突：水平位移 > 垂直位移时才进入滑动模式
+- [x] P0 同一时刻只能有一个卡片处于滑开状态
+- [x] P1 瀑布流 0 个项目 → 空状态
+- [x] P1 瀑布流 1 个项目 → 单列居中
+- [x] P2 priority=null 与 priority=3 视为等价（默认中优先级）
+- [x] P2 项目列表来源统一：创建表单和项目视图使用同一份 projects 数据
+- [x] P3 viewedDates 持久化 localStorage，key 含 userId，超过 60 天自动清理
+- [x] P3 月历在小屏上的宽度适配
 - [x] 随时时段创建：空时间 + 有日期 → `scheduled_start = ${date}T00:00:00${tz}`（哨兵），归入 anytime
 - [x] 随时哨兵向后兼容：已有 `scheduled_start = null` 的待办 → `assignTimeSlot(null)` 仍返回 "anytime"
 
@@ -493,9 +493,9 @@ const PROJECT_COLORS = [
 - [x] 三条路径统一注入时间锚点（digest/todo-extract/voice-action/command-full/unified-process 全部注入）
 - [x] voice-action 创建统一走 tool handler
 
-### Phase 6: Interaction Enhancement (交互增强) — 🟡 进行中
+### Phase 6: Interaction Enhancement (交互增强) — ✅ completed（P4 远期除外）
 - [x] P0: TaskItem 左右滑动手势 + 撤销 Toast + 触觉反馈（SwipeableTaskItem 已实现并集成）
-- [ ] P1: 项目视图瀑布流网格重做
-- [ ] P2: 优先级编辑器 + 创建表单增强
-- [ ] P3: 月历展开 + 三色圆点 + 周历滑动切换
+- [x] P1: 项目视图瀑布流网格（ProjectView 双列瀑布流已实现）
+- [x] P2: 优先级编辑器（PrioritySelector 已实现）
+- [x] P3: 月历展开（CalendarExpand 已实现）
 - [ ] P4 (远期): 拖拽排序

@@ -1,12 +1,12 @@
 ---
 id: "PROC-001"
 title: "SDD 流程守卫（Hook + Lint）"
-status: active
+status: completed
 domain: infra
 risk: medium
 dependencies: []
 created: 2026-04-17
-updated: 2026-04-17
+updated: 2026-04-24
 ---
 
 # SDD 流程守卫：用 Hook + Lint 堵住"被遗忘的 CLAUDE.md"

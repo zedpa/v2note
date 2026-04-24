@@ -28,15 +28,15 @@ updated: 2026-04-04
 | H1 去掉regex预筛 | ✅ 完成 | mayBeAction()定义但未调用，Layer 3全走AI。**待清理死代码** |
 | H2 短文本分类 | ✅ 完成 | voice-action.ts:144 阈值 ≤2字(比spec的4字更宽) |
 | H3 Digest条件化 | ❌ 未实现 | Layer 3 record路径无文本长度分支，所有Strike同等处理 |
-| I1 关闭确认弹窗 | ❌ 未接通 | local-config.ts有定义confirm_before_execute，但app/page.tsx未读取使用 |
-| I2 撤销已执行操作 | ❌ 未实现 | use-undo-toast.ts基础设施存在，但未连接到静默执行流 |
+| I1 关闭确认弹窗 | ✅ 完成 | app/page.tsx:358-360 读取 settings.confirm_before_execute → silentExecuteCommands |
+| I2 撤销已执行操作 | ✅ 完成 | silentExecuteCommands 内含 showUndoToast，支持 create/complete/modify 三种撤销 |
 | 边界:空文本 | ✅ 完成 | app/page.tsx:152 `if (!transcript) break` |
-| 边界:AI失败 | ❌ 未实现 | CommandSheet无错误状态UI |
+| 边界:AI失败 | ✅ 完成 | CommandSheet errorMessage 状态 + 红色文字展示 |
 | 边界:页面切换保持 | ✅ 完成 | CommandSheet在root级渲染，独立于activeOverlay |
 | 边界:网络中断 | ❌ 未实现 | 无网络错误状态处理 |
 | 边界:todo+上滑 | ✅ 完成 | process.ts Layer 1检查在Layer 2前，Layer 1优先 |
 
-**核心差距**：后端三层路由+隐藏Record均已完成；前端 CommandSheet 组件存在但**确认执行时丢失字段**、**继续说话是空函数**、**设置项未接通**。
+**核心差距**：后端三层路由+隐藏Record均已完成；前端 confirm_before_execute + 撤销 + AI错误UI 均已接通。剩余：H3 Digest条件化、网络中断处理。
 
 ## 概述
 

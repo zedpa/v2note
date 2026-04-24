@@ -141,6 +141,7 @@ export default function Page() {
   const [commandSheetTranscript, setCommandSheetTranscript] = useState<string>("");
   const [commandSheetCommands, setCommandSheetCommands] = useState<TodoCommand[]>([]);
   const [commandSheetMode, setCommandSheetMode] = useState<"todo" | "agent" | "action">("todo");
+  const refineModeRef = useRef(false); // D4: 继续说话语音修改模式
   const [commandToolStatuses, setCommandToolStatuses] = useState<string[]>([]);
 
   // Workspace: Segment tab (日记 | 待办)
@@ -335,6 +336,19 @@ export default function Page() {
           const transcript = (msg.payload.transcript || "").trim();
           if (!transcript) break;
           console.log("[CommandSheet] asr.done received, activeTab:", activeTabRef.current, "overlay:", activeOverlayRef.current, "transcript:", transcript.slice(0, 30));
+
+          // D4: 继续说话语音修改模式 — 将转写文本作为 todo.refine 发送
+          if (refineModeRef.current) {
+            refineModeRef.current = false;
+            setCommandSheetTranscript(transcript);
+            setCommandSheetOpen(true); // 重新打开 sheet 显示 loading
+            client.send({
+              type: "todo.refine" as any,
+              payload: { commands: commandSheetCommands, modificationText: transcript },
+            });
+            break;
+          }
+
           // 只在待办页 (sourceContext="todo") 时立即弹出，日记页由 process.result 决定
           if (activeTabRef.current === "todo" && !activeOverlayRef.current) {
             setCommandSheetTranscript(transcript);
@@ -468,8 +482,8 @@ export default function Page() {
   }, []);
 
   // CommandSheet 确认执行：根据指令类型调用 REST API
+  // 注意：不在此处关闭 sheet — 单条确认时由 CommandSheet 内部在最后一条移除后调用 onClose
   const handleCommandConfirm = useCallback(async (commands: TodoCommand[]) => {
-    setCommandSheetOpen(false);
     try {
       for (const cmd of commands) {
         switch (cmd.action_type) {
@@ -948,7 +962,11 @@ export default function Page() {
         toolStatuses={commandToolStatuses}
         onConfirm={handleCommandConfirm}
         onCancel={() => setCommandSheetOpen(false)}
-        onContinueSpeak={() => { /* v2: trigger recording again */ }}
+        onContinueSpeak={() => {
+          // D4: 继续说话语音修改 — 暂时关闭 sheet 让 FAB 可见，录音后 asr.done 走 refine 路径
+          refineModeRef.current = true;
+          setCommandSheetOpen(false);
+        }}
         onTextSubmit={async (text) => {
           try {
             const { getGatewayClient } = await import("@/features/chat/lib/gateway-client");

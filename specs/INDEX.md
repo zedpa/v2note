@@ -10,14 +10,13 @@
 6. superseded 状态的 spec 已被合并，永远不要引用它们，使用 superseded_by 指向的文件
 -->
 
-> 最后更新：2026-04-23 | 共 112 个 spec（15 active / 5 draft / 59 completed / 31 superseded / 2 deprecated）
+> 最后更新：2026-04-24 | 共 112 个 spec（11 active / 5 draft / 63 completed / 31 superseded / 2 deprecated）
 
 ## 🔵 Active（当前有效，可直接引用和修改）
 
 | id | title | domain | file | 子域说明 |
 |----|-------|--------|------|---------|
 
-| 050b | Todo — UI & Interactions | todo | todo-ui.md | 界面交互 + 实施阶段 |
 | 051 | Chat System | chat | chat-system.md | Header/Entry/Greeting/Skill |
 | 062 | AI 伴侣窗口 | ui | ai-companion-window.md | |
 | 064a-d | APP Mobile — Diary | app-mobile | app-mobile-views-diary.md | 整体结构/顶栏/日记/下拉刷新 |
@@ -33,11 +32,8 @@
 | 102a | Voice Routing — Core | voice | voice-routing.md | Layer 3 regex预过滤待移除 |
 | 102b | Voice — Todo Extension | voice | voice-todo-ext.md | 确认弹窗UI/提醒/周期未做 |
 | 110 | UI/UX 全局审查与改进 | design | ui-ux-audit.md | 审查完毕,修复0% |
-| 120 | 原生体验深度优化 — 路线A | ui | native-experience-deep.md | Phase 0-D 分阶段 |
 | 125 | 待办写入系统日历 & 闹钟 | todo | todo-calendar-alarm.md | Intent方案+SystemIntentPlugin |
 | 087 | 鸿蒙 HarmonyOS NEXT 适配 | infra | harmony-support.md | WebView壳+JSBridge+前端适配层 |
-| PROC-001 | SDD 流程守卫（Hook + Lint） | infra | process-sdd-guardrails.md | A/C/B/D 已完成 |
-| fix-sidebar-wiki-mgmt | Fix: 侧边栏 Wiki 页面管理 | ui | fix-sidebar-wiki-mgmt.md | Phase1-4✅+Phase5显示优化✅ |
 ## 🟡 Draft（规划中，尚未开始实施）
 
 | id | title | domain | file |
@@ -148,6 +144,10 @@
 | fix-image-thumbnail | Fix: 图片插入后显示文字描述而非缩略图 | ui | fix-image-thumbnail.md |
 | fix-briefing-prompt-v2 | Fix: 早晚报接入 v2 提示词架构 | report | fix-briefing-prompt-v2.md |
 | fix-reminder-not-working | Fix: 提醒功能未生效 — Agent工具+编辑页+recalc | todo | fix-reminder-not-working.md |
+| 120 | 原生体验深度优化 — 路线A | ui | native-experience-deep.md |
+| PROC-001 | SDD 流程守卫（Hook + Lint） | infra | process-sdd-guardrails.md |
+| fix-sidebar-wiki-mgmt | Fix: 侧边栏 Wiki 页面管理 | ui | fix-sidebar-wiki-mgmt.md |
+| 050b | Todo — UI & Interactions | todo | todo-ui.md |
 
 ## ⛔ Superseded（已被合并，不要引用）
 

@@ -10,6 +10,14 @@ vi.mock("@/shared/lib/api/todos", () => ({
   deleteTodo: vi.fn().mockResolvedValue({}),
 }));
 
+// mock records API
+vi.mock("@/shared/lib/api/records", () => ({
+  getRecord: vi.fn().mockResolvedValue({
+    id: "rec-1",
+    transcript: { text: "这是语音转写的原文内容" },
+  }),
+}));
+
 // mock date-utils
 vi.mock("../lib/date-utils", () => ({
   parseScheduledTime: (ts: string) => new Date(ts),
@@ -21,6 +29,7 @@ vi.mock("../lib/time-slots", () => ({
 }));
 
 import { updateTodo } from "@/shared/lib/api/todos";
+import { getRecord } from "@/shared/lib/api/records";
 
 function makeTodo(overrides: Partial<TodoDTO> = {}): TodoDTO {
   return {
@@ -128,5 +137,72 @@ describe("TodoEditSheet — 提醒功能", () => {
     });
     const callArgs = vi.mocked(updateTodo).mock.calls[0];
     expect(callArgs[1]).toHaveProperty("reminder_before", null);
+  });
+});
+
+describe("TodoEditSheet — 查看原文 (E3b)", () => {
+  beforeEach(() => { vi.clearAllMocks(); });
+
+  it("should_show_view_source_button_when_record_id_exists", () => {
+    const todo = makeTodo({ record_id: "rec-1" });
+    render(<TodoEditSheet todo={todo} open={true} onClose={noop} />);
+    expect(screen.getByText("查看原文")).toBeTruthy();
+  });
+
+  it("should_not_show_view_source_button_when_record_id_is_null", () => {
+    const todo = makeTodo({ record_id: null });
+    render(<TodoEditSheet todo={todo} open={true} onClose={noop} />);
+    expect(screen.queryByText("查看原文")).toBeNull();
+  });
+
+  it("should_fetch_and_display_transcript_when_view_source_clicked", async () => {
+    const todo = makeTodo({ record_id: "rec-1" });
+    render(<TodoEditSheet todo={todo} open={true} onClose={noop} />);
+
+    // 点击"查看原文"按钮
+    fireEvent.click(screen.getByText("查看原文"));
+
+    // 应该调用 getRecord
+    expect(getRecord).toHaveBeenCalledWith("rec-1");
+
+    // 等待异步加载完成，显示转写文本
+    await vi.waitFor(() => {
+      expect(screen.getByText("这是语音转写的原文内容")).toBeTruthy();
+    });
+  });
+
+  it("should_collapse_transcript_when_view_source_clicked_again", async () => {
+    const todo = makeTodo({ record_id: "rec-1" });
+    render(<TodoEditSheet todo={todo} open={true} onClose={noop} />);
+
+    // 展开
+    fireEvent.click(screen.getByText("查看原文"));
+    await vi.waitFor(() => {
+      expect(screen.getByText("这是语音转写的原文内容")).toBeTruthy();
+    });
+
+    // 再次点击收起（按钮文案变为"收起原文"）
+    fireEvent.click(screen.getByText("收起原文"));
+    expect(screen.queryByText("这是语音转写的原文内容")).toBeNull();
+  });
+
+  it("should_only_fetch_record_once_when_toggling", async () => {
+    const todo = makeTodo({ record_id: "rec-1" });
+    render(<TodoEditSheet todo={todo} open={true} onClose={noop} />);
+
+    // 展开
+    fireEvent.click(screen.getByText("查看原文"));
+    await vi.waitFor(() => {
+      expect(screen.getByText("这是语音转写的原文内容")).toBeTruthy();
+    });
+
+    // 收起
+    fireEvent.click(screen.getByText("收起原文"));
+
+    // 再次展开 — 不应再次 fetch
+    fireEvent.click(screen.getByText("查看原文"));
+    expect(getRecord).toHaveBeenCalledTimes(1);
+    // 内容应该立即显示（已缓存）
+    expect(screen.getByText("这是语音转写的原文内容")).toBeTruthy();
   });
 });

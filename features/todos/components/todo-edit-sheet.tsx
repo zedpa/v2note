@@ -6,6 +6,7 @@ import {
   Calendar, Clock, Trash2, Sparkles,
 } from "lucide-react";
 import { updateTodo, deleteTodo } from "@/shared/lib/api/todos";
+import { getRecord } from "@/shared/lib/api/records";
 import { dispatchIntents, type ReminderType } from "@/shared/lib/intent-dispatch";
 import SystemIntent from "@/shared/lib/system-intent";
 import type { TodoDTO } from "../lib/todo-types";
@@ -41,6 +42,9 @@ export function TodoEditSheet({ todo, open, onClose, onUpdated, onAskAI }: TodoE
   const [reminderBefore, setReminderBefore] = useState<number | null>(null);
   const [reminderTypes, setReminderTypes] = useState<ReminderTypeOption[]>(["notification"]);
   const [saving, setSaving] = useState(false);
+  const [sourceExpanded, setSourceExpanded] = useState(false);
+  const [sourceText, setSourceText] = useState<string | null>(null);
+  const [sourceLoading, setSourceLoading] = useState(false);
   const dateRef = useRef<HTMLInputElement>(null);
   const timeRef = useRef<HTMLInputElement>(null);
 
@@ -74,6 +78,26 @@ export function TodoEditSheet({ todo, open, onClose, onUpdated, onAskAI }: TodoE
   if (open && todo && text === "" && !saving) {
     syncFromTodo(todo);
   }
+
+  // 查看原文：懒加载，点击时 fetch，缓存结果
+  const handleToggleSource = useCallback(async () => {
+    if (sourceExpanded) {
+      setSourceExpanded(false);
+      return;
+    }
+    setSourceExpanded(true);
+    if (sourceText !== null) return; // 已缓存，无需再次 fetch
+    if (!todo?.record_id) return;
+    setSourceLoading(true);
+    try {
+      const record = await getRecord(todo.record_id);
+      setSourceText(record?.transcript?.text ?? "（无转写文本）");
+    } catch {
+      setSourceText("加载失败");
+    } finally {
+      setSourceLoading(false);
+    }
+  }, [todo?.record_id, sourceExpanded, sourceText]);
 
   const handleSave = useCallback(async () => {
     if (!todo || saving) return;
@@ -318,6 +342,23 @@ export function TodoEditSheet({ todo, open, onClose, onUpdated, onAskAI }: TodoE
                 {i + 1}. {step}
               </div>
             ))}
+          </div>
+        )}
+
+        {/* 查看原文（仅当有 record_id 时显示） */}
+        {todo.record_id && (
+          <div className="mb-6">
+            <button
+              onClick={handleToggleSource}
+              className="text-[13px] font-medium text-primary/80 transition-colors hover:text-primary"
+            >
+              {sourceExpanded ? "收起原文" : "查看原文"}
+            </button>
+            {sourceExpanded && (
+              <div className="mt-2 rounded-xl bg-muted/60 p-4 text-sm text-foreground/80">
+                {sourceLoading ? "加载中..." : sourceText}
+              </div>
+            )}
           </div>
         )}
 

@@ -187,7 +187,8 @@ export function CommandSheet({
 
   const handleConfirmAll = useCallback(() => {
     onConfirm(editableCommands);
-  }, [editableCommands, onConfirm]);
+    onClose();
+  }, [editableCommands, onConfirm, onClose]);
 
   if (!open) return null;
 

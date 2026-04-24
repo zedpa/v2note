@@ -98,8 +98,23 @@ async function loginIfNeeded(page: Page) {
 }
 ```
 
+**Step 4：关闭"每日回顾"弹窗**（登录后可能自动弹出）
+```typescript
+  // Step 4: 每日回顾弹窗（"每日回顾" + fixed inset-0 z-50 覆盖全屏）
+  const dailyReview = page.locator('button:has-text("晚安")').first();
+  if (await dailyReview.isVisible({ timeout: 2000 }).catch(() => false)) {
+    await dailyReview.click();
+    await waitForIdle(page, 500);
+  }
+  const closeX = page.locator('[class*="fixed inset-0"] button:has-text("×")').first();
+  if (await closeX.isVisible({ timeout: 500 }).catch(() => false)) {
+    await closeX.click();
+    await waitForIdle(page, 500);
+  }
+```
+
 **注意事项：**
-- 三个步骤缺一不可：登录 → onboarding 跳过 → first-run 遮罩关闭
+- 四个步骤缺一不可：登录 → onboarding 跳过 → first-run 遮罩关闭 → 每日回顾弹窗关闭
 - 每步都用 `.catch(() => false)` 防止元素不存在时超时
 - timeout 故意设短（1500-3000ms），元素不在就跳过，不阻塞
 
@@ -108,15 +123,48 @@ async function loginIfNeeded(page: Page) {
 async function registerAndLogin(page: Page): Promise<string> {
   await gw("POST", "/api/v1/auth/register", { phone, password });
   const { data } = await gw("POST", "/api/v1/auth/login", { phone, password });
-  const token = data?.token;
+  const token = (data?.accessToken ?? data?.token) as string;
+  const refreshToken = data?.refreshToken as string;
+  const user = data?.user;
   expect(token).toBeTruthy();
+
   await page.goto(WEB);
-  await page.evaluate((t) => localStorage.setItem("auth_token", t), token);
+  const userId = user?.id as string;
+  await page.evaluate(([t, rt, u, uid]) => {
+    localStorage.setItem("voicenote:accessToken", t);
+    if (rt) localStorage.setItem("voicenote:refreshToken", rt);
+    if (u) localStorage.setItem("voicenote:user", u);
+    sessionStorage.setItem("voicenote:sessionAlive", "1");
+    if (uid) {
+      localStorage.setItem(`v2note:onboarded:${uid}`, "true");
+      localStorage.setItem("v2note:onboarded", "true");
+    }
+  }, [token, refreshToken, user ? JSON.stringify(user) : "", userId ?? ""] as string[]);
   await page.goto(WEB);
   await waitForIdle(page);
+
+  // 关闭 first-run 遮罩
+  const hint = page.getByText(/点击任意位置继续|点击任意位置完成/);
+  if (await hint.isVisible({ timeout: 1500 }).catch(() => false)) {
+    await page.mouse.click(195, 400);
+    await waitForIdle(page, 500);
+  }
+  // 关闭每日回顾弹窗
+  const dailyReview = page.locator('button:has-text("晚安")').first();
+  if (await dailyReview.isVisible({ timeout: 2000 }).catch(() => false)) {
+    await dailyReview.click();
+    await waitForIdle(page, 500);
+  }
+
   return token;
 }
 ```
+
+⚠️ **常见错误**：
+- 用 `data.token` 而不是 `data.accessToken` → token 为 undefined
+- 用 `auth_token` 而不是 `voicenote:accessToken` → 前端不识别
+- 只设 accessToken 不设 user → `isLoggedIn` 检查失败
+- 漏掉 `voicenote:sessionAlive` → session 被判断为过期
 
 **选择哪种方式？**
 - 测试关注点是**登录/注册/onboarding 本身** → 方式 A

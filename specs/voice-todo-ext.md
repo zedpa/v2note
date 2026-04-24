@@ -43,7 +43,7 @@ updated: 2026-04-04
 | D1 零等待弹出 | ✅ 完成 | app/page.tsx:150-162 asr.done→立即打开CommandSheet |
 | D2 待办卡片 | ✅ 完成 | command-sheet.tsx CommandCard 显示所有字段 |
 | D3 多指令独立✓/✕ | ✅ 完成 | CommandCard 多条时显示独立 ✓/✕ 按钮，单条确认即时执行 |
-| D4 继续说话修改 | ❌ 空函数 | app/page.tsx:533 `/* v2: trigger recording again */` |
+| D4 继续说话修改 | ✅ 完成 | 文字: onTextSubmit→todo.refine；语音: onContinueSpeak→关闭sheet→FAB录音→asr.done→refine→重开sheet |
 | D5 字段点击编辑 | ✅ 完成 | TodoDetailEdit 支持text/time/priority/reminder编辑 |
 | D6 Agent状态流 | 🟡 部分 | tool.step接收并显示，但结果非实时流式 |
 | D8 查询结果展示 | ✅ 完成 | 最多5条+查看更多跳转 |
@@ -57,7 +57,7 @@ updated: 2026-04-04
 | E1 todo_voice源 | ✅ 完成 | asr.ts:516 source="todo_voice" |
 | E2 command_voice源 | ✅ 完成 | asr.ts:518 source="command_voice" |
 | E3a 日记列表过滤 | ✅ 完成 | record.ts:25 HIDDEN_SOURCES_CLAUSE 过滤 |
-| E3b 待办详情查看原文 | ❌ 未实现 | 无"查看原文"UI |
+| E3b 待办详情查看原文 | ✅ 完成 | todo-edit-sheet.tsx 懒加载 record transcript，展开/收起，缓存 |
 
 ### Section 4: DB扩展
 | 项 | 状态 | 说明 |

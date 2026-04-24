@@ -1,13 +1,13 @@
 ---
 id: "fix-sidebar-wiki-mgmt"
 title: "Fix: 侧边栏 Wiki Page 统一 — 废弃 domain 工具 + CRUD UI + Agent 工具"
-status: active
+status: completed
 domain: ui
 risk: high
 dependencies: ["cognitive-wiki.md", "app-mobile-nav.md", "tool-ecosystem-enhance.md"]
 superseded_by: null
 created: 2026-04-12
-updated: 2026-04-12
+updated: 2026-04-24
 backport: sidebar-my-world.md
 ---
 
@@ -365,7 +365,7 @@ Error:    404 if not found, 401 if unauthorized
 - [x] Phase 2: 删除旧 domain 工具 + 更新引用（后端清理）
 - [x] Phase 3: 侧边栏 CRUD UI（前端）
 - [x] Phase 4: 一次性数据迁移脚本（domain 孤儿记录补链）— 065_domain_orphan_backfill.sql
-- [ ] Phase 5: 侧边栏显示优化 — Topic/Goal 分区 + 排序 + 空壳弱化（场景 5.1-5.4）
+- [x] Phase 5: 侧边栏显示优化 — Topic/Goal 分区 + 排序 + 空壳弱化（场景 5.1-5.4） ✅ 2026-04-24（审查确认已实现）
 
 ## 备注
 - 删除操作使用 soft delete（status='archived'），符合 CLAUDE.md 约束

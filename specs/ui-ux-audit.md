@@ -7,7 +7,7 @@ risk: medium
 dependencies: ["app-mobile-views.md", "app-mobile-nav.md", "chat-system.md", "todo-core.md", "todo-ui.md"]
 superseded_by: null
 created: 2026-04-04
-updated: 2026-04-12
+updated: 2026-04-24
 ---
 
 # UI/UX 全局审查与改进

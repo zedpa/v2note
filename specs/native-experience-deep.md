@@ -1,13 +1,13 @@
 ---
 id: "120"
 title: "原生体验深度优化 — 路线A"
-status: active
+status: completed
 domain: ui
 risk: high
 dependencies: ["mobile-native-feel.md", "app-mobile-views.md"]
 superseded_by: null
 created: 2026-04-08
-updated: 2026-04-09
+updated: 2026-04-24
 ---
 
 # 原生体验深度优化 — 路线A

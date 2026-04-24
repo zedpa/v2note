@@ -7,7 +7,7 @@ risk: medium
 dependencies: []
 superseded_by: null
 created: 2026-03-23
-updated: 2026-03-31
+updated: 2026-04-24
 ---
 # 侧边栏「我的世界」重构
 
