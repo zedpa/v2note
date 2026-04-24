@@ -48,6 +48,7 @@ import { registerNotificationRoutes } from "./routes/notifications.js";
 import { registerChatRoutes } from "./routes/chat.js";
 import { registerWikiRoutes } from "./routes/wiki.js";
 import { registerFeedbackRoutes } from "./routes/feedback.js";
+import { registerEventRoutes } from "./routes/events.js";
 import { registerTestHelperRoutes } from "./routes/test-helpers.js";
 import { startStaleRecordSweeper } from "./jobs/sweep-stale-records.js";
 import { getProactiveEngine } from "./proactive/engine.js";
@@ -160,6 +161,7 @@ registerNotificationRoutes(router);
 registerChatRoutes(router);
 registerWikiRoutes(router);
 registerFeedbackRoutes(router);
+registerEventRoutes(router);
 // ⚠️ 仅 ENABLE_E2E_HELPERS=1 时生效（spec: fix-oss-image-traffic-storm.md）
 registerTestHelperRoutes(router);
 

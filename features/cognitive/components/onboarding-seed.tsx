@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { api } from "@/shared/lib/api";
+import { trackEvent } from "@/shared/lib/event-tracker";
 
 interface OnboardingSeedProps {
   onComplete: () => void;
@@ -49,6 +50,8 @@ export function OnboardingSeed({ onComplete, onSkip }: OnboardingSeedProps) {
       // 即使失败也继续
     }
     setSubmitting(false);
+    trackEvent("onboarding_step", { step: 1, answer_length: trimmed.length }).catch(() => {});
+    trackEvent("onboarding_complete", { total_steps: 1, skipped_steps: [] }).catch(() => {});
     onComplete();
   }, [name, submitting, onComplete]);
 
@@ -62,6 +65,7 @@ export function OnboardingSeed({ onComplete, onSkip }: OnboardingSeedProps) {
       // 即使失败也继续
     }
     setSubmitting(false);
+    trackEvent("onboarding_skip", { step: 1, skip_type: "all" }).catch(() => {});
     onSkip();
   }, [onSkip, submitting]);
 

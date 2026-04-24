@@ -10,7 +10,7 @@
 6. superseded 状态的 spec 已被合并，永远不要引用它们，使用 superseded_by 指向的文件
 -->
 
-> 最后更新：2026-04-24 | 共 113 个 spec（7 active / 6 draft / 67 completed / 31 superseded / 2 deprecated）
+> 最后更新：2026-04-24 | 共 113 个 spec（6 active / 6 draft / 68 completed / 31 superseded / 2 deprecated）
 
 ## 🔵 Active（当前有效，可直接引用和修改）
 
@@ -23,7 +23,6 @@
 | 064b | APP Mobile — Nav & System | ui | app-mobile-nav.md | 侧边栏/通知/参谋/冷启动/登录 |
 | 065 | 附件持久化 + RAG | infra | attachment-persistence.md | Phase 1 ✅ 已实现；Phase 2 文档分块 RAG 待开发 |
 | 071 | 并发扩容方案 | infra | concurrency-scaling.md | |
-| 092 | 留存分析 | onboarding | onboarding-retention-analytics.md | |
 | 099 | 主题生命周期 | cognitive | topic-lifecycle.md | Harvest AI摘要生成待完成 |
 | cognitive-wiki-core | 认知 Wiki — 核心模型与编译管线 | cognitive | cognitive-wiki-core.md | 概述/数据模型/实时 Ingest/每日编译（拆自 cognitive-wiki.md） |
 | cognitive-wiki-lifecycle | 认知 Wiki — 搜索、热力与前端适配 | cognitive | cognitive-wiki-lifecycle.md | 搜索/热力/前端适配/迁移/验收行为/边界（拆自 cognitive-wiki.md） |
@@ -45,6 +44,7 @@
 
 | id | title | domain | file |
 |----|-------|--------|------|
+| 092 | 留存分析 | onboarding | onboarding-retention-analytics.md |
 | 110 | UI/UX 全局审查与改进 | design | ui-ux-audit.md |
 | 102a | Voice Routing — Core | voice | voice-routing.md |
 | 102b | Voice — Todo Extension | voice | voice-todo-ext.md |

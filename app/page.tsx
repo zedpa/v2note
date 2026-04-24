@@ -48,6 +48,7 @@ import {
 import { dispatchIntents, type ReminderType } from "@/shared/lib/intent-dispatch";
 import SystemIntent from "@/shared/lib/system-intent";
 import { showUndoToast } from "@/features/todos/hooks/use-undo-toast";
+import { trackAppOpen } from "@/shared/lib/event-tracker";
 import { getCommandDefs } from "@/features/commands/lib/registry";
 import { on } from "@/features/recording/lib/events";
 import { useBackHandler } from "@/shared/hooks/use-back-handler";
@@ -177,9 +178,15 @@ export default function Page() {
     disabled: fabRecording,
   });
 
-  // ── Settings 按用户隔离 ──
+  // ── Settings 按用户隔离 + app_open 埋点 ──
   useEffect(() => {
     setCurrentUserId(loggedIn && user?.id ? user.id : null);
+    if (!loggedIn || !user?.id) return;
+    trackAppOpen();
+    // 前台恢复时也上报（5分钟节流由 trackAppOpen 内部处理）
+    const onResume = () => { if (document.visibilityState === "visible") trackAppOpen(); };
+    document.addEventListener("visibilitychange", onResume);
+    return () => document.removeEventListener("visibilitychange", onResume);
   }, [loggedIn, user?.id]);
 
   // Onboarding state — 按用户维度判断，旧设备新用户也能触发冷启动

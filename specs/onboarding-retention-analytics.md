@@ -1,17 +1,17 @@
 ---
 id: "092"
 title: "冷启动五问与留存分析"
-status: active
+status: completed
 domain: onboarding
 risk: medium
 dependencies: []
 superseded_by: null
 created: 2026-03-23
-updated: 2026-04-01
+updated: 2026-04-24
 ---
 # 冷启动五问与留存分析
 
-> 状态：🟡 待开发
+> 状态：✅ 已实现（2026-04-24）
 
 ## 概述
 
