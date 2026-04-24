@@ -8,8 +8,9 @@ import {
   type ClusterDetail,
 } from "@/shared/lib/api/cognitive";
 import { PCLayout } from "@/components/layout/pc-layout";
+import { KnowledgeContourMap } from "@/features/workspace/components/knowledge-contour-map";
 
-type ViewMode = "network" | "mindmap";
+type ViewMode = "network" | "mindmap" | "contour";
 
 /* ── Layout helpers ── */
 function computeRadialPositions(
@@ -471,6 +472,16 @@ export default function MapPage() {
             >
               🌲 思维导图
             </button>
+            <button
+              onClick={() => setViewMode("contour")}
+              className={`rounded px-3 py-1 text-xs transition-colors ${
+                viewMode === "contour"
+                  ? "bg-white font-medium text-bark shadow-sm"
+                  : "text-bark/50 hover:text-bark/70"
+              }`}
+            >
+              🗻 等高线
+            </button>
           </div>
 
           <div className="relative ml-auto">
@@ -497,6 +508,12 @@ export default function MapPage() {
           <div className="p-8">
             <p className="text-sm text-bark/40">暂无聚类数据</p>
           </div>
+        ) : viewMode === "contour" ? (
+          /* ── Contour Map view ── */
+          <KnowledgeContourMap
+            onSelectPage={(id) => setSelectedId(id)}
+            className="min-h-[calc(100dvh-2.5rem)]"
+          />
         ) : viewMode === "network" ? (
           /* ── Network Graph view ── */
           <div

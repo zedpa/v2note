@@ -1,11 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronLeft, Sparkles } from "lucide-react";
+import { ChevronLeft, Sparkles, Map, List } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTopics } from "../hooks/use-topics";
 import type { TopicItem } from "@/shared/lib/api/topics";
+import { KnowledgeContourMap } from "./knowledge-contour-map";
 
+type ViewMode = "list" | "map";
 type FilterType = "all" | "active" | "silent" | "seed";
 
 interface DiscoveryOverlayProps {
@@ -26,6 +28,7 @@ const FILTERS: { key: FilterType; label: string }[] = [
 export function DiscoveryOverlay({ onClose, onOpenTopic }: DiscoveryOverlayProps) {
   const { topics, active, independent, silent, loading } = useTopics();
   const [filter, setFilter] = useState<FilterType>("all");
+  const [viewMode, setViewMode] = useState<ViewMode>("list");
 
   // 按筛选条件过滤
   const filtered = (() => {
@@ -46,29 +49,61 @@ export function DiscoveryOverlay({ onClose, onOpenTopic }: DiscoveryOverlayProps
             <ChevronLeft size={20} />
           </button>
           <h1 className="font-serif text-lg text-on-surface">发现</h1>
+          <div className="ml-auto flex items-center bg-surface-high rounded-full p-0.5">
+            <button
+              type="button"
+              onClick={() => setViewMode("list")}
+              className={cn(
+                "p-1.5 rounded-full transition-colors",
+                viewMode === "list" ? "bg-surface-lowest text-on-surface shadow-sm" : "text-muted-accessible",
+              )}
+              aria-label="列表视图"
+            >
+              <List size={14} />
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode("map")}
+              className={cn(
+                "p-1.5 rounded-full transition-colors",
+                viewMode === "map" ? "bg-surface-lowest text-on-surface shadow-sm" : "text-muted-accessible",
+              )}
+              aria-label="等高线地图"
+            >
+              <Map size={14} />
+            </button>
+          </div>
         </div>
 
-        {/* 筛选药丸 */}
-        <div className="flex gap-2 px-4 pb-3">
-          {FILTERS.map(({ key, label }) => (
-            <button
-              key={key}
-              type="button"
-              onClick={() => setFilter(key)}
-              className={cn(
-                "px-3 py-1 rounded-full text-xs transition-colors",
-                filter === key
-                  ? "bg-deer text-white"
-                  : "bg-surface-high text-muted-accessible hover:bg-surface-low",
-              )}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
+        {/* 筛选药丸（仅列表模式） */}
+        {viewMode === "list" && (
+          <div className="flex gap-2 px-4 pb-3">
+            {FILTERS.map(({ key, label }) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setFilter(key)}
+                className={cn(
+                  "px-3 py-1 rounded-full text-xs transition-colors",
+                  filter === key
+                    ? "bg-deer text-white"
+                    : "bg-surface-high text-muted-accessible hover:bg-surface-low",
+                )}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
       </header>
 
       {/* 内容 */}
+      {viewMode === "map" ? (
+        <KnowledgeContourMap
+          onSelectPage={onOpenTopic}
+          className="flex-1 min-h-[60vh] p-2"
+        />
+      ) : (
       <div className="p-4">
         {loading ? (
           <div className="space-y-4">
@@ -98,6 +133,7 @@ export function DiscoveryOverlay({ onClose, onOpenTopic }: DiscoveryOverlayProps
           </div>
         )}
       </div>
+      )}
     </div>
   );
 }

@@ -320,10 +320,15 @@ GET /api/v1/records?cluster_id=xxx
   - 聊天反馈循环：save-conversation 工具已将有价值对话存为 record(source_type='think')，自动进入编译管线
   - Domain 自动分类：lightweight-classifier.ts 已实现异步 AI 分类 + @route 确定性路由
 
-- [ ] **Phase 10: 可视化** 🟡 后端就绪，前端待实现
-  - GET /api/v1/wiki/heatmap 已实现（Phase 7）
-  - wiki_compile_log 表已建（Phase 8），供编译历史查看
-  - 前端热点地图 UI 待实现（需设计稿）
+- [x] **Phase 10: 可视化** ✅ 2026-04-25
+  - KnowledgeContourMap 组件：地理等高线风格 SVG 可视化
+    - 每个 wiki page 是一座"山"，heat_score 决定海拔和等高线密度
+    - 颜色：暖棕(hot) → 绿(active) → 灰(silent) → 冷蓝(frozen)
+    - 等高线环用不规则椭圆 + 旋转模拟自然地形
+    - parent-child 关系用虚线"山脊线"连接
+    - 点击峰跳转到 wiki page
+  - 发现页 overlay 新增 列表/地图 切换
+  - PC /map 页新增"等高线"视图 tab
 
 ---
 
