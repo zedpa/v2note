@@ -1,7 +1,7 @@
 ---
 id: "062"
 title: "AI 伴侣窗口 — 像素小鹿 + 心情系统 + 工具可视化"
-status: active
+status: deprecated
 domain: ui
 risk: medium
 dependencies: []

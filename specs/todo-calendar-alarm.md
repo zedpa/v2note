@@ -1,13 +1,13 @@
 ---
 id: "125"
 title: "待办写入系统日历 & 闹钟"
-status: active
+status: completed
 domain: todo
 risk: low
 dependencies: ["todo-core.md", "todo-reminder-notify.md"]
 superseded_by: null
 created: 2026-04-11
-updated: 2026-04-11
+updated: 2026-04-24
 ---
 
 # 待办写入系统日历 & 闹钟

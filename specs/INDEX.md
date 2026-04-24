@@ -10,14 +10,13 @@
 6. superseded 状态的 spec 已被合并，永远不要引用它们，使用 superseded_by 指向的文件
 -->
 
-> 最后更新：2026-04-24 | 共 113 个 spec（6 active / 6 draft / 68 completed / 31 superseded / 2 deprecated）
+> 最后更新：2026-04-24 | 共 113 个 spec（8 active / 6 draft / 69 completed / 31 superseded / 3 deprecated）
 
 ## 🔵 Active（当前有效，可直接引用和修改）
 
 | id | title | domain | file | 子域说明 |
 |----|-------|--------|------|---------|
 
-| 062 | AI 伴侣窗口 | ui | ai-companion-window.md | |
 | 064a-d | APP Mobile — Diary | app-mobile | app-mobile-views-diary.md | 整体结构/顶栏/日记/下拉刷新 |
 | 064a-t | APP Mobile — Todo & FAB | app-mobile | app-mobile-views-todo.md | 待办视图/FAB 录音按钮 |
 | 064b | APP Mobile — Nav & System | ui | app-mobile-nav.md | 侧边栏/通知/参谋/冷启动/登录 |
@@ -27,7 +26,6 @@
 | cognitive-wiki-core | 认知 Wiki — 核心模型与编译管线 | cognitive | cognitive-wiki-core.md | 概述/数据模型/实时 Ingest/每日编译（拆自 cognitive-wiki.md） |
 | cognitive-wiki-lifecycle | 认知 Wiki — 搜索、热力与前端适配 | cognitive | cognitive-wiki-lifecycle.md | 搜索/热力/前端适配/迁移/验收行为/边界（拆自 cognitive-wiki.md） |
 | cognitive-wiki-migration | 认知 Wiki — 依赖、接口与实施阶段 | cognitive | cognitive-wiki-migration.md | 依赖/接口/砍掉模块/Batch 1-4 Phases/备注（拆自 cognitive-wiki.md） |
-| 125 | 待办写入系统日历 & 闹钟 | todo | todo-calendar-alarm.md | Intent方案+SystemIntentPlugin |
 | 087 | 鸿蒙 HarmonyOS NEXT 适配 | infra | harmony-support.md | WebView壳+JSBridge+前端适配层 |
 ## 🟡 Draft（规划中，尚未开始实施）
 
@@ -44,6 +42,7 @@
 
 | id | title | domain | file |
 |----|-------|--------|------|
+| 125 | 待办写入系统日历 & 闹钟 | todo | todo-calendar-alarm.md |
 | 092 | 留存分析 | onboarding | onboarding-retention-analytics.md |
 | 110 | UI/UX 全局审查与改进 | design | ui-ux-audit.md |
 | 102a | Voice Routing — Core | voice | voice-routing.md |
@@ -159,5 +158,6 @@
 
 | id | title | domain | file |
 |----|-------|--------|------|
+| 062 | AI 伴侣窗口 | ui | ai-companion-window.md |
 | 063 | 批注系统 | ui | annotation.md |
 | 077 | 涌现链 L1→L2→L3 | cognitive | emergence-chain.md |
