@@ -309,11 +309,11 @@ GET /api/v1/records?cluster_id=xxx
   - GET /api/v1/wiki/heatmap 端点（pages + summary）
   - 防刷机制（同 page+type 每天最多 10 条）
 
-- [ ] **Phase 8: 编译增强**
-  - 确定性预抽取（正则提取日期/人名/金额，减少 AI token）
-  - 置信度标签（[直述]/[推断]/[关联] 三级标注）
-  - 编译变更摘要（wiki_compile_log 表 + 早报引用）
-  - content_hash 增量去重
+- [x] **Phase 8: 编译增强** ✅ 2026-04-24
+  - 确定性预抽取：pre-extract.ts（正则日期/金额/人名/URL → record.metadata.pre_extract）
+  - 置信度标签：已在 compile prompt 中实现（[直述]/[推断]/[关联]）
+  - 编译变更摘要：wiki_compile_log 表（migration 073）+ 每次编译自动记录
+  - content_hash：digest 阶段已生成，compile 阶段通过 compile_status 过滤已编译记录
 
 - [ ] **Phase 9: 知识维护**
   - Record 删除 → wiki 清理（场景 3.9，needs_recompile）

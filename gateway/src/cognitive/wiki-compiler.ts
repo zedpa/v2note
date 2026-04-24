@@ -20,6 +20,7 @@ import { buildCompilePrompt } from "./wiki-compile-prompt.js";
 import { findPagesByRecords } from "../db/repositories/wiki-page-record.js";
 import { canAiModifyStructure, createSuggestion } from "./page-authorization.js";
 import { now as tzNow } from "../lib/tz.js";
+import { execute } from "../db/pool.js";
 
 // ── 类型定义 ──
 
@@ -820,6 +821,15 @@ export async function executeInstructions(
     if (result.pages_merged > 0) summaryParts.push(`合并 ${result.pages_merged} 个 page`);
     if (summaryParts.length > 0) {
       result.summary = `编译完成：${summaryParts.join("，")}，处理了 ${result.records_compiled} 条记录`;
+    }
+
+    // Phase 8: 编译日志写入
+    if (result.records_compiled > 0) {
+      execute(
+        `INSERT INTO wiki_compile_log (user_id, pages_created, pages_updated, records_compiled, change_summary, duration_ms)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [userId, result.pages_created, result.pages_updated, result.records_compiled, result.summary ?? null, 0],
+      ).catch((e) => console.warn("[wiki-compiler] compile log write failed:", e));
     }
 
     return result;

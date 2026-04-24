@@ -9,6 +9,7 @@
  */
 
 import crypto from "crypto";
+import { preExtract, hasExtraction } from "../cognitive/pre-extract.js";
 import { chatCompletion, type ChatMessage } from "../ai/provider.js";
 import {
   recordRepo,
@@ -139,6 +140,17 @@ export async function digestRecords(
         } catch (e) {
           console.warn(`[digest] @路由解析失败 for record ${id}:`, e);
           atRouteResults.set(id, false);
+        }
+      }
+    }
+
+    // ── Step 1.55: 确定性预抽取（日期/金额/人名/URL）───────────
+    for (const id of validIds) {
+      const text = summaryByRecord.get(id) ?? transcriptByRecord.get(id);
+      if (text) {
+        const extracted = preExtract(text);
+        if (hasExtraction(extracted)) {
+          recordRepo.mergeMetadata(id, { pre_extract: extracted }).catch(() => {});
         }
       }
     }
