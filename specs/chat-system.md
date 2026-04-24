@@ -1,7 +1,7 @@
 ---
 id: "051"
 title: "Chat System"
-status: active
+status: completed
 domain: chat
 risk: medium
 dependencies: ["auth.md"]

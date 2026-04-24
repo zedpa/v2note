@@ -10,14 +10,13 @@
 6. superseded 状态的 spec 已被合并，永远不要引用它们，使用 superseded_by 指向的文件
 -->
 
-> 最后更新：2026-04-24 | 共 112 个 spec（11 active / 5 draft / 63 completed / 31 superseded / 2 deprecated）
+> 最后更新：2026-04-24 | 共 112 个 spec（10 active / 5 draft / 64 completed / 31 superseded / 2 deprecated）
 
 ## 🔵 Active（当前有效，可直接引用和修改）
 
 | id | title | domain | file | 子域说明 |
 |----|-------|--------|------|---------|
 
-| 051 | Chat System | chat | chat-system.md | Header/Entry/Greeting/Skill |
 | 062 | AI 伴侣窗口 | ui | ai-companion-window.md | |
 | 064a-d | APP Mobile — Diary | app-mobile | app-mobile-views-diary.md | 整体结构/顶栏/日记/下拉刷新 |
 | 064a-t | APP Mobile — Todo & FAB | app-mobile | app-mobile-views-todo.md | 待办视图/FAB 录音按钮 |
@@ -148,6 +147,7 @@
 | PROC-001 | SDD 流程守卫（Hook + Lint） | infra | process-sdd-guardrails.md |
 | fix-sidebar-wiki-mgmt | Fix: 侧边栏 Wiki 页面管理 | ui | fix-sidebar-wiki-mgmt.md |
 | 050b | Todo — UI & Interactions | todo | todo-ui.md |
+| 051 | Chat System | chat | chat-system.md |
 
 ## ⛔ Superseded（已被合并，不要引用）
 
