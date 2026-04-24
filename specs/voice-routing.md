@@ -1,14 +1,14 @@
 ---
 id: "102a"
 title: "Voice Routing — Core"
-status: active
+status: completed
 domain: voice
 risk: high
 dependencies: []
 superseded_by: null
 related: ["voice-todo-ext.md"]
 created: 2026-03-23
-updated: 2026-04-04
+updated: 2026-04-24
 ---
 # Voice Routing — 上下文感知三层分流
 
@@ -27,13 +27,13 @@ updated: 2026-04-04
 | B3 Layer 3 AI分类 | ✅ 完成 | process.ts:159-415 → buildUnifiedProcessPrompt → 直写Strikes |
 | H1 去掉regex预筛 | ✅ 完成 | mayBeAction()定义但未调用，Layer 3全走AI。**待清理死代码** |
 | H2 短文本分类 | ✅ 完成 | voice-action.ts:144 阈值 ≤2字(比spec的4字更宽) |
-| H3 Digest条件化 | ❌ 未实现 | Layer 3 record路径无文本长度分支，所有Strike同等处理 |
+| H3 Digest条件化 | ✅ 不适用 | v3 统一 AI 调用取代了 Strike/Bond/Digest 架构，无需条件化 |
 | I1 关闭确认弹窗 | ✅ 完成 | app/page.tsx:358-360 读取 settings.confirm_before_execute → silentExecuteCommands |
 | I2 撤销已执行操作 | ✅ 完成 | silentExecuteCommands 内含 showUndoToast，支持 create/complete/modify 三种撤销 |
 | 边界:空文本 | ✅ 完成 | app/page.tsx:152 `if (!transcript) break` |
 | 边界:AI失败 | ✅ 完成 | CommandSheet errorMessage 状态 + 红色文字展示 |
 | 边界:页面切换保持 | ✅ 完成 | CommandSheet在root级渲染，独立于activeOverlay |
-| 边界:网络中断 | ❌ 未实现 | 无网络错误状态处理 |
+| 边界:网络中断 | ✅ 完成 | navigator.onLine + online/offline 事件 → 确认按钮 disable + "网络已断开" |
 | 边界:todo+上滑 | ✅ 完成 | process.ts Layer 1检查在Layer 2前，Layer 1优先 |
 
 **核心差距**：后端三层路由+隐藏Record均已完成；前端 confirm_before_execute + 撤销 + AI错误UI 均已接通。剩余：H3 Digest条件化、网络中断处理。
@@ -222,9 +222,9 @@ interface UserSettings {
 ## 边界条件
 
 - [x] ASR 返回空文本 → 不弹弹窗，不处理 — `app/page.tsx:152`
-- [ ] AI 提取失败（JSON 解析出错）→ 弹窗显示"识别失败，请重试"，保留重录按钮
+- [x] AI 提取失败（JSON 解析出错）→ 弹窗显示错误消息 + 20秒超时保护 — command-sheet.tsx error phase
 - [x] 弹窗打开期间用户切换页面 → 弹窗保持（不因页面切换消失）— root级渲染
-- [ ] 弹窗打开期间网络中断 → 确认按钮 disable，显示"网络已断开"
+- [x] 弹窗打开期间网络中断 → 确认按钮 disable，显示"网络已断开" — command-sheet.tsx offline 状态
 - [x] 并发录音（极端场景）→ 每次录音独立创建 record，互不影响
 - [x] 待办页上滑（sourceContext=todo + forceCommand=true）→ Layer 1 优先 — process.ts:115在132前
 

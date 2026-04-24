@@ -449,6 +449,18 @@ export default function Page() {
           }
           break;
         }
+
+        // 4) tool.done — 工具执行完成（D6: 结果实时更新）
+        case "tool.done" as string: {
+          const { toolName, success, message } = (msg as any).payload;
+          if (commandSheetOpenRef.current) {
+            const doneLabel = success
+              ? `✅ ${message || toolName}`
+              : `❌ ${message || toolName}`;
+            setCommandToolStatuses((prev) => [...prev, doneLabel]);
+          }
+          break;
+        }
       }
     });
 

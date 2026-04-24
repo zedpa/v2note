@@ -1,11 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import {
-  fetchActionPanel,
-  type GoalIndicator,
-} from "@/shared/lib/api/action-panel";
-import { getDeviceId } from "@/shared/lib/device";
+import { api } from "@/shared/lib/api";
 import { PCLayout } from "@/components/layout/pc-layout";
 
 /* ── Local types for three-level hierarchy ── */
@@ -275,14 +271,13 @@ export default function GoalsPage() {
   useEffect(() => {
     async function load() {
       try {
-        await getDeviceId();
-        const panel = await fetchActionPanel();
-        const goals: Goal[] = panel.goals.map((g: GoalIndicator) => ({
-          goalId: g.goalId,
-          goalName: g.goalName,
+        const goalsData = await api.get<Array<{ id: string; text: string; title?: string; level?: number; parent_id?: string | null }>>("/api/v1/goals");
+        const goals: Goal[] = (goalsData ?? []).map((g) => ({
+          goalId: g.id,
+          goalName: g.title ?? g.text,
           actions: [],
           health: { direction: 0.5, resource: 0.5, path: 0.5, drive: 0.5 },
-          projectId: null,
+          projectId: g.parent_id ?? null,
         }));
         setProjects([]);
         setUngrouped(goals);

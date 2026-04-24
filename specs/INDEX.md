@@ -10,7 +10,7 @@
 6. superseded 状态的 spec 已被合并，永远不要引用它们，使用 superseded_by 指向的文件
 -->
 
-> 最后更新：2026-04-24 | 共 112 个 spec（10 active / 5 draft / 64 completed / 31 superseded / 2 deprecated）
+> 最后更新：2026-04-24 | 共 113 个 spec（8 active / 6 draft / 66 completed / 31 superseded / 2 deprecated）
 
 ## 🔵 Active（当前有效，可直接引用和修改）
 
@@ -28,8 +28,6 @@
 | cognitive-wiki-core | 认知 Wiki — 核心模型与编译管线 | cognitive | cognitive-wiki-core.md | 概述/数据模型/实时 Ingest/每日编译（拆自 cognitive-wiki.md） |
 | cognitive-wiki-lifecycle | 认知 Wiki — 搜索、热力与前端适配 | cognitive | cognitive-wiki-lifecycle.md | 搜索/热力/前端适配/迁移/验收行为/边界（拆自 cognitive-wiki.md） |
 | cognitive-wiki-migration | 认知 Wiki — 依赖、接口与实施阶段 | cognitive | cognitive-wiki-migration.md | 依赖/接口/砍掉模块/Batch 1-4 Phases/备注（拆自 cognitive-wiki.md） |
-| 102a | Voice Routing — Core | voice | voice-routing.md | Layer 3 regex预过滤待移除 |
-| 102b | Voice — Todo Extension | voice | voice-todo-ext.md | 确认弹窗UI/提醒/周期未做 |
 | 110 | UI/UX 全局审查与改进 | design | ui-ux-audit.md | 审查完毕,修复0% |
 | 125 | 待办写入系统日历 & 闹钟 | todo | todo-calendar-alarm.md | Intent方案+SystemIntentPlugin |
 | 087 | 鸿蒙 HarmonyOS NEXT 适配 | infra | harmony-support.md | WebView壳+JSBridge+前端适配层 |
@@ -37,6 +35,7 @@
 
 | id | title | domain | file |
 |----|-------|--------|------|
+| 131 | 全局快速捕获 — 闪念胶囊式 App 外录入 | voice | global-quick-capture.md |
 | 130 | Desktop Canvas Shell — Foundation | ui | desktop-foundation.md |
 | 124 | Android App Shortcuts — 长按快捷指令 | ui | android-app-shortcuts.md |
 | 075 | 发现页 | ui | discovery-page.md |
@@ -47,6 +46,8 @@
 
 | id | title | domain | file |
 |----|-------|--------|------|
+| 102a | Voice Routing — Core | voice | voice-routing.md |
+| 102b | Voice — Todo Extension | voice | voice-todo-ext.md |
 | 050a | Todo — Core & Logic | todo | todo-core.md |
 | 053b | Daily Report — Extended | report | daily-report-extended.md |
 | 112 | Recording Resilience — 录音防丢 | voice | recording-resilience.md |

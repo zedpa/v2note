@@ -202,7 +202,7 @@ export default function TimelinePage() {
                 }`}
               >
                 <span className="flex items-center gap-1">
-                  <span className="block truncate">{c.name}</span>
+                  <span className="block truncate">{typeof c.name === 'string' ? c.name : String(c.name)}</span>
                   {c.recentlyActive && (
                     <span className="inline-block w-1.5 h-1.5 rounded-full bg-deer shrink-0" />
                   )}
@@ -305,7 +305,7 @@ export default function TimelinePage() {
                         className={`font-body text-sm leading-relaxed ${isExpanded ? '' : 'line-clamp-4'}`}
                         onClick={(e) => toggleExpand(r.id, e)}
                       >
-                        {r.content || r.short_summary || r.source || r.id}
+                        {typeof r.content === 'string' ? r.content : r.short_summary || r.source || r.id}
                       </p>
 
                       {/* Media preview */}

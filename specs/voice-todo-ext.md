@@ -1,14 +1,14 @@
 ---
 id: "102b"
 title: "Voice — Todo Extension & Reminders"
-status: active
+status: completed
 domain: voice
 risk: medium
 dependencies: ["voice-routing.md", "todo-core.md"]
 superseded_by: null
 related: ["voice-routing.md"]
 created: 2026-03-23
-updated: 2026-04-04
+updated: 2026-04-24
 ---
 # Voice — 待办扩展模型（提醒 + 周期 + 日历）
 
@@ -45,7 +45,7 @@ updated: 2026-04-04
 | D3 多指令独立✓/✕ | ✅ 完成 | CommandCard 多条时显示独立 ✓/✕ 按钮，单条确认即时执行 |
 | D4 继续说话修改 | ✅ 完成 | 文字: onTextSubmit→todo.refine；语音: onContinueSpeak→关闭sheet→FAB录音→asr.done→refine→重开sheet |
 | D5 字段点击编辑 | ✅ 完成 | TodoDetailEdit 支持text/time/priority/reminder编辑 |
-| D6 Agent状态流 | 🟡 部分 | tool.step接收并显示，但结果非实时流式 |
+| D6 Agent状态流 | ✅ 完成 | tool.status+tool.done 实时推送到 CommandSheet，含成功/失败标签 |
 | D8 查询结果展示 | ✅ 完成 | 最多5条+查看更多跳转 |
 | D8b 查看更多跳转 | ✅ 完成 | onViewMore跳转到目标详情或待办页 |
 | D9 静默执行 | ✅ 完成 | silentExecuteCommands 读取 confirm_before_execute 设置，跳过弹窗直接执行 |
@@ -71,9 +71,9 @@ updated: 2026-04-04
 |------|------|------|
 | F1 创建周期模板 | ✅ 后端 | todoRepo.create 支持所有字段 |
 | F2 daily-cycle生成实例 | ✅ 完成 | daily-cycle.ts:133-165 matchesRecurrenceRule+创建实例 |
-| F3 模板修改影响未来 | 🟡 部分 | 模板可修改，但已生成实例不自动同步 |
+| F3 模板修改影响未来 | ✅ 完成 | PATCH 模板时自动同步今日未完成实例（text/time/priority/reminder），用 toLocalDate 处理时区 |
 | F4 完成周期实例 | ✅ 完成 | 标记实例done=true，模板保持false |
-| F5 停止周期 | 🟡 后端 | 可设recurrence_end，但无对应的voice command处理 |
+| F5 停止周期 | ✅ 完成 | AI prompt 规则9识别"停止/取消"意图→modify+recurrence.end_date，前端已处理 |
 | G1 提醒心跳检查 | ✅ 完成 | engine.ts 30min窗口+WebSocket推送+标记已发送 |
 | G2 修改时间重算提醒 | ✅ 完成 | routes/todos.ts PATCH + update-todo.ts 均调 recalcReminderAt |
 

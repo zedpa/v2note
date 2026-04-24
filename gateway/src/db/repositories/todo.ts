@@ -901,6 +901,20 @@ export async function createRecurrenceInstance(
   });
 }
 
+/** 查询今日未完成的周期实例（用于模板修改同步） */
+export async function findTodayInstanceOfTemplate(
+  templateId: string,
+): Promise<Todo | null> {
+  return queryOne<Todo>(
+    `SELECT * FROM todo
+     WHERE recurrence_parent_id = $1
+       AND scheduled_start::date = CURRENT_DATE
+       AND done = false
+     LIMIT 1`,
+    [templateId],
+  );
+}
+
 // ── 提醒方法 ──────────────────────────────────────────────────────
 
 /** 查询即将到来的提醒（窗口内、未完成、未发送） */

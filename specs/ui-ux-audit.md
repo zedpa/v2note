@@ -8,6 +8,7 @@ dependencies: ["app-mobile-views.md", "app-mobile-nav.md", "chat-system.md", "to
 superseded_by: null
 created: 2026-04-04
 updated: 2026-04-24
+# 进度概览: Section 1-6 已完成（审查确认+修复），Section 7-8 为低优先级优化项
 ---
 
 # UI/UX 全局审查与改进
@@ -197,13 +198,7 @@ updated: 2026-04-24
 并且 (And)    当前页面在导航中高亮显示
 ```
 
-**当前问题**: PC 端 4 个页面之间没有任何可见导航，用户只能手动修改 URL。
-
-**修复方案**: 复用 `components/layout/pc-layout.tsx`（已存在但未充分使用），添加左侧固定侧栏：
-- 写作 (/write)
-- 时间线 (/timeline)
-- 目标 (/goals)
-- 认知地图 (/map)
+**状态**: ✅ 已有 MenuBar 组件（components/layout/menu-bar.tsx），通过 PCLayout 渲染在所有 PC 页面。支持 hover 展开、场景切换高亮。
 
 ### 场景 6.2: /timeline Runtime Error
 ```
@@ -213,23 +208,25 @@ updated: 2026-04-24
 并且 (And)    不展示 Runtime Error
 ```
 
-**当前问题**: `Objects are not valid as React child (found: object with keys {id, name})`，某个数据对象被直接渲染为 JSX children。
+**状态**: ✅ 已修复 — content/name 字段添加 typeof 防御性检查，避免对象直接渲染为 JSX。
 
-### 场景 6.3: /write 空白页引导
+### 场景 6.3: /write 空白页引导 ✅
 ```
 假设 (Given)  用户首次打开 PC 端 /write 页面
 当   (When)   编辑区域为空
 那么 (Then)   应显示引导文案或快捷操作提示
 并且 (And)    不是一个几乎全黑的空屏幕
 ```
+**状态**: ✅ 已有日期标题 + "开始记录..." placeholder + Ctrl+Enter 提交按钮。
 
-### 场景 6.4: /goals 数据泄漏
+### 场景 6.4: /goals 数据泄漏 ✅
 ```
 假设 (Given)  用户在 PC 端查看目标看板
 当   (When)   目标卡片渲染标题
 那么 (Then)   应显示用户可读的目标标题
 并且 (And)    不显示 AI 推理过程文本（如"说话者说'明天上山打老虎'，结合当前日期..."）
 ```
+**状态**: ✅ 已修复 — goals 页改为从正确的目标列表接口获取数据，使用 title 字段显示。
 
 ---
 

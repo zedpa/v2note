@@ -2,6 +2,7 @@ import type { Router } from "../router.js";
 import { readBody, sendJson, sendError, getUserId } from "../lib/http-helpers.js";
 import { todoRepo } from "../db/repositories/index.js";
 import { onTodoComplete } from "../cognitive/todo-projector.js";
+import { today, toLocalDate } from "../lib/tz.js";
 
 /** 裸时间字符串补上 +08:00（防御无时区的 ISO 输入） */
 function ensureTz(ts: string | undefined | null): string | undefined | null {
@@ -130,6 +131,43 @@ export function registerTodoRoutes(router: Router) {
         console.error("[todos] onTodoComplete failed:", e),
       );
     }
+
+    // F3: 周期模板修改 → 同步今日未完成实例（失败不影响主更新）
+    const syncableFields = ["text", "scheduled_start", "priority", "estimated_minutes", "reminder_before", "reminder_types"] as const;
+    const hasSyncable = syncableFields.some((f) => (body as any)[f] !== undefined);
+    if (hasSyncable) {
+      try {
+        const todo = await todoRepo.findById(params.id);
+        if (todo?.recurrence_rule && !todo.recurrence_parent_id) {
+          const instance = await todoRepo.findTodayInstanceOfTemplate(params.id);
+          if (instance) {
+            const sync: Record<string, any> = {};
+            if (body.text !== undefined) sync.text = body.text;
+            if (body.priority !== undefined) sync.priority = body.priority;
+            if (body.estimated_minutes !== undefined) sync.estimated_minutes = body.estimated_minutes;
+            if (body.reminder_before !== undefined) sync.reminder_before = body.reminder_before;
+            if (body.reminder_types !== undefined) sync.reminder_types = body.reminder_types;
+            // 时间：保留实例日期，替换时间部分
+            if (body.scheduled_start) {
+              const instanceDate = instance.scheduled_start
+                ? toLocalDate(instance.scheduled_start)
+                : today();
+              const newTimePart = body.scheduled_start.split("T")[1];
+              if (newTimePart) sync.scheduled_start = `${instanceDate}T${newTimePart}`;
+            }
+            if (Object.keys(sync).length > 0) {
+              await todoRepo.update(instance.id, sync);
+              if (sync.scheduled_start || sync.reminder_before !== undefined) {
+                await todoRepo.recalcReminderAt(instance.id);
+              }
+            }
+          }
+        }
+      } catch (e) {
+        console.warn("[todos] F3 recurrence sync failed:", e);
+      }
+    }
+
     sendJson(res, { ok: true });
   });
 

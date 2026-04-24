@@ -129,7 +129,22 @@ export function CommandSheet({
   const [textInputMode, setTextInputMode] = useState(false);
   const [textInputValue, setTextInputValue] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
+  const [offline, setOffline] = useState(false);
   const textInputRef = useRef<HTMLInputElement>(null);
+
+  // 网络状态检测
+  useEffect(() => {
+    if (!open) return;
+    setOffline(!navigator.onLine);
+    const goOffline = () => setOffline(true);
+    const goOnline = () => setOffline(false);
+    window.addEventListener("offline", goOffline);
+    window.addEventListener("online", goOnline);
+    return () => {
+      window.removeEventListener("offline", goOffline);
+      window.removeEventListener("online", goOnline);
+    };
+  }, [open]);
 
   // 根据 props 更新阶段
   useEffect(() => {
@@ -423,10 +438,11 @@ export function CommandSheet({
                   {editableCommands[0]?.action_type !== "query" && (
                     <button
                       onClick={handleConfirmAll}
-                      className="flex items-center justify-center rounded-full bg-white px-5 py-2.5 text-sm font-medium text-black"
+                      disabled={offline}
+                      className="flex items-center justify-center rounded-full bg-white px-5 py-2.5 text-sm font-medium text-black disabled:opacity-40 disabled:cursor-not-allowed"
                     >
                       <Check className="mr-1.5 h-4 w-4" />
-                      确认
+                      {offline ? "网络已断开" : "确认"}
                     </button>
                   )}
                   {editableCommands[0]?.action_type === "query" && (

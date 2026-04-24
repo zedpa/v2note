@@ -120,6 +120,10 @@ ${goalList}
 
 5. **complete/modify** 必须从"未完成待办"列表匹配。匹配到 → 填 target_id。无匹配 → 只填 target_hint
 
+9. **停止周期任务**（"以后不用提醒我锻炼了""不用再跑步了""取消每天打卡"）：
+   用 action_type="modify"，changes 中设 recurrence.end_date 为锚点表中今天的 ISO 日期字符串（如 "2026-04-24"）。
+   示例：{ "action_type": "modify", "target_hint": "锻炼", "changes": { "recurrence": { "end_date": "2026-04-24" } } }
+
 6. **priority**：用户说"急""重要""优先" → 5；"不急""慢慢来" → 1；无信号 → 3
 
 7. **一句话可能包含多个操作**：
