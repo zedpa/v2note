@@ -77,6 +77,10 @@ export function TodoEditSheet({ todo, open, onClose, onUpdated, onAskAI }: TodoE
   // 打开时触发同步
   if (open && todo && text === "" && !saving) {
     syncFromTodo(todo);
+    // 重置原文查看状态，防止切换 todo 时显示上一条的缓存
+    setSourceExpanded(false);
+    setSourceText(null);
+    setSourceLoading(false);
   }
 
   // 查看原文：懒加载，点击时 fetch，缓存结果
