@@ -1,8 +1,10 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Search, X, MessageCircle, ChevronDown } from "lucide-react";
+import { Search, X, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { LuluLogo } from "@/components/brand/lulu-logo";
+import { onAiProcessingChange } from "@/shared/lib/ai-processing";
 
 export type WorkspaceTab = "diary" | "todo";
 export type TodoViewMode = "time" | "project";
@@ -36,7 +38,11 @@ export function WorkspaceHeader({
 }: WorkspaceHeaderProps) {
   const initial = userName?.charAt(0)?.toUpperCase() || "U";
   const [showViewMenu, setShowViewMenu] = useState(false);
+  const [aiProcessing, setAiProcessing] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+
+  // AI 管道处理状态（路路图标动画）
+  useEffect(() => onAiProcessingChange(setAiProcessing), []);
 
   // 点击外部关闭菜单
   useEffect(() => {
@@ -144,10 +150,13 @@ export function WorkspaceHeader({
           {onChatClick && (
             <button
               onClick={onChatClick}
-              className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full text-deer hover:text-deer/80 transition-colors"
+              className={cn(
+                "min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full transition-all",
+                aiProcessing && "animate-pulse",
+              )}
               aria-label="AI 聊天"
             >
-              <MessageCircle size={18} />
+              <LuluLogo size={24} variant="light" className={aiProcessing ? "" : "!animate-none"} />
             </button>
           )}
           <button
