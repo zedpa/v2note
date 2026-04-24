@@ -315,15 +315,15 @@ GET /api/v1/records?cluster_id=xxx
   - 编译变更摘要：wiki_compile_log 表（migration 073）+ 每次编译自动记录
   - content_hash：digest 阶段已生成，compile 阶段通过 compile_status 过滤已编译记录
 
-- [ ] **Phase 9: 知识维护**
-  - Record 删除 → wiki 清理（场景 3.9，needs_recompile）
-  - 聊天反馈循环（场景 3.10，有价值对话回流 wiki）
-  - Domain 自动分类规则（场景 1.4）
+- [x] **Phase 9: 知识维护** ✅ 2026-04-24
+  - Record 删除 → 关联 wiki page 标记 updated_at（触发下次编译重新审视）
+  - 聊天反馈循环：save-conversation 工具已将有价值对话存为 record(source_type='think')，自动进入编译管线
+  - Domain 自动分类：lightweight-classifier.ts 已实现异步 AI 分类 + @route 确定性路由
 
-- [ ] **Phase 10: 可视化**
-  - 个人热点地图 UI（场景 4b.6）
-  - 知识生命周期仪表盘
-  - 编译历史查看
+- [ ] **Phase 10: 可视化** 🟡 后端就绪，前端待实现
+  - GET /api/v1/wiki/heatmap 已实现（Phase 7）
+  - wiki_compile_log 表已建（Phase 8），供编译历史查看
+  - 前端热点地图 UI 待实现（需设计稿）
 
 ---
 

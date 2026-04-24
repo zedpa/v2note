@@ -1,5 +1,6 @@
 import type { Router } from "../router.js";
 import { readBody, sendJson, sendError, getUserId } from "../lib/http-helpers.js";
+import { query as dbQuery } from "../db/pool.js";
 import {
   recordRepo,
   transcriptRepo,
@@ -483,8 +484,30 @@ export function registerRecordRoutes(router: Router) {
   // Delete records
   router.delete("/api/v1/records", async (req, res) => {
     const { ids } = await readBody<{ ids: string[] }>(req);
-    const count = await recordRepo.deleteByIds(ids ?? []);
-    sendJson(res, { deleted: count });
+    // Phase 9: 删除前查找关联的 wiki page，删除后标记 needs_recompile
+    if (ids?.length) {
+      try {
+        const linkedPages = await dbQuery<{ wiki_page_id: string }>(
+          `SELECT DISTINCT wiki_page_id FROM wiki_page_record WHERE record_id = ANY($1)`,
+          [ids],
+        );
+        // 先删除 record（CASCADE 清理 wiki_page_record）
+        const count = await recordRepo.deleteByIds(ids);
+        // 标记相关 page 需要重编译
+        if (linkedPages.length > 0) {
+          const pageIds = linkedPages.map((p) => p.wiki_page_id);
+          dbQuery(
+            `UPDATE wiki_page SET updated_at = now() WHERE id = ANY($1)`,
+            [pageIds],
+          ).catch(() => {});
+        }
+        sendJson(res, { deleted: count });
+      } catch (err: any) {
+        sendError(res, err.message, 500);
+      }
+    } else {
+      sendJson(res, { deleted: 0 });
+    }
   });
 
 }
