@@ -10,6 +10,7 @@ import { runFullCompileMaintenance, type FullMaintenanceResult } from "./full-co
 import { generateCognitiveReport, type CognitiveReport } from "./report.js";
 import { appendToDiary } from "../diary/manager.js";
 import * as todoRepo from "../db/repositories/todo.js";
+import * as wikiPageEventRepo from "../db/repositories/wiki-page-event.js";
 import { today as tzToday, now as tzNow } from "../lib/tz.js";
 
 export interface CognitiveCycleResult {
@@ -84,6 +85,15 @@ export async function runDailyCognitiveCycle(
     }
   } catch (err) {
     console.error("[cognitive] Failed to save cognitive digest:", err);
+  }
+
+  // Step 3: 热力计算 + 事件清理（Phase 7）
+  try {
+    await wikiPageEventRepo.computeHeatScores(userId);
+    const cleaned = await wikiPageEventRepo.cleanupOldEvents();
+    if (cleaned > 0) console.log(`[cognitive] Cleaned ${cleaned} old wiki events`);
+  } catch (err) {
+    console.error("[cognitive] Heat computation failed:", err);
   }
 
   return { wikiCompile, fullMaintenance, report, recurringInstances };

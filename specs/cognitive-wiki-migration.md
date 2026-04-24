@@ -6,7 +6,7 @@ risk: high
 dependencies: ["cognitive-wiki-core.md", "cognitive-wiki-lifecycle.md"]
 superseded_by: null
 created: 2026-04-17
-updated: 2026-04-17
+updated: 2026-04-24
 ---
 
 # 认知 Wiki — 依赖、接口与实施阶段
@@ -300,14 +300,14 @@ GET /api/v1/records?cluster_id=xxx
 > 前提：Batch 1 完成，Wiki 编译管线已稳定运行
 > 涉及场景：1.4, 2.1(确定性预抽取), 1.2(置信度标签), 3.6(变更摘要), 3.9-3.10, 4b.1-4b.6
 
-- [ ] **Phase 7: 知识热力系统**
-  - wiki_page 加 heat_score / heat_phase 字段
-  - wiki_page_event 事件表
-  - 各触碰点埋点（compile/search/view/chat_context）
-  - 每日热力计算（纯 SQL，编译后执行）
-  - 冰封判定 + 候选归档提示
-  - 归档/恢复流程
-  - heatmap 端点
+- [x] **Phase 7: 知识热力系统** ✅ 2026-04-24
+  - wiki_page 加 heat_score / heat_phase 字段（migration 072）
+  - wiki_page_event 事件表（append-only，90天清理）
+  - 4 个触碰点埋点：compile_hit(wiki-compiler) / search_hit(wiki route) / view_hit(page detail) / chat_context_hit(advisor-context)
+  - 每日热力计算（daily-cycle Step 3，指数衰减 λ=ln2/14d + goal_active_bonus）
+  - 冰封判定（heat_score<1.0 → frozen phase）
+  - GET /api/v1/wiki/heatmap 端点（pages + summary）
+  - 防刷机制（同 page+type 每天最多 10 条）
 
 - [ ] **Phase 8: 编译增强**
   - 确定性预抽取（正则提取日期/人名/金额，减少 AI token）

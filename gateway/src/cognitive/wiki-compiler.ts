@@ -13,6 +13,7 @@ import * as wikiPageRepo from "../db/repositories/wiki-page.js";
 import * as wikiPageRecordRepo from "../db/repositories/wiki-page-record.js";
 import * as wikiPageLinkRepo from "../db/repositories/wiki-page-link.js";
 import * as todoRepo from "../db/repositories/todo.js";
+import * as wikiPageEventRepo from "../db/repositories/wiki-page-event.js";
 import * as goalRepo from "../db/repositories/goal.js";
 import { chatCompletion } from "../ai/provider.js";
 import { buildCompilePrompt } from "./wiki-compile-prompt.js";
@@ -512,6 +513,8 @@ export async function executeInstructions(
         summary: upd.new_summary,
         compiled_at: tzNow().toISOString(),
       }, client);
+      // Phase 7: 热力事件（fire-and-forget，不在事务内）
+      wikiPageEventRepo.recordEvent(upd.page_id, "compile_hit").catch(() => {});
       for (const recId of upd.add_record_ids) {
         if (!isValidUuid(recId)) continue;
         // 保留 raw SQL：link 没有 WHERE EXISTS(record) 防护

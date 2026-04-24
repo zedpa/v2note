@@ -14,6 +14,7 @@ import { wikiUnifiedSearch } from "../tools/wiki-search.js";
 import { getPendingSuggestions, acceptSuggestion, rejectSuggestion } from "../cognitive/page-authorization.js";
 import { query, getPool } from "../db/pool.js";
 import { createGoalPageWithTodo } from "../db/repositories/goal-page-factory.js";
+import * as wikiPageEventRepo from "../db/repositories/wiki-page-event.js";
 
 export function registerWikiRoutes(router: Router) {
   // POST /api/v1/wiki/compile — 手动触发编译
@@ -109,6 +110,9 @@ export function registerWikiRoutes(router: Router) {
           todo_done: parseInt(row?.done ?? "0", 10),
         };
       }
+
+      // Phase 7: view_hit 埋点
+      wikiPageEventRepo.recordEvent(page.id, "view_hit").catch(() => {});
 
       sendJson(res, {
         id: page.id,
@@ -462,6 +466,36 @@ export function registerWikiRoutes(router: Router) {
     }
   });
 
+  // GET /api/v1/wiki/heatmap — 热力地图数据（Phase 7）
+  router.get("/api/v1/wiki/heatmap", async (req, res) => {
+    const userId = getUserId(req);
+    if (!userId) { sendJson(res, { error: "Unauthorized" }, 401); return; }
+
+    try {
+      const pages = await query<{
+        id: string; title: string; level: number; parent_id: string | null;
+        heat_score: number; heat_phase: string; compiled_at: string | null;
+      }>(
+        `SELECT id, title, level, parent_id, heat_score, heat_phase, compiled_at
+         FROM wiki_page WHERE user_id = $1 AND status = 'active'
+         ORDER BY heat_score DESC`,
+        [userId],
+      );
+
+      const summary = {
+        hot: pages.filter((p) => p.heat_phase === "hot").length,
+        active: pages.filter((p) => p.heat_phase === "active").length,
+        silent: pages.filter((p) => p.heat_phase === "silent").length,
+        frozen: pages.filter((p) => p.heat_phase === "frozen").length,
+      };
+
+      sendJson(res, { pages, summary });
+    } catch (err: any) {
+      console.error(`[wiki] heatmap error:`, err.message);
+      sendJson(res, { error: "Failed to load heatmap" }, 500);
+    }
+  });
+
   // GET /api/v1/search — 统一搜索（wiki + record 双层）
   router.get("/api/v1/search", async (req, res, _params, query) => {
     const userId = getUserId(req);
@@ -478,6 +512,11 @@ export function registerWikiRoutes(router: Router) {
 
     try {
       const result = await wikiUnifiedSearch(q, userId);
+      // Phase 7: search_hit 埋点（fire-and-forget）
+      const wikiHits = (result as any)?.wiki ?? [];
+      for (const hit of wikiHits.slice(0, 5)) {
+        if (hit?.id) wikiPageEventRepo.recordEvent(hit.id, "search_hit").catch(() => {});
+      }
       sendJson(res, result);
     } catch (err: any) {
       console.error(`[wiki] search error:`, err.message);

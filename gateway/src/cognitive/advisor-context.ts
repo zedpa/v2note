@@ -13,6 +13,7 @@ import { query } from "../db/pool.js";
 import { toLocalDate } from "../lib/tz.js";
 import { recordRepo, goalRepo, todoRepo, transcriptRepo } from "../db/repositories/index.js";
 import { digestRecords } from "../handlers/digest.js";
+import * as wikiPageEventRepo from "../db/repositories/wiki-page-event.js";
 
 // ─── 场景 2: 关键词检测 ───
 
@@ -73,6 +74,10 @@ export async function loadChatCognitive(
       name: r.title,
       recentStrikeCount: 0, // wiki 模式不再统计 strike 数
     }));
+    // Phase 7: chat_context_hit 埋点
+    for (const r of rows) {
+      wikiPageEventRepo.recordEvent(r.id, "chat_context_hit").catch(() => {});
+    }
 
     // 从 wiki 内容中提取矛盾/变化段落（编译时已标注）
     for (const row of rows) {

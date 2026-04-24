@@ -23,6 +23,8 @@ export interface WikiPage {
   embedding: any | null;
   metadata: Record<string, any>;
   compiled_at: string | null;
+  heat_score: number;
+  heat_phase: "hot" | "active" | "silent" | "frozen";
   created_at: string;
   updated_at: string;
 }
