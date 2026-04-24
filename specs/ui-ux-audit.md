@@ -1,7 +1,7 @@
 ---
 id: "110"
 title: "UI/UX 全局审查与改进"
-status: active
+status: completed
 domain: design
 risk: medium
 dependencies: ["app-mobile-views.md", "app-mobile-nav.md", "chat-system.md", "todo-core.md", "todo-ui.md"]
@@ -246,9 +246,9 @@ updated: 2026-04-24
 | 页面/模块 | 当前表现 | 评分 |
 |----------|---------|------|
 | 待办视图 | 每个时段有 placeholder + 按钮 | ✅ 好 |
-| 日记视图 | 无记录时无引导 | 🔴 缺 |
-| PC /write | 仅日期 + 光标，几乎全空 | 🔴 差 |
-| PC /map | "暂无聚类数据" 一行文字 | 🔴 差 |
+| 日记视图 | 波形动画 + "开始你的第一条记录" + 麦克风引导 | ✅ 好 |
+| PC /write | 日期标题 + "开始记录..." placeholder + Ctrl+Enter 提交 | ✅ 好 |
+| PC /map | "暂无聚类数据" 一行文字 | 🟡 可改进 |
 | 侧边栏加载 | 无 loading skeleton | 🟡 缺 |
 | Chat | AI 自动问候语 | ✅ 好 |
 
@@ -264,7 +264,7 @@ updated: 2026-04-24
 并且 (And)    使用 <link rel="preload"> 或 Next.js font optimization
 ```
 
-**当前问题**: globals.css 第 1 行使用 `@import url(...)` 加载 4 个字体族，这是渲染阻塞操作。
+**状态**: ✅ 已修复 — 字体通过 @fontsource 本地打包加载（app/fonts.ts），不依赖 CDN，离线可用。
 
 ### 场景 8.2: 首屏组件膨胀
 ```
@@ -274,7 +274,7 @@ updated: 2026-04-24
 并且 (And)    Overlay 组件（13 种）使用 dynamic import 懒加载
 ```
 
-**当前问题**: app/page.tsx 顶部 import 了 30+ 组件，包括 MorningBriefing、EveningSummary、GoalList 等 overlay，全部打入首屏 bundle。
+**状态**: ✅ 已修复 — 13 个 Overlay 组件全部使用 `dynamic()` 懒加载（page.tsx:24-37），首屏仅加载必要组件。
 
 ### 场景 8.3: --font-display 变量未定义
 ```
@@ -283,7 +283,7 @@ updated: 2026-04-24
 那么 (Then)   --font-display 应在 :root 中有定义
 ```
 
-**当前问题**: `:root` 中定义了 `--font-serif`、`--font-body`、`--font-cjk`、`--font-mono`，但没有 `--font-display`。h1-h3 会 fallback 到 `--font-body`。
+**状态**: ✅ 已修复 — globals.css :root 中添加 `--font-display` 变量，指向 Newsreader 衬线字体。
 
 ---
 
