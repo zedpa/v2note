@@ -21,7 +21,14 @@ const CAPTURES_STORE = "captures";
 const AUDIO_STORE = "audio_blobs";
 
 export type CaptureKind = "diary" | "chat_user_msg" | "todo_free_text";
-export type CaptureSource = "fab" | "fab_command" | "chat_view" | "chat_voice";
+export type CaptureSource =
+  | "fab"
+  | "fab_command"
+  | "chat_view"
+  | "chat_voice"
+  | "notification_capture"
+  | "floating_bubble"
+  | "ios_shortcut";
 export type CaptureSyncStatus = "captured" | "syncing" | "synced" | "failed";
 
 export interface CaptureRecord {

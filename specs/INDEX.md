@@ -10,7 +10,7 @@
 6. superseded 状态的 spec 已被合并，永远不要引用它们，使用 superseded_by 指向的文件
 -->
 
-> 最后更新：2026-04-24 | 共 113 个 spec（8 active / 6 draft / 69 completed / 31 superseded / 3 deprecated）
+> 最后更新：2026-04-28 | 共 114 个 spec（9 active / 6 draft / 69 completed / 31 superseded / 3 deprecated）
 
 ## 🔵 Active（当前有效，可直接引用和修改）
 
@@ -27,11 +27,12 @@
 | cognitive-wiki-lifecycle | 认知 Wiki — 搜索、热力与前端适配 | cognitive | cognitive-wiki-lifecycle.md | 搜索/热力/前端适配/迁移/验收行为/边界（拆自 cognitive-wiki.md） |
 | cognitive-wiki-migration | 认知 Wiki — 依赖、接口与实施阶段 | cognitive | cognitive-wiki-migration.md | 依赖/接口/砍掉模块/Batch 1-4 Phases/备注（拆自 cognitive-wiki.md） |
 | 087 | 鸿蒙 HarmonyOS NEXT 适配 | infra | harmony-support.md | WebView壳+JSBridge+前端适配层 |
+| fix-chat-quality | AI 对话质量 A/B 测试基础设施 | chat | fix-chat-quality.md | 离线测试增强+多Provider+在线实验+指标分析 |
+| 131 | 全局快速捕获 — 闪念胶囊式 App 外录入 | voice | global-quick-capture.md | Phase A 通知栏/B 悬浮气泡/C iOS Shortcuts |
 ## 🟡 Draft（规划中，尚未开始实施）
 
 | id | title | domain | file |
 |----|-------|--------|------|
-| 131 | 全局快速捕获 — 闪念胶囊式 App 外录入 | voice | global-quick-capture.md |
 | 130 | Desktop Canvas Shell — Foundation | ui | desktop-foundation.md |
 | 124 | Android App Shortcuts — 长按快捷指令 | ui | android-app-shortcuts.md |
 | 075 | 发现页 | ui | discovery-page.md |
