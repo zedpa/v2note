@@ -72,12 +72,16 @@ interface TierConfig {
   model: string;
   reasoning: boolean;   // 是否启用推理（thinking）
   timeout: number;
+  provider?: string;    // 指定 provider 名称（不配则用默认 dashscope）
 }
 
 // ── 推理模型检测 ─────────────────────────────────────────────
 
-/** 匹配推理系列模型名 */
-const REASONING_MODEL_PATTERNS = [/qwen3\.\d/, /qwen3-/, /qwen3\.5/];
+/** 匹配推理系列模型名（Qwen3 + DeepSeek-Reasoner） */
+const REASONING_MODEL_PATTERNS = [
+  /qwen3\.\d/, /qwen3-/, /qwen3\.5/,     // Qwen3 系列
+  /deepseek-reason/,                       // DeepSeek 推理模型
+];
 
 function isReasoningModel(model: string): boolean {
   return REASONING_MODEL_PATTERNS.some((p) => p.test(model));
@@ -85,26 +89,81 @@ function isReasoningModel(model: string): boolean {
 
 // ── Provider 初始化 ──────────────────────────────────────────
 
+/** 多 Provider 注册表 */
+const _providers = new Map<string, ReturnType<typeof createOpenAI>>();
+
+/** 默认 provider 名称 */
+const DEFAULT_PROVIDER_NAME = "dashscope";
+
 let _provider: ReturnType<typeof createOpenAI> | null = null;
 let _tiers: Record<ModelTier, TierConfig> | null = null;
 let _defaultModel: string | null = null;
 let _defaultTimeout: number | null = null;
 
+/** 已知 provider 的默认 BASE_URL */
+const PROVIDER_DEFAULT_URLS: Record<string, string> = {
+  dashscope: "https://dashscope.aliyuncs.com/compatible-mode/v1",
+  glm: "https://open.bigmodel.cn/api/paas/v4",
+  deepseek: "https://api.deepseek.com",
+};
+
+/**
+ * 从注册表获取或创建 provider 实例。
+ * 读取 `${NAME.toUpperCase()}_API_KEY` 和 `${NAME.toUpperCase()}_BASE_URL` 环境变量。
+ * 如果 API key 不存在，返回 null。
+ */
+function getOrCreateProvider(name: string): ReturnType<typeof createOpenAI> | null {
+  if (_providers.has(name)) return _providers.get(name)!;
+
+  // dashscope 使用独立的环境变量名
+  const envPrefix = name.toUpperCase();
+  const apiKey = name === "dashscope"
+    ? (process.env.DASHSCOPE_API_KEY ?? "")
+    : (process.env[`${envPrefix}_API_KEY`] ?? "");
+
+  if (!apiKey) {
+    return null;
+  }
+
+  const baseUrl = name === "dashscope"
+    ? (process.env.AI_BASE_URL ?? PROVIDER_DEFAULT_URLS.dashscope)
+    : (process.env[`${envPrefix}_BASE_URL`] ?? PROVIDER_DEFAULT_URLS[name] ?? "");
+
+  const p = createOpenAI({ apiKey, baseURL: baseUrl, name });
+  _providers.set(name, p);
+  return p;
+}
+
 function ensureProvider() {
   if (_provider !== null) return;
 
-  const apiKey = process.env.DASHSCOPE_API_KEY ?? "";
-  const baseUrl = process.env.AI_BASE_URL ?? "https://dashscope.aliyuncs.com/compatible-mode/v1";
   _defaultModel = process.env.AI_MODEL ?? "qwen-plus";
   _defaultTimeout = parseInt(process.env.AI_TIMEOUT ?? "60000", 10);
 
-  if (!apiKey) {
+  // 注册默认 provider（dashscope）
+  const dashscope = getOrCreateProvider("dashscope");
+  if (!dashscope) {
     console.warn("[ai] WARNING: DASHSCOPE_API_KEY is not set — AI calls will fail!");
+    // 仍创建一个空 key 的 provider 以避免 null 崩溃
+    _provider = createOpenAI({
+      apiKey: "",
+      baseURL: process.env.AI_BASE_URL ?? PROVIDER_DEFAULT_URLS.dashscope,
+      name: "dashscope",
+    });
+    _providers.set("dashscope", _provider);
+  } else {
+    _provider = dashscope;
   }
 
-  _provider = createOpenAI({ apiKey, baseURL: baseUrl, name: "dashscope" });
+  // 尝试注册其他已知 provider（GLM, DeepSeek）
+  for (const name of ["glm", "deepseek"]) {
+    const p = getOrCreateProvider(name);
+    if (!p) {
+      console.log(`[ai] ${name} provider not configured, skipping`);
+    }
+  }
 
-  // 读取各层级模型配置
+  // 读取各层级模型配置 + provider 映射
   const fast = process.env.AI_MODEL_FAST ?? _defaultModel;
   const agent = process.env.AI_MODEL_AGENT ?? _defaultModel;
   const chat = process.env.AI_MODEL_CHAT ?? _defaultModel;
@@ -112,27 +171,47 @@ function ensureProvider() {
   const background = process.env.AI_MODEL_BACKGROUND ?? _defaultModel;
   const vision = process.env.AI_MODEL_VISION ?? "qwen-vl-max";
 
-  _tiers = {
-    fast:       { model: fast,       reasoning: false, timeout: _defaultTimeout },
-    agent:      { model: agent,      reasoning: false, timeout: _defaultTimeout * 2 },
-    chat:       { model: chat,       reasoning: true,  timeout: _defaultTimeout * 3 },
-    report:     { model: report,     reasoning: true,  timeout: _defaultTimeout * 3 },
-    background: { model: background, reasoning: false, timeout: _defaultTimeout },
-    vision:     { model: vision,     reasoning: false, timeout: _defaultTimeout },
+  // 从 AI_PROVIDER_${TIER} 环境变量读取每层级的 provider 映射
+  const getProviderForTier = (tierName: string): string | undefined => {
+    const envKey = `AI_PROVIDER_${tierName.toUpperCase()}`;
+    const providerName = process.env[envKey];
+    if (!providerName) return undefined;
+    // 检查 provider 是否可用（有 key）
+    if (_providers.has(providerName)) return providerName;
+    // provider 不可用，fallback 到默认
+    console.warn(`[ai] ${envKey}=${providerName} but provider not available (no API key), fallback to dashscope`);
+    return undefined;
   };
 
+  _tiers = {
+    fast:       { model: fast,       reasoning: false, timeout: _defaultTimeout,     provider: getProviderForTier("fast") },
+    agent:      { model: agent,      reasoning: false, timeout: _defaultTimeout * 2, provider: getProviderForTier("agent") },
+    chat:       { model: chat,       reasoning: true,  timeout: _defaultTimeout * 3, provider: getProviderForTier("chat") },
+    report:     { model: report,     reasoning: true,  timeout: _defaultTimeout * 3, provider: getProviderForTier("report") },
+    background: { model: background, reasoning: false, timeout: _defaultTimeout,     provider: getProviderForTier("background") },
+    vision:     { model: vision,     reasoning: false, timeout: _defaultTimeout,     provider: getProviderForTier("vision") },
+  };
+
+  // 启动日志：provider 注册表
+  const registeredProviders = Array.from(_providers.keys());
+  console.log(`[ai] Provider registry: [${registeredProviders.join(", ")}] (default: dashscope)`);
   console.log("[ai] Provider ready (multi-model):");
   for (const [tier, cfg] of Object.entries(_tiers)) {
     const isReasoning = isReasoningModel(cfg.model);
     const thinkLabel = isReasoning ? (cfg.reasoning ? "thinking:ON" : "thinking:OFF") : "non-reasoning";
-    console.log(`  ${tier.padEnd(12)} → ${cfg.model} (${thinkLabel}, timeout=${cfg.timeout}ms)`);
+    const providerLabel = cfg.provider ? `provider:${cfg.provider}` : "provider:dashscope";
+    console.log(`  ${tier.padEnd(12)} → ${cfg.model} (${thinkLabel}, ${providerLabel}, timeout=${cfg.timeout}ms)`);
   }
 }
 
-/** 获取指定层级的配置 */
+/** 获取指定层级的配置，包含对应的 provider 实例 */
 function getTier(tier: ModelTier): { provider: ReturnType<typeof createOpenAI>; config: TierConfig } {
   ensureProvider();
-  return { provider: _provider!, config: _tiers![tier] };
+  const config = _tiers![tier];
+  // 使用 tier 配置的 provider，不可用则回退到默认
+  const providerName = config.provider ?? DEFAULT_PROVIDER_NAME;
+  const provider = _providers.get(providerName) ?? _provider!;
+  return { provider, config };
 }
 
 /** 兼容旧接口：无 tier 时使用 fast */
@@ -192,24 +271,50 @@ export async function chatCompletion(
   return llmSemaphore.acquire(async () => {
     const { provider, config } = getTier(tier);
     const effectiveTimeout = opts?.timeout ?? config.timeout;
-
     const providerOptions = buildProviderOptions(config.model, config.reasoning, opts?.json);
 
-    const result = await generateText({
-      model: provider.chat(config.model),
-      messages: messages as ModelMessage[],
-      temperature: opts?.temperature ?? 0.7,
-      maxRetries: 1,
-      abortSignal: AbortSignal.timeout(effectiveTimeout),
-      ...(providerOptions ? { providerOptions } : {}),
-    });
+    // 判断当前 tier 是否使用非默认 provider（用于降级判断）
+    const tierProviderName = config.provider ?? DEFAULT_PROVIDER_NAME;
+    const isNonDefaultProvider = tierProviderName !== DEFAULT_PROVIDER_NAME;
 
-    const content = result.text ?? "";
-    if (!content) {
-      console.warn(`[ai][${tier}] AI returned empty content`, { model: config.model, usage: result.usage });
+    try {
+      const result = await generateText({
+        model: provider.chat(config.model),
+        messages: messages as ModelMessage[],
+        temperature: opts?.temperature ?? 0.7,
+        maxRetries: 1,
+        abortSignal: AbortSignal.timeout(effectiveTimeout),
+        ...(providerOptions ? { providerOptions } : {}),
+      });
+
+      const content = result.text ?? "";
+      if (!content) {
+        console.warn(`[ai][${tier}] AI returned empty content`, { model: config.model, usage: result.usage });
+      }
+
+      return { content, usage: mapUsage(result.usage) };
+    } catch (err: any) {
+      // 降级逻辑：非默认 provider 失败时，自动降级到默认 provider 重试一次
+      if (isNonDefaultProvider) {
+        console.warn(`[ai][${tier}] ${tierProviderName} failed: ${err.message}, fallback to ${DEFAULT_PROVIDER_NAME}`);
+        const fallbackProvider = _providers.get(DEFAULT_PROVIDER_NAME) ?? _provider!;
+        const fallbackModel = _defaultModel!;
+        const fallbackOptions = buildProviderOptions(fallbackModel, config.reasoning, opts?.json);
+
+        const result = await generateText({
+          model: fallbackProvider.chat(fallbackModel),
+          messages: messages as ModelMessage[],
+          temperature: opts?.temperature ?? 0.7,
+          maxRetries: 1,
+          abortSignal: AbortSignal.timeout(effectiveTimeout),
+          ...(fallbackOptions ? { providerOptions: fallbackOptions } : {}),
+        });
+
+        const content = result.text ?? "";
+        return { content, usage: mapUsage(result.usage) };
+      }
+      throw err;
     }
-
-    return { content, usage: mapUsage(result.usage) };
   }, { priority: tierPriority(tier) });
 }
 

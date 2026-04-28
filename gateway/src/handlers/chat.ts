@@ -22,6 +22,8 @@ import { buildDateAnchor, fmt, formatDateWithRelative } from "../lib/date-anchor
 import { today, daysAgo, now as tzNow, toLocalDateTime } from "../lib/tz.js";
 import { detectCognitiveQuery, loadChatCognitive, buildGoalDiscussionContext, buildInsightDiscussionContext } from "../cognitive/advisor-context.js";
 import type { ModelTier } from "../ai/provider.js";
+import { getSoulVariant, getContextStrategy, getChatModel, logExperiment, SOUL_B } from "../ai/experiment.js";
+import { DEFAULT_SOUL } from "../soul/default-soul.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const INSIGHTS_DIR = join(__dirname, "../../insights");
@@ -275,36 +277,61 @@ export async function initChat(
     }
   }
 
-  // Load cognitive context for review/insight modes (enriched with clusters + alerts)
+  // Load cognitive context — 所有模式都加载（command 模式也需要认知上下文实现个性化）
   let cognitiveContext: string | undefined;
-  if (payload.mode === "review" || payload.mode === "insight") {
-    try {
-      const cognitive = await loadChatCognitive(userId);
-      if (cognitive.contextString) {
-        cognitiveContext = cognitive.contextString;
-      }
-    } catch {
-      // non-critical — fall back to no cognitive context
+  try {
+    const cognitive = await loadChatCognitive(userId);
+    if (cognitive.contextString) {
+      cognitiveContext = cognitive.contextString;
     }
+  } catch {
+    // non-critical — fall back to no cognitive context
   }
 
-  // 构建 system prompt: SharedAgent + Soul + UserAgent + Profile + 数据摘要提示
-  // Memory/Wiki 不再注入完整内容，改为数量提示，逼 AI 通过工具查询最新数据
-  const memoryHint = memories.length > 0
-    ? [`（有 ${memories.length} 条相关记忆，涉及用户历史时请用 search 工具查询最新数据）`]
-    : [];
-  const wikiHint = loaded.wikiContext && loaded.wikiContext.length > 0
-    ? [`（有 ${loaded.wikiContext.length} 个相关知识主题，涉及具体内容时请用 search 工具查询）`]
-    : [];
+  // ── A/B 实验：Soul 变体 ──
+  let effectiveSoul = loaded.soul;
+  const soulVariant = getSoulVariant(userId);
+  if (soulVariant === "streamlined" && loaded.soul === DEFAULT_SOUL) {
+    // 仅默认 soul 用户参与实验，自定义 soul 不覆盖
+    effectiveSoul = SOUL_B;
+    console.log(`[chat][experiment] soul-variant=streamlined for user ${userId.slice(0, 8)}`);
+  }
+
+  // ── A/B 实验：上下文注入策略 ──
+  const contextStrategy = getContextStrategy(userId);
+  let memoryLines: string[];
+  let wikiLines: string[];
+
+  if (contextStrategy === "hybrid") {
+    // 混合注入：top-3 实际记忆 + 剩余提示
+    memoryLines = memories.slice(0, 3);
+    if (memories.length > 3) {
+      memoryLines.push(`（还有 ${memories.length - 3} 条记忆可通过 search 工具查询）`);
+    }
+    // top-2 Wiki 摘要 + 剩余提示
+    wikiLines = (loaded.wikiContext || []).slice(0, 2);
+    if ((loaded.wikiContext?.length || 0) > 2) {
+      wikiLines.push(`（还有 ${loaded.wikiContext!.length - 2} 个知识主题可查询）`);
+    }
+    console.log(`[chat][experiment] context-strategy=hybrid for user ${userId.slice(0, 8)}`);
+  } else {
+    // 当前默认行为：hint-only
+    memoryLines = memories.length > 0
+      ? [`（有 ${memories.length} 条相关记忆，涉及用户历史时请用 search 工具查询最新数据）`]
+      : [];
+    wikiLines = loaded.wikiContext && loaded.wikiContext.length > 0
+      ? [`（有 ${loaded.wikiContext.length} 个相关知识主题，涉及具体内容时请用 search 工具查询）`]
+      : [];
+  }
+
   const systemPrompt = buildSystemPrompt({
     skills: activeSkills,
-    soul: loaded.soul,
+    soul: effectiveSoul,
     userAgent: loaded.userAgent,
     userProfile: loaded.userProfile,
-    memory: memoryHint,
-    wikiContext: wikiHint,
+    memory: memoryLines,
+    wikiContext: wikiLines,
     mode: "chat",
-    // chat 不再传 agent（Soul 已替代 chat.md），briefing/onboarding 保留
     pendingIntentContext,
     cognitiveContext,
   });
@@ -755,7 +782,13 @@ async function* streamWithNativeTools(
   // 自动选择模型层级
   const messages = session.context.getMessages();
   const lastUserMsg = [...messages].reverse().find(m => m.role === "user");
-  const tier = tierOverride ?? (lastUserMsg ? classifyChatTier(lastUserMsg.content) : "fast");
+  let tier = tierOverride ?? (lastUserMsg ? classifyChatTier(lastUserMsg.content) : "fast");
+
+  // A/B 实验：模型变体覆盖
+  const experimentModel = getChatModel(userId);
+  if (experimentModel && !tierOverride) {
+    console.log(`[chat][experiment] chat-model=${experimentModel} for user ${userId.slice(0, 8)}`);
+  }
 
   if (tier !== "chat") {
     console.log(`[chat] Using ${tier} tier for: "${lastUserMsg?.content.slice(0, 50)}..."`);
@@ -795,6 +828,28 @@ async function* streamWithNativeTools(
   // 记录完整回复到 session context
   if (fullResponse) {
     session.context.addMessage({ role: "assistant", content: fullResponse });
+
+    // A/B 实验指标日志
+    const soulExp = getSoulVariant(userId);
+    const ctxExp = getContextStrategy(userId);
+    const modelExp = getChatModel(userId);
+    if (soulExp !== "current" || ctxExp !== "hint-only" || modelExp) {
+      logExperiment({
+        timestamp: tzNow().toISOString(),
+        userId,
+        experiment: [
+          soulExp !== "current" ? `soul:${soulExp}` : "",
+          ctxExp !== "hint-only" ? `ctx:${ctxExp}` : "",
+          modelExp ? `model:${modelExp}` : "",
+        ].filter(Boolean).join("+"),
+        variant: `soul=${soulExp},ctx=${ctxExp},model=${modelExp || "default"}`,
+        model: experimentModel || tier,
+        provider: "auto",
+        response_length: fullResponse.length,
+        latency_ms: 0, // 后续可从 stream 计时
+        tool_calls_count: 0,
+      });
+    }
   }
 }
 
