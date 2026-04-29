@@ -24,6 +24,7 @@ import {
   checkOverlayPermission,
   requestOverlayPermission,
 } from "@/features/capture/lib/floating-capture";
+import { Capacitor } from "@capacitor/core";
 import { SwipeBack } from "@/shared/components/swipe-back";
 import schema from "../lib/settings-schema.json";
 
@@ -144,12 +145,30 @@ export function SettingsEditor({ onClose, onThemeChange }: SettingsEditorProps) 
                 {section.title}
               </h3>
               <div className="space-y-3">
-                {section.fields.map((field) => (
+                {section.fields
+                  .filter((field) => {
+                    // 按平台过滤：仅在匹配平台上显示
+                    const plat = (field as any).platform as string | undefined;
+                    if (!plat) return true;
+                    try { return Capacitor.getPlatform() === plat; } catch { return plat === "web"; }
+                  })
+                  .map((field) => (
                   <div
                     key={field.key}
                     className="flex items-center justify-between p-3 rounded-xl bg-card border border-border/50"
                   >
+                    {field.type === "info" ? (
+                      <div className="flex flex-col gap-1">
+                        <span className="text-sm font-medium text-foreground">{field.label}</span>
+                        {"description" in field && (
+                          <span className="text-xs text-muted-foreground leading-relaxed">
+                            {(field as any).description}
+                          </span>
+                        )}
+                      </div>
+                    ) : (
                     <span className="text-sm text-foreground">{field.label}</span>
+                    )}
 
                     {field.type === "toggle" && (
                       <Switch

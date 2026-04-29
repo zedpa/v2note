@@ -24,7 +24,6 @@ import android.view.View
 import android.view.WindowManager
 import android.view.animation.AccelerateDecelerateInterpolator
 import android.widget.FrameLayout
-import android.widget.ImageView
 import android.widget.TextView
 import androidx.core.app.NotificationCompat
 import com.getcapacitor.JSObject
@@ -93,7 +92,7 @@ class FloatingCaptureService : Service() {
 
     // Bubble views
     private var bubbleContainer: FrameLayout? = null
-    private var bubbleView: ImageView? = null
+    private var bubbleView: TextView? = null
     private var timerText: TextView? = null
     private var layoutParams: WindowManager.LayoutParams? = null
 
@@ -201,16 +200,17 @@ class FloatingCaptureService : Service() {
         // 容器（包含气泡 + 计时文本）
         val container = FrameLayout(this)
 
-        // 气泡圆形 ImageView
-        val bubble = ImageView(this).apply {
+        // 气泡圆形 — 简化图标（文字符号）
+        val bubble = TextView(this).apply {
             val bg = GradientDrawable().apply {
                 shape = GradientDrawable.OVAL
                 setColor(COLOR_DEER)
             }
             background = bg
-            setImageResource(android.R.drawable.ic_btn_speak_now)
-            scaleType = ImageView.ScaleType.CENTER
-            setColorFilter(Color.WHITE)
+            text = "🎙"
+            textSize = 20f
+            gravity = Gravity.CENTER
+            setTextColor(Color.WHITE)
             elevation = 8f
         }
         val bubbleLp = FrameLayout.LayoutParams(sizePx, sizePx).apply {
@@ -250,10 +250,10 @@ class FloatingCaptureService : Service() {
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.START
-            // 初始位置：右侧中部
+            // 初始位置：右侧顶部（状态栏下方）
             val dm = resources.displayMetrics
             x = dm.widthPixels - dpToPx(BUBBLE_SIZE_RECORDING_DP) - dpToPx(8)
-            y = dm.heightPixels / 2
+            y = dpToPx(80)
         }
 
         // 触摸事件
@@ -387,15 +387,15 @@ class FloatingCaptureService : Service() {
         val bubble = bubbleView ?: return
         val bg = bubble.background as? GradientDrawable ?: return
 
-        val (color, size, iconRes) = when (state) {
-            BubbleState.IDLE -> Triple(COLOR_DEER, BUBBLE_SIZE_IDLE_DP, android.R.drawable.ic_btn_speak_now)
-            BubbleState.RECORDING -> Triple(COLOR_RECORDING, BUBBLE_SIZE_RECORDING_DP, android.R.drawable.ic_media_pause)
-            BubbleState.PROCESSING -> Triple(COLOR_PROCESSING, BUBBLE_SIZE_RECORDING_DP, android.R.drawable.ic_popup_sync)
-            BubbleState.DONE -> Triple(COLOR_DONE, BUBBLE_SIZE_RECORDING_DP, android.R.drawable.ic_input_add)
+        val (color, size, icon) = when (state) {
+            BubbleState.IDLE -> Triple(COLOR_DEER, BUBBLE_SIZE_IDLE_DP, "🎙")
+            BubbleState.RECORDING -> Triple(COLOR_RECORDING, BUBBLE_SIZE_RECORDING_DP, "⏹")
+            BubbleState.PROCESSING -> Triple(COLOR_PROCESSING, BUBBLE_SIZE_RECORDING_DP, "⏳")
+            BubbleState.DONE -> Triple(COLOR_DONE, BUBBLE_SIZE_RECORDING_DP, "✓")
         }
 
         bg.setColor(color)
-        bubble.setImageResource(iconRes)
+        bubble.text = icon
 
         val sizePx = dpToPx(size)
         val lp = bubble.layoutParams as FrameLayout.LayoutParams

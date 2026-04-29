@@ -9,6 +9,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         // 注册自定义 Capacitor 插件
         self.bridge?.registerPluginInstance(AudioSessionPlugin())
+        self.bridge?.registerPluginInstance(SiriShortcutsPlugin())
         return true
     }
 
@@ -41,6 +42,16 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     }
 
     func application(_ application: UIApplication, continue userActivity: NSUserActivity, restorationHandler: @escaping ([UIUserActivityRestoring]?) -> Void) -> Bool {
+        // Spec #131 Phase C: Siri Shortcut 触发时，将 NSUserActivity 的 URL 转为 URL open 路径
+        let captureTypes = ["com.v2note.app.captureVoice", "com.v2note.app.captureText"]
+        if captureTypes.contains(userActivity.activityType),
+           let urlStr = userActivity.userInfo?["url"] as? String,
+           let url = URL(string: urlStr) {
+            // 直接走 ApplicationDelegateProxy 的 URL open 路径，
+            // 避免 UIApplication.shared.open 在冷启动时早于 WebView listener 就绪
+            return ApplicationDelegateProxy.shared.application(application, open: url, options: [:])
+        }
+
         // Called when the app was launched with an activity, including Universal Links.
         // Feel free to add additional processing here, but if you want the App API to support
         // tracking app url opens, make sure to keep this call

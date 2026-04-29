@@ -74,6 +74,13 @@
           "label": "悬浮录入气泡",
           "type": "toggle",
           "default": false
+        },
+        {
+          "key": "iosShortcutGuide",
+          "label": "iOS 快捷指令配置",
+          "type": "info",
+          "description": "打开「快捷指令」App → 搜索「念念」→ 可将「念念录一条」绑定到 Action Button 或添加到锁屏 Widget",
+          "platform": "ios"
         }
       ]
     },

@@ -27,6 +27,7 @@ import {
   checkOverlayPermission,
   onRecordingComplete,
 } from "@/features/capture/lib/floating-capture";
+import { donateAllShortcuts } from "@/features/capture/lib/siri-shortcuts";
 import { createPushCapture, type ChatPushClient } from "@/shared/lib/capture-push";
 // §8：静态导入以便在 startSyncOrchestrator 调用点同步注入 subscribeWsStatus /
 // getCurrentWsStatus。gateway-client 是纯 class + 单例懒加载，无 side effect，
@@ -139,6 +140,14 @@ export function SyncBootstrap() {
           }
         } catch {
           // 气泡恢复失败不阻塞主流程
+        }
+      }
+      // Spec #131 C2: iOS Siri Shortcut 自动捐献 — 每次启动幂等注册
+      if (!cancelled) {
+        try {
+          await donateAllShortcuts();
+        } catch {
+          // Siri Shortcut 捐献失败不阻塞主流程
         }
       }
     })();

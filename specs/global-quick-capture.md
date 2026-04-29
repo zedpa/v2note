@@ -1,7 +1,7 @@
 ---
 id: "131"
 title: "全局快速捕获 — 闪念胶囊式 App 外录入"
-status: active
+status: completed
 domain: voice
 risk: high
 dependencies: ["app-mobile-views-todo.md", "voice-input-unify.md", "android-app-shortcuts.md"]
@@ -498,7 +498,7 @@ v2note://action/record               → spec #124 App Shortcuts（走主页 FAB
 
 ## Implementation Phases
 
-- [ ] **Phase A: 通知栏快捷入口**
+- [x] **Phase A: 通知栏快捷入口**
   - [x] A1: Android 常驻通知 + Action 按钮（录一条/写一条）— PersistentNotificationPlugin
   - [x] A2: 极简捕获页 UI（录音 + 文字两种模式）
   - [x] A3: URL Scheme 路由（v2note://capture/*）
@@ -513,10 +513,10 @@ v2note://action/record               → spec #124 App Shortcuts（走主页 FAB
   - [x] B5: 权限引导流程（checkOverlayPermission → requestOverlayPermission → 系统设置页）
   - [x] B6: 设置页开关（floatingBubble toggle + sync-bootstrap 自动恢复）
 
-- [ ] **Phase C: iOS Shortcuts 集成**
-  - [ ] C1: capacitor-plugin-siri-shortcuts 集成
-  - [ ] C2: Siri Shortcut 自动注册（"念念录一条"/"念念写一条"）
-  - [ ] C3: iOS 设置页说明（引导用户配置 Action Button / Widget）
+- [x] **Phase C: iOS Shortcuts 集成**
+  - [x] C1: 自建 SiriShortcutsPlugin（Capacitor 8 原生 Swift 插件，替代不兼容的 npm 包）
+  - [x] C2: Siri Shortcut 自动注册（"念念录一条"/"念念写一条"）— 每次启动幂等捐献
+  - [x] C3: iOS 设置页说明（引导用户配置 Action Button / Widget）+ 平台过滤
 
 ---
 
