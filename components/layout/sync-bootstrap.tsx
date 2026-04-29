@@ -124,6 +124,23 @@ export function SyncBootstrap() {
           (window as unknown as { __authReady?: boolean }).__authReady = true;
         }
       }
+      // Spec #131 B3: 悬浮气泡自动恢复 — 必须在 initAuth 之后执行，
+      // 否则 _currentUserId 为 null，getSettings() 读全局 key 而非用户 key，
+      // 导致 floatingBubble 始终为 false。
+      if (!cancelled) {
+        try {
+          const { getSettings } = await import("@/shared/lib/local-config");
+          const settings = await getSettings();
+          if (settings.floatingBubble) {
+            const granted = await checkOverlayPermission();
+            if (granted) {
+              await startFloatingBubble();
+            }
+          }
+        } catch {
+          // 气泡恢复失败不阻塞主流程
+        }
+      }
     })();
 
     // §7.7：测试辅助挂载（仅 non-production）。E2E 通过这些入口断言 capture 的 userId 已回填。
@@ -263,9 +280,8 @@ export function SyncBootstrap() {
       if (!rawUrl) return;
       const path = rawUrl.replace(/^v2note:\/\//, "/");
       if (!path.startsWith("/capture/")) return;
-      // 如果当前已在目标页，跳过（防止重复导航）
-      if (window.location.pathname === path.split("?")[0]) return;
-      window.location.href = path;
+      // window.location.replace 不添加历史记录，避免循环返回
+      window.location.replace(path);
     };
     (async () => {
       try {
@@ -292,22 +308,6 @@ export function SyncBootstrap() {
       }
     })();
 
-    // Spec #131 B3: 悬浮气泡自动恢复 — App 启动时检测设置，有权限则启动气泡
-    (async () => {
-      try {
-        const { getSettings } = await import("@/shared/lib/local-config");
-        const settings = await getSettings();
-        if (settings.floatingBubble) {
-          const granted = await checkOverlayPermission();
-          if (granted) {
-            await startFloatingBubble();
-          }
-        }
-      } catch {
-        // 气泡恢复失败不阻塞主流程
-      }
-    })();
-
     // Spec #131 B4: 悬浮气泡录音完成 → 读取 PCM → 写入 capture-store → 触发同步
     let removeBubbleListener: (() => void) | null = null;
     (async () => {
@@ -315,9 +315,12 @@ export function SyncBootstrap() {
         const listener = await onRecordingComplete(async (data) => {
           try {
             const { Filesystem, Directory } = await import("@capacitor/filesystem");
-            // 原生侧写入 cacheDir 的 PCM 文件，通过 Filesystem 读取
+            // 原生侧返回绝对路径如 /data/.../cache/capture_xxx.pcm
+            // Filesystem.readFile 的 Directory.Cache 会拼接 cacheDir 前缀
+            // 因此只传文件名部分
+            const fileName = data.pcmFilePath.split("/").pop() ?? data.pcmFilePath;
             const result = await Filesystem.readFile({
-              path: data.pcmFilePath,
+              path: fileName,
               directory: Directory.Cache,
             });
             // base64 → ArrayBuffer
@@ -350,7 +353,7 @@ export function SyncBootstrap() {
             // 清理临时文件
             try {
               await Filesystem.deleteFile({
-                path: data.pcmFilePath,
+                path: fileName,
                 directory: Directory.Cache,
               });
             } catch { /* 清理失败不阻塞 */ }
