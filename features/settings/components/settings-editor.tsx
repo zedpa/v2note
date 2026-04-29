@@ -14,6 +14,16 @@ import {
   cancelDailyNotifications,
   requestNotificationPermission,
 } from "@/shared/lib/notifications";
+import {
+  showQuickCaptureNotification,
+  hideQuickCaptureNotification,
+} from "@/features/capture/lib/persistent-notification";
+import {
+  startFloatingBubble,
+  stopFloatingBubble,
+  checkOverlayPermission,
+  requestOverlayPermission,
+} from "@/features/capture/lib/floating-capture";
 import { SwipeBack } from "@/shared/components/swipe-back";
 import schema from "../lib/settings-schema.json";
 
@@ -46,6 +56,31 @@ export function SettingsEditor({ onClose, onThemeChange }: SettingsEditorProps) 
 
       if (key === "theme" && onThemeChange) {
         onThemeChange(value as string);
+      }
+
+      // 快捷录入通知开关
+      if (key === "quickCaptureNotification") {
+        if (value) {
+          await showQuickCaptureNotification();
+        } else {
+          await hideQuickCaptureNotification();
+        }
+      }
+
+      // 悬浮气泡开关
+      if (key === "floatingBubble") {
+        if (value) {
+          const granted = await checkOverlayPermission();
+          if (!granted) {
+            await requestOverlayPermission();
+            // 权限需要用户在系统设置页手动授予后返回，暂不启动气泡
+            // 下次 App 启动时 sync-bootstrap 会检测设置并自动启动
+            return;
+          }
+          await startFloatingBubble();
+        } else {
+          await stopFloatingBubble();
+        }
       }
 
       // 通知相关字段变更时重新调度

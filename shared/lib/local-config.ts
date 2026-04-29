@@ -99,6 +99,10 @@ export interface LocalSettings {
   eveningSummaryHour: number;
   /** 是否开启日报本地通知推送（默认 true） */
   dailyNotifications: boolean;
+  /** 是否开启通知栏快捷录入（Android 常驻通知，默认 true） */
+  quickCaptureNotification: boolean;
+  /** 是否开启悬浮录入气泡（Android SYSTEM_ALERT_WINDOW，默认 false） */
+  floatingBubble: boolean;
   [key: string]: unknown;
 }
 
@@ -129,6 +133,8 @@ const DEFAULT_SETTINGS: LocalSettings = {
   morningBriefingHour: 6,
   eveningSummaryHour: 22,
   dailyNotifications: true,
+  quickCaptureNotification: true,
+  floatingBubble: false,
 };
 
 // ── Generic typed get/set ──

@@ -18,6 +18,8 @@ public class MainActivity extends BridgeActivity {
         // 注册自定义 Capacitor 插件
         registerPlugin(AudioSessionPlugin.class);
         registerPlugin(SystemIntentPlugin.class);
+        registerPlugin(PersistentNotificationPlugin.class);
+        registerPlugin(FloatingCapturePlugin.class);
         super.onCreate(savedInstanceState);
 
         // Request permissions at startup

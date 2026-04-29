@@ -62,6 +62,18 @@
           "options": ["realtime", "upload"],
           "optionLabels": ["实时识别（快速，准确率较低）", "录后识别（较慢，准确率更高）"],
           "default": "realtime"
+        },
+        {
+          "key": "quickCaptureNotification",
+          "label": "通知栏快捷录入",
+          "type": "toggle",
+          "default": true
+        },
+        {
+          "key": "floatingBubble",
+          "label": "悬浮录入气泡",
+          "type": "toggle",
+          "default": false
         }
       ]
     },

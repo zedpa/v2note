@@ -499,19 +499,19 @@ v2note://action/record               → spec #124 App Shortcuts（走主页 FAB
 ## Implementation Phases
 
 - [ ] **Phase A: 通知栏快捷入口**
-  - [ ] A1: Android 常驻通知 + Action 按钮（录一条/写一条）— 需原生 Capacitor 插件
+  - [x] A1: Android 常驻通知 + Action 按钮（录一条/写一条）— PersistentNotificationPlugin
   - [x] A2: 极简捕获页 UI（录音 + 文字两种模式）
   - [x] A3: URL Scheme 路由（v2note://capture/*）
   - [x] A4: capture-store 新增 sourceContext 类型
-  - [ ] A5: 设置页开关
+  - [x] A5: 设置页开关（quickCaptureNotification toggle）
 
-- [ ] **Phase B: Android 悬浮气泡**
-  - [ ] B1: 自定义 Capacitor 插件 FloatingCapturePlugin 骨架
-  - [ ] B2: 集成 Floating-Bubble-View + Foreground Service
-  - [ ] B3: 原生 AudioRecord 录音 + Bridge 传输
-  - [ ] B4: 气泡交互动画（录音中/处理中/完成）
-  - [ ] B5: 权限引导流程
-  - [ ] B6: 设置页开关
+- [x] **Phase B: Android 悬浮气泡**
+  - [x] B1: 自定义 Capacitor 插件 FloatingCapturePlugin 骨架
+  - [x] B2: Foreground Service + WindowManager overlay bubble（自建，未用 Floating-Bubble-View）
+  - [x] B3: 原生 AudioRecord 录音 + Bridge 传输（PCM temp file → JS Filesystem → capture-store）
+  - [x] B4: 气泡交互动画（录音中/处理中/完成 状态切换 + 边缘吸附）
+  - [x] B5: 权限引导流程（checkOverlayPermission → requestOverlayPermission → 系统设置页）
+  - [x] B6: 设置页开关（floatingBubble toggle + sync-bootstrap 自动恢复）
 
 - [ ] **Phase C: iOS Shortcuts 集成**
   - [ ] C1: capacitor-plugin-siri-shortcuts 集成

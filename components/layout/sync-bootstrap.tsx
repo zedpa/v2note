@@ -18,6 +18,15 @@ import {
   startSyncOrchestrator,
   type SyncOrchestratorOptions,
 } from "@/shared/lib/sync-orchestrator";
+import {
+  showQuickCaptureNotification,
+  hideQuickCaptureNotification,
+} from "@/features/capture/lib/persistent-notification";
+import {
+  startFloatingBubble,
+  checkOverlayPermission,
+  onRecordingComplete,
+} from "@/features/capture/lib/floating-capture";
 import { createPushCapture, type ChatPushClient } from "@/shared/lib/capture-push";
 // §8：静态导入以便在 startSyncOrchestrator 调用点同步注入 subscribeWsStatus /
 // getCurrentWsStatus。gateway-client 是纯 class + 单例懒加载，无 side effect，
@@ -246,12 +255,144 @@ export function SyncBootstrap() {
       window.addEventListener("capture:created", onCaptureCreated);
     }
 
+    // Spec #131: Deep Link — v2note://capture/* URL 路由
+    // 方案 C: getLaunchUrl 只在首次 mount 调用一次（冷启动），
+    // 热启动全靠 appUrlOpen 事件，彻底分离两条路径。
+    let removeAppUrlListener: (() => void) | null = null;
+    const navigateToCapture = (rawUrl: string) => {
+      if (!rawUrl) return;
+      const path = rawUrl.replace(/^v2note:\/\//, "/");
+      if (!path.startsWith("/capture/")) return;
+      // 如果当前已在目标页，跳过（防止重复导航）
+      if (window.location.pathname === path.split("?")[0]) return;
+      window.location.href = path;
+    };
+    (async () => {
+      try {
+        const { App } = await import("@capacitor/app");
+
+        // 热启动：App 在前台时收到新 intent
+        const listener = await App.addListener("appUrlOpen", (data) => {
+          navigateToCapture(data.url);
+        });
+        removeAppUrlListener = () => listener.remove();
+
+        // 冷启动：仅在首次 mount 时消费一次 launch URL
+        // 用 sessionStorage flag 确保页面重载后不会重复消费
+        const consumedKey = "v2note:launchUrlConsumed";
+        if (!sessionStorage.getItem(consumedKey)) {
+          const launchUrl = await App.getLaunchUrl();
+          if (launchUrl?.url) {
+            sessionStorage.setItem(consumedKey, "1");
+            navigateToCapture(launchUrl.url);
+          }
+        }
+      } catch {
+        // Web 环境无 @capacitor/app，静默跳过
+      }
+    })();
+
+    // Spec #131 B3: 悬浮气泡自动恢复 — App 启动时检测设置，有权限则启动气泡
+    (async () => {
+      try {
+        const { getSettings } = await import("@/shared/lib/local-config");
+        const settings = await getSettings();
+        if (settings.floatingBubble) {
+          const granted = await checkOverlayPermission();
+          if (granted) {
+            await startFloatingBubble();
+          }
+        }
+      } catch {
+        // 气泡恢复失败不阻塞主流程
+      }
+    })();
+
+    // Spec #131 B4: 悬浮气泡录音完成 → 读取 PCM → 写入 capture-store → 触发同步
+    let removeBubbleListener: (() => void) | null = null;
+    (async () => {
+      try {
+        const listener = await onRecordingComplete(async (data) => {
+          try {
+            const { Filesystem, Directory } = await import("@capacitor/filesystem");
+            // 原生侧写入 cacheDir 的 PCM 文件，通过 Filesystem 读取
+            const result = await Filesystem.readFile({
+              path: data.pcmFilePath,
+              directory: Directory.Cache,
+            });
+            // base64 → ArrayBuffer
+            const binary = atob(result.data as string);
+            const bytes = new Uint8Array(binary.length);
+            for (let i = 0; i < binary.length; i++) {
+              bytes[i] = binary.charCodeAt(i);
+            }
+            const pcmData = bytes.buffer;
+
+            // 写入 capture-store
+            const { captureStore } = await import("@/shared/lib/capture-store");
+            const auth = await import("@/shared/lib/auth");
+            const user = auth.getCurrentUser();
+            await captureStore.create({
+              kind: "diary",
+              text: null,
+              audioLocalId: null,
+              sourceContext: "floating_bubble",
+              forceCommand: false,
+              notebook: null,
+              userId: user?.id ?? null,
+              audioBlob: { pcmData, duration: data.durationMs },
+            });
+
+            // 触发同步
+            const { triggerSync } = await import("@/shared/lib/sync-orchestrator");
+            triggerSync();
+
+            // 清理临时文件
+            try {
+              await Filesystem.deleteFile({
+                path: data.pcmFilePath,
+                directory: Directory.Cache,
+              });
+            } catch { /* 清理失败不阻塞 */ }
+          } catch (err) {
+            console.error("[FloatingCapture] Failed to process recording:", err);
+          }
+        });
+        if (listener) {
+          removeBubbleListener = () => listener.remove();
+        }
+      } catch { /* 非 Android 平台静默跳过 */ }
+    })();
+
+    // Spec #131 A1: 常驻通知 — App 可见时隐藏，不可见时根据设置显示
+    const handleVisibility = async () => {
+      try {
+        const { getSettings } = await import("@/shared/lib/local-config");
+        const settings = await getSettings();
+        if (document.visibilityState === "hidden" && settings.quickCaptureNotification) {
+          await showQuickCaptureNotification();
+        } else if (document.visibilityState === "visible") {
+          await hideQuickCaptureNotification();
+        }
+      } catch {
+        // 通知操作失败不阻塞主流程
+      }
+    };
+    if (typeof document !== "undefined") {
+      document.addEventListener("visibilitychange", handleVisibility);
+    }
+
     return () => {
       cancelled = true;
       stop();
       if (typeof window !== "undefined") {
         window.removeEventListener("capture:created", onCaptureCreated);
       }
+      if (typeof document !== "undefined") {
+        document.removeEventListener("visibilitychange", handleVisibility);
+      }
+      removeAppUrlListener?.();
+      removeBubbleListener?.();
     };
   }, []);
 
